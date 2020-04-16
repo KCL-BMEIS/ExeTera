@@ -277,6 +277,11 @@ def iterate_over_patient_assessments(fields, filter_status, visitor):
             cur_end = cur_start
             cur_id = fields[i][1][1]
 
+
+def datetime_to_seconds(dt):
+   return f'{dt[0:4]}-{dt[5:7]}-{dt[8:10]} {dt[11:13]}:{dt[14:16]}:{dt[17:19]}'
+
+
 #patient limits
 MIN_YOB = 1930
 MAX_YOB = 2004
@@ -615,7 +620,8 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     for f in flattened_fields:
         cv = categorical_maps[f[0]]
         print(f"'{f[0]}' to categorical")
-        dest_fields[f[1]] to_categorical(asmt_fields, field_to_index(asmt_ds, f[0]), np.bool, cv)
+        dest_fields[f[1]] = to_categorical(asmt_fields, field_to_index(asmt_ds, f[0]), np.bool, cv)
+        any_symptoms |= dest_fields[f[1]]
 
     for e in exposure_fields:
         cv = categorical_maps[e]
@@ -641,6 +647,8 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
     print(); print('unfiltered assessments:', asmt_filter_status.count(0))
 
+    print('fatigue_binary')
+    print(build_histogram_from_list(dest_fields['fatigue_binary']))
 
     # validate assessments per patient
     print(); print()
@@ -709,7 +717,18 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
     dest_fields['tested_covid_positive'] = sanitised_covid_results
     dest_keys['tested_covid_positive'] = sanitised_covid_results_key
-    print('tcp type sanity check', dest_fields['tested_covid_positive'].dtype)
+
+    print('fatigue_binary')
+    print(build_histogram_from_list(dest_fields['fatigue_binary']))
+
+    # sanity check
+    print('field_len:', len(asmt_fields))
+    print('dest_len:', len(dest_fields['fatigue_binary']))
+    for ir, r in enumerate(asmt_fields):
+        f = r[1][field_to_index(asmt_ds, 'fatigue')]
+        fb = dest_fields['fatigue_binary'][ir]
+        if (f not in ('mild', 'severe') and fb == True) or (f in ('mild', 'severe') and fb == False):
+            print('empty' if f == '' else f, fb)
 
     # create a new assessment space with only unfiltered rows
     print(); print()
@@ -728,18 +747,20 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         remaining_dest_fields[dk] = np.zeros((len(remaining_asmt_fields), ), dtype=dv.dtype)
         rdf = remaining_dest_fields[dk]
         rdindex = 0
-        #for ir in range(remaining_asmt_row_count):
-        for ir in range(len(remaining_asmt_fields)):
+        for ir in range(len(asmt_fields)):
+
             if not asmt_filter_status[ir]:
                 rdf[rdindex] = dv[ir]
                 rdindex += 1
 
-    print('tcp type sanity check 2', remaining_dest_fields['tested_covid_positive'].dtype)
     print(len(remaining_asmt_fields))
     remaining_asmt_filter_status = [0] * len(remaining_asmt_fields)
     print(len(remaining_asmt_filter_status))
 
     print(build_histogram_from_list(sanitised_covid_results))
+
+    print('fatigue_binary')
+    print(build_histogram_from_list(remaining_dest_fields['fatigue_binary']))
 
     print(); print()
     print("quantise assessments by day")
@@ -770,21 +791,23 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
 
     class MergeAssessmentRows:
-        def __init__(self, resulting_fields, created_fields):
+        def __init__(self, resulting_fields, created_fields, existing_field_indices):
             print(created_fields.keys())
             print(created_fields['tested_covid_positive'].dtype, created_fields['tested_covid_positive'])
             print(resulting_fields['tested_covid_positive'].dtype, resulting_fields['tested_covid_positive'])
             self.rfindex = 0
             self.resulting_fields = resulting_fields
             self.created_fields = created_fields
-            print('created_fields:', self.created_fields['fatigue'].size)
+            self.existing_field_indices = existing_field_indices
 
         def populate_row(self, source_fields, source_index):
             source_row = source_fields[source_index]
-            self.resulting_fields['id'][self.rfindex] = source_row[1][0]
-            self.resulting_fields['patient_id'][self.rfindex] = source_row[1][1]
-            self.resulting_fields['created_at'][self.rfindex] = source_row[1][2]
-            self.resulting_fields['updated_at'][self.rfindex] = source_row[1][3]
+#            self.resulting_fields['id'][self.rfindex] = source_row[1][0]
+#            self.resulting_fields['patient_id'][self.rfindex] = source_row[1][1]
+#            self.resulting_fields['created_at'][self.rfindex] = source_row[1][2]
+#            self.resulting_fields['updated_at'][self.rfindex] = source_row[1][3]
+            for e in self.existing_field_indices:
+                self.resulting_fields[e[0]][self.rfindex] = source_row[1][e[1]]
             for ck, cv in self.created_fields.items():
 #                print(ck, cv.dtype)
 #                if ck == 'tested_covid_positive':
@@ -835,11 +858,13 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     remaining_asmt_row_count = len(remaining_asmt_fields) - merged_row_count
     print(f'{len(remaining_asmt_fields)} - {merged_row_count} = {remaining_asmt_row_count}')
 
+    existing_fields = ('id', 'patient_id', 'created_at', 'updated_at', 'version',
+                       'country_code', 'health_status', 'fatigue')
+    existing_field_indices = [(f, field_to_index(asmt_ds, f)) for f in existing_fields]
+
     resulting_fields = dict()
-    resulting_fields['id'] = [None] * remaining_asmt_row_count
-    resulting_fields['patient_id'] = [None] * remaining_asmt_row_count
-    resulting_fields['created_at'] = [None] * remaining_asmt_row_count
-    resulting_fields['updated_at'] = [None] * remaining_asmt_row_count
+    for e in existing_fields:
+        resulting_fields[e] = [None] * remaining_asmt_row_count
     for dk, dv in remaining_dest_fields.items():
         resulting_fields[dk] = np.zeros((remaining_asmt_row_count, ), dtype=dv.dtype)
 
@@ -847,11 +872,34 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     for dk, dv in dest_keys.items():
         resulting_field_keys[dk] = dv
 
+    print(); print('fatigue_binary before merge')
+    print(build_histogram_from_list(remaining_dest_fields['fatigue_binary']))
+
+    # sanity check
+    print('remaining_field_len:', len(remaining_asmt_fields))
+    print('remaining_dest_len:', len(remaining_dest_fields['fatigue_binary']))
+    for ir, r in enumerate(remaining_asmt_fields):
+        f = r[1][field_to_index(asmt_ds, 'fatigue')]
+        fb = remaining_dest_fields['fatigue_binary'][ir]
+        if (f not in ('mild', 'severe') and fb == True) or (f in ('mild', 'severe') and fb == False):
+            print('empty' if f == '' else f, fb)
+    print('resulting_fields:', len(resulting_fields['patient_id']))
+
     print(build_histogram_from_list(remaining_dest_fields['tested_covid_positive']))
-    merge = MergeAssessmentRows(resulting_fields, remaining_dest_fields)
+    merge = MergeAssessmentRows(resulting_fields, remaining_dest_fields, existing_field_indices)
     iterate_over_patient_assessments(remaining_asmt_fields, remaining_asmt_filter_status, merge)
     print(merge.rfindex)
 
+    print(); print('fatigue_binary after merge')
+    print(build_histogram_from_list(resulting_fields['fatigue_binary']))
+#    # sanity check
+#    print('remaining_field_len:', len(remaining_asmt_fields))
+#    for ir, r in enumerate(remaining_asmt_fields):
+#        f = r[1][field_to_index(asmt_ds, 'fatigue')]
+#        fb = remaining_dest_fields['fatigue_binary'][ir]
+#        if (f not in ('mild', 'severe') and fb == True) or (f in ('mild', 'severe') and fb == False):
+#            print('empty' if f == '' else f, fb)
+#    print('resulting_fields:', len(resulting_fields['patient_id']))
 
     print(); print()
     print("filter summaries")
@@ -895,6 +943,8 @@ if __name__ == '__main__':
             if p_status[ir] == 0:
                 csvw.writerow(r[1])
 
+    functor_fields = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
+
     with open('test_assessments.csv', 'w') as f:
         csvw = csv.writer(f)
         headers = res_fields.keys()
@@ -912,7 +962,10 @@ if __name__ == '__main__':
                         print(f'irh {irh} is out of range')
                     if len(res_fields[rh]) <= ir:
                         print(f'ir {ir} is out of range')
-                    row_values[irh] = res_fields[rh][ir]
+                    if rh in functor_fields:
+                        row_values[irh] = functor_fields[rh](res_fields[rh][ir])
+                    else:
+                        row_values[irh] = res_fields[rh][ir]
                 csvw.writerow(row_values)
                 for irv in range(len(row_values)):
                     row_values[irv] = None
