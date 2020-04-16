@@ -663,6 +663,10 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         tcp_index = field_to_index(asmt_ds, 'tested_covid_positive')
 
         def inner_(fields, filter_status, start, end):
+            raw_results = list()
+            for s in range(start, end+1):
+                raw_results.append(fields[s][1][tcp_index])
+
             # validate the subrange
             invalid = False
             max_value = ''
@@ -679,8 +683,12 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
             if invalid:
                 for j in range(start, end + 1):
-                    sanitised_covid_results[j] = key_to_value['']
+                    sanitised_covid_results[j] = key_to_value[fields[j][1][tcp_index]]
                     filter_status[j] |= FILTER_INVALID_COVID_PROGRESSION
+
+#            refined_results = sanitised_covid_results[start:end+1]
+#            if refined_results.sum() > 0 or invalid:
+#                print(raw_results, refined_results, filter_status[start] & FILTER_INVALID_COVID_PROGRESSION)
 
         return inner_
 
@@ -695,7 +703,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
     dest_fields['tested_covid_positive'] = sanitised_covid_results
     dest_keys['tested_covid_positive'] = sanitised_covid_results_key
-
+    print('tcp type sanity check', dest_fields['tested_covid_positive'].dtype)
 
     # create a new assessment space with only unfiltered rows
     print(); print()
@@ -711,7 +719,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print('remaining_asmt_fields:', len(remaining_asmt_fields))
 
     for dk, dv in dest_fields.items():
-        remaining_dest_fields[dk] = np.zeros((len(remaining_asmt_fields), ), dtype=np.bool)
+        remaining_dest_fields[dk] = np.zeros((len(remaining_asmt_fields), ), dtype=dv.dtype)
         rdf = remaining_dest_fields[dk]
         rdindex = 0
         #for ir in range(remaining_asmt_row_count):
@@ -720,10 +728,12 @@ def pipeline(patient_filename, assessment_filename, territory=None):
                 rdf[rdindex] = dv[ir]
                 rdindex += 1
 
+    print('tcp type sanity check 2', remaining_dest_fields['tested_covid_positive'].dtype)
     print(len(remaining_asmt_fields))
     remaining_asmt_filter_status = [0] * len(remaining_asmt_fields)
     print(len(remaining_asmt_filter_status))
 
+    print(build_histogram_from_list(sanitised_covid_results))
 
     print(); print()
     print("quantise assessments by day")
@@ -755,6 +765,9 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
     class MergeAssessmentRows:
         def __init__(self, resulting_fields, created_fields):
+            print(created_fields.keys())
+            print(created_fields['tested_covid_positive'].dtype, created_fields['tested_covid_positive'])
+            print(resulting_fields['tested_covid_positive'].dtype, resulting_fields['tested_covid_positive'])
             self.rfindex = 0
             self.resulting_fields = resulting_fields
             self.created_fields = created_fields
@@ -767,9 +780,22 @@ def pipeline(patient_filename, assessment_filename, territory=None):
             self.resulting_fields['created_at'][self.rfindex] = source_row[1][2]
             self.resulting_fields['updated_at'][self.rfindex] = source_row[1][3]
             for ck, cv in self.created_fields.items():
-                self.resulting_fields[ck][self.rfindex] = self.resulting_fields[ck][self.rfindex] or cv[source_index]
+#                print(ck, cv.dtype)
+#                if ck == 'tested_covid_positive':
+#                    print(ck, cv.dtype)
+                if cv.dtype == np.bool:
+                    self.resulting_fields[ck][self.rfindex] =\
+                        self.resulting_fields[ck][self.rfindex] or cv[source_index]
+                elif cv.dtype == np.uint8:
+#                    print('integer row')
+                    self.resulting_fields[ck][self.rfindex] =\
+                        max(self.resulting_fields[ck][self.rfindex], cv[source_index])
+#                    print(ck, self.resulting_fields[ck][self.rfindex])
 
         def __call__(self, fields, dummy, start, end):
+            rfstart = self.rfindex
+#            print(fields[start][1][1] == fields[end][1][1],
+#                 self.created_fields['tested_covid_positive'][start:end+1])
             # write the first row to the current resulting field index
             prev_asmt = fields[start]
             prev_date_str = prev_asmt[1][3]
@@ -784,13 +810,14 @@ def pipeline(patient_filename, assessment_filename, territory=None):
                     self.rfindex += 1
                 if i % 1000000 == 0 and i > 0:
                     print('.')
-    #                 print(cur_date == prev_date, rfindex, prev_date, cur_date)
                 self.populate_row(fields, i)
 
                 prev_asmt = cur_asmt
                 prev_date_str = cur_date_str
                 prev_date = cur_date
 
+#            print(self.resulting_fields['patient_id'][rfstart], self.resulting_fields['patient_id'][self.rfindex],
+#                  self.resulting_fields['tested_covid_positive'][rfstart:self.rfindex+1])
 
             # finally, update the resulting field index one more time
             self.rfindex += 1
@@ -808,12 +835,13 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     resulting_fields['created_at'] = [None] * remaining_asmt_row_count
     resulting_fields['updated_at'] = [None] * remaining_asmt_row_count
     for dk, dv in remaining_dest_fields.items():
-        resulting_fields[dk] = np.zeros((remaining_asmt_row_count, ), dtype=np.bool)
+        resulting_fields[dk] = np.zeros((remaining_asmt_row_count, ), dtype=dv.dtype)
 
     resulting_field_keys = dict()
     for dk, dv in dest_keys.items():
         resulting_field_keys[dk] = dv
 
+    print(build_histogram_from_list(remaining_dest_fields['tested_covid_positive']))
     merge = MergeAssessmentRows(resulting_fields, remaining_dest_fields)
     iterate_over_patient_assessments(remaining_asmt_fields, remaining_asmt_filter_status, merge)
     print(merge.rfindex)
@@ -854,18 +882,19 @@ if __name__ == '__main__':
     p_ds, p_fields, p_status, a_ds, p_fields, a_status, ra_fields, ra_status, res_fields, res_keys =\
         pipeline(args.patient_data, args.assessment_data, territory=args.territory)
 
-    with open('test_patients', 'w') as f:
+    with open('test_patients.csv', 'w') as f:
         csvw = csv.writer(f)
         csvw.writerow(p_ds.names_)
         for ir, r in enumerate(p_fields):
             if p_status[ir] == 0:
                 csvw.writerow(r[1])
 
-    with open('test_assessments', 'w') as f:
+    with open('test_assessments.csv', 'w') as f:
         csvw = csv.writer(f)
+        headers = res_fields.keys()
+        csvw.writerow(headers)
         row_field_count = len(res_fields)
         row_values = [None] * row_field_count
-        headers = res_fields.keys()
         print('ra_fields:', len(ra_fields))
         print('res_fields:', len(res_fields['id']))
         print(headers)
@@ -881,3 +910,5 @@ if __name__ == '__main__':
                 csvw.writerow(row_values)
                 for irv in range(len(row_values)):
                     row_values[irv] = None
+
+print(res_fields['tested_covid_positive'].dtype, res_fields['tested_covid_positive'])
