@@ -424,47 +424,73 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print(); print()
     print("filter patients with insufficient assessments")
     print("---------------------------------------------")
-    patient_assessment_count = defaultdict(int)
+    patient_assessment_counts = defaultdict(int)
     for a in asmt_fields:
-        patient_assessment_count[a[1][1]] += 1
-    patient_assessments = list(patient_assessment_count.items())
-    print(len(patient_assessments))
-    del patient_assessment_count
+        patient_assessment_counts[a[1][1]] += 1
+    patient_assessments = list(patient_assessment_counts.items())
 
-    i = 0
-    j = 0
-    missing_patient_ids = list()
-    while i < len(geoc_fields) and j < len(patient_assessments):
-        # print(i, j, geoc_fields[i][1][0], patient_assessments[j][0])
-        if geoc_fields[i][1][0] < patient_assessments[j][0]:
-            # patient has no assessments
-            geoc_filter_status[i] |= PFILTER_NO_ASSESSMENTS
-            i += 1
+#    for ir, r in enumerate(geoc_fields):
+#        pid = r[1][0]
+#        if pid not in patient_assessment_counts:
+#            geoc_filter_status[ir] |= PFILTER_NO_ASSESSMENTS
+#        elif patient_assessment_counts[pid] == 1:
+#            geoc_filter_status[ir] |= PFILTER_ONE_ASSESSMENT
+    del patient_assessment_counts
 
-        elif geoc_fields[i][1][0] > patient_assessments[j][0]:
-            # assessment patient id not in patient list
-            missing_patient_ids.append(patient_assessments[j][0])
-            j += 1
-        else:
-            # patient has assessments; but needs multiples
-            if patient_assessments[j][1] == 1:
-                geoc_filter_status[i] |= PFILTER_ONE_ASSESSMENT
-            i += 1
-            j += 1
-    # print(missing_patient_ids)
-    while i < len(geoc_fields):
-        geoc_filter_status[i] |= PFILTER_NO_ASSESSMENTS
-        i += 1
+#    def check_assessment_counts():
+#        abp = defaultdict(int)
+#        for ir in range(len(asmt_fields)):
+#            abp[asmt_fields[ir][1][1]] += 1
+#        abpt = list(abp.items())
+#        count_multi = 0
+#        print(len(abpt))
+#        for it in abpt:
+#            if it[1] > 1:
+#                count_multi += 1
+#        print('multiple assessments:', count_multi)
+#    check_assessment_counts()
+#
+#    Restore once properly refactored and unit tested
+#    i = 0
+#    j = 0
+#    missing_patient_ids = list()
+#    while i < len(geoc_fields) and j < len(patient_assessments):
+#        # print(i, j, geoc_fields[i][1][0], patient_assessments[j][0])
+#        if geoc_fields[i][1][0] < patient_assessments[j][0]:
+#            # patient has no assessments
+#            geoc_filter_status[i] |= PFILTER_NO_ASSESSMENTS
+#            i += 1
+#
+#        elif geoc_fields[i][1][0] > patient_assessments[j][0]:
+#            # assessment patient id not in patient list
+#            missing_patient_ids.append(patient_assessments[j][0])
+#            j += 1
+#        else:
+#            # patient has assessments; but needs multiples
+#            if patient_assessments[j][1] == 1:
+#                geoc_filter_status[i] |= PFILTER_ONE_ASSESSMENT
+#            i += 1
+#            j += 1
+#    # print(missing_patient_ids)
+#    while i < len(geoc_fields):
+#        geoc_filter_status[i] |= PFILTER_NO_ASSESSMENTS
+#        i += 1
+#
+#    while j < len(patient_assessments):
+#        missing_patient_ids.append(patient_assessments[j][0])
+#        j += 1
 
-    while j < len(patient_assessments):
-        missing_patient_ids.append(patient_assessments[j][0])
-        j += 1
-
-    print(count_flag_set(geoc_filter_status, PFILTER_NO_ASSESSMENTS))
+    # print(count_flag_set(geoc_filter_status, PFILTER_NO_ASSESSMENTS))
     patient_ids = set()
     for r in geoc_fields:
         patient_ids.add(r[1][0])
 
+    print('patients:', len(geoc_filter_status))
+    print('patients with no assessments:',
+          count_flag_set(geoc_filter_status, PFILTER_NO_ASSESSMENTS))
+    print('patients with one assessment:',
+          count_flag_set(geoc_filter_status, PFILTER_ONE_ASSESSMENT))
+    print('patients with sufficient assessments:', geoc_filter_status.count(0))
 
     print(); print()
     print("patients")
@@ -503,12 +529,13 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     bmis = build_histogram(geoc_fields, field_to_index(geoc_ds, 'bmi')) #, tx=replace_if_invalid(-1.0))
     print(f'bmi: {len(bmis)} unique values')
 
+    print(); print('unfiltered patients:', geoc_filter_status.count(0))
+
 
     print(); print()
     print("assessments")
     print("-----------")
     clear_set_flag(asmt_filter_status, FILTERA_ALL)
-    # print(geoc_filter_status.count(0))
     # print(); print("removing assessments for filtered patients")
     # def filter_assessments_on_patient_ids(geoc, asmt, g, a):
     #     if geoc_filter_status[g] != 0:
@@ -524,7 +551,8 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         if r[1][1] not in patient_ids:
             asmt_filter_status[ir] |= AFILTER_PATIENT_FILTERED
 
-    print(asmt_filter_status.count(0))
+    print('assessments filtered due to patient filtering:',
+          count_flag_set(asmt_filter_status, FILTERA_ALL))
 
     print(); print("checking temperature")
     # convert temperature to C if F
@@ -549,8 +577,8 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     # had_covid_test
     # tested_covid_positive
     indices = [field_to_index(asmt_ds, c) for c in ('had_covid_test', 'tested_covid_positive')]
-    for ix in indices:
-        print(build_histogram(asmt_fields, ix))
+#    for ix in indices:
+#        print(build_histogram(asmt_fields, ix))
     # for c in ('had_covid_test', 'tested_covid_positive'):
     #     print(f'{c}:', build_histogram(asmt_fields, field_to_index(asmt_ds, c)))
 
@@ -564,7 +592,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
     print(f'inconsistent_not_tested: filtered {count_flag_set(asmt_filter_status, FILTER_INCONSISTENT_NOT_TESTED)} missing values')
     print(f'inconsistent_tested: filtered {count_flag_set(asmt_filter_status, FILTER_INCONSISTENT_TESTED)} missing values')
-    print(asmt_filter_status.count(0))
+    print(); print('unfiltered assessments:', asmt_filter_status.count(0))
 
 
     print(); print()
@@ -604,7 +632,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     for f in (FILTER_INCONSISTENT_SYMPTOMS, FILTER_INCONSISTENT_NO_SYMPTOMS):
         print(f'{assessment_flag_descs[f]}: {count_flag_set(asmt_filter_status, f)}')
 
-    print(asmt_filter_status.count(0))
+    print(); print('unfiltered assessments:', asmt_filter_status.count(0))
 
 
     # validate assessments per patient
@@ -796,20 +824,21 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         print(f'{assessment_flag_descs[v]}: {count_flag_set(asmt_filter_status, v)}')
 
     print('done!')
-    return geoc_ds, geoc_fields, geoc_filter_status, asmt_ds, asmt_fields, asmt_filter_status
+    return geoc_ds, geoc_fields, geoc_filter_status, asmt_ds, asmt_fields, asmt_filter_status, resulting_fields
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--territory', type='string', default=None,
+    parser.add_argument('-t', '--territory', default=None,
                         help='the territory to filter the dataset on (runs on all territories if not set)')
-    parser.add_argument('-p', '--patient_data', type='string',
+    parser.add_argument('-p', '--patient_data',
                         help='the location and name of the patient data csv file')
-    parser.add_argument('-a', '--assessment_data', type='string',
+    parser.add_argument('-a', '--assessment_data',
                         help='the location and name of the assessment data csv file')
     args = parser.parse_args()
     warning = ("Warning! This a pre-release version of the joinzoe data preparation pipeline. It has not been"
               " fully tested and is used very much at your own risk, with a full commitment by you to check"
               " correctness of output before relying on it for downstream analysis.")
     print(warning)
-    pipeline(args.patient_data, args.assessment_data, territory=args.territory)
+    p_ds, p_fields, p_status, a_ds, p_fields, a_status, ra_ds, ra_fields, ra_status, resulting_fields =\
+        pipeline(args.patient_data, args.assessment_data, territory=args.territory)
