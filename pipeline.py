@@ -599,6 +599,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print("convert symptomatic and exposure fields to bool")
     print("-----------------------------------------------")
     dest_fields = dict()
+    dest_keys = dict()
 
     any_symptoms = np.zeros((len(asmt_fields),), dtype=np.bool)
     for s in symptomatic_fields:
@@ -691,6 +692,9 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
     print(f'{assessment_flag_descs[FILTER_INVALID_COVID_PROGRESSION]}:',
           count_flag_set(asmt_filter_status, FILTER_INVALID_COVID_PROGRESSION))
+
+    dest_fields['tested_covid_positive'] = sanitised_covid_results
+    dest_keys['tested_covid_positive'] = sanitised_covid_results_key
 
 
     # create a new assessment space with only unfiltered rows
@@ -806,6 +810,10 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     for dk, dv in remaining_dest_fields.items():
         resulting_fields[dk] = np.zeros((remaining_asmt_row_count, ), dtype=np.bool)
 
+    resulting_field_keys = dict()
+    for dk, dv in dest_keys.items():
+        resulting_field_keys[dk] = dv
+
     merge = MergeAssessmentRows(resulting_fields, remaining_dest_fields)
     iterate_over_patient_assessments(remaining_asmt_fields, remaining_asmt_filter_status, merge)
     print(merge.rfindex)
@@ -824,7 +832,10 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         print(f'{assessment_flag_descs[v]}: {count_flag_set(asmt_filter_status, v)}')
 
     print('done!')
-    return geoc_ds, geoc_fields, geoc_filter_status, asmt_ds, asmt_fields, asmt_filter_status, resulting_fields
+    return (geoc_ds, geoc_fields, geoc_filter_status,
+            asmt_ds, asmt_fields, asmt_filter_status,
+            remaining_asmt_fields, remaining_asmt_filter_status,
+            resulting_fields, resulting_field_keys)
 
 if __name__ == '__main__':
     import argparse
@@ -840,5 +851,33 @@ if __name__ == '__main__':
               " fully tested and is used very much at your own risk, with a full commitment by you to check"
               " correctness of output before relying on it for downstream analysis.")
     print(warning)
-    p_ds, p_fields, p_status, a_ds, p_fields, a_status, ra_ds, ra_fields, ra_status, resulting_fields =\
+    p_ds, p_fields, p_status, a_ds, p_fields, a_status, ra_fields, ra_status, res_fields, res_keys =\
         pipeline(args.patient_data, args.assessment_data, territory=args.territory)
+
+    with open('test_patients', 'w') as f:
+        csvw = csv.writer(f)
+        csvw.writerow(p_ds.names_)
+        for ir, r in enumerate(p_fields):
+            if p_status[ir] == 0:
+                csvw.writerow(r[1])
+
+    with open('test_assessments', 'w') as f:
+        csvw = csv.writer(f)
+        row_field_count = len(res_fields)
+        row_values = [None] * row_field_count
+        headers = res_fields.keys()
+        print('ra_fields:', len(ra_fields))
+        print('res_fields:', len(res_fields['id']))
+        print(headers)
+        for ir in range(len(res_fields['id'])):
+            if ra_status[ir] == 0:
+                for irh, rh in enumerate(headers):
+                    # print(irh, rh)
+                    if len(row_values) <= irh:
+                        print(f'irh {irh} is out of range')
+                    if len(res_fields[rh]) <= ir:
+                        print(f'ir {ir} is out of range')
+                    row_values[irh] = res_fields[rh][ir]
+                csvw.writerow(row_values)
+                for irv in range(len(row_values)):
+                    row_values[irv] = None
