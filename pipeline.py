@@ -334,10 +334,11 @@ assessment_flag_descs = {
     0xffffffff: 'all_flags'
 }
 
-symptomatic_fields = ["fatigue", "shortness_of_breath", "abdominal_pain", "chest_pain",
+symptomatic_fields = ["abdominal_pain", "chest_pain",
                       "delirium", "diarrhoea", "fever", "headache",
                       "hoarse_voice", "loss_of_smell", "persistent_cough",  "skipped_meals",
                       "sore_throat", "unusual_muscle_pains"]
+flattened_fields = [("fatigue", "fatigue_binary"), ("shortness_of_breath", "shortness_of_breath_binary")]
 exposure_fields = ["always_used_shortage", "have_used_PPE", "never_used_shortage", "sometimes_used_shortage",
                    "treated_patients_with_covid"]
 
@@ -610,6 +611,11 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         any_symptoms |= dest_fields[s]
         print(np.count_nonzero(dest_fields[s] == True))
         print(np.count_nonzero(any_symptoms == True))
+
+    for f in flattened_fields:
+        cv = categorical_maps[f[0]]
+        print(f"'{f[0]}' to categorical")
+        dest_fields[f[1]] to_categorical(asmt_fields, field_to_index(asmt_ds, f[0]), np.bool, cv)
 
     for e in exposure_fields:
         cv = categorical_maps[e]
