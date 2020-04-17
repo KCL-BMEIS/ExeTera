@@ -161,15 +161,16 @@ def clear_set_flag(values, to_clear):
     return values
 
 
-def valid_range_fac(f_min, f_max):
+def valid_range_fac(f_min, f_max, default_value=''):
+    print('foo')
     def inner_(x):
-         return x > f_min and x < f_max
+        return x == default_value or x > f_min and x < f_max
     return inner_
 
 
-def valid_range_fac_inc(f_min, f_max):
+def valid_range_fac_inc(f_min, f_max, default_value=''):
     def inner_(x):
-        return x >= f_min and x <= f_max
+        return x == default_value or x >= f_min and x <= f_max
     return inner_
 
 
@@ -320,7 +321,7 @@ FILTER_MISSING_WEIGHT = 0x80
 FILTER_BAD_WEIGHT = 0x100
 FILTER_MISSING_BMI = 0x200
 FILTER_BAD_BMI = 0x400
-FILTER_ASSESSMENT_FILTERED = 0x800
+FILTER_NOT_IN_FINAL_ASSESSMENTS = 0x800
 FILTERP_ALL = 0xffffffff
 patient_flag_descs = {
     0x1: 'other_territory',
@@ -329,7 +330,7 @@ patient_flag_descs = {
     0x20: 'missing_height', 0x40: 'out_of_range_height',
     0x80: 'missing_weight', 0x100: 'out_of_range_weight',
     0x200: 'missing_bmi', 0x400: 'out_of_range_bmi',
-    0x800: 'assessment_filtered',
+    0x800: 'not_in_final_assessments',
     0xffffffff: 'all_flags'
 }
 
@@ -361,7 +362,7 @@ symptomatic_fields = ["fatigue", "shortness_of_breath", "abdominal_pain", "chest
 flattened_fields = [("fatigue", "fatigue_binary"), ("shortness_of_breath", "shortness_of_breath_binary")]
 exposure_fields = ["always_used_shortage", "have_used_PPE", "never_used_shortage", "sometimes_used_shortage",
                    "treated_patients_with_covid"]
-miscellaneous_fields = ['location']
+miscellaneous_fields = ['location', 'level_of_isolation', 'had_covid_test']
 
 categorical_maps = {
     'fatigue': {'': 0, 'no': 1, 'mild': 2, 'severe': 3},
@@ -386,7 +387,9 @@ categorical_maps = {
                                     'yes_documented_suspected': 3, 'yes_documented': 4},
     'fatigue_binary': {'': 0, 'no': 1, 'mild': 2, 'severe': 2},
     'shortness_of_breath_binary': {'': 0, 'no': 1, 'mild': 2, 'significant': 2, 'severe': 2},
-    'location': {'': 0, 'home': 1, 'hospital': 2, 'back_from_hospital': 3}
+    'location': {'': 0, 'home': 1, 'hospital': 2, 'back_from_hospital': 3},
+    'level_of_isolation': {'': 0, 'not_left_the_house': 1, 'rarely_left_the_house': 2, 'often_left_the_house': 3},
+    'had_covid_test': {'': 0, 'False': 1, 'True': 2}
 }
 
 boolean_inv_map = ['na', 'False', 'True']
@@ -413,7 +416,9 @@ categorical_inv_maps = {
                                     'yes_documented_suspected', 'yes_documented'],
     'fatigue_binary': ['na', 'False', 'True'],
     'shortness_of_breath_binary': ['na', 'False', 'True'],
-    'location': ['na', 'home', 'hospital']
+    'location': ['na', 'home', 'hospital'],
+    'level_of_isolation': ['na', 'not_left_the_house', 'rarely_left_the_house', 'often_left_the_house'],
+    'had_covid_test': boolean_inv_map
 }
 
 
@@ -473,21 +478,21 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         print(f'other territories: filtered {count_flag_set(geoc_filter_status, PFILTER_OTHER_TERRITORY)} missing values')
 
 
-#    print(); print()
-#    print("filter patients with insufficient assessments")
-#    print("---------------------------------------------")
-#    patient_assessment_counts = defaultdict(int)
-#    for a in asmt_fields:
-#        patient_assessment_counts[a[1][1]] += 1
-#    patient_assessments = list(patient_assessment_counts.items())
-#
-#    for ir, r in enumerate(geoc_fields):
-#        pid = r[1][0]
-#        if pid not in patient_assessment_counts:
-#            geoc_filter_status[ir] |= PFILTER_NO_ASSESSMENTS
-#        elif patient_assessment_counts[pid] == 1:
-#            geoc_filter_status[ir] |= PFILTER_ONE_ASSESSMENT
-#    del patient_assessment_counts
+    # print(); print()
+    # print("filter patients with insufficient assessments")
+    # print("---------------------------------------------")
+    # patient_assessment_counts = defaultdict(int)
+    # for a in asmt_fields:
+    #     patient_assessment_counts[a[1][1]] += 1
+    # patient_assessments = list(patient_assessment_counts.items())
+    #
+    # for ir, r in enumerate(geoc_fields):
+    #     pid = r[1][0]
+    #     if pid not in patient_assessment_counts:
+    #         geoc_filter_status[ir] |= PFILTER_NO_ASSESSMENTS
+    #     elif patient_assessment_counts[pid] == 1:
+    #         geoc_filter_status[ir] |= PFILTER_ONE_ASSESSMENT
+    # del patient_assessment_counts
 
 #    def check_assessment_counts():
 #        abp = defaultdict(int)
@@ -556,6 +561,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print(f'yob: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_YOB)} bad values')
     yobs = build_histogram(geoc_fields, field_to_index(geoc_ds, 'year_of_birth'))
     print(f'yob: {len(yobs)} unique values')
+    print(geoc_filter_status.count(0))
 
     print(); print("checking height")
     filter_fields(geoc_fields, geoc_filter_status, field_to_index(geoc_ds, 'height_cm'),
@@ -564,6 +570,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print(f'height: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_HEIGHT)} bad values')
     heights = build_histogram(geoc_fields, field_to_index(geoc_ds, 'height_cm')) #, tx=replace_if_invalid(-1.0))
     print(f'height: {len(heights)} unique values')
+    print(geoc_filter_status.count(0))
 
     print(); print("checking weight")
     filter_fields(geoc_fields, geoc_filter_status, field_to_index(geoc_ds, 'weight_kg'),
@@ -572,6 +579,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print(f'weight: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_WEIGHT)} bad values')
     weights = build_histogram(geoc_fields, field_to_index(geoc_ds, 'weight_kg')) #, tx=replace_if_invalid(-1.0))
     print(f'weight: {len(weights)} unique values')
+    print(geoc_filter_status.count(0))
 
     print(); print("checking bmi")
     filter_fields(geoc_fields, geoc_filter_status, field_to_index(geoc_ds, 'bmi'), FILTER_MISSING_BMI, FILTER_BAD_BMI,
@@ -623,10 +631,14 @@ def pipeline(patient_filename, assessment_filename, territory=None):
             temperature_c[ir] = 0.0
 
     filter_list(temperature_c, asmt_filter_status, FILTER_MISSING_TEMP, FILTER_BAD_TEMP,
-                  is_float, to_float, valid_range_fac(MIN_TEMP, MAX_TEMP))
+                  is_float, to_float, valid_range_fac(MIN_TEMP, MAX_TEMP, 0.0))
     print(f'temperature: filtered {count_flag_set(asmt_filter_status, FILTER_MISSING_TEMP)} missing values')
     print(f'temperature: filtered {count_flag_set(asmt_filter_status, FILTER_BAD_TEMP)} bad values')
-    dest_fields['temperature_C'] = temperature_c 
+    dest_fields['temperature_C'] = temperature_c
+
+
+    # print('level_of_isolation', build_histogram(asmt_fields, field_to_index(asmt_ds, 'level_of_isolation')))
+    # print('had_covid_test', build_histogram(asmt_fields, field_to_index(asmt_ds, 'had_covid_test')))
 
     # had_covid_test
     # tested_covid_positive
@@ -783,6 +795,8 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         # if (f not in ('mild', 'severe') and fb == True) or (f in ('mild', 'severe') and fb == False):
         #    print('empty' if f == '' else f, fb)
 
+    print('remaining assessments before squashing', asmt_filter_status.count(0))
+
     # create a new assessment space with only unfiltered rows
     print(); print()
     print("discard all filtered assessments")
@@ -928,6 +942,11 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print(); print('fatigue_binary before merge')
     print(build_histogram_from_list(remaining_dest_fields['fatigue_binary']))
 
+    unique_patients = set()
+    for ir, r in enumerate(remaining_asmt_fields):
+        unique_patients.add(r[1][1])
+    print('unique patents in remaining assessments:', len(unique_patients))
+
     # sanity check
     print('remaining_field_len:', len(remaining_asmt_fields))
     print('remaining_dest_len:', len(remaining_dest_fields['fatigue_binary']))
@@ -943,16 +962,10 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     iterate_over_patient_assessments(remaining_asmt_fields, remaining_asmt_filter_status, merge)
     print(merge.rfindex)
 
-    print(); print('fatigue_binary after merge')
-    print(build_histogram_from_list(resulting_fields['fatigue_binary']))
-#    # sanity check
-#    print('remaining_field_len:', len(remaining_asmt_fields))
-#    for ir, r in enumerate(remaining_asmt_fields):
-#        f = r[1][field_to_index(asmt_ds, 'fatigue')]
-#        fb = remaining_dest_fields['fatigue_binary'][ir]
-#        if (f not in ('mild', 'severe') and fb == True) or (f in ('mild', 'severe') and fb == False):
-#            print('empty' if f == '' else f, fb)
-#    print('resulting_fields:', len(resulting_fields['patient_id']))
+    unique_patients = defaultdict(int)
+    for ir, r in enumerate(remaining_asmt_fields):
+        unique_patients[r[1][1]] += 1
+    print('unique patents in remaining assessments:', len(unique_patients))
 
 #    print(); print()
 #    print("filter patients with insufficient assessments")
@@ -1162,6 +1175,15 @@ if __name__ == '__main__':
         p_ds, p_fields, p_status, a_ds, a_fields, a_status, ra_fields, ra_status, res_fields, res_keys =\
             pipeline(args.patient_data, args.assessment_data, territory=args.territory)
 
+        remaining_patients = set()
+        for p in res_fields['patient_id']:
+            remaining_patients.add(p)
+        for ip, p in enumerate(p_fields):
+            if p[1][0] not in remaining_patients:
+                p_status[ip] |= FILTER_NOT_IN_FINAL_ASSESSMENTS
+        print(p_status.count(0))
+
+
         print(p_fields[0])
         with open('test_patients.csv', 'w') as f:
             csvw = csv.writer(f)
@@ -1177,7 +1199,7 @@ if __name__ == '__main__':
 
         with open('test_assessments.csv', 'w') as f:
             csvw = csv.writer(f)
-            headers = res_fields.keys()
+            headers = list(res_fields.keys())# + ['day']
             csvw.writerow(headers)
             row_field_count = len(res_fields)
             row_values = [None] * row_field_count
@@ -1187,18 +1209,27 @@ if __name__ == '__main__':
             for ir in range(len(res_fields['id'])):
                 if ra_status[ir] == 0:
                     for irh, rh in enumerate(headers):
-                        if len(row_values) <= irh:
-                            print(f'irh {irh} is out of range')
-                        if len(res_fields[rh]) <= ir:
-                            print(f'ir {ir} is out of range')
+                        # if len(row_values) <= irh:
+                        #     print(f'irh {irh} is out of range')
+                        # if len(res_fields[rh]) <= ir:
+                        #     print(f'ir {ir} is out of range')
                         if rh in functor_fields:
                             row_values[irh] = functor_fields[rh](res_fields[rh][ir])
                         elif rh in categorical_inv_maps:
-                            if res_fields[rh][ir] >= len(categorical_inv_maps[rh]):
-                                print("oor:", rh, res_fields[rh][ir], categorical_inv_maps[rh])
+                            # if res_fields[rh][ir] >= len(categorical_inv_maps[rh]):
+                            #     print("oor:", rh, res_fields[rh][ir], categorical_inv_maps[rh])
                             row_values[irh] = categorical_inv_maps[rh][res_fields[rh][ir]]
                         else:
                             row_values[irh] = res_fields[rh][ir]
+                    updated = res_fields['updated_at']
+                    row_values[-1] = f"{updated[0:4]}-{updated[5:7]}-{updated[8:10]}"
                     csvw.writerow(row_values)
                     for irv in range(len(row_values)):
                         row_values[irv] = None
+
+        # remaining_patients = defaultdict(int)
+        # for ir in res_fields['patient_id']:
+        #     remaining_patients[ir] += 1
+        # for s in remaining_patients.items():
+        #     print(s[0], s[1])
+
