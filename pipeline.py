@@ -281,6 +281,19 @@ def iterate_over_patient_assessments(fields, filter_status, visitor):
 def datetime_to_seconds(dt):
    return f'{dt[0:4]}-{dt[5:7]}-{dt[8:10]} {dt[11:13]}:{dt[14:16]}:{dt[17:19]}'
 
+def print_diagnostic_row(preamble, ds, fields, ir, keys, fns=None):
+    if fns is None:
+        fns = dict()
+    indices = [field_to_index(ds, k) for k in keys]
+    indexed_fns = [None if k not in fns else fns[k] for k in keys]
+    values = [None] * len(indices)
+    for ii, i in enumerate(indices):
+        if indexed_fns[ii] is None:
+            values[ii] = fields[ir][1][i]
+        else:
+            values[ii] = indexed_fns[ii](fields[ir][1][i])
+    print(f'{preamble}: {values}')
+
 
 #patient limits
 MIN_YOB = 1930
@@ -822,9 +835,13 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 #                    print(ck, self.resulting_fields[ck][self.rfindex])
 
         def __call__(self, fields, dummy, start, end):
+            if fields[start][1][1][0:8] == '1fa25a81':
+                for ir in range(start, end+1):
+                    print(fields[ir][1][0], fields[ir][1][1], fields[ir][1][2], fields[ir][1][3],
+                          fields[ir][1][field_to_index(asmt_ds, 'fatigue')], self.created_fields['fatigue_binary'][ir])
+
             rfstart = self.rfindex
-#            print(fields[start][1][1] == fields[end][1][1],
-#                 self.created_fields['tested_covid_positive'][start:end+1])
+
             # write the first row to the current resulting field index
             prev_asmt = fields[start]
             prev_date_str = prev_asmt[1][3]
@@ -847,7 +864,11 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
 #            print(self.resulting_fields['patient_id'][rfstart], self.resulting_fields['patient_id'][self.rfindex],
 #                  self.resulting_fields['tested_covid_positive'][rfstart:self.rfindex+1])
-
+            if fields[start][1][1][0:8] == '1fa25a81':
+                for ir in range(rfstart, self.rfindex+1):
+                    print(self.resulting_fields['id'][ir], self.resulting_fields['patient_id'][ir],
+                          self.resulting_fields['created_at'][ir], self.resulting_fields['updated_at'][ir],
+                          self.resulting_fields['fatigue'][ir], self.resulting_fields['fatigue_binary'][ir])
             # finally, update the resulting field index one more time
             self.rfindex += 1
 
@@ -919,9 +940,85 @@ def pipeline(patient_filename, assessment_filename, territory=None):
             remaining_asmt_fields, remaining_asmt_filter_status,
             resulting_fields, resulting_field_keys)
 
+
+def regression_test(old_patients, new_patients, old_assessments, new_assessments):
+    r_a_fieldnames = enumerate_fields(old_assessments)
+    p_a_fieldnames = enumerate_fields(new_assessments)
+    r_a_ds = PatientDataset(r_a_fieldnames)
+    p_a_ds = PatientDataset(p_a_fieldnames)
+    parse_file(old_assessments, functor=r_a_ds)
+    parse_file(new_assessments, functor=p_a_ds)
+
+    r_a_fields = r_a_ds.fields_
+    p_a_fields = p_a_ds.fields_
+
+    r_a_keys = set(r_a_ds.names_)
+    p_a_keys = set(p_a_ds.names_)
+    print(r_a_keys)
+    print(p_a_keys)
+    r_a_fields = sorted(r_a_fields, key=lambda r: (r[1][2], r[1][1]))
+    p_a_fields = sorted(p_a_fields, key=lambda p: (p[1][1], p[1][0]))
+
+    diagnostic_row_keys = ['id', 'patient_id', 'created_at', 'updated_at', 'fatigue', 'fatigue_binary']
+    r_fns = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
+#    def print_diagnostic_row(preamble, ds, fields, ir, keys, fns=None):
+#        if fns is None:
+#            fns = dict()
+#        indices = [field_to_index(ds, k) for k in keys]
+#        indexed_fns = [None if k not in fns else fns[k] for k in keys]
+#        values = [None] * len(indices)
+#        for ii, i in enumerate(indices):
+#            if indexed_fns[ii] is None:
+#                values[ii] = fields[ir][1][i]
+#            else:
+#                values[ii] = indexed_fns[ii](fields[ir][1][i])
+#        print(f'{preamble}: {values}')
+
+    patients_with_disparities = set()
+    r = 0
+    p = 0
+    while r < len(r_a_fields) and p < len(p_a_fields):
+        #rkey = (r_a_fields[r][1][2], r_a_fields[r][1][4])
+        #pkey = (p_a_fields[p][1][1], p_a_fields[p][1][3])
+        rkey = (r_a_fields[r][1][2], r_a_fields[r][1][1])
+        pkey = (p_a_fields[p][1][1], p_a_fields[p][1][0])
+        if rkey < pkey:
+            print(f'{r}, {p}: {rkey} not in python dataset')
+            print_diagnostic_row('', r_a_ds, r_a_fields, r, diagnostic_row_keys, fns=r_fns)
+            print_diagnostic_row('', p_a_ds, p_a_fields, p, diagnostic_row_keys)
+            patients_with_disparities.add(r_a_fields[r][1][2])
+            patients_with_disparities.add(p_a_fields[p][1][1])
+            r += 1
+        elif pkey < rkey:
+            print(f'{r}, {p}: {pkey} not in r dataset')
+            print_diagnostic_row('', r_a_ds, r_a_fields, r, diagnostic_row_keys, fns=r_fns)
+            print_diagnostic_row('', p_a_ds, p_a_fields, p, diagnostic_row_keys)
+            patients_with_disparities.add(r_a_fields[r][1][2])
+            patients_with_disparities.add(p_a_fields[p][1][1])
+            p += 1
+        else:
+            print(r, p,
+                  r_a_fields[r][1][field_to_index(r_a_ds, 'fatigue_binary')],
+                  p_a_fields[p][1][field_to_index(p_a_ds, 'fatigue_binary')])
+            r += 1
+            p += 1
+
+    r_a_fields = sorted(r_a_fields, key=lambda r: (r[1][2], r[1][4]))
+    p_a_fields = sorted(p_a_fields, key=lambda p: (p[1][1], p[1][3]))
+
+    for pd in patients_with_disparities:
+        print(); print(pd)
+        for ir, r in enumerate(r_a_fields):
+            if r[1][2] == pd:
+                print_diagnostic_row(f'r[ir]', r_a_ds, r_a_fields, ir, diagnostic_row_keys, fns=r_fns)
+        for ip, p in enumerate(p_a_fields):
+            if p[1][1] == pd:
+                print_diagnostic_row(f'p[ip]', p_a_ds, p_a_fields, ip, diagnostic_row_keys)
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument('-r', '--regression_test', action='store_true')
     parser.add_argument('-t', '--territory', default=None,
                         help='the territory to filter the dataset on (runs on all territories if not set)')
     parser.add_argument('-p', '--patient_data',
@@ -933,41 +1030,42 @@ if __name__ == '__main__':
               " fully tested and is used very much at your own risk, with a full commitment by you to check"
               " correctness of output before relying on it for downstream analysis.")
     print(warning)
-    p_ds, p_fields, p_status, a_ds, p_fields, a_status, ra_fields, ra_status, res_fields, res_keys =\
-        pipeline(args.patient_data, args.assessment_data, territory=args.territory)
+    if args.regression_test:
+        regression_test('patients_cleaned_short.csv', args.patient_data, 'assessments_cleaned_short.csv', args.assessment_data)
+    else:
+        p_ds, p_fields, p_status, a_ds, p_fields, a_status, ra_fields, ra_status, res_fields, res_keys =\
+            pipeline(args.patient_data, args.assessment_data, territory=args.territory)
 
-    with open('test_patients.csv', 'w') as f:
-        csvw = csv.writer(f)
-        csvw.writerow(p_ds.names_)
-        for ir, r in enumerate(p_fields):
-            if p_status[ir] == 0:
-                csvw.writerow(r[1])
+        with open('test_patients.csv', 'w') as f:
+            csvw = csv.writer(f)
+            csvw.writerow(p_ds.names_)
+            for ir, r in enumerate(p_fields):
+                if p_status[ir] == 0:
+                    csvw.writerow(r[1])
 
-    functor_fields = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
+        functor_fields = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
 
-    with open('test_assessments.csv', 'w') as f:
-        csvw = csv.writer(f)
-        headers = res_fields.keys()
-        csvw.writerow(headers)
-        row_field_count = len(res_fields)
-        row_values = [None] * row_field_count
-        print('ra_fields:', len(ra_fields))
-        print('res_fields:', len(res_fields['id']))
-        print(headers)
-        for ir in range(len(res_fields['id'])):
-            if ra_status[ir] == 0:
-                for irh, rh in enumerate(headers):
-                    # print(irh, rh)
-                    if len(row_values) <= irh:
-                        print(f'irh {irh} is out of range')
-                    if len(res_fields[rh]) <= ir:
-                        print(f'ir {ir} is out of range')
-                    if rh in functor_fields:
-                        row_values[irh] = functor_fields[rh](res_fields[rh][ir])
-                    else:
-                        row_values[irh] = res_fields[rh][ir]
-                csvw.writerow(row_values)
-                for irv in range(len(row_values)):
-                    row_values[irv] = None
-
-print(res_fields['tested_covid_positive'].dtype, res_fields['tested_covid_positive'])
+        with open('test_assessments.csv', 'w') as f:
+            csvw = csv.writer(f)
+            headers = res_fields.keys()
+            csvw.writerow(headers)
+            row_field_count = len(res_fields)
+            row_values = [None] * row_field_count
+            print('ra_fields:', len(ra_fields))
+            print('res_fields:', len(res_fields['id']))
+            print(headers)
+            for ir in range(len(res_fields['id'])):
+                if ra_status[ir] == 0:
+                    for irh, rh in enumerate(headers):
+                        # print(irh, rh)
+                        if len(row_values) <= irh:
+                            print(f'irh {irh} is out of range')
+                        if len(res_fields[rh]) <= ir:
+                            print(f'ir {ir} is out of range')
+                        if rh in functor_fields:
+                            row_values[irh] = functor_fields[rh](res_fields[rh][ir])
+                        else:
+                            row_values[irh] = res_fields[rh][ir]
+                    csvw.writerow(row_values)
+                    for irv in range(len(row_values)):
+                        row_values[irv] = None
