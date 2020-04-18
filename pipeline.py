@@ -11,6 +11,7 @@
 
 import os
 import csv
+import time
 from collections import defaultdict
 import numpy as np
 
@@ -415,7 +416,7 @@ categorical_inv_maps = {
                                     'yes_documented_suspected', 'yes_documented'],
     'fatigue_binary': ['na', 'False', 'True'],
     'shortness_of_breath_binary': ['na', 'False', 'True'],
-    'location': ['na', 'home', 'hospital'],
+    'location': ['na', 'home', 'hospital', 'back_from_hospital'],
     'level_of_isolation': ['na', 'not_left_the_house', 'rarely_left_the_house', 'often_left_the_house'],
     'had_covid_test': boolean_inv_map
 }
@@ -671,8 +672,8 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         print(f"symptomatic_field '{s}' to categorical")
         asmt_dest_fields[s] = to_categorical(asmt_fields, field_to_index(asmt_ds, s), np.uint8, cv)
         any_symptoms |= asmt_dest_fields[s] > 1
-        print(np.count_nonzero(asmt_dest_fields[s] is True))
-        print(np.count_nonzero(any_symptoms is True))
+        print(np.count_nonzero(asmt_dest_fields[s] == True))
+        print(np.count_nonzero(any_symptoms == True))
 
     for f in flattened_fields:
         cv = categorical_maps[f[1]]
@@ -960,7 +961,6 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     for v in assessment_flag_descs.keys():
         print(f'{assessment_flag_descs[v]}: {count_flag_set(asmt_filter_status, v)}')
 
-    print('done!')
     return (geoc_ds, geoc_fields, geoc_filter_status, ptnt_dest_fields,
             asmt_ds, asmt_fields, asmt_filter_status,
             remaining_asmt_fields, remaining_asmt_filter_status,
@@ -1119,8 +1119,12 @@ if __name__ == '__main__':
                         help='the territory to filter the dataset on (runs on all territories if not set)')
     parser.add_argument('-p', '--patient_data',
                         help='the location and name of the patient data csv file')
+    parser.add_argument('-po', '--patient_data_out',
+                        help='the location and name of the output patient data csv file')
     parser.add_argument('-a', '--assessment_data',
                         help='the location and name of the assessment data csv file')
+    parser.add_argument('-ao', '--assessment_data_out',
+                        help='the location and name of the output assessment data csv file')
     args = parser.parse_args()
     warning = ("Warning! This a pre-release version of the joinzoe data preparation pipeline. It has not been"
               " fully tested and is used very much at your own risk, with a full commitment by you to check"
@@ -1130,8 +1134,11 @@ if __name__ == '__main__':
         regression_test_assessments('assessments_cleaned_short.csv', args.assessment_data)
         regression_test_patients('patients_cleaned_short.csv', args.patient_data)
     else:
+        print(); print(f'cleaning')
+        tstart = time.time()
         p_ds, p_fields, p_status, p_dest_fields, a_ds, a_fields, a_status, ra_fields, ra_status, res_fields, res_keys =\
             pipeline(args.patient_data, args.assessment_data, territory=args.territory)
+        print(f'cleaning completed in {time.time() - tstart} seconds')
 
         remaining_patients = set()
         for p in res_fields['patient_id']:
@@ -1140,7 +1147,9 @@ if __name__ == '__main__':
             if p[1][0] not in remaining_patients:
                 p_status[ip] |= FILTER_NOT_IN_FINAL_ASSESSMENTS
 
-        with open('test_patients.csv', 'w') as f:
+        print(); print(f'writing patient data to {args.patient_data_out}')
+        tstart = time.time()
+        with open(args.patient_data_out, 'w') as f:
             dest_keys = list(p_dest_fields.keys())
             values = [None] * (len(p_ds.names_) + len(dest_keys))
             csvw = csv.writer(f)
@@ -1152,10 +1161,13 @@ if __name__ == '__main__':
                     for iv in range(len(dest_keys)):
                         values[len(p_ds.names_) + iv] = p_dest_fields[dest_keys[iv]][ir]
                     csvw.writerow(values)
+        print(f'written to {args.patient_data_out} in {time.time() - tstart} seconds')
 
         functor_fields = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
 
-        with open('test_assessments.csv', 'w') as f:
+        print(f'writing assessment data to {args.assessment_data_out}')
+        tstart = time.time()
+        with open(args.assessment_data_out, 'w') as f:
             csvw = csv.writer(f)
             headers = list(res_fields.keys())# + ['day']
             csvw.writerow(headers)
@@ -1167,6 +1179,12 @@ if __name__ == '__main__':
                         if rh in functor_fields:
                             row_values[irh] = functor_fields[rh](res_fields[rh][ir])
                         elif rh in categorical_inv_maps:
+                            if rh not in categorical_inv_maps:
+                                print(f'{rh} not in {categorical_inv_maps.keys()}')
+                            if rh not in res_fields:
+                                print(f'{rh} not in {res_fields.keys()}')
+                            if res_fields[rh][ir] >= len(categorical_inv_maps[rh]):
+                                print(f'{res_fields[rh][ir]} is out of range for {categorical_inv_maps[rh]}')
                             row_values[irh] = categorical_inv_maps[rh][res_fields[rh][ir]]
                         else:
                             row_values[irh] = res_fields[rh][ir]
@@ -1175,3 +1193,4 @@ if __name__ == '__main__':
                     csvw.writerow(row_values)
                     for irv in range(len(row_values)):
                         row_values[irv] = None
+        print(f'written to {args.assessment_data_out} in {time.time() - tstart} seconds')
