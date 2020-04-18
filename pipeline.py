@@ -1126,10 +1126,6 @@ if __name__ == '__main__':
     parser.add_argument('-ao', '--assessment_data_out',
                         help='the location and name of the output assessment data csv file')
     args = parser.parse_args()
-    warning = ("Warning! This a pre-release version of the joinzoe data preparation pipeline. It has not been"
-              " fully tested and is used very much at your own risk, with a full commitment by you to check"
-              " correctness of output before relying on it for downstream analysis.")
-    print(warning)
     if args.regression_test:
         regression_test_assessments('assessments_cleaned_short.csv', args.assessment_data)
         regression_test_patients('patients_cleaned_short.csv', args.patient_data)
