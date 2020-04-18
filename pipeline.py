@@ -1169,8 +1169,8 @@ if __name__ == '__main__':
         tstart = time.time()
         with open(args.assessment_data_out, 'w') as f:
             csvw = csv.writer(f)
-            headers = list(res_fields.keys())# + ['day']
-            csvw.writerow(headers)
+            headers = list(res_fields.keys())
+            csvw.writerow(headers + ['day'])
             row_field_count = len(res_fields)
             row_values = [None] * row_field_count
             for ir in range(len(res_fields['id'])):
@@ -1179,17 +1179,13 @@ if __name__ == '__main__':
                         if rh in functor_fields:
                             row_values[irh] = functor_fields[rh](res_fields[rh][ir])
                         elif rh in categorical_inv_maps:
-                            if rh not in categorical_inv_maps:
-                                print(f'{rh} not in {categorical_inv_maps.keys()}')
-                            if rh not in res_fields:
-                                print(f'{rh} not in {res_fields.keys()}')
                             if res_fields[rh][ir] >= len(categorical_inv_maps[rh]):
                                 print(f'{res_fields[rh][ir]} is out of range for {categorical_inv_maps[rh]}')
                             row_values[irh] = categorical_inv_maps[rh][res_fields[rh][ir]]
                         else:
                             row_values[irh] = res_fields[rh][ir]
                     updated = res_fields['updated_at']
-                    row_values[-1] = f"{updated[0:4]}-{updated[5:7]}-{updated[8:10]}"
+                    row_values[-1] = f"{updated[ir][0:4]}-{updated[ir][5:7]}-{updated[ir][8:10]}"
                     csvw.writerow(row_values)
                     for irv in range(len(row_values)):
                         row_values[irv] = None
