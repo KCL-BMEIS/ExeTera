@@ -394,6 +394,7 @@ categorical_maps = {
     'location': {na_value_from: 0, 'home': 1, 'hospital': 2, 'back_from_hospital': 3},
     'level_of_isolation': {na_value_from: 0, 'not_left_the_house': 1, 'rarely_left_the_house': 2, 'often_left_the_house': 3},
     'had_covid_test': leaky_boolean_from,
+    'tested_covid_positive': {na_value_from: 0, 'waiting': 1, 'no': 2, 'yes': 3}
 }
 
 boolean_inv_map = [na_value_to, 'False', 'True']
@@ -422,7 +423,8 @@ categorical_inv_maps = {
     'shortness_of_breath_binary': [na_value_to, 'False', 'True'],
     'location': [na_value_to, 'home', 'hospital', 'back_from_hospital'],
     'level_of_isolation': [na_value_to, 'not_left_the_house', 'rarely_left_the_house', 'often_left_the_house'],
-    'had_covid_test': boolean_inv_map
+    'had_covid_test': boolean_inv_map,
+    'tested_covid_positive': [na_value_to, 'waiting', 'no', 'yes']
 }
 
 
@@ -678,6 +680,8 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         any_symptoms |= asmt_dest_fields[s] > 1
         print(np.count_nonzero(asmt_dest_fields[s] == True))
         print(np.count_nonzero(any_symptoms == True))
+
+    print(build_histogram(asmt_fields, field_to_index(asmt_ds, 'tested_covid_positive')))
 
     for f in flattened_fields:
         cv = categorical_maps[f[1]]
@@ -990,7 +994,7 @@ def regression_test_assessments(old_assessments, new_assessments):
     r_a_fields = sorted(r_a_fields, key=lambda r: (r[1][2], r[1][1]))
     p_a_fields = sorted(p_a_fields, key=lambda p: (p[1][1], p[1][0]))
 
-    diagnostic_row_keys = ['id', 'patient_id', 'created_at', 'updated_at', 'fatigue', 'fatigue_binary']
+    diagnostic_row_keys = ['id', 'patient_id', 'created_at', 'updated_at', 'fatigue', 'fatigue_binary', 'tested_covid_positive']
     r_fns = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
 
     patients_with_disparities = set()
@@ -1039,6 +1043,7 @@ def regression_test_assessments(old_assessments, new_assessments):
             if p[1][1] == pd:
                 print_diagnostic_row(f'p[ip]', p_a_ds, p_a_fields, ip, diagnostic_row_keys)
 
+    print('done')
 
 def regression_test_patients(old_patients, new_patients):
     print(); print('regression test patients')
@@ -1172,7 +1177,7 @@ if __name__ == '__main__':
             headers = list(res_fields.keys())
             csvw.writerow(headers + ['day'])
             row_field_count = len(res_fields)
-            row_values = [None] * row_field_count
+            row_values = [None] * (row_field_count + 1)
             for ir in range(len(res_fields['id'])):
                 if ra_status[ir] == 0:
                     for irh, rh in enumerate(headers):
