@@ -364,38 +364,42 @@ exposure_fields = ["always_used_shortage", "have_used_PPE", "never_used_shortage
                    "treated_patients_with_covid"]
 miscellaneous_fields = ['location', 'level_of_isolation', 'had_covid_test']
 
+na_value_from = ''
+na_value_to = ''
+
+leaky_boolean_from = {na_value_from: 0, 'False': 1, 'True': 2}
 categorical_maps = {
-    'fatigue': {'': 0, 'no': 1, 'mild': 2, 'severe': 3},
-    'shortness_of_breath': {'': 0, 'no': 1, 'mild': 2, 'significant': 3, 'severe': 4},
-    'abdominal_pain': {'': 0, 'False': 1, 'True': 2},
-    'chest_pain': {'': 0, 'False': 1, 'True': 2},
-    'delirium': {'': 0, 'False': 1, 'True': 2},
-    'diarrhoea': {'': 0, 'False': 1, 'True': 2},
-    'fever': {'': 0, 'False': 1, 'True': 2},
-    'headache': {'': 0, 'False': 1, 'True': 2},
-    'hoarse_voice': {'': 0, 'False': 1, 'True': 2},
-    'loss_of_smell': {'': 0, 'False': 1, 'True': 2},
-    'persistent_cough': {'': 0, 'False': 1, 'True': 2},
-    'skipped_meals': {'': 0, 'False': 1, 'True': 2},
-    'sore_throat': {'': 0, 'False': 1, 'True': 2},
-    'unusual_muscle_pains': {'': 0, 'False': 1, 'True': 2},
-    'always_used_shortage': {'': 0, 'all_needed': 1, 'reused': 2},
-    'have_used_PPE': {'': 0, 'never': 1, 'sometimes': 2, 'always': 3},
-    'never_used_shortage': {'': 0, 'not_needed': 1, 'not_available': 2},
-    'sometimes_used_shortage': {'': 0, 'all_needed': 1, 'reused': 2, 'not_enough': 3},
-    'treated_patients_with_covid': {'': 0, 'no': 1, 'yes_suspected': 2,
+    'fatigue': {na_value_from: 0, 'no': 1, 'mild': 2, 'severe': 3},
+    'shortness_of_breath': {na_value_from: 0, 'no': 1, 'mild': 2, 'significant': 3, 'severe': 4},
+    'abdominal_pain': leaky_boolean_from,
+    'chest_pain': leaky_boolean_from,
+    'delirium': leaky_boolean_from,
+    'diarrhoea': leaky_boolean_from,
+    'fever': leaky_boolean_from,
+    'headache': leaky_boolean_from,
+    'hoarse_voice': leaky_boolean_from,
+    'loss_of_smell': leaky_boolean_from,
+    'persistent_cough': leaky_boolean_from,
+    'skipped_meals': leaky_boolean_from,
+    'sore_throat': leaky_boolean_from,
+    'unusual_muscle_pains': leaky_boolean_from,
+    'always_used_shortage': {na_value_from: 0, 'all_needed': 1, 'reused': 2},
+    'have_used_PPE': {na_value_from: 0, 'never': 1, 'sometimes': 2, 'always': 3},
+    'never_used_shortage': {na_value_from: 0, 'not_needed': 1, 'not_available': 2},
+    'sometimes_used_shortage': {na_value_from: 0, 'all_needed': 1, 'reused': 2, 'not_enough': 3},
+    'treated_patients_with_covid': {na_value_from: 0, 'no': 1, 'yes_suspected': 2,
                                     'yes_documented_suspected': 3, 'yes_documented': 4},
-    'fatigue_binary': {'': 0, 'no': 1, 'mild': 2, 'severe': 2},
-    'shortness_of_breath_binary': {'': 0, 'no': 1, 'mild': 2, 'significant': 2, 'severe': 2},
-    'location': {'': 0, 'home': 1, 'hospital': 2, 'back_from_hospital': 3},
-    'level_of_isolation': {'': 0, 'not_left_the_house': 1, 'rarely_left_the_house': 2, 'often_left_the_house': 3},
-    'had_covid_test': {'': 0, 'False': 1, 'True': 2}
+    'fatigue_binary': {na_value_from: 0, 'no': 1, 'mild': 2, 'severe': 2},
+    'shortness_of_breath_binary': {na_value_from: 0, 'no': 1, 'mild': 2, 'significant': 2, 'severe': 2},
+    'location': {na_value_from: 0, 'home': 1, 'hospital': 2, 'back_from_hospital': 3},
+    'level_of_isolation': {na_value_from: 0, 'not_left_the_house': 1, 'rarely_left_the_house': 2, 'often_left_the_house': 3},
+    'had_covid_test': leaky_boolean_from,
 }
 
-boolean_inv_map = ['na', 'False', 'True']
+boolean_inv_map = [na_value_to, 'False', 'True']
 categorical_inv_maps = {
-    'fatigue': ['na', 'no', 'mild', 'severe'],
-    'shortness_of_breath': ['', 'no', 'mild', 'significant', 'severe'],
+    'fatigue': [na_value_to, 'no', 'mild', 'severe'],
+    'shortness_of_breath': [na_value_to, 'no', 'mild', 'significant', 'severe'],
     'abdominal_pain': boolean_inv_map,
     'chest_pain': boolean_inv_map,
     'delirium': boolean_inv_map,
@@ -408,16 +412,16 @@ categorical_inv_maps = {
     'skipped_meals': boolean_inv_map,
     'sore_throat': boolean_inv_map,
     'unusual_muscle_pains': boolean_inv_map,
-    'always_used_shortage': ['na', 'all_needed', 'reused'],
-    'have_used_PPE': ['na', 'never', 'sometimes', 'always'],
-    'never_used_shortage': ['na', 'not_needed', 'not_available'],
-    'sometimes_used_shortage': ['na', 'all_needed', 'reused', 'not_enough'],
-    'treated_patients_with_covid': ['na', 'no', 'yes_suspected',
+    'always_used_shortage': [na_value_to, 'all_needed', 'reused'],
+    'have_used_PPE': [na_value_to, 'never', 'sometimes', 'always'],
+    'never_used_shortage': [na_value_to, 'not_needed', 'not_available'],
+    'sometimes_used_shortage': [na_value_to, 'all_needed', 'reused', 'not_enough'],
+    'treated_patients_with_covid': [na_value_to, 'no', 'yes_suspected',
                                     'yes_documented_suspected', 'yes_documented'],
-    'fatigue_binary': ['na', 'False', 'True'],
-    'shortness_of_breath_binary': ['na', 'False', 'True'],
-    'location': ['na', 'home', 'hospital', 'back_from_hospital'],
-    'level_of_isolation': ['na', 'not_left_the_house', 'rarely_left_the_house', 'often_left_the_house'],
+    'fatigue_binary': [na_value_to, 'False', 'True'],
+    'shortness_of_breath_binary': [na_value_to, 'False', 'True'],
+    'location': [na_value_to, 'home', 'hospital', 'back_from_hospital'],
+    'level_of_isolation': [na_value_to, 'not_left_the_house', 'rarely_left_the_house', 'often_left_the_house'],
     'had_covid_test': boolean_inv_map
 }
 
