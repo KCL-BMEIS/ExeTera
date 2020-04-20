@@ -16,21 +16,6 @@ def compare_row(eindex, expected, aindex, actual, keys):
             return evalue == avalue
 
 def compare(expected, actual):
-    # with open(expected) as fpe:
-    #     with open(actual) as fpa:
-    #         csvfpe = csv.DictReader(fpe)
-    #         expected_field_names = csvfpe.fieldnames
-    #         e_permutation = sorted([x for x in range(len(expected_field_names))], key=lambda x: expected_field_names[x])
-    #         print(e_permutation)
-    #
-    #         csvfpe = csv.reader(fpe)
-    #
-    #         csvfpa = csv.DictReader(fpa)
-    #         actual_field_names = csvfpa.fieldnames
-    #         a_permutation = sorted([x for x in range(len(actual_field_names))], key=lambda x: actual_field_names[x])
-    #         print(a_permutation)
-    #
-    #         csvfpa = csv.reader(fpa)
 
     expected_ds = pipeline.Dataset(expected)
     expected_field_names = expected_ds.names_
@@ -48,17 +33,9 @@ def compare(expected, actual):
     common_fields = set(expected_field_names).intersection(set(actual_field_names))
     print('common fields:', common_fields)
 
-    # efields = list()
-    # for ei, e in enumerate(csvfpe):
-    #     efields.append(e)
-    # print(ei+1)
     efields = expected_ds.parse_file()
     print(expected_ds.row_count())
 
-    # afields = list()
-    # for ai, a in enumerate(csvfpa):
-    #     afields.append(a)
-    # print(ai+1)
     afields = actual_ds.parse_file()
     print(actual_ds.row_count())
 
@@ -74,13 +51,10 @@ def compare(expected, actual):
     else:
         print('rows equal')
 
-def validate():
-    epfn = 'expected_50k_patients.csv'
-    apfn = 'test_patients.csv'
-    eafn = 'expected_50k_assessments.csv'
-    aafn = 'test_assessments.csv'
-    compare(epfn, apfn)
-    compare(eafn, aafn)
+def validate(expected_patients_file_name, actual_patient_file_name,
+             expected_assessments_file_name, actual_assessments_file_name):
+    compare(expected_patients_file_name, actual_patient_file_name)
+    compare(expected_assessments_file_name, actual_assessments_file_name)
 
 def validate_full():
     filename = '/home/ben/covid/assessments_20200413050002_clean.csv'
@@ -103,22 +77,9 @@ def show_rows(filename, fields_to_show):
         if ds.value_from_fieldname(i_f, 'patient_id') == 'e88bfabe5b16897866f91deb8a7a90f2':
             pipeline.print_diagnostic_row(f'{i_f}:', ds, ds.fields_, i_f, fields_to_show)
 
-# print()
-# print('input')
-# print('-----')
-# filename = '/home/ben/covid/assessments_short.csv'
-# show_rows(filename, ('id', 'patient_id', 'updated_at', 'fatigue'))
-#
-# print()
-# print('python output')
-# print('-------------')
-# filename = '/home/ben/git/zoe-data-prep/test_assessments.csv'
-# show_rows(filename, ('id', 'patient_id', 'updated_at', 'fatigue', 'fatigue_binary'))
-#
-# print()
-# print('R output')
-# print('--------')
-# filename = '/home/ben/covid/assessments_cleaned_short.csv'
-# show_rows(filename, ('id', 'patient_id', 'updated_at', 'fatigue', 'fatigue_binary'))
 
-validate()
+epfn = 'v0.1.2_50k_patients.csv'
+apfn = 'test_patients.csv'
+eafn = 'v0.1.2_50k_assessments.csv'
+aafn = 'test_assessments.csv'
+validate(epfn, apfn, eafn, aafn)

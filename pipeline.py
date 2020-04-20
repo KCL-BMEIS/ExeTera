@@ -499,65 +499,6 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         print(f'other territories: filtered {count_flag_set(geoc_filter_status, PFILTER_OTHER_TERRITORY)} missing values')
 
 
-    # print(); print()
-    # print("filter patients with insufficient assessments")
-    # print("---------------------------------------------")
-    # patient_assessment_counts = defaultdict(int)
-    # for a in asmt_fields:
-    #     patient_assessment_counts[a[1][1]] += 1
-    # patient_assessments = list(patient_assessment_counts.items())
-    #
-    # for ir, r in enumerate(geoc_fields):
-    #     pid = r[1][0]
-    #     if pid not in patient_assessment_counts:
-    #         geoc_filter_status[ir] |= PFILTER_NO_ASSESSMENTS
-    #     elif patient_assessment_counts[pid] == 1:
-    #         geoc_filter_status[ir] |= PFILTER_ONE_ASSESSMENT
-    # del patient_assessment_counts
-
-#    def check_assessment_counts():
-#        abp = defaultdict(int)
-#        for ir in range(len(asmt_fields)):
-#            abp[asmt_fields[ir][1][1]] += 1
-#        abpt = list(abp.items())
-#        count_multi = 0
-#        print(len(abpt))
-#        for it in abpt:
-#            if it[1] > 1:
-#                count_multi += 1
-#        print('multiple assessments:', count_multi)
-#    check_assessment_counts()
-#
-#    Restore once properly refactored and unit tested
-#    i = 0
-#    j = 0
-#    missing_patient_ids = list()
-#    while i < len(geoc_fields) and j < len(patient_assessments):
-#        # print(i, j, geoc_fields[i][1][0], patient_assessments[j][0])
-#        if geoc_fields[i][1][0] < patient_assessments[j][0]:
-#            # patient has no assessments
-#            geoc_filter_status[i] |= PFILTER_NO_ASSESSMENTS
-#            i += 1
-#
-#        elif geoc_fields[i][1][0] > patient_assessments[j][0]:
-#            # assessment patient id not in patient list
-#            missing_patient_ids.append(patient_assessments[j][0])
-#            j += 1
-#        else:
-#            # patient has assessments; but needs multiples
-#            if patient_assessments[j][1] == 1:
-#                geoc_filter_status[i] |= PFILTER_ONE_ASSESSMENT
-#            i += 1
-#            j += 1
-#    # print(missing_patient_ids)
-#    while i < len(geoc_fields):
-#        geoc_filter_status[i] |= PFILTER_NO_ASSESSMENTS
-#        i += 1
-#
-#    while j < len(patient_assessments):
-#        missing_patient_ids.append(patient_assessments[j][0])
-#        j += 1
-
     # print(count_flag_set(geoc_filter_status, PFILTER_NO_ASSESSMENTS))
     patient_ids = set()
     for r in geoc_fields:
