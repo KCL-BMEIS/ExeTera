@@ -46,15 +46,20 @@ def compare(expected, actual, verbose):
     else:
         print(f'WARNING: expected file has {expected_ds.row_count()} rows, actual file has {actual_ds.row_count()} rows')
 
-    disparities = 0
+    rows_that_differ = []
     for i in range(expected_ds.row_count()):
             if not compare_row(i, expected_ds, i, actual_ds, common_fields):
-                disparities += 1
+                rows_that_differ.append(i)
 
-    if disparities > 0:
-        print('WARNING: rows not equal')
+    if len(rows_that_differ) > 0:
+        print(f'WARNING: a total of {len(rows_that_differ)} rows do not match')
+        if verbose:
+            for row in rows_that_differ:
+                print('expected value | actual_value')
+                for field in common_fields:
+                    print(f'{expected_ds.value_from_fieldname(row, field)} | {actual_ds.value_from_fieldname(row, field)}')
     else:
-        print('rows equal')
+        print('row contents are equal')
 
 def validate(expected_patients_file_name, actual_patient_file_name,
              expected_assessments_file_name, actual_assessments_file_name, verbose=False):
@@ -73,6 +78,7 @@ def validate_full():
         for ir, r in enumerate(csvr):
             if r['tested_covid_positive'] != '':
                 print(ir, r['id'], r['patient_id'], r['tested_covid_positive'])
+
 
 def show_rows(filename, fields_to_show):
     with open(filename) as f:
