@@ -33,8 +33,8 @@ def compare(expected, actual, verbose):
     if expected_field_names == actual_field_names:
         print('field names are identical')
     else:
-        print('WARNING: only in expected:', set(expected_field_names).difference(set(actual_field_names)))
-        print('WARNING: only in actual:', set(actual_field_names).difference(set(expected_field_names)))
+        print('WARNING: fieldnames only in expected:', set(expected_field_names).difference(set(actual_field_names)))
+        print('WARNING: fieldnames only in actual:', set(actual_field_names).difference(set(expected_field_names)))
 
     common_fields = set(expected_field_names).intersection(set(actual_field_names))
     if verbose:
@@ -61,9 +61,9 @@ def compare(expected, actual, verbose):
     else:
         print('row contents are equal')
 
-def validate(expected_patients_file_name, actual_patient_file_name,
+def validate(expected_patients_file_name, actual_patients_file_name,
              expected_assessments_file_name, actual_assessments_file_name, verbose=False):
-    compare(expected_patients_file_name, actual_patient_file_name, verbose)
+    compare(expected_patients_file_name, actual_patients_file_name, verbose)
     compare(expected_assessments_file_name, actual_assessments_file_name, verbose)
 
 def validate_full():
@@ -93,16 +93,28 @@ def show_rows(filename, fields_to_show):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-pe', '--patients_expected',
+    parser.add_argument('-pe', '--patients_output_expected',
                         help='the location of the patient file produced by a correct version (currently v.0.1.2) of the pipeline')
-    parser.add_argument('-pa', '--patients_actual',
-                        help='the location of the patient file produced by the current version of the pipeline')
-    parser.add_argument('-ae', '--assessments_expected',
+    parser.add_argument('-pi', '--patients_input',
+                        help='the location of the patient input file to be processed')
+    parser.add_argument('-ae', '--assessments_output_expected',
                         help='the location of the assessments file produced by a correct version (currently v.0.1.2) of the pipeline')
-    parser.add_argument('-aa', '--assessments_actual',
-                        help='the location of the assessments file produced by the current version of the pipeline')
+    parser.add_argument('-ai', '--assessments_input',
+                        help='the location of the assessments input file to be processed')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='increase verbosity')
     args = parser.parse_args()
-    validate(args.patients_expected, args.patients_actual, args.assessments_expected, args.assessments_actual,
+
+    # run the current pipeline
+    pipeline_output = pipeline.pipeline(patient_filename=args.patients_input,
+                                        assessment_filename=args.assessments_input)
+    pipeline.save_csv(pipeline_output,
+                      patient_data_out='patients_output_test.csv',
+                      assessment_data_out='assessments_output_test.csv')
+
+    # compare to expected pipeline output
+    validate(expected_patients_file_name=args.patients_output_expected,
+             actual_patients_file_name='patients_output_test.csv',
+             expected_assessments_file_name=args.assessments_output_expected,
+             actual_assessments_file_name='assessments_output_test.csv',
              verbose=args.verbose)

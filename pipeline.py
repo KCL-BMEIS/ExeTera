@@ -983,6 +983,62 @@ def regression_test_patients(old_patients, new_patients):
     for pd in patients_with_disparities:
         print(); print(pd)
 
+def save_csv(pipeline_output, assessment_data_out, patient_data_out):
+    p_ds, p_fields, p_status, p_dest_fields, a_ds, a_fields, a_status, ra_fields, ra_status, res_fields, res_keys \
+        = pipeline_output
+    remaining_patients = set()
+    for p in res_fields['patient_id']:
+        remaining_patients.add(p)
+    for ip, p in enumerate(p_fields):
+        if p[1][0] not in remaining_patients:
+            p_status[ip] |= FILTER_NOT_IN_FINAL_ASSESSMENTS
+
+    print();
+    print(f'writing patient data to {patient_data_out}')
+    tstart = time.time()
+    with open(patient_data_out, 'w') as f:
+        dest_keys = list(p_dest_fields.keys())
+        values = [None] * (len(p_ds.names_) + len(dest_keys))
+        csvw = csv.writer(f)
+        csvw.writerow(p_ds.names_ + dest_keys)
+        for ir, r in enumerate(p_fields):
+            if p_status[ir] == 0:
+                for iv, v in enumerate(r[1]):
+                    values[iv] = v
+                for iv in range(len(dest_keys)):
+                    values[len(p_ds.names_) + iv] = p_dest_fields[dest_keys[iv]][ir]
+                csvw.writerow(values)
+    print(f'written to {patient_data_out} in {time.time() - tstart} seconds')
+
+    functor_fields = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
+
+    print(f'writing assessment data to {assessment_data_out}')
+    tstart = time.time()
+    with open(assessment_data_out, 'w') as f:
+        csvw = csv.writer(f)
+        headers = list(res_fields.keys())
+        # TODO: constructed fields should be in their own collection; the ['day'] and +1 stuff is a temporary hack
+        csvw.writerow(headers + ['day'])
+        row_field_count = len(res_fields)
+        row_values = [None] * (row_field_count + 1)
+        for ir in range(len(res_fields['id'])):
+            if ra_status[ir] == 0:
+                for irh, rh in enumerate(headers):
+                    if rh in functor_fields:
+                        row_values[irh] = functor_fields[rh](res_fields[rh][ir])
+                    elif rh in categorical_inv_maps:
+                        if res_fields[rh][ir] >= len(categorical_inv_maps[rh]):
+                            print(f'{res_fields[rh][ir]} is out of range for {categorical_inv_maps[rh]}')
+                        row_values[irh] = categorical_inv_maps[rh][res_fields[rh][ir]]
+                    else:
+                        row_values[irh] = res_fields[rh][ir]
+                updated = res_fields['updated_at']
+                row_values[-1] = f"{updated[ir][0:4]}-{updated[ir][5:7]}-{updated[ir][8:10]}"
+                csvw.writerow(row_values)
+                for irv in range(len(row_values)):
+                    row_values[irv] = None
+    print(f'written to {assessment_data_out} in {time.time() - tstart} seconds')
+
 
 if __name__ == '__main__':
     import argparse
@@ -1005,58 +1061,7 @@ if __name__ == '__main__':
     else:
         print(); print(f'cleaning')
         tstart = time.time()
-        p_ds, p_fields, p_status, p_dest_fields, a_ds, a_fields, a_status, ra_fields, ra_status, res_fields, res_keys =\
-            pipeline(args.patient_data, args.assessment_data, territory=args.territory)
+        pipeline_output = pipeline(args.patient_data, args.assessment_data, territory=args.territory)
         print(f'cleaning completed in {time.time() - tstart} seconds')
 
-        remaining_patients = set()
-        for p in res_fields['patient_id']:
-            remaining_patients.add(p)
-        for ip, p in enumerate(p_fields):
-            if p[1][0] not in remaining_patients:
-                p_status[ip] |= FILTER_NOT_IN_FINAL_ASSESSMENTS
-
-        print(); print(f'writing patient data to {args.patient_data_out}')
-        tstart = time.time()
-        with open(args.patient_data_out, 'w') as f:
-            dest_keys = list(p_dest_fields.keys())
-            values = [None] * (len(p_ds.names_) + len(dest_keys))
-            csvw = csv.writer(f)
-            csvw.writerow(p_ds.names_ + dest_keys)
-            for ir, r in enumerate(p_fields):
-                if p_status[ir] == 0:
-                    for iv, v in enumerate(r[1]):
-                        values[iv] = v
-                    for iv in range(len(dest_keys)):
-                        values[len(p_ds.names_) + iv] = p_dest_fields[dest_keys[iv]][ir]
-                    csvw.writerow(values)
-        print(f'written to {args.patient_data_out} in {time.time() - tstart} seconds')
-
-        functor_fields = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
-
-        print(f'writing assessment data to {args.assessment_data_out}')
-        tstart = time.time()
-        with open(args.assessment_data_out, 'w') as f:
-            csvw = csv.writer(f)
-            headers = list(res_fields.keys())
-            #TODO: constructed fields should be in their own collection; the ['day'] and +1 stuff is a temporary hack
-            csvw.writerow(headers + ['day'])
-            row_field_count = len(res_fields)
-            row_values = [None] * (row_field_count + 1)
-            for ir in range(len(res_fields['id'])):
-                if ra_status[ir] == 0:
-                    for irh, rh in enumerate(headers):
-                        if rh in functor_fields:
-                            row_values[irh] = functor_fields[rh](res_fields[rh][ir])
-                        elif rh in categorical_inv_maps:
-                            if res_fields[rh][ir] >= len(categorical_inv_maps[rh]):
-                                print(f'{res_fields[rh][ir]} is out of range for {categorical_inv_maps[rh]}')
-                            row_values[irh] = categorical_inv_maps[rh][res_fields[rh][ir]]
-                        else:
-                            row_values[irh] = res_fields[rh][ir]
-                    updated = res_fields['updated_at']
-                    row_values[-1] = f"{updated[ir][0:4]}-{updated[ir][5:7]}-{updated[ir][8:10]}"
-                    csvw.writerow(row_values)
-                    for irv in range(len(row_values)):
-                        row_values[irv] = None
-        print(f'written to {args.assessment_data_out} in {time.time() - tstart} seconds')
+        save_csv(pipeline_output, args.patient_data_out, args.assessment_data_out)
