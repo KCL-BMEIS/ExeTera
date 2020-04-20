@@ -23,13 +23,13 @@ class Dataset:
         # next(ecsvf)
         for i, fields in enumerate(ecsvf):
             self.fields_.append((i, fields))
-            if i > 0 and i % lines_per_dot == 0:
-                if i % (lines_per_dot * newline_at) == 0:
-                    print(f'. {i}')
-                else:
-                    print('.', end='')
-        if i % (lines_per_dot * newline_at) != 0:
-            print(f' {i}')
+        #     if i > 0 and i % lines_per_dot == 0:
+        #         if i % (lines_per_dot * newline_at) == 0:
+        #             print(f'. {i}')
+        #         else:
+        #             print('.', end='')
+        # if i % (lines_per_dot * newline_at) != 0:
+        #     print(f' {i}')
         self.index_ = np.asarray([i for i in range(len(self.fields_))], dtype=np.uint32)
         # return strings
 
