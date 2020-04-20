@@ -17,37 +17,39 @@ import numpy as np
 
 class Dataset:
 
-    def __init__(self, filename):
-        self.filename_ = filename
+    def __init__(self, source):
+        #self.filename_ = filename
         self.names_ = list()
         self.fields_ = list()
+        self.names_ = list()
         self.index_ = None
 
-        with open(self.filename_) as f:
-            csvf = csv.DictReader(f, delimiter=',', quotechar='"')
+        if source:
+            csvf = csv.DictReader(source, delimiter=',', quotechar='"')
             self.names_ = csvf.fieldnames
 
-    def parse_file(self, strings=None):
-        if strings is None:
-            strings = list()
+    #
+    # def _parse_file(self, source, strings=None):
+    #     if strings is None:
+    #         strings = list()
         newline_at = 10
         lines_per_dot = 100000
-        with open(self.filename_) as f:
-            csvf = csv.reader(f, delimiter=',', quotechar='"')
+        # TODO: better for the Dataset to take a stream rather than a name - this allows us to unittest it from strings
+        csvf = csv.reader(source, delimiter=',', quotechar='"')
 
-            ecsvf = iter(csvf)
-            next(ecsvf)
-            for i, fields in enumerate(ecsvf):
-                self.fields_.append((i, fields))
-                if i > 0 and i % lines_per_dot == 0:
-                    if i % (lines_per_dot * newline_at) == 0:
-                        print(f'. {i}')
-                    else:
-                        print('.', end='')
-            if i % (lines_per_dot * newline_at) != 0:
-                print(f' {i}')
-
-        return strings
+        ecsvf = iter(csvf)
+        # next(ecsvf)
+        for i, fields in enumerate(ecsvf):
+            self.fields_.append((i, fields))
+            if i > 0 and i % lines_per_dot == 0:
+                if i % (lines_per_dot * newline_at) == 0:
+                    print(f'. {i}')
+                else:
+                    print('.', end='')
+        if i % (lines_per_dot * newline_at) != 0:
+            print(f' {i}')
+        self.index_ = np.asarray([i for i in range(len(self.fields_))], dtype=np.uint32)
+        # return strings
 
     def sort(self, keys):
         #map names to indices
@@ -437,8 +439,10 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print('-------------')
     # geoc_fieldnames = enumerate_fields(patient_filename)
     # geoc_countdict = {'id': False, 'patient_id': False}
-    geoc_ds = Dataset(patient_filename)
-    geoc_ds.parse_file()
+    with open(patient_filename) as f:
+        geoc_ds = Dataset(f)
+    # with open(patient_filename) as f:
+    #         geoc_ds.parse_file(f)
     geoc_ds.sort(('id',))
     geoc_ds.show()
 
@@ -448,8 +452,10 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print('----------------')
     # asmt_fieldnames = enumerate_fields(assessment_filename)
     # asmt_countdict = {'id': False, 'patient_id': False}
-    asmt_ds = Dataset(assessment_filename)
-    asmt_ds.parse_file()
+    with open(assessment_filename) as f:
+        asmt_ds = Dataset(f)
+    # with open(assessment_filename) as f:
+    #     asmt_ds.parse_file(f)
     asmt_ds.sort(('patient_id', 'updated_at'))
     asmt_ds.show()
 
@@ -921,11 +927,13 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
 
 def regression_test_assessments(old_assessments, new_assessments):
-    r_a_ds = Dataset(old_assessments)
-    r_a_ds.parse_file()
+    with open(old_assessments) as f:
+        r_a_ds = Dataset(f)
+        # r_a_ds.parse_file(f)
     r_a_ds.sort(('patient_id', 'id'))
-    p_a_ds = Dataset(new_assessments)
-    p_a_ds.parse_file()
+    with open(new_assessments) as f:
+        p_a_ds = Dataset(f)
+        # p_a_ds.parse_file(f)
     p_a_ds.sort(('patient_id', 'id'))
 
     r_a_fields = r_a_ds.fields_
@@ -989,11 +997,13 @@ def regression_test_patients(old_patients, new_patients):
     print(); print('regression test patients')
     print('old_patients:', old_patients)
     print('new_patients:', new_patients)
-    r_a_ds = Dataset(old_patients)
-    r_a_ds.parse_file()
+    with open(old_patients) as f:
+        r_a_ds = Dataset(f)
+        # r_a_ds.parse_file(f)
     r_a_ds.sort(('id',))
-    p_a_ds = Dataset(new_patients)
-    p_a_ds.parse_file()
+    with open(new_patients) as f:
+        p_a_ds = Dataset(f)
+        # p_a_ds.parse_file(f)
     p_a_ds.sort(('id',))
 
     r_a_fields = r_a_ds.fields_

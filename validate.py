@@ -20,9 +20,15 @@ def compare_row(eindex, expected, aindex, actual, keys):
 
 def compare(expected, actual):
 
-    expected_ds = pipeline.Dataset(expected)
+    with open(expected) as f:
+        expected_ds = pipeline.Dataset(f)
+    # with open(expected) as f:
+    #     expected_ds.parse_file(f)
     expected_field_names = expected_ds.names_
-    actual_ds = pipeline.Dataset(actual)
+    with open(actual) as f:
+        actual_ds = pipeline.Dataset(f)
+    # with open(actual) as f:
+    #     actual_ds.parse_file(f)
     actual_field_names = actual_ds.names_
 
     if expected_field_names == actual_field_names:
@@ -36,10 +42,7 @@ def compare(expected, actual):
     common_fields = set(expected_field_names).intersection(set(actual_field_names))
     print('common fields:', common_fields)
 
-    expected_ds.parse_file()
     print(expected_ds.row_count())
-
-    actual_ds.parse_file()
     print(actual_ds.row_count())
 
     disparities = 0
@@ -71,8 +74,9 @@ def validate_full():
                 print(ir, r['id'], r['patient_id'], r['tested_covid_positive'])
 
 def show_rows(filename, fields_to_show):
-    ds = pipeline.Dataset(filename)
-    ds.parse_file()
+    with open(filename) as f:
+        ds = pipeline.Dataset(f)
+    # ds.parse_file()
     ds.sort(('patient_id', 'updated_at'))
     for i_f, f in enumerate(ds.fields_):
         if ds.value_from_fieldname(i_f, 'patient_id') == 'e88bfabe5b16897866f91deb8a7a90f2':
