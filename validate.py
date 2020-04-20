@@ -2,18 +2,21 @@ import csv
 import pipeline
 
 equivalence_map = {
-    'na':('', 'na'),
+    'na': ('', 'na'),
     '': ('', 'na')
 }
 
 def compare_row(eindex, expected, aindex, actual, keys):
+    all_true = True
     for k in keys:
         evalue = expected.value_from_fieldname(eindex, k)
         avalue = actual.value_from_fieldname(aindex, k)
         if evalue in equivalence_map:
-            return avalue in equivalence_map[evalue]
+            all_true = all_true and avalue in equivalence_map[evalue]
         else:
-            return evalue == avalue
+            all_true = all_true and evalue == avalue
+
+    return all_true
 
 def compare(expected, actual):
 
@@ -33,18 +36,16 @@ def compare(expected, actual):
     common_fields = set(expected_field_names).intersection(set(actual_field_names))
     print('common fields:', common_fields)
 
-    efields = expected_ds.parse_file()
+    expected_ds.parse_file()
     print(expected_ds.row_count())
 
-    afields = actual_ds.parse_file()
+    actual_ds.parse_file()
     print(actual_ds.row_count())
 
     disparities = 0
-    for i in range(len(efields)):
-        for n in common_fields:
-            compare_row()
-        if efields[1][i] != afields[1][i] and efields[1][i] not in ('na', '') and afields[1][i] not in ('na', ''):
-            disparities += 1
+    for i in range(expected_ds.row_count()):
+            if not compare_row(i, expected_ds, i, actual_ds, common_fields):
+                disparities += 1
 
     if disparities > 0:
         print('rows not equal')
