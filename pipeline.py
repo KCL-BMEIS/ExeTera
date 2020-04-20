@@ -1041,38 +1041,21 @@ def regression_test_patients(old_patients, new_patients):
     r = 0
     p = 0
     while r < len(r_a_fields) and p < len(p_a_fields):
-        #print(r, p)
-        #print(r, r_a_fields[r])
-        #print(p, p_a_fields[p])
-        #rkey = (r_a_fields[r][1][2], r_a_fields[r][1][4])
-        #pkey = (p_a_fields[p][1][1], p_a_fields[p][1][3])
         rkey = r_a_fields[r][1][1]
         pkey = p_a_fields[p][1][0]
         if rkey < pkey:
             print(f'{r}, {p}: {rkey} not in python dataset')
-            #print_diagnostic_row('', r_a_ds, r_a_fields, r, diagnostic_row_keys, fns=r_fns)
-            #print_diagnostic_row('', p_a_ds, p_a_fields, p, diagnostic_row_keys)
             patients_with_disparities.add(r_a_fields[r][1][1])
             r += 1
         elif pkey < rkey:
             print(f'{r}, {p}: {pkey} not in r dataset')
-            #print_diagnostic_row('', r_a_ds, r_a_fields, r, diagnostic_row_keys, fns=r_fns)
-            #print_diagnostic_row('', p_a_ds, p_a_fields, p, diagnostic_row_keys)
             patients_with_disparities.add(p_a_fields[p][1][0])
             p += 1
         else:
-#            print(r, p,
-#                  r_a_fields[r][1][field_to_index(r_a_ds, 'fatigue_binary')],
-#                  p_a_fields[p][1][field_to_index(p_a_ds, 'fatigue_binary')])
-            #print_diagnostic_row('', r_a_ds, r_a_fields, r, diagnostic_row_keys, fns=r_fns)
-            #print_diagnostic_row('', p_a_ds, p_a_fields, p, diagnostic_row_keys)
             age_same = r_a_fields[r][1][r_a_ds.field_to_index('age')] == p_a_fields[p][1][p_a_ds.field_to_index('age')]
             print(r, p, age_same)
             r += 1
             p += 1
-
-#    r_a_fields = sorted(r_a_fields, key=lambda r: (r[1][2], r[1][4]))
-#    p_a_fields = sorted(p_a_fields, key=lambda p: (p[1][1], p[1][3]))
 
     for pd in patients_with_disparities:
         print(); print(pd)
