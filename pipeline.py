@@ -9,7 +9,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import csv
 import time
 from collections import defaultdict
@@ -22,6 +21,7 @@ class Dataset:
         self.filename_ = filename
         self.names_ = list()
         self.fields_ = list()
+        self.index_ = None
 
         with open(self.filename_) as f:
             csvf = csv.DictReader(f, delimiter=',', quotechar='"')
@@ -33,24 +33,11 @@ class Dataset:
         newline_at = 10
         lines_per_dot = 100000
         with open(self.filename_) as f:
-            # csvf = csv.DictReader(f, delimiter=',', quotechar='"')
-            # fieldnames = csvf.fieldnames
-            # field_count = len(fieldnames)  # len(line.split(','))
-            # print('field count =', field_count)
-            # print('field names =', fieldnames)
-            #
             csvf = csv.reader(f, delimiter=',', quotechar='"')
 
             ecsvf = iter(csvf)
             next(ecsvf)
             for i, fields in enumerate(ecsvf):
-                # if len(fields) != len(self.names_):
-                #     print(len(fields), fields)
-                # if len(fields) == 1:
-                #     print(f'warning: line {i} skipped as it is not data ({fields})')
-                #     continue
-                # if functor is not None:
-                #     functor(i, fields)
                 self.fields_.append((i, fields))
                 if i > 0 and i % lines_per_dot == 0:
                     if i % (lines_per_dot * newline_at) == 0:
@@ -94,28 +81,32 @@ def read_header_and_n_lines(filename, n):
 
 
 def build_histogram(dataset, field_index, filtered_records=None, tx=None):
-#     dataset = sorted(dataset, dataset.field_index)
-#     histogram = list()
-#     histogram.append((dataset[0][1][1], 0))
-#     for r in dataset:
-#         if histogram[-1][0] != r[1][1]:
-#             histogram.append((r[1][1], 1))
-#         else:
-#             histogram[-1] = (histogram[-1][0], histogram[-1][1] + 1)
-    histogram = defaultdict(int)
-    for ir, r in enumerate(dataset):
-        if not filtered_records or not filtered_records[ir]:
-            if tx is not None:
-                value = tx(r[1][field_index])
+    if False:
+        # TODO: memory_efficiency: test and replace defaultdict with this code when tested
+        dataset = sorted(dataset, dataset.field_index)
+        histogram = list()
+        histogram.append((dataset[0][1][1], 0))
+        for r in dataset:
+            if histogram[-1][0] != r[1][1]:
+                histogram.append((r[1][1], 1))
             else:
-                value = r[1][field_index]
-            histogram[value] += 1
-    hlist = list(histogram.items())
-    del histogram
-    return hlist
+                histogram[-1] = (histogram[-1][0], histogram[-1][1] + 1)
+    else:
+        histogram = defaultdict(int)
+        for ir, r in enumerate(dataset):
+            if not filtered_records or not filtered_records[ir]:
+                if tx is not None:
+                    value = tx(r[1][field_index])
+                else:
+                    value = r[1][field_index]
+                histogram[value] += 1
+        hlist = list(histogram.items())
+        del histogram
+        return hlist
 
 
 def build_histogram_from_list(dataset, filtered_records=None, tx=None):
+    # TODO: memory_efficiency: see build_histogram function
     histogram = defaultdict(int)
     for ir, r in enumerate(dataset):
         if not filtered_records or not filtered_records[ir]:
@@ -252,10 +243,6 @@ def to_categorical(fields, field_index, desttype, mapdict):
         v = r[1][field_index]
         results[ir] = mapdict[v]
     return results
-#
-#
-# def field_to_index(dataset, field_name):
-#     return dataset.names_.index(field_name)
 
 
 def map_patient_ids(geoc, asmt, map_fn):
@@ -294,7 +281,8 @@ def iterate_over_patient_assessments(fields, filter_status, visitor):
 
 
 def datetime_to_seconds(dt):
-   return f'{dt[0:4]}-{dt[5:7]}-{dt[8:10]} {dt[11:13]}:{dt[14:16]}:{dt[17:19]}'
+    return f'{dt[0:4]}-{dt[5:7]}-{dt[8:10]} {dt[11:13]}:{dt[14:16]}:{dt[17:19]}'
+
 
 def print_diagnostic_row(preamble, ds, fields, ir, keys, fns=None):
     if fns is None:
@@ -933,16 +921,12 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
 
 def regression_test_assessments(old_assessments, new_assessments):
-#    r_a_fieldnames = enumerate_fields(old_assessments)
-#    p_a_fieldnames = enumerate_fields(new_assessments)
     r_a_ds = Dataset(old_assessments)
     r_a_ds.parse_file()
     r_a_ds.sort(('patient_id', 'id'))
     p_a_ds = Dataset(new_assessments)
     p_a_ds.parse_file()
     p_a_ds.sort(('patient_id', 'id'))
-#    parse_file(old_assessments, functor=r_a_ds)
-#    parse_file(new_assessments, functor=p_a_ds)
 
     r_a_fields = r_a_ds.fields_
     p_a_fields = p_a_ds.fields_
@@ -962,8 +946,6 @@ def regression_test_assessments(old_assessments, new_assessments):
     r = 0
     p = 0
     while r < len(r_a_fields) and p < len(p_a_fields):
-        #rkey = (r_a_fields[r][1][2], r_a_fields[r][1][4])
-        #pkey = (p_a_fields[p][1][1], p_a_fields[p][1][3])
         rkey = (r_a_fields[r][1][2], r_a_fields[r][1][1])
         pkey = (p_a_fields[p][1][1], p_a_fields[p][1][0])
         if rkey < pkey:
@@ -981,9 +963,6 @@ def regression_test_assessments(old_assessments, new_assessments):
             patients_with_disparities.add(p_a_fields[p][1][1])
             p += 1
         else:
-            # print(r, p,
-            #       r_a_fields[r][1][field_to_index(r_a_ds, 'fatigue_binary')],
-            #       p_a_fields[p][1][field_to_index(p_a_ds, 'fatigue_binary')])
             r += 1
             p += 1
 
@@ -1010,16 +989,12 @@ def regression_test_patients(old_patients, new_patients):
     print(); print('regression test patients')
     print('old_patients:', old_patients)
     print('new_patients:', new_patients)
-    # r_a_fieldnames = enumerate_fields(old_patients)
-    # p_a_fieldnames = enumerate_fields(new_patients)
     r_a_ds = Dataset(old_patients)
     r_a_ds.parse_file()
     r_a_ds.sort(('id',))
     p_a_ds = Dataset(new_patients)
     p_a_ds.parse_file()
     p_a_ds.sort(('id',))
-    # parse_file(old_patients, functor=r_a_ds)
-    # parse_file(new_patients, functor=p_a_ds)
 
     r_a_fields = r_a_ds.fields_
     p_a_fields = p_a_ds.fields_
@@ -1031,10 +1006,6 @@ def regression_test_patients(old_patients, new_patients):
 
     r_a_fields = sorted(r_a_fields, key=lambda r: r[1][1])
     p_a_fields = sorted(p_a_fields, key=lambda p: p[1][0])
-    # print('r_a_fields[0]:', r_a_fields[0])
-    #print('p_a_fields[0]:', p_a_fields[0])
-    diagnostic_row_keys = ['id', 'created_at', 'updated_at', 'age']
-    r_fns = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
 
     print('checking for disparities')
     patients_with_disparities = set()
@@ -1059,13 +1030,6 @@ def regression_test_patients(old_patients, new_patients):
 
     for pd in patients_with_disparities:
         print(); print(pd)
-#        for ir, r in enumerate(r_a_fields):
-#            if r[1][2] == pd:
-#                print_diagnostic_row(f'r[ir]', r_a_ds, r_a_fields, ir, diagnostic_row_keys, fns=r_fns)
-#        for ip, p in enumerate(p_a_fields):
-#            if p[1][1] == pd:
-#                print_diagnostic_row(f'p[ip]', p_a_ds, p_a_fields, ip, diagnostic_row_keys)
-
 
 
 if __name__ == '__main__':
