@@ -870,11 +870,11 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
 def regression_test_assessments(old_assessments, new_assessments):
     with open(old_assessments) as f:
-        r_a_ds = Dataset(f)
+        r_a_ds = dataset.Dataset(f)
         # r_a_ds.parse_file(f)
     r_a_ds.sort(('patient_id', 'id'))
     with open(new_assessments) as f:
-        p_a_ds = Dataset(f)
+        p_a_ds = dataset.Dataset(f)
         # p_a_ds.parse_file(f)
     p_a_ds.sort(('patient_id', 'id'))
 
@@ -940,11 +940,11 @@ def regression_test_patients(old_patients, new_patients):
     print('old_patients:', old_patients)
     print('new_patients:', new_patients)
     with open(old_patients) as f:
-        r_a_ds = Dataset(f)
+        r_a_ds = dataset.Dataset(f)
         # r_a_ds.parse_file(f)
     r_a_ds.sort(('id',))
     with open(new_patients) as f:
-        p_a_ds = Dataset(f)
+        p_a_ds = dataset.Dataset(f)
         # p_a_ds.parse_file(f)
     p_a_ds.sort(('id',))
 
