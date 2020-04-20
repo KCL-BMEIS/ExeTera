@@ -86,58 +86,6 @@ class Dataset:
         for ir, r in enumerate(self.names_):
             print(f'{ir}-{r}')
 
-class PatientDataset:
-    def __init__(self, fieldnames):
-        self.names_ = fieldnames
-        self.fields_ = list()
-
-    def __call__(self, index, fields):
-        if len(fields) < 2:
-            print(f'{index}: fields is badly formatted ({fields})')
-        self.fields_.append((index, fields))
-
-
-def enumerate_fields(filename):
-    with open(filename) as f:
-        csvf = csv.DictReader(f, delimiter=',', quotechar='"')
-        fieldnames = csvf.fieldnames
-        field_count = len(fieldnames) # len(line.split(','))
-    return fieldnames
-
-
-def parse_file(filename, strings=None, functor=None):
-    if strings is None:
-        strings = list()
-    newline_at = 10
-    lines_per_dot = 100000
-    with open(filename) as f:
-        csvf = csv.DictReader(f, delimiter=',', quotechar='"')
-        fieldnames = csvf.fieldnames
-        field_count = len(fieldnames)  # len(line.split(','))
-        print('field count =', field_count)
-        print('field names =', fieldnames)
-
-        csvf = csv.reader(f, delimiter=',', quotechar='"')
-
-        for i, fields in enumerate(csvf):
-            if len(fields) != field_count:
-                print(len(fields), fields)
-            if len(fields) == 1:
-                print(f'warning: line {i} skipped as it is not data ({fields})')
-                continue
-            if functor is not None:
-                functor(i, fields)
-            if i > 0 and i % lines_per_dot == 0:
-                if i % (lines_per_dot * newline_at) == 0:
-                    print(f'. {i}')
-                else:
-                    print('.', end='')
-        if i % (lines_per_dot * newline_at) != 0:
-            print(f' {i}')
-
-    return strings
-
-
 def read_header_and_n_lines(filename, n):
     with open(filename) as f:
         print(f.readline())
