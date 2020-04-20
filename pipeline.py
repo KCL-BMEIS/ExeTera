@@ -16,6 +16,87 @@ from collections import defaultdict
 import numpy as np
 
 
+class Dataset:
+
+    def __init__(self, filename):
+        self.filename_ = filename
+        self.names_ = list()
+        self.fields_ = list()
+
+        with open(self.filename_) as f:
+            csvf = csv.DictReader(f, delimiter=',', quotechar='"')
+            self.names_ = csvf.fieldnames
+
+    def parse_file(self, strings=None):
+        if strings is None:
+            strings = list()
+        newline_at = 10
+        lines_per_dot = 100000
+        with open(self.filename_) as f:
+            # csvf = csv.DictReader(f, delimiter=',', quotechar='"')
+            # fieldnames = csvf.fieldnames
+            # field_count = len(fieldnames)  # len(line.split(','))
+            # print('field count =', field_count)
+            # print('field names =', fieldnames)
+            #
+            csvf = csv.reader(f, delimiter=',', quotechar='"')
+
+            ecsvf = iter(csvf)
+            next(ecsvf)
+            for i, fields in enumerate(ecsvf):
+                # if len(fields) != len(self.names_):
+                #     print(len(fields), fields)
+                # if len(fields) == 1:
+                #     print(f'warning: line {i} skipped as it is not data ({fields})')
+                #     continue
+                # if functor is not None:
+                #     functor(i, fields)
+                self.fields_.append((i, fields))
+                if i > 0 and i % lines_per_dot == 0:
+                    if i % (lines_per_dot * newline_at) == 0:
+                        print(f'. {i}')
+                    else:
+                        print('.', end='')
+            if i % (lines_per_dot * newline_at) != 0:
+                print(f' {i}')
+
+        return strings
+
+    def sort(self, keys):
+        #map names to indices
+        kindices = [self.field_to_index(k) for k in keys]
+
+        def comparison(indices):
+            def inner_(row):
+                return [row[1][i] for i in indices]
+            return inner_
+
+        self.fields_ = sorted(self.fields_, key=comparison(kindices))
+
+    def field_to_index(self, field_name):
+        return self.names_.index(field_name)
+
+    def value_from_fieldname(self, index, field_name):
+        return self.fields_[index][1][self.field_to_index(field_name)]
+
+    def row_count(self):
+        return len(self.fields_)
+
+    def show(self):
+        for ir, r in enumerate(self.names_):
+            print(f'{ir}-{r}')
+
+class PatientDataset:
+    def __init__(self, fieldnames):
+        self.names_ = fieldnames
+        self.fields_ = list()
+
+    def __call__(self, index, fields):
+        if len(fields) < 2:
+            print(f'{index}: fields is badly formatted ({fields})')
+        self.fields_.append((index, fields))
+
+
 def enumerate_fields(filename):
     with open(filename) as f:
         csvf = csv.DictReader(f, delimiter=',', quotechar='"')
@@ -32,7 +113,7 @@ def parse_file(filename, strings=None, functor=None):
     with open(filename) as f:
         csvf = csv.DictReader(f, delimiter=',', quotechar='"')
         fieldnames = csvf.fieldnames
-        field_count = len(fieldnames) # len(line.split(','))
+        field_count = len(fieldnames)  # len(line.split(','))
         print('field count =', field_count)
         print('field names =', fieldnames)
 
@@ -50,7 +131,7 @@ def parse_file(filename, strings=None, functor=None):
                 if i % (lines_per_dot * newline_at) == 0:
                     print(f'. {i}')
                 else:
-                    print('.', end= '')
+                    print('.', end='')
         if i % (lines_per_dot * newline_at) != 0:
             print(f' {i}')
 
@@ -223,25 +304,10 @@ def to_categorical(fields, field_index, desttype, mapdict):
         v = r[1][field_index]
         results[ir] = mapdict[v]
     return results
-
-
-def field_to_index(dataset, field_name):
-    return dataset.names_.index(field_name)
-
-
-class PatientDataset:
-    def __init__(self, fieldnames):
-        self.names_ = fieldnames
-        self.fields_ = list()
-
-    def __call__(self, index, fields):
-        if len(fields) < 2:
-            print(f'{index}: fields is badly formatted ({fields})')
-        self.fields_.append((index, fields))
-
-    def show(self):
-        for ir, r in enumerate(self.names_):
-            print(f'{ir}-{r}')
+#
+#
+# def field_to_index(dataset, field_name):
+#     return dataset.names_.index(field_name)
 
 
 def map_patient_ids(geoc, asmt, map_fn):
@@ -285,7 +351,7 @@ def datetime_to_seconds(dt):
 def print_diagnostic_row(preamble, ds, fields, ir, keys, fns=None):
     if fns is None:
         fns = dict()
-    indices = [field_to_index(ds, k) for k in keys]
+    indices = [ds.field_to_index(k) for k in keys]
     indexed_fns = [None if k not in fns else fns[k] for k in keys]
     values = [None] * len(indices)
     for ii, i in enumerate(indices):
@@ -433,29 +499,31 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print(); print();
     print('load patients')
     print('-------------')
-    geoc_fieldnames = enumerate_fields(patient_filename)
-    geoc_countdict = {'id': False, 'patient_id': False}
-    geoc_ds = PatientDataset(geoc_fieldnames)
-    parse_file(patient_filename, functor=geoc_ds)
+    # geoc_fieldnames = enumerate_fields(patient_filename)
+    # geoc_countdict = {'id': False, 'patient_id': False}
+    geoc_ds = Dataset(patient_filename)
+    geoc_ds.parse_file()
+    geoc_ds.sort(('id',))
     geoc_ds.show()
 
 
     print(); print()
     print('load assessments')
     print('----------------')
-    asmt_fieldnames = enumerate_fields(assessment_filename)
-    asmt_countdict = {'id': False, 'patient_id': False}
-    asmt_ds = PatientDataset(asmt_fieldnames)
-    parse_file(assessment_filename, functor=asmt_ds)
+    # asmt_fieldnames = enumerate_fields(assessment_filename)
+    # asmt_countdict = {'id': False, 'patient_id': False}
+    asmt_ds = Dataset(assessment_filename)
+    asmt_ds.parse_file()
+    asmt_ds.sort(('patient_id', 'updated_at'))
     asmt_ds.show()
 
 
     print(); print()
     print('generate dataset indices')
     print("------------------------")
-    symptomatic_indices = [field_to_index(asmt_ds, c) for c in symptomatic_fields]
+    symptomatic_indices = [asmt_ds.field_to_index(c) for c in symptomatic_fields]
     print(symptomatic_indices)
-    exposure_indices = [field_to_index(asmt_ds, c) for c in exposure_fields]
+    exposure_indices = [asmt_ds.field_to_index(c) for c in exposure_fields]
     print(exposure_indices)
 
 
@@ -476,7 +544,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         print("filter patients from outside the territory of interest")
         print("------------------------------------------------------")
 
-        country_code = field_to_index(geoc_ds, 'country_code')
+        country_code = geoc_ds.field_to_index('country_code')
         for ir, r in enumerate(geoc_fields):
             if r[1][country_code] != territory:
                 geoc_filter_status[ir] |= PFILTER_OTHER_TERRITORY
@@ -562,15 +630,15 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
     print(); print("checking yob")
 
-    filter_fields(geoc_fields, geoc_filter_status, field_to_index(geoc_ds, 'year_of_birth'),
+    filter_fields(geoc_fields, geoc_filter_status, geoc_ds.field_to_index('year_of_birth'),
                   FILTER_MISSING_YOB, FILTER_BAD_YOB, is_int, to_int, valid_range_fac_inc(MIN_YOB, MAX_YOB))
     print(f'yob: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_YOB)} missing values')
     print(f'yob: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_YOB)} bad values')
-    yobs = build_histogram(geoc_fields, field_to_index(geoc_ds, 'year_of_birth'))
+    yobs = build_histogram(geoc_fields, geoc_ds.field_to_index('year_of_birth'))
     print(f'yob: {len(yobs)} unique values')
     print(geoc_filter_status.count(0))
     age = np.zeros((len(geoc_fields),), dtype=np.int16)
-    yob_index = field_to_index(geoc_ds, 'year_of_birth')
+    yob_index = geoc_ds.field_to_index('year_of_birth')
     for ir, r in enumerate(geoc_fields):
         if geoc_filter_status[ir] & (FILTER_MISSING_YOB | FILTER_BAD_YOB):
             age[ir] = 0
@@ -579,29 +647,29 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     ptnt_dest_fields['age'] = age
 
     print(); print("checking height")
-    filter_fields(geoc_fields, geoc_filter_status, field_to_index(geoc_ds, 'height_cm'),
+    filter_fields(geoc_fields, geoc_filter_status, geoc_ds.field_to_index('height_cm'),
                   FILTER_MISSING_HEIGHT, FILTER_BAD_HEIGHT, is_float, to_float, valid_range_fac_inc(MIN_HEIGHT, MAX_HEIGHT))
     print(f'height: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_HEIGHT)} missing values')
     print(f'height: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_HEIGHT)} bad values')
-    heights = build_histogram(geoc_fields, field_to_index(geoc_ds, 'height_cm')) #, tx=replace_if_invalid(-1.0))
+    heights = build_histogram(geoc_fields, geoc_ds.field_to_index('height_cm')) #, tx=replace_if_invalid(-1.0))
     print(f'height: {len(heights)} unique values')
     print(geoc_filter_status.count(0))
 
     print(); print("checking weight")
-    filter_fields(geoc_fields, geoc_filter_status, field_to_index(geoc_ds, 'weight_kg'),
+    filter_fields(geoc_fields, geoc_filter_status, geoc_ds.field_to_index('weight_kg'),
                   FILTER_MISSING_WEIGHT, FILTER_BAD_WEIGHT, is_float, to_float, valid_range_fac_inc(MIN_WEIGHT, MAX_WEIGHT))
     print(f'weight: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_WEIGHT)} missing values')
     print(f'weight: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_WEIGHT)} bad values')
-    weights = build_histogram(geoc_fields, field_to_index(geoc_ds, 'weight_kg')) #, tx=replace_if_invalid(-1.0))
+    weights = build_histogram(geoc_fields, geoc_ds.field_to_index('weight_kg')) #, tx=replace_if_invalid(-1.0))
     print(f'weight: {len(weights)} unique values')
     print(geoc_filter_status.count(0))
 
     print(); print("checking bmi")
-    filter_fields(geoc_fields, geoc_filter_status, field_to_index(geoc_ds, 'bmi'), FILTER_MISSING_BMI, FILTER_BAD_BMI,
+    filter_fields(geoc_fields, geoc_filter_status, geoc_ds.field_to_index('bmi'), FILTER_MISSING_BMI, FILTER_BAD_BMI,
                  is_float, to_float, valid_range_fac_inc(MIN_BMI, MAX_BMI))
     print(f'bmi: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_BMI)} missing values')
     print(f'bmi: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_BMI)} bad values')
-    bmis = build_histogram(geoc_fields, field_to_index(geoc_ds, 'bmi')) #, tx=replace_if_invalid(-1.0))
+    bmis = build_histogram(geoc_fields, geoc_ds.field_to_index('bmi')) #, tx=replace_if_invalid(-1.0))
     print(f'bmi: {len(bmis)} unique values')
 
     print(); print('unfiltered patients:', geoc_filter_status.count(0))
@@ -636,7 +704,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print(); print("checking temperature")
     # convert temperature to C if F
     temperature_c = np.zeros((len(asmt_fields),), dtype=np.float)
-    temperature_index = field_to_index(asmt_ds, 'temperature')
+    temperature_index = asmt_ds.field_to_index('temperature')
     for ir, r in enumerate(asmt_fields):
         t = r[1][temperature_index]
         if is_float(t):
@@ -651,7 +719,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print(f'temperature: filtered {count_flag_set(asmt_filter_status, FILTER_BAD_TEMP)} bad values')
     asmt_dest_fields['temperature_C'] = temperature_c
 
-    indices = [field_to_index(asmt_ds, c) for c in ('had_covid_test', 'tested_covid_positive')]
+    indices = [asmt_ds.field_to_index(c) for c in ('had_covid_test', 'tested_covid_positive')]
 
     for ir, r in asmt_fields:
         had_test = asmt_fields[ir][1][indices[0]]
@@ -676,35 +744,35 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         print('symptomatic_field', s)
         cv = categorical_maps[s]
         print(f"symptomatic_field '{s}' to categorical")
-        asmt_dest_fields[s] = to_categorical(asmt_fields, field_to_index(asmt_ds, s), np.uint8, cv)
+        asmt_dest_fields[s] = to_categorical(asmt_fields, asmt_ds.field_to_index(s), np.uint8, cv)
         any_symptoms |= asmt_dest_fields[s] > 1
         print(np.count_nonzero(asmt_dest_fields[s] == True))
         print(np.count_nonzero(any_symptoms == True))
 
-    print(build_histogram(asmt_fields, field_to_index(asmt_ds, 'tested_covid_positive')))
+    print(build_histogram(asmt_fields, asmt_ds.field_to_index('tested_covid_positive')))
 
     for f in flattened_fields:
         cv = categorical_maps[f[1]]
         print(f[1], categorical_maps[f[1]])
         print(f"flattened_field '{f[0]}' to categorical field '{f[1]}'")
-        asmt_dest_fields[f[1]] = to_categorical(asmt_fields, field_to_index(asmt_ds, f[0]), np.uint8, cv)
+        asmt_dest_fields[f[1]] = to_categorical(asmt_fields, asmt_ds.field_to_index(f[0]), np.uint8, cv)
         any_symptoms |= asmt_dest_fields[f[1]] > 1
 
     for e in exposure_fields:
         cv = categorical_maps[e]
         print(f"exposure_field '{e}' to categorical")
-        asmt_dest_fields[e] = to_categorical(asmt_fields, field_to_index(asmt_ds, e), np.uint8, cv)
+        asmt_dest_fields[e] = to_categorical(asmt_fields, asmt_ds.field_to_index(e), np.uint8, cv)
 
     for m in miscellaneous_fields:
         cv = categorical_maps[m]
         print(f"miscellaneous_field '{m}' to categorical")
-        print(build_histogram(asmt_fields, field_to_index(asmt_ds, m)))
-        asmt_dest_fields[m] = to_categorical(asmt_fields, field_to_index(asmt_ds, m), np.uint8, cv)
+        print(build_histogram(asmt_fields, asmt_ds.field_to_index(m)))
+        asmt_dest_fields[m] = to_categorical(asmt_fields, asmt_ds.field_to_index(m), np.uint8, cv)
 
     print(); print()
     print("filter inconsistent health status")
     print("---------------------------------")
-    health_status_index = field_to_index(asmt_ds, 'health_status')
+    health_status_index = asmt_ds.field_to_index('health_status')
     health_status = build_histogram(asmt_fields, health_status_index)
 
     for ir, r in enumerate(asmt_fields):
@@ -745,7 +813,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
             'yes': 3
         }
 
-        tcp_index = field_to_index(asmt_ds, 'tested_covid_positive')
+        tcp_index = asmt_ds.field_to_index('tested_covid_positive')
 
         def inner_(fields, filter_status, start, end):
             raw_results = list()
@@ -888,7 +956,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
     existing_fields = ('id', 'patient_id', 'created_at', 'updated_at', 'version',
                        'country_code', 'health_status')
-    existing_field_indices = [(f, field_to_index(asmt_ds, f)) for f in existing_fields]
+    existing_field_indices = [(f, asmt_ds.field_to_index(f)) for f in existing_fields]
 
     resulting_fields = dict()
     for e in existing_fields:
@@ -912,7 +980,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print('remaining_field_len:', len(remaining_asmt_fields))
     print('remaining_dest_len:', len(remaining_dest_fields['fatigue_binary']))
     for ir, r in enumerate(remaining_asmt_fields):
-        f = r[1][field_to_index(asmt_ds, 'fatigue')]
+        f = r[1][asmt_ds.field_to_index('fatigue')]
         fb = remaining_dest_fields['fatigue_binary'][ir]
         # if (f not in ('mild', 'severe') and fb == True) or (f in ('mild', 'severe') and fb == False):
         #    print('empty' if f == '' else f, fb)
@@ -976,12 +1044,16 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
 
 def regression_test_assessments(old_assessments, new_assessments):
-    r_a_fieldnames = enumerate_fields(old_assessments)
-    p_a_fieldnames = enumerate_fields(new_assessments)
-    r_a_ds = PatientDataset(r_a_fieldnames)
-    p_a_ds = PatientDataset(p_a_fieldnames)
-    parse_file(old_assessments, functor=r_a_ds)
-    parse_file(new_assessments, functor=p_a_ds)
+#    r_a_fieldnames = enumerate_fields(old_assessments)
+#    p_a_fieldnames = enumerate_fields(new_assessments)
+    r_a_ds = Dataset(old_assessments)
+    r_a_ds.parse_file()
+    r_a_ds.sort(('patient_id', 'id'))
+    p_a_ds = Dataset(new_assessments)
+    p_a_ds.parse_file()
+    p_a_ds.sort(('patient_id', 'id'))
+#    parse_file(old_assessments, functor=r_a_ds)
+#    parse_file(new_assessments, functor=p_a_ds)
 
     r_a_fields = r_a_ds.fields_
     p_a_fields = p_a_ds.fields_
@@ -1027,7 +1099,7 @@ def regression_test_assessments(old_assessments, new_assessments):
             p += 1
 
         if r < len(r_a_fields):
-            treatment = r_a_fields[r][1][field_to_index(r_a_ds, 'treatment')]
+            treatment = r_a_fields[r][1][r_a_ds.field_to_index('treatment')]
             if treatment not in ('NA', '', 'none'):
                 print(r, treatment)
 
@@ -1049,12 +1121,16 @@ def regression_test_patients(old_patients, new_patients):
     print(); print('regression test patients')
     print('old_patients:', old_patients)
     print('new_patients:', new_patients)
-    r_a_fieldnames = enumerate_fields(old_patients)
-    p_a_fieldnames = enumerate_fields(new_patients)
-    r_a_ds = PatientDataset(r_a_fieldnames)
-    p_a_ds = PatientDataset(p_a_fieldnames)
-    parse_file(old_patients, functor=r_a_ds)
-    parse_file(new_patients, functor=p_a_ds)
+    # r_a_fieldnames = enumerate_fields(old_patients)
+    # p_a_fieldnames = enumerate_fields(new_patients)
+    r_a_ds = Dataset(old_patients)
+    r_a_ds.parse_file()
+    r_a_ds.sort(('id',))
+    p_a_ds = Dataset(new_patients)
+    p_a_ds.parse_file()
+    p_a_ds.sort(('id',))
+    # parse_file(old_patients, functor=r_a_ds)
+    # parse_file(new_patients, functor=p_a_ds)
 
     r_a_fields = r_a_ds.fields_
     p_a_fields = p_a_ds.fields_
@@ -1101,7 +1177,7 @@ def regression_test_patients(old_patients, new_patients):
 #                  p_a_fields[p][1][field_to_index(p_a_ds, 'fatigue_binary')])
             #print_diagnostic_row('', r_a_ds, r_a_fields, r, diagnostic_row_keys, fns=r_fns)
             #print_diagnostic_row('', p_a_ds, p_a_fields, p, diagnostic_row_keys)
-            age_same = r_a_fields[r][1][field_to_index(r_a_ds, 'age')] == p_a_fields[p][1][field_to_index(p_a_ds, 'age')]
+            age_same = r_a_fields[r][1][r_a_ds.field_to_index('age')] == p_a_fields[p][1][p_a_ds.field_to_index('age')]
             print(r, p, age_same)
             r += 1
             p += 1
@@ -1175,6 +1251,7 @@ if __name__ == '__main__':
         with open(args.assessment_data_out, 'w') as f:
             csvw = csv.writer(f)
             headers = list(res_fields.keys())
+            #TODO: constructed fields should be in their own collection; the ['day'] and +1 stuff is a temporary hack
             csvw.writerow(headers + ['day'])
             row_field_count = len(res_fields)
             row_values = [None] * (row_field_count + 1)
