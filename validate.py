@@ -1,5 +1,6 @@
 import csv
 import pipeline
+import dataset
 
 equivalence_map = {
     'na': ('', 'na'),
@@ -21,12 +22,12 @@ def compare_row(eindex, expected, aindex, actual, keys):
 def compare(expected, actual):
 
     with open(expected) as f:
-        expected_ds = pipeline.Dataset(f)
+        expected_ds = dataset.Dataset(f)
     # with open(expected) as f:
     #     expected_ds.parse_file(f)
     expected_field_names = expected_ds.names_
     with open(actual) as f:
-        actual_ds = pipeline.Dataset(f)
+        actual_ds = dataset.Dataset(f)
     # with open(actual) as f:
     #     actual_ds.parse_file(f)
     actual_field_names = actual_ds.names_
@@ -75,7 +76,7 @@ def validate_full():
 
 def show_rows(filename, fields_to_show):
     with open(filename) as f:
-        ds = pipeline.Dataset(f)
+        ds = dataset.Dataset(f)
     # ds.parse_file()
     ds.sort(('patient_id', 'updated_at'))
     for i_f, f in enumerate(ds.fields_):
