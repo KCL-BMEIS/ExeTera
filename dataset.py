@@ -47,6 +47,9 @@ class Dataset:
     def field_to_index(self, field_name):
         return self.names_.index(field_name)
 
+    def value(self, row_index, field_index):
+        return self.fields_[row_index][1][field_index]
+
     def value_from_fieldname(self, index, field_name):
         return self.fields_[index][1][self.field_to_index(field_name)]
 
