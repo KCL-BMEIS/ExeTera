@@ -1,8 +1,10 @@
 import csv
-import pipeline
-import dataset
 import argparse
 import os
+
+import data_schema
+import dataset
+import pipeline
 
 equivalence_map = {
     'na': ('', 'na'),
@@ -145,12 +147,16 @@ if __name__ == '__main__':
                         help='increase verbosity')
     args = parser.parse_args()
 
+    data_schema_version = 1
+    categorical_maps = data_schema.get_categorical_maps(data_schema_version)
     # run the current pipeline
     pipeline_output = pipeline.pipeline(patient_filename=args.patients_input,
-                                        assessment_filename=args.assessments_input)
+                                        assessment_filename=args.assessments_input,
+                                        categorical_maps=categorical_maps)
     pipeline.save_csv(pipeline_output,
                       patient_data_out='patients_output_test.csv',
-                      assessment_data_out='assessments_output_test.csv')
+                      assessment_data_out='assessments_output_test.csv',
+                      categorical_maps=categorical_maps)
 
     # compare to expected pipeline output
     validate(expected_patients_file_name=args.patients_output_expected,

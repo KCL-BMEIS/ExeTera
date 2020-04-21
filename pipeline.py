@@ -313,74 +313,8 @@ exposure_fields = ["always_used_shortage", "have_used_PPE", "never_used_shortage
                    "treated_patients_with_covid"]
 miscellaneous_fields = ['location', 'level_of_isolation', 'had_covid_test']
 
-# na_value_from = ''
-# na_value_to = ''
 
-# leaky_boolean_from = {na_value_from: 0, 'False': 1, 'True': 2}
-# categorical_maps = {
-#     'fatigue': {na_value_from: 0, 'no': 1, 'mild': 2, 'severe': 3},
-#     'shortness_of_breath': {na_value_from: 0, 'no': 1, 'mild': 2, 'significant': 3, 'severe': 4},
-#     'abdominal_pain': leaky_boolean_from,
-#     'chest_pain': leaky_boolean_from,
-#     'delirium': leaky_boolean_from,
-#     'diarrhoea': leaky_boolean_from,
-#     'fever': leaky_boolean_from,
-#     'headache': leaky_boolean_from,
-#     'hoarse_voice': leaky_boolean_from,
-#     'loss_of_smell': leaky_boolean_from,
-#     'persistent_cough': leaky_boolean_from,
-#     'skipped_meals': leaky_boolean_from,
-#     'sore_throat': leaky_boolean_from,
-#     'unusual_muscle_pains': leaky_boolean_from,
-#     'always_used_shortage': {na_value_from: 0, 'all_needed': 1, 'reused': 2},
-#     'have_used_PPE': {na_value_from: 0, 'never': 1, 'sometimes': 2, 'always': 3},
-#     'never_used_shortage': {na_value_from: 0, 'not_needed': 1, 'not_available': 2},
-#     'sometimes_used_shortage': {na_value_from: 0, 'all_needed': 1, 'reused': 2, 'not_enough': 3},
-#     'treated_patients_with_covid': {na_value_from: 0, 'no': 1, 'yes_suspected': 2,
-#                                     'yes_documented_suspected': 3, 'yes_documented': 4},
-#     'fatigue_binary': {na_value_from: 0, 'no': 1, 'mild': 2, 'severe': 2},
-#     'shortness_of_breath_binary': {na_value_from: 0, 'no': 1, 'mild': 2, 'significant': 2, 'severe': 2},
-#     'location': {na_value_from: 0, 'home': 1, 'hospital': 2, 'back_from_hospital': 3},
-#     'level_of_isolation': {na_value_from: 0, 'not_left_the_house': 1, 'rarely_left_the_house': 2,'rarely_left_the_house_but_visited_lots':3, 'often_left_the_house': 4},
-#     'had_covid_test': leaky_boolean_from,
-#     'tested_covid_positive': {na_value_from: 0, 'waiting': 1, 'no': 2, 'yes': 3}
-# }
-
-# boolean_inv_map = [na_value_to, 'False', 'True']
-# categorical_inv_maps = {
-#     'fatigue': [na_value_to, 'no', 'mild', 'severe'],
-#     'shortness_of_breath': [na_value_to, 'no', 'mild', 'significant', 'severe'],
-#     'abdominal_pain': boolean_inv_map,
-#     'chest_pain': boolean_inv_map,
-#     'delirium': boolean_inv_map,
-#     'diarrhoea': boolean_inv_map,
-#     'fever': boolean_inv_map,
-#     'headache': boolean_inv_map,
-#     'hoarse_voice': boolean_inv_map,
-#     'loss_of_smell': boolean_inv_map,
-#     'persistent_cough': boolean_inv_map,
-#     'skipped_meals': boolean_inv_map,
-#     'sore_throat': boolean_inv_map,
-#     'unusual_muscle_pains': boolean_inv_map,
-#     'always_used_shortage': [na_value_to, 'all_needed', 'reused'],
-#     'have_used_PPE': [na_value_to, 'never', 'sometimes', 'always'],
-#     'never_used_shortage': [na_value_to, 'not_needed', 'not_available'],
-#     'sometimes_used_shortage': [na_value_to, 'all_needed', 'reused', 'not_enough'],
-#     'treated_patients_with_covid': [na_value_to, 'no', 'yes_suspected',
-#                                     'yes_documented_suspected', 'yes_documented'],
-#     'fatigue_binary': [na_value_to, 'False', 'True'],
-#     'shortness_of_breath_binary': [na_value_to, 'False', 'True'],
-#     'location': [na_value_to, 'home', 'hospital', 'back_from_hospital'],
-#     'level_of_isolation': [na_value_to, 'not_left_the_house', 'rarely_left_the_house','rarely_left_the_house_but_visited_lots', 'often_left_the_house'],
-#     'had_covid_test': boolean_inv_map,
-#     'tested_covid_positive': [na_value_to, 'waiting', 'no', 'yes']
-# }
-
-
-def pipeline(patient_filename, assessment_filename, territory=None,
-             data_schema_version=1):
-
-    categorical_maps = data_schema.get_categorical_maps(data_schema_version)
+def pipeline(patient_filename, assessment_filename, categorical_maps, territory=None):
 
     print(); print();
     print('load patients')
@@ -988,7 +922,7 @@ def regression_test_patients(old_patients, new_patients):
     for pd in patients_with_disparities:
         print(); print(pd)
 
-def save_csv(pipeline_output, patient_data_out, assessment_data_out):
+def save_csv(pipeline_output, patient_data_out, assessment_data_out, categorical_maps):
     p_ds, p_fields, p_status, p_dest_fields, a_ds, a_fields, a_status, ra_fields, ra_status, res_fields, res_keys \
         = pipeline_output
     remaining_patients = set()
@@ -1070,7 +1004,11 @@ if __name__ == '__main__':
     else:
         print(); print(f'cleaning')
         tstart = time.time()
-        pipeline_output = pipeline(args.patient_data, args.assessment_data, territory=args.territory)
+
+        data_schema_version = 1
+        categorical_maps = data_schema.get_categorical_maps(data_schema_version)
+        pipeline_output = pipeline(args.patient_data, args.assessment_data, categorical_maps,
+                                   territory=args.territory)
         print(f'cleaning completed in {time.time() - tstart} seconds')
 
-        save_csv(pipeline_output, args.patient_data_out, args.assessment_data_out)
+        save_csv(pipeline_output, args.patient_data_out, args.assessment_data_out, categorical_maps)
