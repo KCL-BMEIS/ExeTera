@@ -15,7 +15,7 @@ from collections import defaultdict
 import numpy as np
 
 import dataset
-import cleaning
+import data_schema
 
 
 def read_header_and_n_lines(filename, n):
@@ -293,7 +293,6 @@ FILTER_INCONSISTENT_NO_SYMPTOMS = 0x80
 FILTER_INVALID_COVID_PROGRESSION = 0X100
 FILTERA_ALL = 0xffffffff
 
-data_schema = 1
 
 assessment_flag_descs = {
     0x1: 'invalid_patient_id',
@@ -314,10 +313,10 @@ exposure_fields = ["always_used_shortage", "have_used_PPE", "never_used_shortage
                    "treated_patients_with_covid"]
 miscellaneous_fields = ['location', 'level_of_isolation', 'had_covid_test']
 
-na_value_from = ''
-na_value_to = ''
+# na_value_from = ''
+# na_value_to = ''
 
-leaky_boolean_from = {na_value_from: 0, 'False': 1, 'True': 2}
+# leaky_boolean_from = {na_value_from: 0, 'False': 1, 'True': 2}
 # categorical_maps = {
 #     'fatigue': {na_value_from: 0, 'no': 1, 'mild': 2, 'severe': 3},
 #     'shortness_of_breath': {na_value_from: 0, 'no': 1, 'mild': 2, 'significant': 3, 'severe': 4},
@@ -347,7 +346,7 @@ leaky_boolean_from = {na_value_from: 0, 'False': 1, 'True': 2}
 #     'tested_covid_positive': {na_value_from: 0, 'waiting': 1, 'no': 2, 'yes': 3}
 # }
 
-boolean_inv_map = [na_value_to, 'False', 'True']
+# boolean_inv_map = [na_value_to, 'False', 'True']
 # categorical_inv_maps = {
 #     'fatigue': [na_value_to, 'no', 'mild', 'severe'],
 #     'shortness_of_breath': [na_value_to, 'no', 'mild', 'significant', 'severe'],
@@ -377,9 +376,11 @@ boolean_inv_map = [na_value_to, 'False', 'True']
 #     'tested_covid_positive': [na_value_to, 'waiting', 'no', 'yes']
 # }
 
-categorical_maps = cleaning.get_categorical_maps(data_schema)
 
-def pipeline(patient_filename, assessment_filename, territory=None):
+def pipeline(patient_filename, assessment_filename, territory=None,
+             data_schema_version=1):
+
+    categorical_maps = data_schema.get_categorical_maps(data_schema_version)
 
     print(); print();
     print('load patients')
@@ -570,9 +571,8 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
     any_symptoms = np.zeros((len(asmt_fields),), dtype=np.bool)
     for s in symptomatic_fields:
-    # for ck, cv in categorical_maps.items():
         print('symptomatic_field', s)
-        cv = categorical_maps[s]
+        cv = categorical_maps[s].strings_to_values
         print(f"symptomatic_field '{s}' to categorical")
         asmt_dest_fields[s] = to_categorical(asmt_fields, asmt_ds.field_to_index(s), np.uint8, cv)
         any_symptoms |= asmt_dest_fields[s] > 1
@@ -582,19 +582,19 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print(build_histogram(asmt_fields, asmt_ds.field_to_index('tested_covid_positive')))
 
     for f in flattened_fields:
-        cv = categorical_maps[f[1]]
-        print(f[1], categorical_maps[f[1]])
+        cv = categorical_maps[f[1]].strings_to_values
+        print(f[1], cv)
         print(f"flattened_field '{f[0]}' to categorical field '{f[1]}'")
         asmt_dest_fields[f[1]] = to_categorical(asmt_fields, asmt_ds.field_to_index(f[0]), np.uint8, cv)
         any_symptoms |= asmt_dest_fields[f[1]] > 1
 
     for e in exposure_fields:
-        cv = categorical_maps[e]
+        cv = categorical_maps[e].strings_to_values
         print(f"exposure_field '{e}' to categorical")
         asmt_dest_fields[e] = to_categorical(asmt_fields, asmt_ds.field_to_index(e), np.uint8, cv)
 
     for m in miscellaneous_fields:
-        cv = categorical_maps[m]
+        cv = categorical_maps[m].strings_to_values
         print(f"miscellaneous_field '{m}' to categorical")
         print(build_histogram(asmt_fields, asmt_ds.field_to_index(m)))
         asmt_dest_fields[m] = to_categorical(asmt_fields, asmt_ds.field_to_index(m), np.uint8, cv)
@@ -1031,10 +1031,14 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out):
                 for irh, rh in enumerate(headers):
                     if rh in functor_fields:
                         row_values[irh] = functor_fields[rh](res_fields[rh][ir])
-                    elif rh in categorical_inv_maps:
-                        if res_fields[rh][ir] >= len(categorical_inv_maps[rh]):
-                            print(f'{res_fields[rh][ir]} is out of range for {categorical_inv_maps[rh]}')
-                        row_values[irh] = categorical_inv_maps[rh][res_fields[rh][ir]]
+                    elif rh in categorical_maps:
+                        v_to_s = categorical_maps[rh].values_to_strings
+                        if res_fields[rh][ir] >= len(v_to_s):
+                            print(f'{res_fields[rh][ir]} is out of range for {v_to_s}')
+                        try:
+                            row_values[irh] = v_to_s[res_fields[rh][ir]]
+                        except:
+                            print('que?')
                     else:
                         row_values[irh] = res_fields[rh][ir]
                 updated = res_fields['updated_at']
