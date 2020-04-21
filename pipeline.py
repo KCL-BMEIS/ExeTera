@@ -338,7 +338,7 @@ categorical_maps = {
     'fatigue_binary': {na_value_from: 0, 'no': 1, 'mild': 2, 'severe': 2},
     'shortness_of_breath_binary': {na_value_from: 0, 'no': 1, 'mild': 2, 'significant': 2, 'severe': 2},
     'location': {na_value_from: 0, 'home': 1, 'hospital': 2, 'back_from_hospital': 3},
-    'level_of_isolation': {na_value_from: 0, 'not_left_the_house': 1, 'rarely_left_the_house': 2, 'often_left_the_house': 3},
+    'level_of_isolation': {na_value_from: 0, 'not_left_the_house': 1, 'rarely_left_the_house': 2,'rarely_left_the_house_but_visited_lots':3, 'often_left_the_house': 4},
     'had_covid_test': leaky_boolean_from,
     'tested_covid_positive': {na_value_from: 0, 'waiting': 1, 'no': 2, 'yes': 3}
 }
@@ -368,7 +368,7 @@ categorical_inv_maps = {
     'fatigue_binary': [na_value_to, 'False', 'True'],
     'shortness_of_breath_binary': [na_value_to, 'False', 'True'],
     'location': [na_value_to, 'home', 'hospital', 'back_from_hospital'],
-    'level_of_isolation': [na_value_to, 'not_left_the_house', 'rarely_left_the_house', 'often_left_the_house'],
+    'level_of_isolation': [na_value_to, 'not_left_the_house', 'rarely_left_the_house','rarely_left_the_house_but_visited_lots', 'often_left_the_house'],
     'had_covid_test': boolean_inv_map,
     'tested_covid_positive': [na_value_to, 'waiting', 'no', 'yes']
 }
