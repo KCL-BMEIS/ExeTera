@@ -155,7 +155,7 @@ if __name__ == '__main__':
     # run the current pipeline
     pipeline_output = pipeline.pipeline(patient_filename=args.patients_input,
                                         assessment_filename=args.assessments_input,
-                                        data_schema=data_schema)
+                                        data_schema=data_schema, parsing_schema=parsing_schema)
     pipeline.save_csv(pipeline_output,
                       patient_data_out='patients_output_test.csv',
                       assessment_data_out='assessments_output_test.csv',
