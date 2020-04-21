@@ -2,8 +2,9 @@ import csv
 import argparse
 import os
 
-import data_schema
+import data_schemas
 import dataset
+import parsing_schemas
 import pipeline
 
 equivalence_map = {
@@ -148,15 +149,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     data_schema_version = 1
-    categorical_maps = data_schema.get_categorical_maps(data_schema_version)
+    data_schema = data_schemas.get_categorical_maps(data_schema_version)
+    parsing_schema_version = 1
+    parsing_schema = parsing_schemas.ParsingSchema(parsing_schema_version)
     # run the current pipeline
     pipeline_output = pipeline.pipeline(patient_filename=args.patients_input,
                                         assessment_filename=args.assessments_input,
-                                        data_schema=categorical_maps)
+                                        data_schema=data_schema)
     pipeline.save_csv(pipeline_output,
                       patient_data_out='patients_output_test.csv',
                       assessment_data_out='assessments_output_test.csv',
-                      categorical_maps=categorical_maps)
+                      data_schema=data_schema)
 
     # compare to expected pipeline output
     validate(expected_patients_file_name=args.patients_output_expected,

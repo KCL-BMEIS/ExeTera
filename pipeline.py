@@ -15,8 +15,8 @@ from collections import defaultdict
 import numpy as np
 
 import dataset
-import data_schema
-import parsing_schema
+import data_schemas
+import parsing_schemas
 
 
 def read_header_and_n_lines(filename, n):
@@ -562,7 +562,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     sanitised_covid_results = np.ndarray((len(asmt_fields),), dtype=np.uint8)
     sanitised_covid_results_key = data_schema['tested_covid_positive'].values_to_strings[:]
 
-    fn_fac = parsing_schema.ParsingSchema(1).class_entries['clean_covid_progression']
+    fn_fac = parsing_schemas.ParsingSchema(1).class_entries['clean_covid_progression']
     fn = fn_fac(asmt_ds, asmt_filter_status, sanitised_covid_results_key, sanitised_covid_results,
                 FILTER_INVALID_COVID_PROGRESSION)
     # fn = ValidateCovidTestResultsFac(asmt_ds, asmt_filter_status, sanitised_covid_results_key, sanitised_covid_results)
@@ -880,7 +880,7 @@ def regression_test_patients(old_patients, new_patients):
     for pd in patients_with_disparities:
         print(); print(pd)
 
-def save_csv(pipeline_output, patient_data_out, assessment_data_out, categorical_maps):
+def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema):
     p_ds, p_fields, p_status, p_dest_fields, a_ds, a_fields, a_status, ra_fields, ra_status, res_fields, res_keys \
         = pipeline_output
     remaining_patients = set()
@@ -923,8 +923,8 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out, categorical
                 for irh, rh in enumerate(headers):
                     if rh in functor_fields:
                         row_values[irh] = functor_fields[rh](res_fields[rh][ir])
-                    elif rh in categorical_maps:
-                        v_to_s = categorical_maps[rh].values_to_strings
+                    elif rh in data_schema:
+                        v_to_s = data_schema[rh].values_to_strings
                         if res_fields[rh][ir] >= len(v_to_s):
                             print(f'{res_fields[rh][ir]} is out of range for {v_to_s}')
                         try:
@@ -964,9 +964,12 @@ if __name__ == '__main__':
         tstart = time.time()
 
         data_schema_version = 1
-        categorical_maps = data_schema.get_categorical_maps(data_schema_version)
-        pipeline_output = pipeline(args.patient_data, args.assessment_data, categorical_maps,
+        data_schema = data_schemas.get_categorical_maps(data_schema_version)
+        parsing_schema_version = 1
+        parsing_schema = parsing_schemas.ParsingSchema(parsing_schema_version)
+        pipeline_output = pipeline(args.patient_data, args.assessment_data,
+                                   data_schema, parsing_schema,
                                    territory=args.territory)
         print(f'cleaning completed in {time.time() - tstart} seconds')
 
-        save_csv(pipeline_output, args.patient_data_out, args.assessment_data_out, categorical_maps)
+        save_csv(pipeline_output, args.patient_data_out, args.assessment_data_out, data_schema)
