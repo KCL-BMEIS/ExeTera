@@ -430,7 +430,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
         country_code = geoc_ds.field_to_index('country_code')
         for ir, r in enumerate(geoc_fields):
-            if r[1][country_code] != territory:
+            if r[country_code] != territory:
                 geoc_filter_status[ir] |= PFILTER_OTHER_TERRITORY
         print(f'other territories: filtered {count_flag_set(geoc_filter_status, PFILTER_OTHER_TERRITORY)} missing values')
 
@@ -826,11 +826,11 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 #    print("---------------------------------------------")
 #    patient_assessment_counts = defaultdict(int)
 #    for a in asmt_fields:
-#        patient_assessment_counts[a[1][1]] += 1
+#        patient_assessment_counts[a[1]] += 1
 #    patient_assessments = list(patient_assessment_counts.items())
 #
 #    for ir, r in enumerate(geoc_fields):
-#        pid = r[1][0]
+#        pid = r[0]
 #        if pid not in patient_assessment_counts:
 #            geoc_filter_status[ir] |= PFILTER_NO_ASSESSMENTS
 #        elif patient_assessment_counts[pid] == 1:
@@ -841,9 +841,9 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 #    patient_ids = set()
 #    for ir, r in enumerate(geoc_fields):
 #        if geoc_filter_status[ir] == 0:
-#            patient_ids.add(r[1][0])
+#            patient_ids.add(r[0])
 #    for ir, r in enumerate(asmt_fields):
-#        if r[1][1] not in patient_ids:
+#        if r[1] not in patient_ids:
 #            asmt_filter_status[ir] |= AFILTER_PATIENT_FILTERED
 #
 #    print('assessments filtered due to patient filtering:',
