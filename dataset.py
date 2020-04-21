@@ -22,7 +22,7 @@ class Dataset:
         ecsvf = iter(csvf)
         # next(ecsvf)
         for i, fields in enumerate(ecsvf):
-            self.fields_.append((i, fields))
+            self.fields_.append(fields)
         #     if i > 0 and i % lines_per_dot == 0:
         #         if i % (lines_per_dot * newline_at) == 0:
         #             print(f'. {i}')
@@ -37,21 +37,33 @@ class Dataset:
         #map names to indices
         kindices = [self.field_to_index(k) for k in keys]
 
-        def comparison(indices):
-            def inner_(row):
-                return [row[1][i] for i in indices]
+        def index_sort(indices):
+            def inner_(r):
+                return tuple(self.fields_[r][i] for i in indices)
             return inner_
 
-        self.fields_ = sorted(self.fields_, key=comparison(kindices))
+        self.index_ = sorted(self.index_, key=index_sort(kindices))
+        fields2 = self.fields_[:]
+        Dataset._apply_permutation(self.index_, self.fields_)
+
+    @staticmethod
+    def _apply_permutation(permutation, fields):
+        n = len(permutation)
+        for i in range(0, n):
+            pi = permutation[i]
+            while pi < i:
+                pi = permutation[pi]
+            fields[i], fields[pi] = fields[pi], fields[i]
+        return fields
 
     def field_to_index(self, field_name):
         return self.names_.index(field_name)
 
     def value(self, row_index, field_index):
-        return self.fields_[row_index][1][field_index]
+        return self.fields_[row_index][field_index]
 
     def value_from_fieldname(self, index, field_name):
-        return self.fields_[index][1][self.field_to_index(field_name)]
+        return self.fields_[index][self.field_to_index(field_name)]
 
     def row_count(self):
         return len(self.fields_)

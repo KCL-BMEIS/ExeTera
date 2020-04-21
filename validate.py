@@ -63,7 +63,9 @@ def compare(expected, actual, verbose):
 
 def validate(expected_patients_file_name, actual_patients_file_name,
              expected_assessments_file_name, actual_assessments_file_name, verbose=False):
+    print('validating patients')
     compare(expected_patients_file_name, actual_patients_file_name, verbose)
+    print('validating assessments')
     compare(expected_assessments_file_name, actual_assessments_file_name, verbose)
 
 def validate_full():
