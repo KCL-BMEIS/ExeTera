@@ -4,7 +4,7 @@ import numpy as np
 
 class Dataset:
 
-    def __init__(self, source):
+    def __init__(self, source, progress=False, stop_after=None):
         self.names_ = list()
         self.fields_ = list()
         self.names_ = list()
@@ -21,8 +21,19 @@ class Dataset:
 
         ecsvf = iter(csvf)
         # next(ecsvf)
-        for i, fields in enumerate(ecsvf):
-            self.fields_.append(fields)
+        if not progress:
+            for i, fields in enumerate(ecsvf):
+                self.fields_.append(fields)
+                if stop_after and i > stop_after:
+                    break
+        else:
+            for i, fields in enumerate(ecsvf):
+                self.fields_.append(fields)
+                if i % 100000 == 0:
+                    print(i)
+                if stop_after and i >= stop_after:
+                    break
+            print(i)
         #     if i > 0 and i % lines_per_dot == 0:
         #         if i % (lines_per_dot * newline_at) == 0:
         #             print(f'. {i}')
@@ -44,17 +55,22 @@ class Dataset:
 
         self.index_ = sorted(self.index_, key=index_sort(kindices))
         fields2 = self.fields_[:]
-        Dataset._apply_permutation(self.index_, self.fields_)
+        self.fields_ = Dataset._apply_permutation(self.index_, self.fields_)
 
     @staticmethod
     def _apply_permutation(permutation, fields):
-        n = len(permutation)
-        for i in range(0, n):
-            pi = permutation[i]
-            while pi < i:
-                pi = permutation[pi]
-            fields[i], fields[pi] = fields[pi], fields[i]
-        return fields
+        # n = len(permutation)
+        # for i in range(0, n):
+        #     print(i)
+        #     pi = permutation[i]
+        #     while pi < i:
+        #         pi = permutation[pi]
+        #     fields[i], fields[pi] = fields[pi], fields[i]
+        # return fields
+        sorted_fields = [0] * len(fields)
+        for ip, p in enumerate(permutation):
+            sorted_fields[ip] = fields[p]
+        return sorted_fields
 
     def field_to_index(self, field_name):
         return self.names_.index(field_name)
