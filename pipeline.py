@@ -983,7 +983,7 @@ def regression_test_patients(old_patients, new_patients):
     for pd in patients_with_disparities:
         print(); print(pd)
 
-def save_csv(pipeline_output, assessment_data_out, patient_data_out):
+def save_csv(pipeline_output, patient_data_out, assessment_data_out):
     p_ds, p_fields, p_status, p_dest_fields, a_ds, a_fields, a_status, ra_fields, ra_status, res_fields, res_keys \
         = pipeline_output
     remaining_patients = set()
