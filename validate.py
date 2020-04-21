@@ -2,11 +2,39 @@ import csv
 import pipeline
 import dataset
 import argparse
+import os
 
 equivalence_map = {
     'na': ('', 'na'),
     '': ('', 'na')
 }
+
+class Logger(object):
+    def __init__(self):
+        self.report = ''
+
+    def log(self, text, print_to_console=False):
+        if isinstance(text, list):
+            for item in text:
+                self.report += str(item)
+                self.report += '\n'
+                if print_to_console:
+                    print(item)
+        else:
+            self.report += text
+            self.report += '\n'
+            if print_to_console:
+                print(text)
+
+    def write(self, destination, append=False):
+        if os.path.isfile(destination) and append is False:
+            raise FileExistsError(f'Report destination file {destination} already exists.')
+        else:
+            with open(destination, 'a') as f:
+                f.write(self.report)
+
+
+
 
 def compare_row(expected_index, expected_row, actual_index, actual_row, keys):
     all_true = True
@@ -20,7 +48,8 @@ def compare_row(expected_index, expected_row, actual_index, actual_row, keys):
     return all_true
 
 def compare(expected, actual, verbose):
-    print(f'Comparing expected {expected} and current {actual}')
+    logger = Logger()
+    logger.log(f'Comparing expected {expected} and current {actual}', print_to_console=True)
 
     with open(expected) as f:
         expected_ds = dataset.Dataset(f)
@@ -31,20 +60,21 @@ def compare(expected, actual, verbose):
 
     # compare field names
     if expected_field_names == actual_field_names:
-        print('field names are identical')
+        logger.log('field names are identical')
     else:
-        print('WARNING: fieldnames only in expected:', set(expected_field_names).difference(set(actual_field_names)))
-        print('WARNING: fieldnames only in actual:', set(actual_field_names).difference(set(expected_field_names)))
+        logger.log(['WARNING: fieldnames only in expected:', set(expected_field_names).difference(set(actual_field_names))], print_to_console = True)
+        logger.log(['WARNING: fieldnames only in actual:', set(actual_field_names).difference(set(expected_field_names))], print_to_console = True)
 
     common_fields = set(expected_field_names).intersection(set(actual_field_names))
     if verbose:
-        print('common fields:', common_fields)
+        logger.log(['common fields:', common_fields,'\n'], print_to_console = True)
 
     # compare data content
     if expected_ds.row_count() == actual_ds.row_count():
-        print(f'both files have {expected_ds.row_count()} rows')
+        logger.log(f'both files have {expected_ds.row_count()} rows', print_to_console=True)
     else:
-        print(f'WARNING: expected file has {expected_ds.row_count()} rows, actual file has {actual_ds.row_count()} rows')
+        logger.log(f'WARNING: expected file has {expected_ds.row_count()} rows, actual file has {actual_ds.row_count()} rows', print_to_console=True)
+
 
     rows_that_differ = []
     for i in range(expected_ds.row_count()):
@@ -52,19 +82,25 @@ def compare(expected, actual, verbose):
                 rows_that_differ.append(i)
 
     if len(rows_that_differ) > 0:
-        print(f'WARNING: a total of {len(rows_that_differ)} rows do not match')
+        logger.log(f'WARNING: a total of {len(rows_that_differ)} rows do not match', print_to_console=True)
         if verbose:
             for row in rows_that_differ:
-                print('expected value | actual_value')
+                logger.log('expected value | actual_value')
                 for field in common_fields:
-                    print(f'{expected_ds.value_from_fieldname(row, field)} | {actual_ds.value_from_fieldname(row, field)}')
+                    logger.log(f'{expected_ds.value_from_fieldname(row, field)} | {actual_ds.value_from_fieldname(row, field)}')
     else:
-        print('row contents are equal')
+        logger.log('row contents are equal \n \n', print_to_console=True)
+    return logger
 
 def validate(expected_patients_file_name, actual_patients_file_name,
-             expected_assessments_file_name, actual_assessments_file_name, verbose=False):
-    compare(expected_patients_file_name, actual_patients_file_name, verbose)
-    compare(expected_assessments_file_name, actual_assessments_file_name, verbose)
+             expected_assessments_file_name, actual_assessments_file_name, verbose=False, report_dest=None):
+    log = compare(expected_patients_file_name, actual_patients_file_name, verbose)
+    if report_dest is not None:
+        log.write(report_dest)
+    log = compare(expected_assessments_file_name, actual_assessments_file_name, verbose)
+    if report_dest is not None:
+        log.write(report_dest, append=True)
+
 
 def validate_full():
     filename = '/home/ben/covid/assessments_20200413050002_clean.csv'
@@ -101,7 +137,11 @@ if __name__ == '__main__':
                         help='the location of the assessments file produced by a correct version (currently v.0.1.2) of the pipeline')
     parser.add_argument('-ai', '--assessments_input',
                         help='the location of the assessments input file to be processed')
-    parser.add_argument('-v', '--verbose', action='store_true',
+    parser.add_argument('-r', '--report_destination',
+                        help='the location for the report .txt to be saved',
+                        default=None)
+    parser.add_argument('-v', '--verbose',
+                        action='store_true',
                         help='increase verbosity')
     args = parser.parse_args()
 
@@ -117,4 +157,5 @@ if __name__ == '__main__':
              actual_patients_file_name='patients_output_test.csv',
              expected_assessments_file_name=args.assessments_output_expected,
              actual_assessments_file_name='assessments_output_test.csv',
+             report_dest=args.report_destination,
              verbose=args.verbose)
