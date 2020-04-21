@@ -16,6 +16,7 @@ import numpy as np
 
 import dataset
 import data_schema
+import parsing_schema
 
 
 def read_header_and_n_lines(filename, n):
@@ -314,7 +315,7 @@ exposure_fields = ["always_used_shortage", "have_used_PPE", "never_used_shortage
 miscellaneous_fields = ['location', 'level_of_isolation', 'had_covid_test']
 
 
-def pipeline(patient_filename, assessment_filename, categorical_maps, territory=None):
+def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema, territory=None):
 
     print(); print();
     print('load patients')
@@ -506,7 +507,7 @@ def pipeline(patient_filename, assessment_filename, categorical_maps, territory=
     any_symptoms = np.zeros((len(asmt_fields),), dtype=np.bool)
     for s in symptomatic_fields:
         print('symptomatic_field', s)
-        cv = categorical_maps[s].strings_to_values
+        cv = data_schema[s].strings_to_values
         print(f"symptomatic_field '{s}' to categorical")
         asmt_dest_fields[s] = to_categorical(asmt_fields, asmt_ds.field_to_index(s), np.uint8, cv)
         any_symptoms |= asmt_dest_fields[s] > 1
@@ -516,19 +517,19 @@ def pipeline(patient_filename, assessment_filename, categorical_maps, territory=
     print(build_histogram(asmt_fields, asmt_ds.field_to_index('tested_covid_positive')))
 
     for f in flattened_fields:
-        cv = categorical_maps[f[1]].strings_to_values
+        cv = data_schema[f[1]].strings_to_values
         print(f[1], cv)
         print(f"flattened_field '{f[0]}' to categorical field '{f[1]}'")
         asmt_dest_fields[f[1]] = to_categorical(asmt_fields, asmt_ds.field_to_index(f[0]), np.uint8, cv)
         any_symptoms |= asmt_dest_fields[f[1]] > 1
 
     for e in exposure_fields:
-        cv = categorical_maps[e].strings_to_values
+        cv = data_schema[e].strings_to_values
         print(f"exposure_field '{e}' to categorical")
         asmt_dest_fields[e] = to_categorical(asmt_fields, asmt_ds.field_to_index(e), np.uint8, cv)
 
     for m in miscellaneous_fields:
-        cv = categorical_maps[m].strings_to_values
+        cv = data_schema[m].strings_to_values
         print(f"miscellaneous_field '{m}' to categorical")
         print(build_histogram(asmt_fields, asmt_ds.field_to_index(m)))
         asmt_dest_fields[m] = to_categorical(asmt_fields, asmt_ds.field_to_index(m), np.uint8, cv)
@@ -557,57 +558,14 @@ def pipeline(patient_filename, assessment_filename, categorical_maps, territory=
     print(); print()
     print("validate covid progression")
     print("--------------------------")
-    def validate_and_sanitise_covid_test_results_fac(results_key, results):
-        valid_transitions = {
-            '': ('', 'waiting', 'yes', 'no'),
-            'waiting': ('', 'waiting', 'yes', 'no'),
-            'no': ('', 'no'),
-            'yes': ('', 'yes')
-        }
-        upgrades = {
-            '': ('waiting', 'yes', 'no'),
-            'waiting': ('yes', 'no'),
-            'no': (),
-            'yes':()
-        }
-        key_to_value = {
-            '': 0,
-            'waiting': 1,
-            'no': 2,
-            'yes': 3
-        }
-
-        tcp_index = asmt_ds.field_to_index('tested_covid_positive')
-
-        def inner_(fields, filter_status, start, end):
-            raw_results = list()
-            for s in range(start, end+1):
-                raw_results.append(fields[s][tcp_index])
-
-            # validate the subrange
-            invalid = False
-            max_value = ''
-            for j in range(start, end + 1):
-                # allowable transitions
-                value = fields[j][tcp_index]
-                if not value in valid_transitions[max_value]:
-                    invalid = True
-                    break
-                if value in upgrades[max_value]:
-                    max_value = value
-                sanitised_covid_results[j] = key_to_value[max_value]
-
-            if invalid:
-                for j in range(start, end + 1):
-                    sanitised_covid_results[j] = key_to_value[fields[j][tcp_index]]
-                    filter_status[j] |= FILTER_INVALID_COVID_PROGRESSION
-
-        return inner_
 
     sanitised_covid_results = np.ndarray((len(asmt_fields),), dtype=np.uint8)
-    sanitised_covid_results_key = ['', 'waiting', 'no', 'yes']
+    sanitised_covid_results_key = data_schema['tested_covid_positive'].values_to_strings[:]
 
-    fn = validate_and_sanitise_covid_test_results_fac(sanitised_covid_results_key, sanitised_covid_results)
+    fn_fac = parsing_schema.ParsingSchema(1).class_entries['clean_covid_progression']
+    fn = fn_fac(asmt_ds, asmt_filter_status, sanitised_covid_results_key, sanitised_covid_results,
+                FILTER_INVALID_COVID_PROGRESSION)
+    # fn = ValidateCovidTestResultsFac(asmt_ds, asmt_filter_status, sanitised_covid_results_key, sanitised_covid_results)
     iterate_over_patient_assessments(asmt_fields, asmt_filter_status, fn)
 
     print(f'{assessment_flag_descs[FILTER_INVALID_COVID_PROGRESSION]}:',

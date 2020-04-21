@@ -8,25 +8,25 @@ class FieldEntry:
         self.version_to = version_to
 
     def __str__(self):
-        str = 'FieldEntry(field={}, strings_to_values={}, values_to_strings={}, version_from={}, version_to={})'
-        return str.format(self.field, self.strings_to_values, self.values_to_string,
-                          self.version_from, self.version_to)
+        output = 'FieldEntry(field={}, strings_to_values={}, values_to_strings={}, version_from={}, version_to={})'
+        return output.format(self.field, self.strings_to_values, self.values_to_string,
+                             self.version_from, self.version_to)
 
     def __repr__(self):
         return self.__str__()
 
 
-class CleaningSchemaError(Exception):
+class DataSchemaVersionError(Exception):
     pass
 
 
-def validate_schema_number(schema):
+def _validate_schema_number(schema):
     if schema not in data_schemas:
-        raise CleaningSchemaError(f'{schema} is not a valid cleaning schema value')
+        raise DataSchemaVersionError(f'{schema} is not a valid cleaning schema value')
 
 
 def get_categorical_maps(version):
-    validate_schema_number(version)
+    _validate_schema_number(version)
 
     selected_field_entries = dict()
     # get fields for which the schema number is in range
@@ -34,6 +34,7 @@ def get_categorical_maps(version):
         for e in fe[1]:
             if version >= e.version_from and (e.version_to is None or version < e.version_to):
                 selected_field_entries[fe[0]] = e
+                break
 
     return selected_field_entries
 
@@ -46,7 +47,6 @@ def _build_map(value_list):
 
 
 data_schemas = [1]
-cleaning_schemas = [1]
 na_value_from = ''
 na_value_to = ''
 leaky_boolean_to = [na_value_to, 'False', 'True']
