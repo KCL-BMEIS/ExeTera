@@ -29,10 +29,10 @@ def build_histogram(dataset, field_index, filtered_records=None, tx=None):
         # TODO: memory_efficiency: test and replace defaultdict with this code when tested
         dataset = sorted(dataset, dataset.field_index)
         histogram = list()
-        histogram.append((dataset[0][1][1], 0))
+        histogram.append((dataset[0][1], 0))
         for r in dataset:
             if histogram[-1][0] != r[1][1]:
-                histogram.append((r[1][1], 1))
+                histogram.append((r[1], 1))
             else:
                 histogram[-1] = (histogram[-1][0], histogram[-1][1] + 1)
     else:
@@ -40,9 +40,9 @@ def build_histogram(dataset, field_index, filtered_records=None, tx=None):
         for ir, r in enumerate(dataset):
             if not filtered_records or not filtered_records[ir]:
                 if tx is not None:
-                    value = tx(r[1][field_index])
+                    value = tx(r[field_index])
                 else:
-                    value = r[1][field_index]
+                    value = r[field_index]
                 histogram[value] += 1
         hlist = list(histogram.items())
         del histogram
@@ -140,11 +140,11 @@ def valid_range_fac_inc(f_min, f_max, default_value=''):
 
 def filter_fields(fields, filter_list, index, f_missing, f_bad, is_type_fn, type_fn, valid_fn):
     for ir, r in enumerate(fields):
-        if not is_type_fn(r[1][index]):
+        if not is_type_fn(r[index]):
             if f_missing != 0:
                 filter_list[ir] |= f_missing
         else:
-            value = type_fn(r[1][index])
+            value = type_fn(r[index])
             if not valid_fn(value):
                 if f_bad != 0:
                     filter_list[ir] |= f_bad
@@ -184,7 +184,7 @@ def sort_mixed_list(values, check_fn, sort_fn):
 def to_categorical(fields, field_index, desttype, mapdict):
     results = np.ndarray((len(fields),), dtype=desttype)
     for ir, r in enumerate(fields):
-        v = r[1][field_index]
+        v = r[field_index]
         results[ir] = mapdict[v]
     return results
 
@@ -193,8 +193,8 @@ def map_patient_ids(geoc, asmt, map_fn):
     g = 0
     a = 0
     while g < len(geoc) and a < len(asmt):
-        gpid = geoc[g][1][0]
-        apid = asmt[a][1][1]
+        gpid = geoc[g][0]
+        apid = asmt[a][1]
         if gpid < apid:
             g += 1
         elif apid < gpid:
@@ -205,12 +205,12 @@ def map_patient_ids(geoc, asmt, map_fn):
 
 
 def iterate_over_patient_assessments(fields, filter_status, visitor):
-    cur_id = fields[0][1][1]
+    cur_id = fields[0][1]
     cur_start = 0
     cur_end = 0
     i = 1
     while i < len(fields):
-        while fields[i][1][1] == cur_id:
+        while fields[i][1] == cur_id:
             cur_end = i
             i += 1
             if i >= len(fields):
@@ -221,7 +221,7 @@ def iterate_over_patient_assessments(fields, filter_status, visitor):
         if i < len(fields):
             cur_start = i
             cur_end = cur_start
-            cur_id = fields[i][1][1]
+            cur_id = fields[i][1]
 
 
 def datetime_to_seconds(dt):
@@ -236,9 +236,9 @@ def print_diagnostic_row(preamble, ds, fields, ir, keys, fns=None):
     values = [None] * len(indices)
     for ii, i in enumerate(indices):
         if indexed_fns[ii] is None:
-            values[ii] = fields[ir][1][i]
+            values[ii] = fields[ir][i]
         else:
-            values[ii] = indexed_fns[ii](fields[ir][1][i])
+            values[ii] = indexed_fns[ii](fields[ir][i])
     print(f'{preamble}: {values}')
 
 
@@ -415,11 +415,11 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     print("pre-sort by patient id")
     print("----------------------")
     print("pre-sort patient data")
-    geoc_fields = sorted(geoc_ds.fields_, key=lambda r: r[1][0])
+    geoc_fields = sorted(geoc_ds.fields_, key=lambda r: r[0])
     geoc_filter_status = [0] * len(geoc_fields)
 
     print("pre-sort assessment data")
-    asmt_fields = sorted(asmt_ds.fields_, key=lambda r: (r[1][1], r[1][3]))
+    asmt_fields = sorted(asmt_ds.fields_, key=lambda r: (r[1], r[3]))
     asmt_filter_status = [0] * len(asmt_fields)
 
 
@@ -430,7 +430,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
         country_code = geoc_ds.field_to_index('country_code')
         for ir, r in enumerate(geoc_fields):
-            if r[1][country_code] != territory:
+            if r[country_code] != territory:
                 geoc_filter_status[ir] |= PFILTER_OTHER_TERRITORY
         print(f'other territories: filtered {count_flag_set(geoc_filter_status, PFILTER_OTHER_TERRITORY)} missing values')
 
@@ -438,7 +438,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     # print(count_flag_set(geoc_filter_status, PFILTER_NO_ASSESSMENTS))
     patient_ids = set()
     for r in geoc_fields:
-        patient_ids.add(r[1][0])
+        patient_ids.add(r[0])
 
     print('patients:', len(geoc_filter_status))
     print('patients with no assessments:',
@@ -468,7 +468,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         if geoc_filter_status[ir] & (FILTER_MISSING_YOB | FILTER_BAD_YOB):
             age[ir] = 0
         else:
-            age[ir] = 2020 - to_int(r[1][yob_index])
+            age[ir] = 2020 - to_int(r[yob_index])
     ptnt_dest_fields['age'] = age
 
     print(); print("checking height")
@@ -518,9 +518,9 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     patient_ids = set()
     for ir, r in enumerate(geoc_fields):
         if geoc_filter_status[ir] == 0:
-            patient_ids.add(r[1][0])
+            patient_ids.add(r[0])
     for ir, r in enumerate(asmt_fields):
-        if r[1][1] not in patient_ids:
+        if r[1] not in patient_ids:
             asmt_filter_status[ir] |= AFILTER_PATIENT_FILTERED
 
     print('assessments filtered due to patient filtering:',
@@ -531,7 +531,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     temperature_c = np.zeros((len(asmt_fields),), dtype=np.float)
     temperature_index = asmt_ds.field_to_index('temperature')
     for ir, r in enumerate(asmt_fields):
-        t = r[1][temperature_index]
+        t = r[temperature_index]
         if is_float(t):
             t = float(t)
             temperature_c[ir] = (t - 32) / 1.8 if t > MAX_TEMP else t
@@ -546,9 +546,9 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
     indices = [asmt_ds.field_to_index(c) for c in ('had_covid_test', 'tested_covid_positive')]
 
-    for ir, r in asmt_fields:
-        had_test = asmt_fields[ir][1][indices[0]]
-        test_result = asmt_fields[ir][1][indices[1]]
+    for ir, r in enumerate(asmt_fields):
+        had_test = asmt_fields[ir][indices[0]]
+        test_result = asmt_fields[ir][indices[1]]
         if had_test != 'True' and test_result != '':
             asmt_filter_status[ir] |= FILTER_INCONSISTENT_NOT_TESTED
         if had_test == 'True' and test_result == '':
@@ -601,9 +601,9 @@ def pipeline(patient_filename, assessment_filename, territory=None):
     health_status = build_histogram(asmt_fields, health_status_index)
 
     for ir, r in enumerate(asmt_fields):
-        if r[1][health_status_index] == 'healthy' and any_symptoms[ir]:
+        if r[health_status_index] == 'healthy' and any_symptoms[ir]:
             asmt_filter_status[ir] |= FILTER_INCONSISTENT_SYMPTOMS
-        elif r[1][health_status_index] == 'not_healthy' and not any_symptoms[ir]:
+        elif r[health_status_index] == 'not_healthy' and not any_symptoms[ir]:
             asmt_filter_status[ir] |= FILTER_INCONSISTENT_NO_SYMPTOMS
 
     for f in (FILTER_INCONSISTENT_SYMPTOMS, FILTER_INCONSISTENT_NO_SYMPTOMS):
@@ -643,14 +643,14 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         def inner_(fields, filter_status, start, end):
             raw_results = list()
             for s in range(start, end+1):
-                raw_results.append(fields[s][1][tcp_index])
+                raw_results.append(fields[s][tcp_index])
 
             # validate the subrange
             invalid = False
             max_value = ''
             for j in range(start, end + 1):
                 # allowable transitions
-                value = fields[j][1][tcp_index]
+                value = fields[j][tcp_index]
                 if not value in valid_transitions[max_value]:
                     invalid = True
                     break
@@ -660,7 +660,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
             if invalid:
                 for j in range(start, end + 1):
-                    sanitised_covid_results[j] = key_to_value[fields[j][1][tcp_index]]
+                    sanitised_covid_results[j] = key_to_value[fields[j][tcp_index]]
                     filter_status[j] |= FILTER_INVALID_COVID_PROGRESSION
 
         return inner_
@@ -717,12 +717,12 @@ def pipeline(patient_filename, assessment_filename, territory=None):
             nonlocal merged_row_count
             results = list()
             for i in range(start + 1, end + 1):
-                last_date_str = fields[i-1][1][3]
+                last_date_str = fields[i-1][3]
                 last_date = (last_date_str[0:4], last_date_str[5:7], last_date_str[8:10])
-                cur_date_str = fields[i][1][3]
+                cur_date_str = fields[i][3]
                 cur_date = (cur_date_str[0:4], cur_date_str[5:7], cur_date_str[8:10])
                 if last_date == cur_date:
-                    merged_row = fields[i][1].copy()
+                    merged_row = fields[i].copy()
                     merged_row_count += 1
 
         return inner_
@@ -741,7 +741,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
         def populate_row(self, source_fields, source_index):
             source_row = source_fields[source_index]
             for e in self.existing_field_indices:
-                self.resulting_fields[e[0]][self.rfindex] = source_row[1][e[1]]
+                self.resulting_fields[e[0]][self.rfindex] = source_row[e[1]]
             for ck, cv in self.created_fields.items():
                 self.resulting_fields[ck][self.rfindex] =\
                     max(self.resulting_fields[ck][self.rfindex], cv[source_index])
@@ -751,13 +751,13 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
             # write the first row to the current resulting field index
             prev_asmt = fields[start]
-            prev_date_str = prev_asmt[1][3]
+            prev_date_str = prev_asmt[3]
             prev_date = (prev_date_str[0:4], prev_date_str[5:7], prev_date_str[8:10])
             self.populate_row(fields, start)
 
             for i in range(start + 1, end + 1):
                 cur_asmt = fields[i]
-                cur_date_str = cur_asmt[1][3]
+                cur_date_str = cur_asmt[3]
                 cur_date = (cur_date_str[0:4], cur_date_str[5:7], cur_date_str[8:10])
                 if cur_date != prev_date:
                     self.rfindex += 1
@@ -798,14 +798,14 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
     unique_patients = set()
     for ir, r in enumerate(remaining_asmt_fields):
-        unique_patients.add(r[1][1])
+        unique_patients.add(r[1])
     print('unique patents in remaining assessments:', len(unique_patients))
 
     # sanity check
     print('remaining_field_len:', len(remaining_asmt_fields))
     print('remaining_dest_len:', len(remaining_dest_fields['fatigue_binary']))
     for ir, r in enumerate(remaining_asmt_fields):
-        f = r[1][asmt_ds.field_to_index('fatigue')]
+        f = r[asmt_ds.field_to_index('fatigue')]
         fb = remaining_dest_fields['fatigue_binary'][ir]
         # if (f not in ('mild', 'severe') and fb == True) or (f in ('mild', 'severe') and fb == False):
         #    print('empty' if f == '' else f, fb)
@@ -818,7 +818,7 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 
     unique_patients = defaultdict(int)
     for ir, r in enumerate(remaining_asmt_fields):
-        unique_patients[r[1][1]] += 1
+        unique_patients[r[1]] += 1
     print('unique patents in remaining assessments:', len(unique_patients))
 
 #    print(); print()
@@ -826,11 +826,11 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 #    print("---------------------------------------------")
 #    patient_assessment_counts = defaultdict(int)
 #    for a in asmt_fields:
-#        patient_assessment_counts[a[1][1]] += 1
+#        patient_assessment_counts[a[1]] += 1
 #    patient_assessments = list(patient_assessment_counts.items())
 #
 #    for ir, r in enumerate(geoc_fields):
-#        pid = r[1][0]
+#        pid = r[0]
 #        if pid not in patient_assessment_counts:
 #            geoc_filter_status[ir] |= PFILTER_NO_ASSESSMENTS
 #        elif patient_assessment_counts[pid] == 1:
@@ -841,9 +841,9 @@ def pipeline(patient_filename, assessment_filename, territory=None):
 #    patient_ids = set()
 #    for ir, r in enumerate(geoc_fields):
 #        if geoc_filter_status[ir] == 0:
-#            patient_ids.add(r[1][0])
+#            patient_ids.add(r[0])
 #    for ir, r in enumerate(asmt_fields):
-#        if r[1][1] not in patient_ids:
+#        if r[1] not in patient_ids:
 #            asmt_filter_status[ir] |= AFILTER_PATIENT_FILTERED
 #
 #    print('assessments filtered due to patient filtering:',
@@ -886,8 +886,8 @@ def regression_test_assessments(old_assessments, new_assessments):
     print('diff:', r_a_keys.difference(p_a_keys))
     print(r_a_keys)
     print(p_a_keys)
-    r_a_fields = sorted(r_a_fields, key=lambda r: (r[1][2], r[1][1]))
-    p_a_fields = sorted(p_a_fields, key=lambda p: (p[1][1], p[1][0]))
+    r_a_fields = sorted(r_a_fields, key=lambda r: (r[2], r[1]))
+    p_a_fields = sorted(p_a_fields, key=lambda p: (p[1], p[0]))
 
     diagnostic_row_keys = ['id', 'patient_id', 'created_at', 'updated_at', 'fatigue', 'fatigue_binary', 'tested_covid_positive']
     r_fns = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
@@ -896,41 +896,41 @@ def regression_test_assessments(old_assessments, new_assessments):
     r = 0
     p = 0
     while r < len(r_a_fields) and p < len(p_a_fields):
-        rkey = (r_a_fields[r][1][2], r_a_fields[r][1][1])
-        pkey = (p_a_fields[p][1][1], p_a_fields[p][1][0])
+        rkey = (r_a_fields[r][2], r_a_fields[r][1])
+        pkey = (p_a_fields[p][1], p_a_fields[p][0])
         if rkey < pkey:
             print(f'{r}, {p}: {rkey} not in python dataset')
             print_diagnostic_row('', r_a_ds, r_a_fields, r, diagnostic_row_keys, fns=r_fns)
             print_diagnostic_row('', p_a_ds, p_a_fields, p, diagnostic_row_keys)
-            patients_with_disparities.add(r_a_fields[r][1][2])
-            patients_with_disparities.add(p_a_fields[p][1][1])
+            patients_with_disparities.add(r_a_fields[r][2])
+            patients_with_disparities.add(p_a_fields[p][1])
             r += 1
         elif pkey < rkey:
             print(f'{r}, {p}: {pkey} not in r dataset')
             print_diagnostic_row('', r_a_ds, r_a_fields, r, diagnostic_row_keys, fns=r_fns)
             print_diagnostic_row('', p_a_ds, p_a_fields, p, diagnostic_row_keys)
-            patients_with_disparities.add(r_a_fields[r][1][2])
-            patients_with_disparities.add(p_a_fields[p][1][1])
+            patients_with_disparities.add(r_a_fields[r][2])
+            patients_with_disparities.add(p_a_fields[p][1])
             p += 1
         else:
             r += 1
             p += 1
 
         if r < len(r_a_fields):
-            treatment = r_a_fields[r][1][r_a_ds.field_to_index('treatment')]
+            treatment = r_a_fields[r][r_a_ds.field_to_index('treatment')]
             if treatment not in ('NA', '', 'none'):
                 print(r, treatment)
 
-    r_a_fields = sorted(r_a_fields, key=lambda r: (r[1][2], r[1][4]))
-    p_a_fields = sorted(p_a_fields, key=lambda p: (p[1][1], p[1][3]))
+    r_a_fields = sorted(r_a_fields, key=lambda r: (r[2], r[4]))
+    p_a_fields = sorted(p_a_fields, key=lambda p: (p[1], p[3]))
 
     for pd in patients_with_disparities:
         print(); print(pd)
         for ir, r in enumerate(r_a_fields):
-            if r[1][2] == pd:
+            if r[2] == pd:
                 print_diagnostic_row(f'r[ir]', r_a_ds, r_a_fields, ir, diagnostic_row_keys, fns=r_fns)
         for ip, p in enumerate(p_a_fields):
-            if p[1][1] == pd:
+            if p[1] == pd:
                 print_diagnostic_row(f'p[ip]', p_a_ds, p_a_fields, ip, diagnostic_row_keys)
 
     print('done')
@@ -956,26 +956,26 @@ def regression_test_patients(old_patients, new_patients):
     print('r_a_keys:', r_a_keys)
     print('p_a_keys:', p_a_keys)
 
-    r_a_fields = sorted(r_a_fields, key=lambda r: r[1][1])
-    p_a_fields = sorted(p_a_fields, key=lambda p: p[1][0])
+    r_a_fields = sorted(r_a_fields, key=lambda r: r[1])
+    p_a_fields = sorted(p_a_fields, key=lambda p: p[0])
 
     print('checking for disparities')
     patients_with_disparities = set()
     r = 0
     p = 0
     while r < len(r_a_fields) and p < len(p_a_fields):
-        rkey = r_a_fields[r][1][1]
-        pkey = p_a_fields[p][1][0]
+        rkey = r_a_fields[r][1]
+        pkey = p_a_fields[p][0]
         if rkey < pkey:
             print(f'{r}, {p}: {rkey} not in python dataset')
-            patients_with_disparities.add(r_a_fields[r][1][1])
+            patients_with_disparities.add(r_a_fields[r][1])
             r += 1
         elif pkey < rkey:
             print(f'{r}, {p}: {pkey} not in r dataset')
-            patients_with_disparities.add(p_a_fields[p][1][0])
+            patients_with_disparities.add(p_a_fields[p][0])
             p += 1
         else:
-            age_same = r_a_fields[r][1][r_a_ds.field_to_index('age')] == p_a_fields[p][1][p_a_ds.field_to_index('age')]
+            age_same = r_a_fields[r][r_a_ds.field_to_index('age')] == p_a_fields[p][p_a_ds.field_to_index('age')]
             print(r, p, age_same)
             r += 1
             p += 1
@@ -990,7 +990,7 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out):
     for p in res_fields['patient_id']:
         remaining_patients.add(p)
     for ip, p in enumerate(p_fields):
-        if p[1][0] not in remaining_patients:
+        if p[0] not in remaining_patients:
             p_status[ip] |= FILTER_NOT_IN_FINAL_ASSESSMENTS
 
     print();
@@ -1003,7 +1003,7 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out):
         csvw.writerow(p_ds.names_ + dest_keys)
         for ir, r in enumerate(p_fields):
             if p_status[ir] == 0:
-                for iv, v in enumerate(r[1]):
+                for iv, v in enumerate(r):
                     values[iv] = v
                 for iv in range(len(dest_keys)):
                     values[len(p_ds.names_) + iv] = p_dest_fields[dest_keys[iv]][ir]
