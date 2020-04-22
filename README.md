@@ -29,3 +29,7 @@ Proper documentation and packaging to follow
 
 ### v0.1.2 -> v0.1.3
 * Fix: `-po` and `-ao` options now properly export patient and assessment csvs respectively
+
+### v0.1.3 -> v0.1.4
+* Fix: added missing value `rarely_left_the_house_but_visit_lots` to `level_of_isolation`
+* Fix: added missing fields `weight_clean`, `height_clean` and `bmi_clean`
