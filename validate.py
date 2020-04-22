@@ -63,7 +63,7 @@ def compare_row(expected_index, expected_row, actual_index, actual_row, keys):
 
 def compare(expected, actual, verbose):
     logger = Logger()
-    logger.log(f'Comparing expected {expected} and current {actual}', print_to_console=True)
+    logger.log(f'\nComparing expected {expected} and current {actual}', print_to_console=True)
 
     with open(expected) as f:
         expected_ds = dataset.Dataset(f)
