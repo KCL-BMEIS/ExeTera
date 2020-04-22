@@ -39,10 +39,11 @@ ds.sort(('patient_id', 'updated_at'))
 
 filter_status = np.zeros(len(ds.fields_,), dtype=np.uint32)
 
-data_schema = data_schemas.get_categorical_maps(1)
+data_schema = data_schemas.DataSchema(1)
+categorical_maps = data_schema.get_assessment_categorical_maps()
 
 tcp_index = ds.field_to_index('tested_covid_positive')
-strings_to_values = data_schema['tested_covid_positive'].strings_to_values
+strings_to_values = categorical_maps['tested_covid_positive'].strings_to_values
 patients = defaultdict(int)
 for ir, r in enumerate(ds.fields_):
     patients[r[1]] = max(patients[r[1]], strings_to_values[r[tcp_index]])
@@ -61,7 +62,7 @@ print("patients with 'tested_covid_positive' set: ", remaining_patients)
 print('trying schema 1')
 parsing_schema_1 = parsing_schemas.ParsingSchema(1)
 sanitised_covid_results_1 = np.ndarray((len(ds.fields_),), dtype=np.uint8)
-sanitised_covid_results_key_1 = data_schema['tested_covid_positive'].values_to_strings[:]
+sanitised_covid_results_key_1 = categorical_maps['tested_covid_positive'].values_to_strings[:]
 
 fn_fac = parsing_schema_1.class_entries['clean_covid_progression']
 fn = fn_fac(ds, filter_status, sanitised_covid_results_key_1, sanitised_covid_results_1, 0x2)
@@ -70,7 +71,7 @@ pipeline.iterate_over_patient_assessments(ds.fields_, filter_status, fn)
 print('trying schema 2')
 parsing_schema_2 = parsing_schemas.ParsingSchema(2)
 sanitised_covid_results_2 = np.ndarray((len(ds.fields_),), dtype=np.uint8)
-sanitised_covid_results_key_2 = data_schema['tested_covid_positive'].values_to_strings[:]
+sanitised_covid_results_key_2 = categorical_maps['tested_covid_positive'].values_to_strings[:]
 
 fn_fac = parsing_schema_2.class_entries['clean_covid_progression']
 fn = fn_fac(ds, filter_status, sanitised_covid_results_key_2, sanitised_covid_results_2, 0x4, show_debug=True)

@@ -15,7 +15,7 @@ import numpy as np
 
 class Dataset:
 
-    def __init__(self, source, progress=False, stop_after=None):
+    def __init__(self, source, field_descriptors=None, progress=False, stop_after=None):
         self.names_ = list()
         self.fields_ = list()
         self.names_ = list()
@@ -25,26 +25,29 @@ class Dataset:
             csvf = csv.DictReader(source, delimiter=',', quotechar='"')
             self.names_ = csvf.fieldnames
 
-        newline_at = 10
-        lines_per_dot = 100000
+        # transforms_by_index = list()
+        # for i_n, n in enumerate(self.names_):
+        #     if field_descriptors and n in field_descriptors:
+        #         transforms_by_index.append(field_descriptors[n])
+        #     else:
+        #         transforms_by_index.append(None)
+
+
         # TODO: better for the Dataset to take a stream rather than a name - this allows us to unittest it from strings
         csvf = csv.reader(source, delimiter=',', quotechar='"')
 
         ecsvf = iter(csvf)
-        # next(ecsvf)
-        if not progress:
-            for i, fields in enumerate(ecsvf):
-                self.fields_.append(fields)
-                if stop_after and i > stop_after:
-                    break
-        else:
-            for i, fields in enumerate(ecsvf):
-                self.fields_.append(fields)
-                if i % 100000 == 0:
+        for i, fields in enumerate(ecsvf):
+            self.fields_.append(fields)
+            if i % 100000 == 0:
+                if progress:
                     print(i)
-                if stop_after and i >= stop_after:
-                    break
+            if stop_after and i >= stop_after:
+                break
+        if progress:
             print(i)
+        self.index_ = np.asarray([i for i in range(len(self.fields_))], dtype=np.uint32)
+
         #     if i > 0 and i % lines_per_dot == 0:
         #         if i % (lines_per_dot * newline_at) == 0:
         #             print(f'. {i}')
@@ -52,8 +55,6 @@ class Dataset:
         #             print('.', end='')
         # if i % (lines_per_dot * newline_at) != 0:
         #     print(f' {i}')
-        self.index_ = np.asarray([i for i in range(len(self.fields_))], dtype=np.uint32)
-        # return strings
 
     def sort(self, keys):
         #map names to indices
@@ -65,7 +66,6 @@ class Dataset:
             return inner_
 
         self.index_ = sorted(self.index_, key=index_sort(kindices))
-        fields2 = self.fields_[:]
         self.fields_ = Dataset._apply_permutation(self.index_, self.fields_)
 
     @staticmethod

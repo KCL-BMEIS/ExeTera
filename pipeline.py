@@ -187,7 +187,8 @@ def to_categorical(fields, field_index, desttype, mapdict):
     results = np.ndarray((len(fields),), dtype=desttype)
     for ir, r in enumerate(fields):
         v = r[field_index]
-        results[ir] = mapdict[v]
+        result = mapdict[v]
+        results[ir] = result
     return results
 
 
@@ -312,10 +313,12 @@ symptomatic_fields = ["fatigue", "shortness_of_breath", "abdominal_pain", "chest
 flattened_fields = [("fatigue", "fatigue_binary"), ("shortness_of_breath", "shortness_of_breath_binary")]
 exposure_fields = ["always_used_shortage", "have_used_PPE", "never_used_shortage", "sometimes_used_shortage",
                    "treated_patients_with_covid"]
-miscellaneous_fields = ['location', 'level_of_isolation', 'had_covid_test']
+miscellaneous_fields = ['health_status', 'location', 'level_of_isolation', 'had_covid_test']
 
 
 def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema, territory=None):
+
+    categorical_maps = data_schema.assessment_categorical_maps
 
     print(); print();
     print('load patients')
@@ -323,7 +326,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     # geoc_fieldnames = enumerate_fields(patient_filename)
     # geoc_countdict = {'id': False, 'patient_id': False}
     with open(patient_filename) as f:
-        geoc_ds = dataset.Dataset(f)
+        geoc_ds = dataset.Dataset(f, data_schema.patient_categorical_maps)
     # with open(patient_filename) as f:
     #         geoc_ds.parse_file(f)
     geoc_ds.sort(('id',))
@@ -336,7 +339,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     # asmt_fieldnames = enumerate_fields(assessment_filename)
     # asmt_countdict = {'id': False, 'patient_id': False}
     with open(assessment_filename) as f:
-        asmt_ds = dataset.Dataset(f)
+        asmt_ds = dataset.Dataset(f, data_schema.assessment_categorical_maps)
     # with open(assessment_filename) as f:
     #     asmt_ds.parse_file(f)
     asmt_ds.sort(('patient_id', 'updated_at'))
@@ -520,7 +523,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     any_symptoms = np.zeros((len(asmt_fields),), dtype=np.bool)
     for s in symptomatic_fields:
         print('symptomatic_field', s)
-        cv = data_schema[s].strings_to_values
+        cv = categorical_maps[s].strings_to_values
         print(f"symptomatic_field '{s}' to categorical")
         asmt_dest_fields[s] = to_categorical(asmt_fields, asmt_ds.field_to_index(s), np.uint8, cv)
         any_symptoms |= asmt_dest_fields[s] > 1
@@ -530,19 +533,19 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print(build_histogram(asmt_fields, asmt_ds.field_to_index('tested_covid_positive')))
 
     for f in flattened_fields:
-        cv = data_schema[f[1]].strings_to_values
+        cv = categorical_maps[f[1]].strings_to_values
         print(f[1], cv)
         print(f"flattened_field '{f[0]}' to categorical field '{f[1]}'")
         asmt_dest_fields[f[1]] = to_categorical(asmt_fields, asmt_ds.field_to_index(f[0]), np.uint8, cv)
         any_symptoms |= asmt_dest_fields[f[1]] > 1
 
     for e in exposure_fields:
-        cv = data_schema[e].strings_to_values
+        cv = categorical_maps[e].strings_to_values
         print(f"exposure_field '{e}' to categorical")
         asmt_dest_fields[e] = to_categorical(asmt_fields, asmt_ds.field_to_index(e), np.uint8, cv)
 
     for m in miscellaneous_fields:
-        cv = data_schema[m].strings_to_values
+        cv = categorical_maps[m].strings_to_values
         print(f"miscellaneous_field '{m}' to categorical")
         print(build_histogram(asmt_fields, asmt_ds.field_to_index(m)))
         asmt_dest_fields[m] = to_categorical(asmt_fields, asmt_ds.field_to_index(m), np.uint8, cv)
@@ -573,7 +576,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print("--------------------------")
 
     sanitised_covid_results = np.ndarray((len(asmt_fields),), dtype=np.uint8)
-    sanitised_covid_results_key = data_schema['tested_covid_positive'].values_to_strings[:]
+    sanitised_covid_results_key = categorical_maps['tested_covid_positive'].values_to_strings[:]
 
     fn_fac = parsing_schema.class_entries['clean_covid_progression']
     fn = fn_fac(asmt_ds, asmt_filter_status,
@@ -690,7 +693,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print(f'{len(remaining_asmt_fields)} - {merged_row_count} = {remaining_asmt_row_count}')
 
     existing_fields = ('id', 'patient_id', 'created_at', 'updated_at', 'version',
-                       'country_code', 'health_status')
+                       'country_code')
     existing_field_indices = [(f, asmt_ds.field_to_index(f)) for f in existing_fields]
 
     resulting_fields = dict()
@@ -770,7 +773,7 @@ def regression_test_assessments(old_assessments, new_assessments):
     r_a_fields = sorted(r_a_fields, key=lambda r: (r[2], r[1]))
     p_a_fields = sorted(p_a_fields, key=lambda p: (p[1], p[0]))
 
-    diagnostic_row_keys = ['id', 'patient_id', 'created_at', 'updated_at', 'fatigue', 'fatigue_binary', 'tested_covid_positive']
+    diagnostic_row_keys = ['id', 'patient_id', 'created_at', 'updated_at', 'health_status', 'fatigue', 'fatigue_binary', 'had_covid_test', 'tested_covid_positive']
     r_fns = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
 
     patients_with_disparities = set()
@@ -865,6 +868,9 @@ def regression_test_patients(old_patients, new_patients):
         print(); print(pd)
 
 def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema):
+
+    categorical_maps = data_schema.assessment_categorical_maps
+
     p_ds, p_fields, p_status, p_dest_fields, a_ds, a_fields, a_status, ra_fields, ra_status, res_fields, res_keys \
         = pipeline_output
     remaining_patients = set()
@@ -907,8 +913,8 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema
                 for irh, rh in enumerate(headers):
                     if rh in functor_fields:
                         row_values[irh] = functor_fields[rh](res_fields[rh][ir])
-                    elif rh in data_schema:
-                        v_to_s = data_schema[rh].values_to_strings
+                    elif rh in categorical_maps:
+                        v_to_s = categorical_maps[rh].values_to_strings
                         if res_fields[rh][ir] >= len(v_to_s):
                             print(f'{res_fields[rh][ir]} is out of range for {v_to_s}')
                         try:
@@ -953,7 +959,7 @@ if __name__ == '__main__':
         tstart = time.time()
 
         data_schema_version = 1
-        data_schema = data_schemas.get_categorical_maps(data_schema_version)
+        data_schema = data_schemas.DataSchema(data_schema_version)
         parsing_schema_version = 1
         parsing_schema = parsing_schemas.ParsingSchema(parsing_schema_version)
         pipeline_output = pipeline(args.patient_data, args.assessment_data,

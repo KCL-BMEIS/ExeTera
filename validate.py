@@ -42,24 +42,36 @@ class Logger(object):
 
     def write(self, destination, append=False):
         if os.path.isfile(destination) and append is False:
-            raise FileExistsError(f'Report destination file {destination} already exists.')
+            mode = 'w'
         else:
-            with open(destination, 'a') as f:
-                f.write(self.report)
+            mode = 'a'
+        with open(destination, mode) as f:
+            f.write(self.report)
 
 
 
 
 def compare_row(expected_index, expected_row, actual_index, actual_row, keys):
     all_true = True
+    mismatches = None
     for k in keys:
         expected_value = expected_row.value_from_fieldname(expected_index, k)
         actual_value = actual_row.value_from_fieldname(actual_index, k)
         if expected_value in equivalence_map:
-            all_true = all_true and actual_value in equivalence_map[expected_value]
+            if actual_value not in equivalence_map[expected_value]:
+                all_true = False
+                if mismatches is None:
+                    mismatches = list()
+                mismatches.append(k)
+            # all_true = all_true and actual_value in equivalence_map[expected_value]
         else:
-            all_true = all_true and expected_value == actual_value
-    return all_true
+            if expected_value != actual_value:
+                all_true = False
+                if mismatches is None:
+                    mismatches = list()
+                mismatches.append(k)
+            # all_true = all_true and expected_value == actual_value
+    return all_true, mismatches
 
 def compare(expected, actual, verbose):
     logger = Logger()
@@ -92,16 +104,18 @@ def compare(expected, actual, verbose):
 
     rows_that_differ = []
     for i in range(expected_ds.row_count()):
-            if not compare_row(i, expected_ds, i, actual_ds, common_fields):
-                rows_that_differ.append(i)
+        matched, mismatches = compare_row(i, expected_ds, i, actual_ds, common_fields)
+        if not matched:
+            rows_that_differ.append((i, mismatches))
+
 
     if len(rows_that_differ) > 0:
         logger.log(f'WARNING: a total of {len(rows_that_differ)} rows do not match', print_to_console=True)
         if verbose:
             for row in rows_that_differ:
                 logger.log('expected value | actual_value')
-                for field in common_fields:
-                    logger.log(f'{expected_ds.value_from_fieldname(row, field)} | {actual_ds.value_from_fieldname(row, field)}')
+                for field in row[1]:# common_fields:
+                    logger.log(f'{expected_ds.value_from_fieldname(row[0], field)} | {actual_ds.value_from_fieldname(row[0], field)}')
     else:
         logger.log('row contents are equal \n \n', print_to_console=True)
     return logger
@@ -160,7 +174,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     data_schema_version = 1
-    data_schema = data_schemas.get_categorical_maps(data_schema_version)
+    data_schema = data_schemas.DataSchema(data_schema_version)
     parsing_schema_version = 1
     parsing_schema = parsing_schemas.ParsingSchema(parsing_schema_version)
     # run the current pipeline

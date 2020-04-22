@@ -28,7 +28,7 @@ print('loaded')
 
 filter_status = np.zeros(len(ds.fields_,), dtype=np.uint32)
 
-data_schema = data_schemas.get_categorical_maps(1)
+data_schema = data_schemas.assessment_categorical_maps
 
 
 i_yob = ds.field_to_index('year_of_birth')
