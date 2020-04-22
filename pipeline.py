@@ -412,31 +412,44 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
             age[ir] = 2020 - to_int(r[yob_index])
     ptnt_dest_fields['age'] = age
 
-    print(); print("checking height")
-    filter_fields(geoc_fields, geoc_filter_status, geoc_ds.field_to_index('height_cm'),
-                  FILTER_MISSING_HEIGHT, FILTER_BAD_HEIGHT, is_float, to_float, valid_range_fac_inc(MIN_HEIGHT, MAX_HEIGHT))
-    print(f'height: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_HEIGHT)} missing values')
-    print(f'height: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_HEIGHT)} bad values')
-    heights = build_histogram(geoc_fields, geoc_ds.field_to_index('height_cm')) #, tx=replace_if_invalid(-1.0))
-    print(f'height: {len(heights)} unique values')
-    print(geoc_filter_status.count(0))
+    # print(); print("checking height")
+    # filter_fields(geoc_fields, geoc_filter_status, geoc_ds.field_to_index('height_cm'),
+    #               FILTER_MISSING_HEIGHT, FILTER_BAD_HEIGHT, is_float, to_float, valid_range_fac_inc(MIN_HEIGHT, MAX_HEIGHT))
+    # print(f'height: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_HEIGHT)} missing values')
+    # print(f'height: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_HEIGHT)} bad values')
+    # heights = build_histogram(geoc_fields, geoc_ds.field_to_index('height_cm')) #, tx=replace_if_invalid(-1.0))
+    # print(f'height: {len(heights)} unique values')
+    # print(geoc_filter_status.count(0))
+    #
+    # print(); print("checking weight")
+    # filter_fields(geoc_fields, geoc_filter_status, geoc_ds.field_to_index('weight_kg'),
+    #               FILTER_MISSING_WEIGHT, FILTER_BAD_WEIGHT, is_float, to_float, valid_range_fac_inc(MIN_WEIGHT, MAX_WEIGHT))
+    # print(f'weight: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_WEIGHT)} missing values')
+    # print(f'weight: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_WEIGHT)} bad values')
+    # weights = build_histogram(geoc_fields, geoc_ds.field_to_index('weight_kg')) #, tx=replace_if_invalid(-1.0))
+    # print(f'weight: {len(weights)} unique values')
+    # print(geoc_filter_status.count(0))
+    #
+    # print(); print("checking bmi")
+    # filter_fields(geoc_fields, geoc_filter_status, geoc_ds.field_to_index('bmi'), FILTER_MISSING_BMI, FILTER_BAD_BMI,
+    #              is_float, to_float, valid_range_fac_inc(MIN_BMI, MAX_BMI))
+    # print(f'bmi: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_BMI)} missing values')
+    # print(f'bmi: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_BMI)} bad values')
+    # bmis = build_histogram(geoc_fields, geoc_ds.field_to_index('bmi')) #, tx=replace_if_invalid(-1.0))
+    # print(f'bmi: {len(bmis)} unique values')
+    fn_fac = parsing_schema.class_entries['validate_weight_height_bmi']
+    fn = fn_fac(MIN_WEIGHT, MAX_WEIGHT, MIN_HEIGHT, MAX_HEIGHT, MIN_BMI, MAX_BMI,
+                FILTER_MISSING_WEIGHT, FILTER_BAD_WEIGHT,
+                FILTER_MISSING_HEIGHT, FILTER_BAD_HEIGHT,
+                FILTER_MISSING_BMI, FILTER_BAD_BMI,
+                geoc_ds.field_to_index('weight_kg'),
+                geoc_ds.field_to_index('height_cm'),
+                geoc_ds.field_to_index('bmi'))
+    height_clean, weight_clean, bmi_clean = fn(geoc_ds.fields_, geoc_filter_status)
+    ptnt_dest_fields['weight_clean'] = weight_clean
+    ptnt_dest_fields['height_clean'] = height_clean
+    ptnt_dest_fields['bmi_clean'] = bmi_clean
 
-    print(); print("checking weight")
-    filter_fields(geoc_fields, geoc_filter_status, geoc_ds.field_to_index('weight_kg'),
-                  FILTER_MISSING_WEIGHT, FILTER_BAD_WEIGHT, is_float, to_float, valid_range_fac_inc(MIN_WEIGHT, MAX_WEIGHT))
-    print(f'weight: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_WEIGHT)} missing values')
-    print(f'weight: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_WEIGHT)} bad values')
-    weights = build_histogram(geoc_fields, geoc_ds.field_to_index('weight_kg')) #, tx=replace_if_invalid(-1.0))
-    print(f'weight: {len(weights)} unique values')
-    print(geoc_filter_status.count(0))
-
-    print(); print("checking bmi")
-    filter_fields(geoc_fields, geoc_filter_status, geoc_ds.field_to_index('bmi'), FILTER_MISSING_BMI, FILTER_BAD_BMI,
-                 is_float, to_float, valid_range_fac_inc(MIN_BMI, MAX_BMI))
-    print(f'bmi: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_BMI)} missing values')
-    print(f'bmi: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_BMI)} bad values')
-    bmis = build_histogram(geoc_fields, geoc_ds.field_to_index('bmi')) #, tx=replace_if_invalid(-1.0))
-    print(f'bmi: {len(bmis)} unique values')
 
     print(); print('unfiltered patients:', geoc_filter_status.count(0))
 
@@ -562,10 +575,10 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     sanitised_covid_results = np.ndarray((len(asmt_fields),), dtype=np.uint8)
     sanitised_covid_results_key = data_schema['tested_covid_positive'].values_to_strings[:]
 
-    fn_fac = parsing_schemas.ParsingSchema(1).class_entries['clean_covid_progression']
-    fn = fn_fac(asmt_ds, asmt_filter_status, sanitised_covid_results_key, sanitised_covid_results,
+    fn_fac = parsing_schema.class_entries['clean_covid_progression']
+    fn = fn_fac(asmt_ds, asmt_filter_status,
+                sanitised_covid_results_key, sanitised_covid_results,
                 FILTER_INVALID_COVID_PROGRESSION)
-    # fn = ValidateCovidTestResultsFac(asmt_ds, asmt_filter_status, sanitised_covid_results_key, sanitised_covid_results)
     iterate_over_patient_assessments(asmt_fields, asmt_filter_status, fn)
 
     print(f'{assessment_flag_descs[FILTER_INVALID_COVID_PROGRESSION]}:',
@@ -717,35 +730,6 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     for ir, r in enumerate(remaining_asmt_fields):
         unique_patients[r[1]] += 1
     print('unique patents in remaining assessments:', len(unique_patients))
-
-#    print(); print()
-#    print("filter patients with insufficient assessments")
-#    print("---------------------------------------------")
-#    patient_assessment_counts = defaultdict(int)
-#    for a in asmt_fields:
-#        patient_assessment_counts[a[1]] += 1
-#    patient_assessments = list(patient_assessment_counts.items())
-#
-#    for ir, r in enumerate(geoc_fields):
-#        pid = r[0]
-#        if pid not in patient_assessment_counts:
-#            geoc_filter_status[ir] |= PFILTER_NO_ASSESSMENTS
-#        elif patient_assessment_counts[pid] == 1:
-#            geoc_filter_status[ir] |= PFILTER_ONE_ASSESSMENT
-#    del patient_assessment_counts
-
-#    print('filter patients with only zero or one rows')
-#    patient_ids = set()
-#    for ir, r in enumerate(geoc_fields):
-#        if geoc_filter_status[ir] == 0:
-#            patient_ids.add(r[0])
-#    for ir, r in enumerate(asmt_fields):
-#        if r[1] not in patient_ids:
-#            asmt_filter_status[ir] |= AFILTER_PATIENT_FILTERED
-#
-#    print('assessments filtered due to patient filtering:',
-#          count_flag_set(asmt_filter_status, FILTERA_ALL))
-
 
     print(); print()
     print("filter summaries")
@@ -941,6 +925,11 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema
     print(f'written to {assessment_data_out} in {time.time() - tstart} seconds')
 
 
+# TODO: add json based config option
+# TODO: add parsing schema option and default
+# TODO: add data schema option and default
+# TODO: provide specific schema element overrides (via json only)
+# TODO: add flag to output values as categorical variables
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
