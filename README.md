@@ -33,3 +33,6 @@ Proper documentation and packaging to follow
 ### v0.1.3 -> v0.1.4
 * Fix: added missing value `rarely_left_the_house_but_visit_lots` to `level_of_isolation`
 * Fix: added missing fields `weight_clean`, `height_clean` and `bmi_clean`
+
+### v0.1.4 -> v0.1.5
+* Fix: `health_status` was not being accumulated during the assessment compression phase of cleanup
