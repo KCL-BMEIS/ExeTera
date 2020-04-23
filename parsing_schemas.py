@@ -265,12 +265,13 @@ class ValidateCovidTestResultsFacVersion1:
         self.show_debug = show_debug
 
     def __call__(self, fields, filter_status, start, end):
+        tcps = fields[self.tcp_index]
         # validate the subrange
         invalid = False
         max_value = ''
         for j in range(start, end + 1):
             # allowable transitions
-            value = fields[j][self.tcp_index]
+            value = tcps[j]
             if value not in self.valid_transitions[max_value]:
                 invalid = True
                 break
@@ -280,14 +281,14 @@ class ValidateCovidTestResultsFacVersion1:
 
         if invalid:
             for j in range(start, end + 1):
-                self.results[j] = self.key_to_value[fields[j][self.tcp_index]]
+                self.results[j] = self.key_to_value[tcps[j]]
                 filter_status[j] |= self.filter_flag
             if self.show_debug:
-                print(fields[j][1], end=': ')
+                print(tcps[j], end=': ')
                 for j in range(start, end + 1):
                     if j > start:
                         print(' ->', end=' ')
-                    value = fields[j][self.tcp_index]
+                    value = tcps[j]
                     print('na' if value == '' else value, end='')
                 print('')
 
@@ -339,9 +340,10 @@ class ValidateCovidTestResultsFacVersion2:
         first_waiting = -1
         first_no = -1
         first_yes = -1
+        tcps = fields[self.tcp_index]
 
         for j in range(start, end + 1):
-            value = fields[j][self.tcp_index]
+            value = tcps[j]
             if value == 'waiting' and first_waiting == -1:
                 first_waiting = j
             if value == 'no' and first_no == -1:
@@ -353,7 +355,7 @@ class ValidateCovidTestResultsFacVersion2:
             valid_transitions = self.valid_transitions_before_yes if j <= first_yes else self.valid_transitions
             upgrades = self.upgrades_before_yes if j <= first_yes else self.upgrades
             # allowable transitions
-            value = fields[j][self.tcp_index]
+            value = tcps[j]
             if value not in valid_transitions[max_value]:
                 invalid = True
                 break
@@ -364,25 +366,25 @@ class ValidateCovidTestResultsFacVersion2:
             self.results[j] = self.key_to_value[max_value]
 
         #rescue na -> waiting -> no -> waiting
-        if invalid and first_yes == -1 and fields[end][self.tcp_index] == 'waiting':
+        if invalid and first_yes == -1 and tcps[end] == 'waiting':
             invalid = False
             max_value = ''
             for j in range(start, end+1):
-                value = fields[j][self.tcp_index]
+                value = tcps[j]
                 if max_value == '' and value != '':
                     max_value = 'waiting'
                 self.results[j] = self.key_to_value[max_value]
 
         if invalid:
             for j in range(start, end + 1):
-                self.results[j] = self.key_to_value[fields[j][self.tcp_index]]
+                self.results[j] = self.key_to_value[tcps[j]]
                 filter_status[j] |= self.filter_flag
             if self.show_debug:
-                print(fields[j][1], end=': ')
+                print(tcps[j], end=': ')
                 for j in range(start, end + 1):
                     if j > start:
                         print(' ->', end=' ')
-                    value = fields[j][self.tcp_index]
+                    value = tcps[j]
                     print('na' if value == '' else value, end='')
                 print('')
 

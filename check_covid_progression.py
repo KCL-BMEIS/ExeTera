@@ -32,24 +32,26 @@ def progress():
 
 print(f"loading {filename}")
 with open(filename) as f:
-    ds = dataset.Dataset(f, progress)#, stop_after=5000000)
+    ds = dataset.Dataset(f, progress=True, stop_after=1000000)#, stop_after=5000000)
 print('loaded')
 
 ds.sort(('patient_id', 'updated_at'))
 
-filter_status = np.zeros(len(ds.fields_,), dtype=np.uint32)
+filter_status = np.zeros(ds.row_count(), dtype=np.uint32)
 
 data_schema = data_schemas.DataSchema(1)
-categorical_maps = data_schema.get_assessment_categorical_maps()
+categorical_maps = data_schema.assessment_categorical_maps
 
 tcp_index = ds.field_to_index('tested_covid_positive')
 strings_to_values = categorical_maps['tested_covid_positive'].strings_to_values
 patients = defaultdict(int)
-for ir, r in enumerate(ds.fields_):
-    patients[r[1]] = max(patients[r[1]], strings_to_values[r[tcp_index]])
+patient_ids = ds.fields_[1]
+tcps = ds.fields_[tcp_index]
+for ir, r in enumerate(patient_ids):
+    patients[r] = max(patients[r], strings_to_values[tcps[ir]])
 
-for ir, r in enumerate(ds.fields_):
-    if patients[r[1]] == 0:
+for ir, r in enumerate(patient_ids):
+    if patients[r] == 0:
         filter_status[ir] |= 1
 
 remaining_patients = 0
@@ -82,8 +84,9 @@ print(pipeline.build_histogram_from_list(filter_status))
 
 print('reporting')
 patients_flagged = defaultdict(int)
-for ir, r in enumerate(ds.fields_):
-    patients_flagged[r[1]] |= filter_status[ir]
+patient_ids = ds.fields_[1]
+for ir, r in enumerate(patient_ids):
+    patients_flagged[r] |= filter_status[ir]
 
 print(pipeline.build_histogram_from_list(filter_status))
 

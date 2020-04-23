@@ -73,6 +73,7 @@ def compare_row(expected_index, expected_row, actual_index, actual_row, keys):
             # all_true = all_true and expected_value == actual_value
     return all_true, mismatches
 
+
 def compare(expected, actual, verbose):
     logger = Logger()
     logger.log(f'\nComparing expected {expected} and current {actual}', print_to_console=True)

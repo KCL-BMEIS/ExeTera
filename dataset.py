@@ -12,6 +12,8 @@
 import csv
 import numpy as np
 
+import numpy_buffer
+
 
 class Dataset:
 
@@ -25,28 +27,48 @@ class Dataset:
             csvf = csv.DictReader(source, delimiter=',', quotechar='"')
             self.names_ = csvf.fieldnames
 
-        # transforms_by_index = list()
-        # for i_n, n in enumerate(self.names_):
-        #     if field_descriptors and n in field_descriptors:
-        #         transforms_by_index.append(field_descriptors[n])
-        #     else:
-        #         transforms_by_index.append(None)
+        transforms_by_index = list()
+        new_fields = list()
+        for i_n, n in enumerate(self.names_):
+            if field_descriptors and n in field_descriptors:
+                transforms_by_index.append(field_descriptors[n])
+                to_datatype = field_descriptors[n].to_datatype
+                if to_datatype == str:
+                    new_fields.append(list())
+                else:
+                    new_fields.append(numpy_buffer.NumpyBuffer(dtype=to_datatype))
+            else:
+                transforms_by_index.append(None)
+                new_fields.append(list())
 
+        # self.new_fields = [None] * len(self.names_)
+        # for i_t, t in enumerate(transforms_by_index):
+        #     self.new_fields[i_t] = [None] *
 
-        # TODO: better for the Dataset to take a stream rather than a name - this allows us to unittest it from strings
+        # read the cvs rows into the fields
         csvf = csv.reader(source, delimiter=',', quotechar='"')
-
         ecsvf = iter(csvf)
+        next(ecsvf)
         for i, fields in enumerate(ecsvf):
-            self.fields_.append(fields)
-            if i % 100000 == 0:
-                if progress:
+            for i_f, f in enumerate(fields):
+                t = transforms_by_index[i_f]
+                new_fields[i_f].append(f if not t else t.strings_to_values[f])
+            del fields
+            if progress:
+                if i % 100000 == 0:
                     print(i)
             if stop_after and i >= stop_after:
                 break
         if progress:
             print(i)
-        self.index_ = np.asarray([i for i in range(len(self.fields_))], dtype=np.uint32)
+
+        # assign the built sequences to fields_
+        for i_f, f in enumerate(new_fields):
+            if isinstance(f, list):
+                self.fields_.append(f)
+            else:
+                self.fields_.append(f.finalise())
+        self.index_ = np.asarray([i for i in range(len(self.fields_[0]))], dtype=np.uint32)
 
         #     if i > 0 and i % lines_per_dot == 0:
         #         if i % (lines_per_dot * newline_at) == 0:
@@ -62,14 +84,19 @@ class Dataset:
 
         def index_sort(indices):
             def inner_(r):
-                return tuple(self.fields_[r][i] for i in indices)
+                t = tuple(self.fields_[i][r] for i in indices)
+                return t
             return inner_
 
         self.index_ = sorted(self.index_, key=index_sort(kindices))
-        self.fields_ = Dataset._apply_permutation(self.index_, self.fields_)
+
+        for i_f in range(len(self.fields_)):
+            unsorted_field = self.fields_[i_f]
+            self.fields_[i_f] = Dataset._apply_permutation(self.index_, unsorted_field)
+            del unsorted_field
 
     @staticmethod
-    def _apply_permutation(permutation, fields):
+    def _apply_permutation(permutation, field):
         # n = len(permutation)
         # for i in range(0, n):
         #     print(i)
@@ -78,10 +105,15 @@ class Dataset:
         #         pi = permutation[pi]
         #     fields[i], fields[pi] = fields[pi], fields[i]
         # return fields
-        sorted_fields = [0] * len(fields)
-        for ip, p in enumerate(permutation):
-            sorted_fields[ip] = fields[p]
-        return sorted_fields
+        if isinstance(field, list):
+            sorted_field = [None] * len(field)
+            for ip, p in enumerate(permutation):
+                sorted_field[ip] = field[p]
+        else:
+            sorted_field = np.empty_like(field)
+            for ip, p in enumerate(permutation):
+                sorted_field[ip] = field[p]
+        return sorted_field
 
     def field_to_index(self, field_name):
         return self.names_.index(field_name)
@@ -93,7 +125,7 @@ class Dataset:
         return self.fields_[index][self.field_to_index(field_name)]
 
     def row_count(self):
-        return len(self.fields_)
+        return len(self.index_)
 
     def show(self):
         for ir, r in enumerate(self.names_):

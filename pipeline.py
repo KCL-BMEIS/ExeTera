@@ -208,23 +208,24 @@ def map_patient_ids(geoc, asmt, map_fn):
 
 
 def iterate_over_patient_assessments(fields, filter_status, visitor):
-    cur_id = fields[0][1]
+    patient_ids = fields[1]
+    cur_id = patient_ids[0]
     cur_start = 0
     cur_end = 0
     i = 1
     while i < len(fields):
-        while fields[i][1] == cur_id:
+        while patient_ids[i] == cur_id:
             cur_end = i
             i += 1
             if i >= len(fields):
-                break;
+                break
 
         visitor(fields, filter_status, cur_start, cur_end)
 
         if i < len(fields):
             cur_start = i
             cur_end = cur_start
-            cur_id = fields[i][1]
+            cur_id = patient_ids[i]
 
 
 def datetime_to_seconds(dt):
@@ -326,7 +327,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     # geoc_fieldnames = enumerate_fields(patient_filename)
     # geoc_countdict = {'id': False, 'patient_id': False}
     with open(patient_filename) as f:
-        geoc_ds = dataset.Dataset(f, data_schema.patient_categorical_maps)
+        geoc_ds = dataset.Dataset(f, data_schema.patient_categorical_maps, True)
     # with open(patient_filename) as f:
     #         geoc_ds.parse_file(f)
     geoc_ds.sort(('id',))
@@ -339,7 +340,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     # asmt_fieldnames = enumerate_fields(assessment_filename)
     # asmt_countdict = {'id': False, 'patient_id': False}
     with open(assessment_filename) as f:
-        asmt_ds = dataset.Dataset(f, data_schema.assessment_categorical_maps)
+        asmt_ds = dataset.Dataset(f, data_schema.assessment_categorical_maps, True)
     # with open(assessment_filename) as f:
     #     asmt_ds.parse_file(f)
     asmt_ds.sort(('patient_id', 'updated_at'))
