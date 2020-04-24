@@ -10,7 +10,18 @@ python pipeline.py --help
 python pipeline.py -t <territory> -p <input patient csv> -a <input assessor csv> -po <output patient csv -ao <output assessor csv>
 ```
 
+### options
+ * `-t` / `--territory`: the territory to filter the dataset on (runs on all territories if not set)
+ * `-p` / `--patient_data`: the location and name of the patient data csv file
+ * `-a` / `--assessment_data`: the location and name of the assessment data csv file
+ * `-po` / `--patient_data_out`: the location and name of the output patient data csv file
+ * `-ao` / `--assessment_data_out`: the location and name of the output assessment data csv file
+ * `-ps` / `--parsing_schema`: the schema number to use for parsing and cleaning data
 
+### parsing schema
+There are currently 2 parsing schema versions:
+* 1: The baseline cleaning behaviour, intented to match the R script
+* 2 (in progress): Improved cleaning for height/weight/BMI and covid symptom progression
 ## Including in a script
 
 Use the function `pipeline()` from `pipeline.py`.
@@ -36,3 +47,7 @@ Proper documentation and packaging to follow
 
 ### v0.1.4 -> v0.1.5
 * Fix: `health_status` was not being accumulated during the assessment compression phase of cleanup
+
+### v0.1.5 -> v0.1.6
+* Performance: reduced memory usage
+* Addition: provision of `-ps` flag for setting parsing schema
