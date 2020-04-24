@@ -256,7 +256,10 @@ class ValidateTemperature1:
             else:
                 t = float(t)
                 dest_temp = (t - 32) / 1.8 if t > self.max_temp_incl else t
-                if dest_temp <= self.min_temp_incl or dest_temp >= self.max_temp_incl:
+                if dest_temp == 0.0:
+                    filter_list[ir] |= self.f_missing_temp
+                    temperature_c[ir] = dest_temp
+                elif dest_temp <= self.min_temp_incl or dest_temp >= self.max_temp_incl:
                     temperature_c[ir] = 0.0
                     filter_list[ir] |= self.f_bad_temp
                 else:

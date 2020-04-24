@@ -10,6 +10,7 @@
 # limitations under the License.
 
 import csv
+import time
 import numpy as np
 
 import numpy_buffer
@@ -27,6 +28,7 @@ class Dataset:
             csvf = csv.DictReader(source, delimiter=',', quotechar='"')
             self.names_ = csvf.fieldnames
 
+        tstart = time.time()
         transforms_by_index = list()
         new_fields = list()
         for i_n, n in enumerate(self.names_):
@@ -35,11 +37,14 @@ class Dataset:
                 to_datatype = field_descriptors[n].to_datatype
                 if to_datatype == str:
                     new_fields.append(list())
+                    # new_fields.append(numpy_buffer.ListBuffer())
                 else:
-                    new_fields.append(numpy_buffer.NumpyBuffer(dtype=to_datatype))
+                    # new_fields.append(numpy_buffer.NumpyBuffer(dtype=to_datatype))
+                    new_fields.append(numpy_buffer.NumpyBuffer2(dtype=to_datatype))
             else:
                 transforms_by_index.append(None)
                 new_fields.append(list())
+                # new_fields.append(numpy_buffer.ListBuffer())
 
         # self.new_fields = [None] * len(self.names_)
         # for i_t, t in enumerate(transforms_by_index):
@@ -68,6 +73,7 @@ class Dataset:
             else:
                 self.fields_.append(f.finalise())
         self.index_ = np.asarray([i for i in range(len(self.fields_[0]))], dtype=np.uint32)
+        print('loading took', time.time() - tstart, "seconds")
 
         #     if i > 0 and i % lines_per_dot == 0:
         #         if i % (lines_per_dot * newline_at) == 0:

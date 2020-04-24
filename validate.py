@@ -170,6 +170,8 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--report_destination',
                         help='the location for the report .txt to be saved',
                         default=None)
+    parser.add_argument('-ps', '--parsing_schema', default=1,
+                        help='the schema number to use for parsing and cleaning data')
     parser.add_argument('-v', '--verbose',
                         action='store_true',
                         help='increase verbosity')
@@ -177,7 +179,7 @@ if __name__ == '__main__':
 
     data_schema_version = 1
     data_schema = data_schemas.DataSchema(data_schema_version)
-    parsing_schema_version = 1
+    parsing_schema_version = args.parsing_schema
     parsing_schema = parsing_schemas.ParsingSchema(parsing_schema_version)
     # run the current pipeline
     pipeline_output = pipeline.pipeline(patient_filename=args.patients_input,

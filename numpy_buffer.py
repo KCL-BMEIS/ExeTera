@@ -11,6 +11,20 @@
 
 import numpy as np
 
+class NumpyBuffer2:
+    def __init__(self, dtype, block_pow=8):
+        self.dtype_ = dtype
+        self.list_ = list()
+
+    def append(self, value):
+        self.list_.append(value)
+
+    def finalise(self):
+        result = np.asarray(self.list_, dtype=self.dtype_)
+        del self.list_
+        return result
+
+
 class NumpyBuffer:
     def __init__(self, dtype, block_pow=8):
         self.block_shift_ = block_pow
@@ -18,12 +32,14 @@ class NumpyBuffer:
         self.block_mask_ = self.block_size_ - 1
         self.blocks_ = list()
         self.dtype_ = dtype
+        self.current_block_ = None
         self.current_ = 0
 
     def append(self, value):
         if self.current_ == len(self.blocks_) * self.block_size_:
             self.blocks_.append(np.zeros(self.block_size_, dtype=self.dtype_))
-        self.blocks_[self.current_ >> self.block_shift_][self.current_ & self.block_mask_] = value
+            self.current_block_ = self.blocks_[-1]
+        self.current_block_[self.current_ & self.block_mask_] = value
         self.current_ += 1
 
 
@@ -31,6 +47,42 @@ class NumpyBuffer:
         if self.current_ == 0:
             return None
         final = np.zeros(self.current_, dtype=self.dtype_)
+        start = 0
+        for b in range(len(self.blocks_) - 1):
+            cur_block = self.blocks_[b]
+            final[start:start + self.block_size_] = cur_block
+            start += self.block_size_
+            del cur_block
+        current = self.current_ & self.block_mask_
+        last_block = self.blocks_[-1]
+        final[start:start + current] = last_block[0:current]
+        del last_block
+
+        self.blocks_ = list()
+        self.current_ = 0
+
+        return final
+
+
+class ListBuffer:
+    def __init__(self, block_pow=8):
+        self.block_shift_ = block_pow
+        self.block_size_ = 1 << block_pow
+        self.block_mask_ = self.block_size_ - 1
+        self.blocks_ = list()
+        self.current_ = 0
+
+    def append(self, value):
+        if self.current_ == len(self.blocks_) * self.block_size_:
+            self.blocks_.append([None] * self.block_size_)
+        self.blocks_[self.current_ >> self.block_shift_][self.current_ & self.block_mask_] = value
+        self.current_ += 1
+
+
+    def finalise(self):
+        if self.current_ == 0:
+            return None
+        final = [None] * self.current_
         start = 0
         for b in range(len(self.blocks_) - 1):
             cur_block = self.blocks_[b]
