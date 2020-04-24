@@ -489,51 +489,13 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
           count_flag_set(asmt_filter_status, FILTERA_ALL))
 
     print(); print("checking temperature")
-    # convert temperature to C if F
-    # temperature_c = np.zeros(asmt_ds.row_count(), dtype=np.float)
-    # for ir, r in enumerate(asmt_ds.field_by_name('temperature')):
-    #     t = r
-    #     if is_float(t):
-    #         t = float(t)
-    #         temperature_c[ir] = (t - 32) / 1.8 if t > MAX_TEMP else t
-    #     else:
-    #         temperature_c[ir] = 0.0
-    #
-    # filter_list(temperature_c, asmt_filter_status, FILTER_MISSING_TEMP, FILTER_BAD_TEMP,
-    #               is_float, to_float, valid_range_fac(MIN_TEMP, MAX_TEMP, 0.0))
-    # FILTER_BAD_TEMP_2 = 0x10000
-    # print(f'temperature: filtered {count_flag_set(asmt_filter_status, FILTER_BAD_TEMP)} bad values')
-
     fn_fac = parsing_schema.class_entries['validate_temperature']
     fn = fn_fac(MIN_TEMP, MAX_TEMP, FILTER_MISSING_TEMP, FILTER_BAD_TEMP)
     temperature_c = fn(asmt_ds.field_by_name('temperature'), asmt_filter_status)
     asmt_dest_fields['temperature_C'] = temperature_c
     print(f'temperature: filtered {count_flag_set(asmt_filter_status, FILTER_BAD_TEMP)} bad values')
 
-    # print(f'temperature: filtered {count_flag_set(asmt_filter_status, FILTER_MISSING_TEMP)} missing values')
-    # print(f'temperature: filtered {count_flag_set(asmt_filter_status, FILTER_BAD_TEMP_2)} bad values')
-    # asmt_dest_fields['temperature_C'] = temperature_c
-
-    # only_in_first_count = 0
-    # only_in_second_count = 0
-    # in_both_count = 0
-    # for ir in range(len(asmt_filter_status)):
-    #     filter_both_temps = FILTER_BAD_TEMP | FILTER_BAD_TEMP_2
-    #     only_in_first = (asmt_filter_status[ir] & filter_both_temps) == FILTER_BAD_TEMP
-    #     only_in_second = (asmt_filter_status[ir] & filter_both_temps) == FILTER_BAD_TEMP_2
-    #     in_both = (asmt_filter_status[ir] & filter_both_temps) == filter_both_temps
-    #     if only_in_first:
-    #         only_in_first_count += 1
-    #         if only_in_first_count < 100:
-    #             print(ir, "only in first: ", temperature_c[ir], temperature_c2[ir])
-    #     elif only_in_second:
-    #         only_in_second_count += 1
-    #         if only_in_second_count < 100:
-    #             print(ir, "only_in_second", temperature_c[ir], temperature_c2[ir])
-    #     elif in_both:
-    #         in_both_count += 1
-    # print('bad temp counts:', only_in_first_count, only_in_second_count, in_both_count)
-
+    print(); print("checking inconsistent test / test results fields")
     src_had_test = asmt_ds.field_by_name('had_covid_test')
     src_tested_covid_positive = asmt_ds.field_by_name('tested_covid_positive')
 
@@ -679,8 +641,6 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
                     max(self.resulting_fields[ck][self.rfindex], cv[source_index])
 
         def __call__(self, fields, dummy, start, end):
-            rfstart = self.rfindex
-
             # write the first row to the current resulting field index
             prev_date_str = fields[3][start]
             prev_date = (prev_date_str[0:4], prev_date_str[5:7], prev_date_str[8:10])
@@ -770,8 +730,6 @@ def regression_test_assessments(old_assessments, new_assessments):
     print('diff:', r_a_keys.difference(p_a_keys))
     print(r_a_keys)
     print(p_a_keys)
-    # r_a_fields = sorted(r_a_fields, key=lambda r: (r[2], r[1]))
-    # p_a_fields = sorted(p_a_fields, key=lambda p: (p[1], p[0]))
 
     diagnostic_row_keys = ['id', 'patient_id', 'created_at', 'updated_at', 'health_status', 'fatigue', 'fatigue_binary', 'had_covid_test', 'tested_covid_positive']
     r_fns = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
@@ -951,9 +909,16 @@ if __name__ == '__main__':
                         help='the location and name of the assessment data csv file')
     parser.add_argument('-ao', '--assessment_data_out',
                         help='the location and name of the output assessment data csv file')
-    parser.add_argument('-ps', '--parsing_schema', default=1,
+    parser.add_argument('-ps', '--parsing_schema', default=1, type=int,
                         help='the schema number to use for parsing and cleaning data')
     args = parser.parse_args()
+
+    if args.parsing_schema not in parsing_schemas.parsing_schemas:
+        error_str = "the parsing schema must be one of {} for this version"
+        print(error_str.format(parsing_schemas.parsing_schemas))
+        exit(-1)
+
+
     if args.regression_test:
         regression_test_assessments('assessments_cleaned_short.csv', args.assessment_data)
         regression_test_patients('patients_cleaned_short.csv', args.patient_data)

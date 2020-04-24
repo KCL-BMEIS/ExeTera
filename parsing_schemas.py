@@ -328,36 +328,42 @@ class ValidateCovidTestResultsFacVersion1:
 class ValidateCovidTestResultsFacVersion2:
     def __init__(self, tcps, filter_status, results_key, results, filter_flag, show_debug=False):
         # TODO: this is all actually dependent on the data schema so that must be checked
-        self.valid_transitions = {
-            '': ('', 'waiting', 'yes', 'no'),
-            'waiting': ('', 'waiting', 'yes', 'no'),
-            'no': ('', 'no'),
-            'yes': ('', 'yes')
-        }
-        self.valid_transitions_before_yes = {
-            '': ('', 'waiting', 'yes', 'no'),
-            'waiting': ('', 'waiting', 'yes', 'no'),
-            'no': ('', 'waiting', 'no', 'yes'),
-            'yes': ('', 'yes')
-        }
-        self.upgrades = {
-            '': ('waiting', 'yes', 'no'),
-            'waiting': ('yes', 'no'),
-            'no': (),
-            'yes': ()
-        }
-        self.upgrades_before_yes = {
-            '': ('waiting', 'yes', 'no'),
-            'waiting': ('yes',),
-            'no': ('waiting', 'yes'),
-            'yes': ()
-        }
-        self.key_to_value = {
-            '': 0,
-            'waiting': 1,
-            'no': 2,
-            'yes': 3
-        }
+        # self.valid_transitions = {
+        #     '': ('', 'waiting', 'yes', 'no'),
+        #     'waiting': ('', 'waiting', 'yes', 'no'),
+        #     'no': ('', 'no'),
+        #     'yes': ('', 'yes')
+        # }
+        # self.valid_transitions_before_yes = {
+        #     '': ('', 'waiting', 'yes', 'no'),
+        #     'waiting': ('', 'waiting', 'yes', 'no'),
+        #     'no': ('', 'waiting', 'no', 'yes'),
+        #     'yes': ('', 'yes')
+        # }
+        # self.upgrades = {
+        #     '': ('waiting', 'yes', 'no'),
+        #     'waiting': ('yes', 'no'),
+        #     'no': (),
+        #     'yes': ()
+        # }
+        # self.upgrades_before_yes = {
+        #     '': ('waiting', 'yes', 'no'),
+        #     'waiting': ('yes',),
+        #     'no': ('waiting', 'yes'),
+        #     'yes': ()
+        # }
+        # self.key_to_value = {
+        #     '': 0,
+        #     'waiting': 1,
+        #     'no': 2,
+        #     'yes': 3
+        # }
+        self.valid_transitions = {0: (0, 1, 2, 3), 1: (0, 1, 2, 3), 2: (0, 2), 3: (0, 3)}
+        self.valid_transitions_before_yes =\
+            {0: (0, 1, 2, 3), 1: (0, 1, 2, 3), 2: (0, 1, 2, 3), 3: (0, 3)}
+        self.upgrades = {0: (0, 1, 2, 3), 1: (2, 3), 2: tuple(), 3: tuple()}
+        self.upgrades_before_yes = {0: (1, 2, 3), 1: (3,), 2: (1, 3), 3: tuple()}
+
         self.tcps = tcps
         self.results = results
         self.filter_status = filter_status
@@ -367,7 +373,7 @@ class ValidateCovidTestResultsFacVersion2:
     def __call__(self, patient_id, filter_status, start, end):
         # validate the subrange
         invalid = False
-        max_value = ''
+        max_value = 0
         first_waiting = -1
         first_no = -1
         first_yes = -1
@@ -393,7 +399,7 @@ class ValidateCovidTestResultsFacVersion2:
                 value == 'waiting'
             if value in upgrades[max_value]:
                 max_value = value
-            self.results[j] = self.key_to_value[max_value]
+            self.results[j] = max_value
 
         #rescue na -> waiting -> no -> waiting
         if invalid and first_yes == -1 and self.tcps[end] == 'waiting':
@@ -403,11 +409,11 @@ class ValidateCovidTestResultsFacVersion2:
                 value = self.tcps[j]
                 if max_value == '' and value != '':
                     max_value = 'waiting'
-                self.results[j] = self.key_to_value[max_value]
+                self.results[j] = max_value
 
         if invalid:
             for j in range(start, end + 1):
-                self.results[j] = self.key_to_value[self.tcps[j]]
+                self.results[j] = self.tcps[j]
                 filter_status[j] |= self.filter_flag
             if self.show_debug:
                 print(self.tcps[j], end=': ')
@@ -418,12 +424,12 @@ class ValidateCovidTestResultsFacVersion2:
                     print('na' if value == '' else value, end='')
                 print('')
 
-
+parsing_schemas = [1, 2]
 
 class ParsingSchema:
     def __init__(self, schema_number):
 
-        self.parsing_schemas = [1, 2]
+        #self.parsing_schemas = [1, 2]
         self.functors = {
             'validate_weight_height_bmi': [
                 ClassEntry('validate_weight_height_bmi', ValidateHeight1, 1, 2),
@@ -446,5 +452,6 @@ class ParsingSchema:
                     break
 
     def _validate_schema_number(self, schema_number):
-        if schema_number not in self.parsing_schemas:
-            raise ParsingSchemaVersionError(f'{schema} is not a valid cleaning schema value')
+        if schema_number not in parsing_schemas:
+            raise ParsingSchemaVersionError(
+                f'{schema_number} is not a valid cleaning schema value')
