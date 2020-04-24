@@ -86,7 +86,7 @@ class DataSchema:
         ('never_used_shortage', [na_value_to, 'not_needed', 'not_available'], None, np.uint8, 1, None),
         ('sometimes_used_shortage', [na_value_to, 'all_needed', 'reused', 'not_enough'], None, np.uint8, 1, None),
         ('treated_patients_with_covid', [na_value_to, 'no', 'yes_suspected', 'yes_documented_suspected', 'yes_documented'], None, np.uint8, 1, None),
-        ('fatigue_binary', leaky_boolean_to, {na_value_from: 0, 'no': 1, 'mild': 2, 'severe': 2}, np.uint8, 1, None),
+        ('fatigue_binary', leaky_boolean_to, {na_value_from: 0, 'no': 1, 'mild': 2, 'significant': 2, 'severe': 2}, np.uint8, 1, None),
         ('shortness_of_breath_binary', leaky_boolean_to, {na_value_from: 0, 'no': 1, 'mild': 2, 'significant': 2, 'severe': 2}, np.uint8, 1, None),
         ('location', [na_value_to, 'home', 'hospital', 'back_from_hospital'], None, np.uint8, 1, None),
         ('level_of_isolation', [na_value_to, 'not_left_the_house', 'rarely_left_the_house', 'rarely_left_the_house_but_visited_lots', 'often_left_the_house'], None, np.uint8, 1, None),

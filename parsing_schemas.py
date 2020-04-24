@@ -37,8 +37,7 @@ class ValidateHeight1:
                  min_bmi_inc, max_bmi_inc,
                  f_missing_weight, f_bad_weight,
                  f_missing_height, f_bad_height,
-                 f_missing_bmi, f_bad_bmi,
-                 weight_index, height_index, bmi_index):
+                 f_missing_bmi, f_bad_bmi):
         self.min_weight_inc = min_weight_inc
         self.max_weight_inc = max_weight_inc
         self.min_height_inc = min_height_inc
@@ -52,10 +51,6 @@ class ValidateHeight1:
         self.f_bad_height = f_bad_height
         self.f_missing_bmi = f_missing_bmi
         self.f_bad_bmi = f_bad_bmi
-
-        self.weight_index = weight_index
-        self.height_index = height_index
-        self.bmi_index = bmi_index
 
         self.weight_kg_clean = None
         self.height_cm_clean = None
@@ -64,37 +59,41 @@ class ValidateHeight1:
     def valid(self, value):
         return self.min_height_inc <= value <= self.max_height_inc
 
-    def __call__(self, fields, filter_list):
-        self.weight_kg_clean = np.zeros(len(fields), dtype=np.float)
-        self.height_cm_clean = np.zeros(len(fields), dtype=np.float)
-        self.bmi_clean = np.zeros(len(fields), dtype=np.float)
+    def __call__(self, weights, heights, bmis, filter_list):
+        if len(weights) != len(heights):
+            raise ValueError("'weights' and 'heights' are different lengths")
+        if len(weights) != len(bmis):
+            raise ValueError("'weights' and 'bmis' are different lengths")
+        self.weight_kg_clean = np.zeros(len(weights), dtype=np.float)
+        self.height_cm_clean = np.zeros(len(heights), dtype=np.float)
+        self.bmi_clean = np.zeros(len(bmis), dtype=np.float)
 
-        for ir, r in enumerate(fields):
-            if r[self.weight_index] == '':
+        for ir in range(len(weights)):
+            if weights[ir] == '':
                 if self.f_missing_weight != 0:
                     filter_list[ir] |= self.f_missing_weight
             else:
-                weight_clean = float(r[self.weight_index])
+                weight_clean = float(weights[ir])
                 if weight_clean < self.min_weight_inc or weight_clean > self.max_weight_inc:
                     filter_list[ir] |= self.f_bad_weight
                 else:
                     self.weight_kg_clean[ir] = weight_clean
 
-            if r[self.height_index] == '':
+            if heights[ir] == '':
                 if self.f_missing_height != 0:
                     filter_list[ir] |= self.f_missing_height
             else:
-                height_clean = float(r[self.height_index])
+                height_clean = float(heights[ir])
                 if height_clean < self.min_height_inc or height_clean > self.max_height_inc:
                     filter_list[ir] |= self.f_bad_height
                 else:
                     self.height_cm_clean[ir] = height_clean
 
-            if r[self.bmi_index] == '':
+            if bmis[ir] == '':
                 if self.f_missing_bmi != 0:
                     filter_list[ir] |= self.f_missing_bmi
             else:
-                bmi_clean = float(r[self.bmi_index])
+                bmi_clean = float(bmis[ir])
                 if bmi_clean < self.min_bmi_inc or bmi_clean > self.max_bmi_inc:
                     filter_list[ir] |= self.f_bad_bmi
                 else:
@@ -103,9 +102,13 @@ class ValidateHeight1:
 
 
 class ValidateHeight2:
-    def __init__(self, min_weight_inc, max_weight_inc, min_height_inc, max_height_inc, min_bmi_inc, max_bmi_inc,
-                 f_missing_weight, f_bad_weight, f_missing_height, f_bad_height, f_missing_bmi, f_bad_bmi,
-                 weight_index, height_index, bmi_index):
+    def __init__(self,
+                 min_weight_inc, max_weight_inc,
+                 min_height_inc, max_height_inc,
+                 min_bmi_inc, max_bmi_inc,
+                 f_missing_weight, f_bad_weight,
+                 f_missing_height, f_bad_height,
+                 f_missing_bmi, f_bad_bmi):
         self.min_weight_inc = min_weight_inc
         self.max_weight_inc = max_weight_inc
         self.min_height_inc = min_height_inc
@@ -119,10 +122,6 @@ class ValidateHeight2:
         self.f_bad_height = f_bad_height
         self.f_missing_bmi = f_missing_bmi
         self.f_bad_bmi = f_bad_bmi
-
-        self.weight_index = weight_index
-        self.height_index = height_index
-        self.bmi_index = bmi_index
 
         self.kgs_per_stone = 6.35029
         self.kgs_per_lb = 0.453592
@@ -139,17 +138,21 @@ class ValidateHeight2:
     def valid(self, value):
         return self.min_height_inc <= value <= self.max_height_inc
 
-    def __call__(self, fields, filter_list):
-        self.weight_kg_clean = np.zeros(len(fields), dtype=np.float)
-        self.height_cm_clean = np.zeros(len(fields), dtype=np.float)
-        self.bmi_clean = np.zeros(len(fields), dtype=np.float)
+    def __call__(self, weights, heights, bmis, filter_list):
+        if len(weights) != len(heights):
+            raise ValueError("'weights' and 'heights' are different lengths")
+        if len(weights) != len(bmis):
+            raise ValueError("'weights' and 'bmis' are different lengths")
+        self.weight_kg_clean = np.zeros(len(weights), dtype=np.float)
+        self.height_cm_clean = np.zeros(len(heights), dtype=np.float)
+        self.bmi_clean = np.zeros(len(bmis), dtype=np.float)
 
-        for ir, r in enumerate(fields):
-            if r[self.weight_index] == '':
+        for ir in range(len(weights)):
+            if weights[ir] == '':
                 if self.f_missing_weight != 0:
                     filter_list[ir] |= self.f_missing_weight
             else:
-                weight_clean = float(r[self.weight_index])
+                weight_clean = float(weights[ir])
                 if weight_clean < 25:
                     weight_clean *= self.kgs_per_stone
                 elif 150 <= weight_clean < 300:
@@ -186,11 +189,11 @@ class ValidateHeight2:
                 #     np.logical_and(df_reg_new['weight_clean'] > 450, df_reg_new['weight_clean'] < 600),
                 #     df_reg_new['weight_clean'] / 6.35029, df_reg_new['weight_clean'])
 
-            if r[self.height_index] == '':
+            if heights[ir] == '':
                 if self.f_missing_height != 0:
                     filter_list[ir] |= self.f_missing_height
             else:
-                height_clean = float(r[self.height_index])
+                height_clean = float(heights[ir])
                 if height_clean < 2.4:
                     height_clean *= 100
                 elif height_clean < 7.4:
@@ -217,7 +220,7 @@ class ValidateHeight2:
                 #                                       df_reg_new['height_clean'] / 30.48, df_reg_new['height_clean'])
 
                 # Cleaning up bmi
-                if r[self.weight_index] == '' or r[self.height_index] == '' or height_clean == 0.0:
+                if weights[ir] == '' or heights[ir] == '' or height_clean == 0.0:
                     if self.f_missing_bmi != 0:
                         filter_list[ir] |= self.f_missing_bmi
                 else:
@@ -237,64 +240,90 @@ class ValidateHeight2:
         return self.weight_kg_clean, self.height_cm_clean, self.bmi_clean
 
 
+class ValidateTemperature1:
+    def __init__(self, min_temp_incl, max_temp_incl, f_missing_temp, f_bad_temp):
+        self.min_temp_incl = min_temp_incl
+        self.max_temp_incl = max_temp_incl
+        self.f_missing_temp = f_missing_temp
+        self.f_bad_temp = f_bad_temp
+
+    def __call__(self, temps, filter_list):
+        temperature_c = np.zeros_like(temps, dtype=np.float)
+        for ir, t in enumerate(temps):
+            if t == '':
+                dest_temp = 0.0
+                filter_list[ir] |= self.f_missing_temp
+            else:
+                t = float(t)
+                dest_temp = (t - 32) / 1.8 if t > self.max_temp_incl else t
+                if dest_temp <= self.min_temp_incl or dest_temp >= self.max_temp_incl:
+                    temperature_c[ir] = 0.0
+                    filter_list[ir] |= self.f_bad_temp
+                else:
+                    temperature_c[ir] = dest_temp
+
+        return temperature_c
+
+
 class ValidateCovidTestResultsFacVersion1:
-    def __init__(self, dataset, filter_status, results_key, results, filter_flag, show_debug=False):
-        self.valid_transitions = {
-            '': ('', 'waiting', 'yes', 'no'),
-            'waiting': ('', 'waiting', 'yes', 'no'),
-            'no': ('', 'no'),
-            'yes': ('', 'yes')
-        }
-        self.upgrades = {
-            '': ('waiting', 'yes', 'no'),
-            'waiting': ('yes', 'no'),
-            'no': (),
-            'yes': ()
-        }
-        self.key_to_value = {
-            '': 0,
-            'waiting': 1,
-            'no': 2,
-            'yes': 3
-        }
-        self.dataset = dataset
+    def __init__(self, tcps, filter_status, results_key, results, filter_flag, show_debug=False):
+        # self.valid_transitions = {
+        #     '': ('', 'waiting', 'yes', 'no'),
+        #     'waiting': ('', 'waiting', 'yes', 'no'),
+        #     'no': ('', 'no'),
+        #     'yes': ('', 'yes')
+        # }
+        # self.upgrades = {
+        #     '': ('waiting', 'yes', 'no'),
+        #     'waiting': ('yes', 'no'),
+        #     'no': (),
+        #     'yes': ()
+        # }
+        # self.key_to_value = {
+        #     '': 0,
+        #     'waiting': 1,
+        #     'no': 2,
+        #     'yes': 3
+        # }
+        self.valid_transitions = {0: (0, 1, 2, 3), 1: (0, 1, 2, 3), 2: (0, 2), 3: (0, 3)}
+        self.upgrades = {0: (0, 1, 2, 3), 1: (2, 3), 2: tuple(), 3: tuple()}
+        # self.key_to_value = {0: tuple(), 1: (1,), 2: (2,), 3: (3,)}
+        self.tcps = tcps
         self.results = results
         self.filter_status = filter_status
-        self.tcp_index = self.dataset.field_to_index('tested_covid_positive')
         self.filter_flag = filter_flag
         self.show_debug = show_debug
 
-    def __call__(self, fields, filter_status, start, end):
-        tcps = fields[self.tcp_index]
+    def __call__(self, patient_id, filter_status, start, end):
         # validate the subrange
         invalid = False
-        max_value = ''
+        max_value = 0
         for j in range(start, end + 1):
             # allowable transitions
-            value = tcps[j]
+            value = self.tcps[j]
             if value not in self.valid_transitions[max_value]:
                 invalid = True
                 break
             if value in self.upgrades[max_value]:
                 max_value = value
-            self.results[j] = self.key_to_value[max_value]
+            self.results[j] = max_value # self.key_to_value[max_value]
 
         if invalid:
             for j in range(start, end + 1):
-                self.results[j] = self.key_to_value[tcps[j]]
+                self.results[j] = self.tcps[j]
                 filter_status[j] |= self.filter_flag
             if self.show_debug:
-                print(tcps[j], end=': ')
+                print(self.tcps[j], end=': ')
                 for j in range(start, end + 1):
                     if j > start:
                         print(' ->', end=' ')
-                    value = tcps[j]
-                    print('na' if value == '' else value, end='')
+                    value = self.tcps[j]
+                    print(value)
                 print('')
 
 
 class ValidateCovidTestResultsFacVersion2:
-    def __init__(self, dataset, filter_status, results_key, results, filter_flag, show_debug=False):
+    def __init__(self, tcps, filter_status, results_key, results, filter_flag, show_debug=False):
         # TODO: this is all actually dependent on the data schema so that must be checked
         self.valid_transitions = {
             '': ('', 'waiting', 'yes', 'no'),
@@ -326,24 +355,22 @@ class ValidateCovidTestResultsFacVersion2:
             'no': 2,
             'yes': 3
         }
-        self.dataset = dataset
+        self.tcps = tcps
         self.results = results
         self.filter_status = filter_status
-        self.tcp_index = self.dataset.field_to_index('tested_covid_positive')
         self.filter_flag = filter_flag
         self.show_debug = show_debug
 
-    def __call__(self, fields, filter_status, start, end):
+    def __call__(self, patient_id, filter_status, start, end):
         # validate the subrange
         invalid = False
         max_value = ''
         first_waiting = -1
         first_no = -1
         first_yes = -1
-        tcps = fields[self.tcp_index]
 
         for j in range(start, end + 1):
-            value = tcps[j]
+            value = self.tcps[j]
             if value == 'waiting' and first_waiting == -1:
                 first_waiting = j
             if value == 'no' and first_no == -1:
@@ -355,7 +382,7 @@ class ValidateCovidTestResultsFacVersion2:
             valid_transitions = self.valid_transitions_before_yes if j <= first_yes else self.valid_transitions
             upgrades = self.upgrades_before_yes if j <= first_yes else self.upgrades
             # allowable transitions
-            value = tcps[j]
+            value = self.tcps[j]
             if value not in valid_transitions[max_value]:
                 invalid = True
                 break
@@ -366,25 +393,25 @@ class ValidateCovidTestResultsFacVersion2:
             self.results[j] = self.key_to_value[max_value]
 
         #rescue na -> waiting -> no -> waiting
-        if invalid and first_yes == -1 and tcps[end] == 'waiting':
+        if invalid and first_yes == -1 and self.tcps[end] == 'waiting':
             invalid = False
             max_value = ''
             for j in range(start, end+1):
-                value = tcps[j]
+                value = self.tcps[j]
                 if max_value == '' and value != '':
                     max_value = 'waiting'
                 self.results[j] = self.key_to_value[max_value]
 
         if invalid:
             for j in range(start, end + 1):
-                self.results[j] = self.key_to_value[tcps[j]]
+                self.results[j] = self.key_to_value[self.tcps[j]]
                 filter_status[j] |= self.filter_flag
             if self.show_debug:
-                print(tcps[j], end=': ')
+                print(self.tcps[j], end=': ')
                 for j in range(start, end + 1):
                     if j > start:
                         print(' ->', end=' ')
-                    value = tcps[j]
+                    value = self.tcps[j]
                     print('na' if value == '' else value, end='')
                 print('')
 
@@ -398,6 +425,8 @@ class ParsingSchema:
             'validate_weight_height_bmi': [
                 ClassEntry('validate_weight_height_bmi', ValidateHeight1, 1, 2),
                 ClassEntry('validate_weight_height_bmi', ValidateHeight2, 2, None)],
+            'validate_temperature': [
+                ClassEntry('validate_temperature', ValidateTemperature1, 1, None)],
             'clean_covid_progression': [
                 ClassEntry('validate_covid_fields', ValidateCovidTestResultsFacVersion1, 1, 2),
                 ClassEntry('validate_covid_fields', ValidateCovidTestResultsFacVersion2, 2, None)]

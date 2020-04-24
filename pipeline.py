@@ -9,6 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import csv
 import time
 from collections import defaultdict
@@ -16,6 +17,7 @@ import numpy as np
 
 import dataset
 import data_schemas
+import filtered_field
 import parsing_schemas
 
 
@@ -191,6 +193,27 @@ def to_categorical(fields, field_index, desttype, mapdict):
         results[ir] = result
     return results
 
+def copy_field(field):
+    if isinstance(field, list):
+        return copy.deepcopy(field)
+    else:
+        return field.copy()
+
+
+
+def map_between_categories(first_map, second_map):
+    result_map = dict()
+    for m in first_map.keys():
+        result_map[first_map[m]] = second_map[m]
+    return result_map
+
+
+def to_categorical2(field, transform):
+    results = np.zeros_like(field, dtype=field.dtype)
+    for ir, r in enumerate(field):
+        results[ir] = transform[r]
+    return results
+
 
 def map_patient_ids(geoc, asmt, map_fn):
     g = 0
@@ -213,16 +236,36 @@ def iterate_over_patient_assessments(fields, filter_status, visitor):
     cur_start = 0
     cur_end = 0
     i = 1
-    while i < len(fields):
+    while i < len(filter_status):
         while patient_ids[i] == cur_id:
             cur_end = i
             i += 1
-            if i >= len(fields):
+            if i >= len(filter_status):
                 break
 
         visitor(fields, filter_status, cur_start, cur_end)
 
-        if i < len(fields):
+        if i < len(filter_status):
+            cur_start = i
+            cur_end = cur_start
+            cur_id = patient_ids[i]
+
+
+def iterate_over_patient_assessments2(patient_ids, filter_status, visitor):
+    cur_id = patient_ids[0]
+    cur_start = 0
+    cur_end = 0
+    i = 1
+    while i < len(patient_ids):
+        while patient_ids[i] == cur_id:
+            cur_end = i
+            i += 1
+            if i >= len(patient_ids):
+                break
+
+        visitor(cur_id, filter_status, cur_start, cur_end)
+
+        if i < len(patient_ids):
             cur_start = i
             cur_end = cur_start
             cur_id = patient_ids[i]
@@ -343,6 +386,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
         asmt_ds = dataset.Dataset(f, data_schema.assessment_categorical_maps, True)
     # with open(assessment_filename) as f:
     #     asmt_ds.parse_file(f)
+    print('sorting patient ids')
     asmt_ds.sort(('patient_id', 'updated_at'))
     asmt_ds.show()
 
@@ -360,30 +404,35 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print("pre-sort by patient id")
     print("----------------------")
     print("pre-sort patient data")
-    geoc_fields = sorted(geoc_ds.fields_, key=lambda r: r[0])
-    geoc_filter_status = [0] * len(geoc_fields)
-
-    print("pre-sort assessment data")
-    asmt_fields = sorted(asmt_ds.fields_, key=lambda r: (r[1], r[3]))
-    asmt_filter_status = [0] * len(asmt_fields)
-
+    # geoc_fields = sorted(geoc_ds.fields_, key=lambda r: r[0])
+    # geoc_filter_status = [0] * len(geoc_fields)
+    geoc_fields = geoc_ds.fields_
+    geoc_filter_status = [0] * geoc_ds.row_count()
+    print("geoc field count:", geoc_ds.row_count())
+    print(); print("pre-sort assessment data")
+    # asmt_fields = sorted(asmt_ds.fields_, key=lambda r: (r[1], r[3]))
+    # asmt_filter_status = [0] * len(asmt_fields)
+    #asmt_fields = asmt_ds.fields_
+    asmt_filter_status = [0] * asmt_ds.row_count()
+    print("asmt field count:", asmt_ds.row_count())
 
     if territory is not None:
         print(); print();
         print("filter patients from outside the territory of interest")
         print("------------------------------------------------------")
 
-        country_code = geoc_ds.field_to_index('country_code')
-        for ir, r in enumerate(geoc_fields):
-            if r[country_code] != territory:
+        # country_code = geoc_ds.field_to_index('country_code')
+        country_codes = geoc_fields[geoc_ds.field_to_index('country_code')]
+        for ir, r in enumerate(country_codes):
+            if r != territory:
                 geoc_filter_status[ir] |= PFILTER_OTHER_TERRITORY
         print(f'other territories: filtered {count_flag_set(geoc_filter_status, PFILTER_OTHER_TERRITORY)} missing values')
 
 
     # print(count_flag_set(geoc_filter_status, PFILTER_NO_ASSESSMENTS))
-    patient_ids = set()
-    for r in geoc_fields:
-        patient_ids.add(r[0])
+    # patient_ids = set()
+    # for r in geoc_fields:
+    #     patient_ids.add(r[0])
 
     print('patients:', len(geoc_filter_status))
     print('patients with no assessments:',
@@ -400,20 +449,18 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
 
     print(); print("checking yob")
 
-    filter_fields(geoc_fields, geoc_filter_status, geoc_ds.field_to_index('year_of_birth'),
-                  FILTER_MISSING_YOB, FILTER_BAD_YOB, is_int, to_int, valid_range_fac_inc(MIN_YOB, MAX_YOB))
+    src_yobs = geoc_fields[geoc_ds.field_to_index('year_of_birth')]
+    filter_list(src_yobs, geoc_filter_status, FILTER_MISSING_YOB, FILTER_BAD_YOB,
+                is_int, to_int, valid_range_fac_inc(MIN_YOB, MAX_YOB))
     print(f'yob: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_YOB)} missing values')
     print(f'yob: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_YOB)} bad values')
-    yobs = build_histogram(geoc_fields, geoc_ds.field_to_index('year_of_birth'))
-    print(f'yob: {len(yobs)} unique values')
     print(geoc_filter_status.count(0))
-    age = np.zeros((len(geoc_fields),), dtype=np.int16)
-    yob_index = geoc_ds.field_to_index('year_of_birth')
-    for ir, r in enumerate(geoc_fields):
+    age = np.zeros_like(src_yobs, dtype=np.int16)
+    for ir, r in enumerate(src_yobs):
         if geoc_filter_status[ir] & (FILTER_MISSING_YOB | FILTER_BAD_YOB):
             age[ir] = 0
         else:
-            age[ir] = 2020 - to_int(r[yob_index])
+            age[ir] = 2020 - to_int(r)
     ptnt_dest_fields['age'] = age
 
     # print(); print("checking height")
@@ -442,14 +489,15 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     # bmis = build_histogram(geoc_fields, geoc_ds.field_to_index('bmi')) #, tx=replace_if_invalid(-1.0))
     # print(f'bmi: {len(bmis)} unique values')
     fn_fac = parsing_schema.class_entries['validate_weight_height_bmi']
+    src_weights = geoc_fields[geoc_ds.field_to_index('weight_kg')]
+    src_heights = geoc_fields[geoc_ds.field_to_index('height_cm')]
+    src_bmis = geoc_fields[geoc_ds.field_to_index('bmi')]
     fn = fn_fac(MIN_WEIGHT, MAX_WEIGHT, MIN_HEIGHT, MAX_HEIGHT, MIN_BMI, MAX_BMI,
                 FILTER_MISSING_WEIGHT, FILTER_BAD_WEIGHT,
                 FILTER_MISSING_HEIGHT, FILTER_BAD_HEIGHT,
-                FILTER_MISSING_BMI, FILTER_BAD_BMI,
-                geoc_ds.field_to_index('weight_kg'),
-                geoc_ds.field_to_index('height_cm'),
-                geoc_ds.field_to_index('bmi'))
-    height_clean, weight_clean, bmi_clean = fn(geoc_ds.fields_, geoc_filter_status)
+                FILTER_MISSING_BMI, FILTER_BAD_BMI)
+    height_clean, weight_clean, bmi_clean =\
+        fn(src_weights, src_heights, src_bmis, geoc_filter_status)
     ptnt_dest_fields['weight_clean'] = weight_clean
     ptnt_dest_fields['height_clean'] = height_clean
     ptnt_dest_fields['bmi_clean'] = bmi_clean
@@ -465,7 +513,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     asmt_dest_fields = dict()
     asmt_dest_keys = dict()
 
-    clear_set_flag(asmt_filter_status, FILTERA_ALL)
+    # clear_set_flag(asmt_filter_status, FILTERA_ALL)
     # print(); print("removing assessments for filtered patients")
     # def filter_assessments_on_patient_ids(geoc, asmt, g, a):
     #     if geoc_filter_status[g] != 0:
@@ -474,11 +522,13 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     # map_patient_ids(geoc_fields, asmt_fields, filter_assessments_on_patient_ids)
 
     patient_ids = set()
-    for ir, r in enumerate(geoc_fields):
+    src_patient_ids = geoc_fields[0]
+    for ir, r in enumerate(src_patient_ids):
         if geoc_filter_status[ir] == 0:
-            patient_ids.add(r[0])
-    for ir, r in enumerate(asmt_fields):
-        if r[1] not in patient_ids:
+            patient_ids.add(r)
+    src_asmt_patient_ids = asmt_ds.fields_[1]
+    for ir, r in enumerate(src_asmt_patient_ids):
+        if r not in patient_ids:
             asmt_filter_status[ir] |= AFILTER_PATIENT_FILTERED
 
     print('assessments filtered due to patient filtering:',
@@ -486,10 +536,10 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
 
     print(); print("checking temperature")
     # convert temperature to C if F
-    temperature_c = np.zeros((len(asmt_fields),), dtype=np.float)
-    temperature_index = asmt_ds.field_to_index('temperature')
-    for ir, r in enumerate(asmt_fields):
-        t = r[temperature_index]
+    temperature_c = np.zeros(asmt_ds.row_count(), dtype=np.float)
+    #temperature_index = asmt_ds.field_to_index('temperature')
+    for ir, r in enumerate(asmt_ds.field_by_name('temperature')):
+        t = r
         if is_float(t):
             t = float(t)
             temperature_c[ir] = (t - 32) / 1.8 if t > MAX_TEMP else t
@@ -498,18 +548,27 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
 
     filter_list(temperature_c, asmt_filter_status, FILTER_MISSING_TEMP, FILTER_BAD_TEMP,
                   is_float, to_float, valid_range_fac(MIN_TEMP, MAX_TEMP, 0.0))
+
+    print(f'temperature: filtered {count_flag_set(asmt_filter_status, FILTER_BAD_TEMP)} bad values')
+
+    # fn_fac = parsing_schema.class_entries['validate_temperature']
+    # fn = fn_fac(MIN_TEMP, MAX_TEMP, FILTER_MISSING_TEMP, FILTER_BAD_TEMP)
+    # temperature_c2 = fn(asmt_ds.field_by_name('temperature'), asmt_filter_status)
+
     print(f'temperature: filtered {count_flag_set(asmt_filter_status, FILTER_MISSING_TEMP)} missing values')
     print(f'temperature: filtered {count_flag_set(asmt_filter_status, FILTER_BAD_TEMP)} bad values')
     asmt_dest_fields['temperature_C'] = temperature_c
 
-    indices = [asmt_ds.field_to_index(c) for c in ('had_covid_test', 'tested_covid_positive')]
+    #indices = [asmt_ds.field_to_index(c) for c in ('had_covid_test', 'tested_covid_positive')]
+    src_had_test = asmt_ds.field_by_name('had_covid_test')
+    src_tested_covid_positive = asmt_ds.field_by_name('tested_covid_positive')
 
-    for ir, r in enumerate(asmt_fields):
-        had_test = asmt_fields[ir][indices[0]]
-        test_result = asmt_fields[ir][indices[1]]
-        if had_test != 'True' and test_result != '':
+    for ir in range(asmt_ds.row_count()):
+        had_test = src_had_test[ir]
+        test_result = src_tested_covid_positive[ir]
+        if had_test != 2 and test_result != 0:
             asmt_filter_status[ir] |= FILTER_INCONSISTENT_NOT_TESTED
-        if had_test == 'True' and test_result == '':
+        if had_test == 2 and test_result == 0:
             asmt_filter_status[ir] |= FILTER_INCONSISTENT_TESTED
 
     print(f'inconsistent_not_tested: filtered {count_flag_set(asmt_filter_status, FILTER_INCONSISTENT_NOT_TESTED)} missing values')
@@ -521,46 +580,64 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print("convert symptomatic, exposure, flattened and miscellaneous fields to bool")
     print("-------------------------------------------------------------------------")
 
-    any_symptoms = np.zeros((len(asmt_fields),), dtype=np.bool)
+    any_symptoms = np.zeros(asmt_ds.row_count(), dtype=np.bool)
     for s in symptomatic_fields:
-        print('symptomatic_field', s)
-        cv = categorical_maps[s].strings_to_values
+        # cv = categorical_maps[s].strings_to_values
         print(f"symptomatic_field '{s}' to categorical")
-        asmt_dest_fields[s] = to_categorical(asmt_fields, asmt_ds.field_to_index(s), np.uint8, cv)
+        # asmt_dest_fields[s] = to_categorical(asmt_fields, asmt_ds.field_to_index(s), np.uint8, cv)
+        # any_symptoms |= asmt_dest_fields[s] > 1
+        # asmt_dest_fields[s] = to_categorical2(asmt_ds.field_by_name(s), categorical_maps[s])
+
+        asmt_dest_fields[s] = copy_field(asmt_ds.field_by_name(s))
         any_symptoms |= asmt_dest_fields[s] > 1
         print(np.count_nonzero(asmt_dest_fields[s] == True))
         print(np.count_nonzero(any_symptoms == True))
 
-    print(build_histogram(asmt_fields, asmt_ds.field_to_index('tested_covid_positive')))
+    print(build_histogram_from_list(asmt_ds.field_by_name('tested_covid_positive')))
 
     for f in flattened_fields:
-        cv = categorical_maps[f[1]].strings_to_values
-        print(f[1], cv)
+        # cv = categorical_maps[f[1]].strings_to_values
+        # print(f[1], cv)
         print(f"flattened_field '{f[0]}' to categorical field '{f[1]}'")
-        asmt_dest_fields[f[1]] = to_categorical(asmt_fields, asmt_ds.field_to_index(f[0]), np.uint8, cv)
+        # asmt_dest_fields[f[1]] = to_categorical(asmt_fields, asmt_ds.field_to_index(f[0]), np.uint8, cv)
+        # asmt_dest_fields[f[1]] =\
+        #     to_categorical2(asmt_ds.field_by_name(f[0]), categorical_maps[f[1]])
+        remap = map_between_categories(categorical_maps[f[0]].strings_to_values,
+                                       categorical_maps[f[1]].strings_to_values)
+        asmt_dest_fields[f[1]] =\
+            to_categorical2(asmt_ds.field_by_name(f[0]), remap)
+        # TODO: this shouldn't be necessary as the fields were covered in 'symptomatic_fields'
         any_symptoms |= asmt_dest_fields[f[1]] > 1
 
     for e in exposure_fields:
-        cv = categorical_maps[e].strings_to_values
+        # cv = categorical_maps[e].strings_to_values
         print(f"exposure_field '{e}' to categorical")
-        asmt_dest_fields[e] = to_categorical(asmt_fields, asmt_ds.field_to_index(e), np.uint8, cv)
-
+        # asmt_dest_fields[e] = to_categorical(asmt_fields, asmt_ds.field_to_index(e), np.uint8, cv)
+        # asmt_dest_fields[e] = to_categorical2(asmt_ds.field_by_name(e), categorical_maps[e])
+        asmt_dest_fields[e] = copy_field(asmt_ds.field_by_name(e))
     for m in miscellaneous_fields:
-        cv = categorical_maps[m].strings_to_values
+        # cv = categorical_maps[m].strings_to_values
         print(f"miscellaneous_field '{m}' to categorical")
-        print(build_histogram(asmt_fields, asmt_ds.field_to_index(m)))
-        asmt_dest_fields[m] = to_categorical(asmt_fields, asmt_ds.field_to_index(m), np.uint8, cv)
-
+        # print(build_histogram(asmt_fields, asmt_ds.field_to_index(m)))
+        # asmt_dest_fields[m] = to_categorical(asmt_fields, asmt_ds.field_to_index(m), np.uint8, cv)
+        # asmt_dest_fields[m] = to_categorical2(asmt_ds.field_by_name(m), categorical_maps[m])
+        asmt_dest_fields[m] = copy_field(asmt_ds.field_by_name(m))
     print(); print()
     print("filter inconsistent health status")
     print("---------------------------------")
-    health_status_index = asmt_ds.field_to_index('health_status')
-    health_status = build_histogram(asmt_fields, health_status_index)
+    # health_status_index = asmt_ds.field_to_index('health_status')
+    # health_status = build_histogram(asmt_fields, health_status_index)
 
-    for ir, r in enumerate(asmt_fields):
-        if r[health_status_index] == 'healthy' and any_symptoms[ir]:
+    # TODO: can use the processed field
+    src_health_status = asmt_ds.field_by_name('health_status')
+    i_healthy = categorical_maps['health_status'].strings_to_values['healthy']
+    i_not_healthy = categorical_maps['health_status'].strings_to_values['not_healthy']
+    for ir in range(asmt_ds.row_count()):
+        # if r[health_status_index] == 'healthy' and any_symptoms[ir]:
+        if src_health_status[ir] == i_healthy and any_symptoms[ir]:
             asmt_filter_status[ir] |= FILTER_INCONSISTENT_SYMPTOMS
-        elif r[health_status_index] == 'not_healthy' and not any_symptoms[ir]:
+        # elif r[health_status_index] == 'not_healthy' and not any_symptoms[ir]:
+        elif src_health_status[ir] == i_not_healthy and not any_symptoms[ir]:
             asmt_filter_status[ir] |= FILTER_INCONSISTENT_NO_SYMPTOMS
 
     for f in (FILTER_INCONSISTENT_SYMPTOMS, FILTER_INCONSISTENT_NO_SYMPTOMS):
@@ -576,15 +653,19 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print("validate covid progression")
     print("--------------------------")
 
-    sanitised_covid_results = np.ndarray((len(asmt_fields),), dtype=np.uint8)
+    sanitised_covid_results = np.ndarray(asmt_ds.row_count(), dtype=np.uint8)
     sanitised_covid_results_key = categorical_maps['tested_covid_positive'].values_to_strings[:]
 
     fn_fac = parsing_schema.class_entries['clean_covid_progression']
-    fn = fn_fac(asmt_ds, asmt_filter_status,
+    fn = fn_fac(asmt_ds.field_by_name('tested_covid_positive'), asmt_filter_status,
                 sanitised_covid_results_key, sanitised_covid_results,
                 FILTER_INVALID_COVID_PROGRESSION)
-    iterate_over_patient_assessments(asmt_fields, asmt_filter_status, fn)
+    iterate_over_patient_assessments2(
+        asmt_ds.field_by_name('patient_id'), asmt_filter_status, fn)
 
+    # for f in asmt_filter_status:
+    #     if f & FILTER_INVALID_COVID_PROGRESSION:
+    #         print(hex(f))
     print(f'{assessment_flag_descs[FILTER_INVALID_COVID_PROGRESSION]}:',
           count_flag_set(asmt_filter_status, FILTER_INVALID_COVID_PROGRESSION))
 
@@ -600,46 +681,72 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     remaining_asmt_fields = list()
     remaining_dest_fields = dict()
 
-    print('asmt_fields:', len(asmt_fields))
-    for ir, r in enumerate(asmt_fields):
-        if not asmt_filter_status[ir]:
-            remaining_asmt_fields.append(r)
-    print('remaining_asmt_fields:', len(remaining_asmt_fields))
+    #raf for ir, r in enumerate(asmt_fields):
+    #raf    if not asmt_filter_status[ir]:
+    #raf        remaining_asmt_fields.append(r)
+    #raf print('remaining_asmt_fields:', len(remaining_asmt_fields))
 
-    for dk, dv in asmt_dest_fields.items():
-        remaining_dest_fields[dk] = np.zeros((len(remaining_asmt_fields), ), dtype=dv.dtype)
-        rdf = remaining_dest_fields[dk]
-        rdindex = 0
-        for ir in range(len(asmt_fields)):
+    filter_map = list()
+    for ir, r in enumerate(asmt_filter_status):
+        if r == 0:
+            filter_map.append(ir)
 
-            if not asmt_filter_status[ir]:
-                rdf[rdindex] = dv[ir]
-                rdindex += 1
+    for ir, r in enumerate(asmt_ds.fields_):
+        remaining_asmt_fields.append(filtered_field.FilteredField(r, filter_map))
 
-    print(len(remaining_asmt_fields))
-    remaining_asmt_filter_status = [0] * len(remaining_asmt_fields)
-    print(len(remaining_asmt_filter_status))
+    for k, v in asmt_dest_fields.items():
+        remaining_dest_fields[k] = filtered_field.FilteredField(v, filter_map)
+
+    #ref for dk, dv in asmt_dest_fields.items():
+    #ref    remaining_dest_fields[dk] = np.zeros((len(remaining_asmt_fields), ), dtype=dv.dtype)
+    #ref    rdf = remaining_dest_fields[dk]
+    #ref    rdindex = 0
+
+    #ref    for ir in range(len(asmt_fields)):
+    #ref        if not asmt_filter_status[ir]:
+    #ref            rdf[rdindex] = dv[ir]
+    #ref            rdindex += 1
+
+    print("remaining asmt fields: ", len(filter_map))
+
+    #ref print(len(remaining_asmt_fields))
+    remaining_asmt_filter_status = [0] * len(filter_map)
 
     print(); print()
     print("quantise assessments by day")
     print("---------------------------")
     merged_row_count = 0
 
-    def calculate_merged_field_count_fac():
+    class CalculateMergedFieldCount:
+        def __init__(self, updated_ats):
+            self.updated_ats = updated_ats
+            self.merged_row_count = 0
 
-        def inner_(fields, dummy, start, end):
-            nonlocal merged_row_count
-            results = list()
+        def __call__(self, patient_id, filter_status, start, end):
             for i in range(start + 1, end + 1):
-                last_date_str = fields[i-1][3]
+                last_date_str = self.updated_ats[i-1]
                 last_date = (last_date_str[0:4], last_date_str[5:7], last_date_str[8:10])
-                cur_date_str = fields[i][3]
+                cur_date_str = self.updated_ats[i]
                 cur_date = (cur_date_str[0:4], cur_date_str[5:7], cur_date_str[8:10])
                 if last_date == cur_date:
-                    merged_row = fields[i].copy()
-                    merged_row_count += 1
+                    # merged_row = fields[i].copy()
+                    self.merged_row_count += 1
 
-        return inner_
+    # def calculate_merged_field_count_fac():
+    #
+    #     def inner_(fields, dummy, start, end):
+    #         nonlocal merged_row_count
+    #         # results = list()
+    #         for i in range(start + 1, end + 1):
+    #             last_date_str = fields[i-1][3]
+    #             last_date = (last_date_str[0:4], last_date_str[5:7], last_date_str[8:10])
+    #             cur_date_str = fields[i][3]
+    #             cur_date = (cur_date_str[0:4], cur_date_str[5:7], cur_date_str[8:10])
+    #             if last_date == cur_date:
+    #                 # merged_row = fields[i].copy()
+    #                 merged_row_count += 1
+    #
+    #     return inner_
 
 
     class MergeAssessmentRows:
@@ -653,9 +760,9 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
             self.existing_field_indices = existing_field_indices
 
         def populate_row(self, source_fields, source_index):
-            source_row = source_fields[source_index]
+            #source_row = source_fields[source_index]
             for e in self.existing_field_indices:
-                self.resulting_fields[e[0]][self.rfindex] = source_row[e[1]]
+                self.resulting_fields[e[0]][self.rfindex] = source_fields[e[1]][source_index]
             for ck, cv in self.created_fields.items():
                 self.resulting_fields[ck][self.rfindex] =\
                     max(self.resulting_fields[ck][self.rfindex], cv[source_index])
@@ -664,14 +771,14 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
             rfstart = self.rfindex
 
             # write the first row to the current resulting field index
-            prev_asmt = fields[start]
-            prev_date_str = prev_asmt[3]
+            # prev_asmt = fields[3][start]
+            prev_date_str = fields[3][start]
             prev_date = (prev_date_str[0:4], prev_date_str[5:7], prev_date_str[8:10])
             self.populate_row(fields, start)
 
             for i in range(start + 1, end + 1):
-                cur_asmt = fields[i]
-                cur_date_str = cur_asmt[3]
+                # cur_asmt = fields[i]
+                cur_date_str = fields[3][i]
                 cur_date = (cur_date_str[0:4], cur_date_str[5:7], cur_date_str[8:10])
                 if cur_date != prev_date:
                     self.rfindex += 1
@@ -679,19 +786,21 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
                     print('.')
                 self.populate_row(fields, i)
 
-                prev_asmt = cur_asmt
-                prev_date_str = cur_date_str
+                # prev_asmt = cur_asmt
+                # prev_date_str = cur_date_str
                 prev_date = cur_date
 
             # finally, update the resulting field index one more time
             self.rfindex += 1
 
-    fn = calculate_merged_field_count_fac()
-    print(len(remaining_asmt_fields))
+    # fn = calculate_merged_field_count_fac()
+    fn = CalculateMergedFieldCount(remaining_asmt_fields[asmt_ds.field_to_index('updated_at')])
+    print(len(filter_map))
     print(len(remaining_asmt_filter_status))
-    iterate_over_patient_assessments(remaining_asmt_fields, remaining_asmt_filter_status, fn)
-    remaining_asmt_row_count = len(remaining_asmt_fields) - merged_row_count
-    print(f'{len(remaining_asmt_fields)} - {merged_row_count} = {remaining_asmt_row_count}')
+    remaining_patient_ids = remaining_asmt_fields[asmt_ds.field_to_index('patient_id')]
+    iterate_over_patient_assessments2(remaining_patient_ids, remaining_asmt_filter_status, fn)
+    remaining_asmt_row_count = len(filter_map) - fn.merged_row_count
+    print(f'{len(filter_map)} - {fn.merged_row_count} = {remaining_asmt_row_count}')
 
     existing_fields = ('id', 'patient_id', 'created_at', 'updated_at', 'version',
                        'country_code')
@@ -710,10 +819,10 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print(); print('fatigue_binary before merge')
     print(build_histogram_from_list(remaining_dest_fields['fatigue_binary']))
 
-    unique_patients = set()
-    for ir, r in enumerate(remaining_asmt_fields):
-        unique_patients.add(r[1])
-    print('unique patents in remaining assessments:', len(unique_patients))
+    # unique_patients = set()
+    # for ir, r in enumerate(remaining_asmt_fields):
+    #     unique_patients.add(r[1])
+    # print('unique patents in remaining assessments:', len(unique_patients))
 
     # sanity check
     print('remaining_field_len:', len(remaining_asmt_fields))
@@ -731,8 +840,8 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print(merge.rfindex)
 
     unique_patients = defaultdict(int)
-    for ir, r in enumerate(remaining_asmt_fields):
-        unique_patients[r[1]] += 1
+    for r in remaining_patient_ids:
+        unique_patients[r] += 1
     print('unique patents in remaining assessments:', len(unique_patients))
 
     print(); print()
@@ -748,7 +857,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
         print(f'{assessment_flag_descs[v]}: {count_flag_set(asmt_filter_status, v)}')
 
     return (geoc_ds, geoc_fields, geoc_filter_status, ptnt_dest_fields,
-            asmt_ds, asmt_fields, asmt_filter_status,
+            asmt_ds, asmt_ds.fields_, asmt_filter_status,
             remaining_asmt_fields, remaining_asmt_filter_status,
             resulting_fields, resulting_field_keys)
 
@@ -872,13 +981,14 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema
 
     categorical_maps = data_schema.assessment_categorical_maps
 
-    p_ds, p_fields, p_status, p_dest_fields, a_ds, a_fields, a_status, ra_fields, ra_status, res_fields, res_keys \
+    p_ds, p_fields, p_status, p_dest_fields,\
+    a_ds, a_fields, a_status, ra_fields, ra_status, res_fields, res_keys \
         = pipeline_output
     remaining_patients = set()
     for p in res_fields['patient_id']:
         remaining_patients.add(p)
-    for ip, p in enumerate(p_fields):
-        if p[0] not in remaining_patients:
+    for ip, p in enumerate(p_ds.field_by_name('id')):
+        if p not in remaining_patients:
             p_status[ip] |= FILTER_NOT_IN_FINAL_ASSESSMENTS
 
     print();
@@ -889,10 +999,10 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema
         values = [None] * (len(p_ds.names_) + len(dest_keys))
         csvw = csv.writer(f)
         csvw.writerow(p_ds.names_ + dest_keys)
-        for ir, r in enumerate(p_fields):
+        for ir in range(p_ds.row_count()):
             if p_status[ir] == 0:
-                for iv, v in enumerate(r):
-                    values[iv] = v
+                for iv, v in enumerate(p_fields):
+                    values[iv] = v[ir]
                 for iv in range(len(dest_keys)):
                     values[len(p_ds.names_) + iv] = p_dest_fields[dest_keys[iv]][ir]
                 csvw.writerow(values)

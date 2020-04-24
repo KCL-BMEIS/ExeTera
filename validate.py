@@ -123,7 +123,8 @@ def compare(expected, actual, verbose):
 
 
 def validate(expected_patients_file_name, actual_patients_file_name,
-             expected_assessments_file_name, actual_assessments_file_name, verbose=False, report_dest=None):
+             expected_assessments_file_name, actual_assessments_file_name,
+             verbose=False, report_dest=None):
     log = compare(expected_patients_file_name, actual_patients_file_name, verbose)
     if report_dest is not None:
         log.write(report_dest)

@@ -48,7 +48,6 @@ class Dataset:
         # read the cvs rows into the fields
         csvf = csv.reader(source, delimiter=',', quotechar='"')
         ecsvf = iter(csvf)
-        next(ecsvf)
         for i, fields in enumerate(ecsvf):
             for i_f, f in enumerate(fields):
                 t = transforms_by_index[i_f]
@@ -115,14 +114,17 @@ class Dataset:
                 sorted_field[ip] = field[p]
         return sorted_field
 
+    def field_by_name(self, field_name):
+        return self.fields_[self.field_to_index(field_name)]
+
     def field_to_index(self, field_name):
         return self.names_.index(field_name)
 
     def value(self, row_index, field_index):
-        return self.fields_[row_index][field_index]
+        return self.fields_[field_index][row_index]
 
     def value_from_fieldname(self, index, field_name):
-        return self.fields_[index][self.field_to_index(field_name)]
+        return self.fields_[self.field_to_index(field_name)][index]
 
     def row_count(self):
         return len(self.index_)
