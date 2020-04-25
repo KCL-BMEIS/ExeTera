@@ -458,7 +458,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
                 FILTER_MISSING_WEIGHT, FILTER_BAD_WEIGHT,
                 FILTER_MISSING_HEIGHT, FILTER_BAD_HEIGHT,
                 FILTER_MISSING_BMI, FILTER_BAD_BMI)
-    height_clean, weight_clean, bmi_clean =\
+    weight_clean, height_clean, bmi_clean =\
         fn(src_weights, src_heights, src_bmis, geoc_filter_status)
     ptnt_dest_fields['weight_clean'] = weight_clean
     ptnt_dest_fields['height_clean'] = height_clean
