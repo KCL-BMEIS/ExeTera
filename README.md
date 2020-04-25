@@ -51,3 +51,7 @@ Proper documentation and packaging to follow
 ### v0.1.5 -> v0.1.6
 * Performance: reduced memory usage
 * Addition: provision of `-ps` flag for setting parsing schema
+
+### v0.1.6 -> v0.1.7
+* Fix: `height_clean` contains weight data and `weight_clean` contains height data.
+  This has been the case since they were introduced in v0.1.5

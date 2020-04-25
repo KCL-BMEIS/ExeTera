@@ -2,8 +2,10 @@ import dataset
 import pipeline
 
 
-filename1 = 'assessments_short.csv'
-filename2 = 'assessments_short_0423.csv'
+filename1 = 'v0.1.6_50k_patients.csv'
+filename2 = 'test_patients.csv'
+sort_keys = ('id',)
+diagnostic_keys = ['id', 'weight_kg', 'height_cm', 'weight_clean', 'height_clean']
 
 
 with open(filename1) as f:
@@ -14,9 +16,9 @@ with open(filename2) as f:
 
 
 print(ds1.row_count())
-ds1.sort(('patient_id', 'updated_at'))
+ds1.sort(sort_keys)
 print(ds2.row_count())
-ds2.sort(('patient_id', 'updated_at'))
+ds2.sort(sort_keys)
 
 fields = set(ds1.names_).intersection(set(ds2.names_))
 print(fields)
@@ -54,14 +56,14 @@ k1 = ds1.field_by_name('id')
 k2 = ds2.field_by_name('id')
 xinds, yinds = match_rows(k1, k2)
 
-diagnostic_keys = ['id', 'patient_id', 'created_at', 'updated_at']
+
 for f in fields:
 
     f1 = ds1.field_by_name(f)
     f2 = ds2.field_by_name(f)
     discrepencies = elements_not_equal(xinds, yinds, f1, f2)
     if discrepencies is not None:
-        for d in discrepencies[0:10]:
+        for d in discrepencies:
             v1 = ds1.value_from_fieldname(xinds[d], f)
             v2 = ds2.value_from_fieldname(yinds[d], f)
             print(xinds[d], yinds[d],
