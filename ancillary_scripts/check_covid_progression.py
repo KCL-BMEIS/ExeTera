@@ -35,8 +35,8 @@ print(f"loading {filename}")
 with open(filename) as f:
     ds = dataset.Dataset(f, data_schemas.DataSchema(1).assessment_categorical_maps,
                          keys=['id', 'patient_id', 'updated_at', 'had_covid_test', 'tested_covid_positive'],
-                         progress=True)
-                         # progress = True, stop_after = 1000000)
+                         # progress=True)
+                         progress = True, stop_after = 1000000)
 print('loaded')
 
 
@@ -57,22 +57,45 @@ print(results)
 print('trying schema 1')
 ds.sort(('patient_id', 'updated_at'))
 print('setting up validation test')
-hct_results = np.zeros_like(hct, dtype=np.uint8)
-tcp_results = np.zeros_like(tcp, dtype=np.uint8)
-filter_status = np.zeros(ds.row_count(), dtype=np.uint32)
-fn = parsing_schemas.ValidateCovidTestResultsFacVersion1(hct, tcp, filter_status, None, hct_results, tcp_results, 0x1,
-                                                         show_debug=True)
-print('performing validation text')
-pipeline.iterate_over_patient_assessments(ds.fields_, filter_status, fn)
+hct_results1 = np.zeros_like(hct, dtype=np.uint8)
+tcp_results1 = np.zeros_like(tcp, dtype=np.uint8)
+filter_status1 = np.zeros(ds.row_count(), dtype=np.uint32)
+fn1 = parsing_schemas.ValidateCovidTestResultsFacVersion1(hct, tcp, filter_status1, None, hct_results1, tcp_results1, 0x1,
+                                                         )
+                                                         # show_debug=True)
+print('performing validation test')
+pipeline.iterate_over_patient_assessments(ds.fields_, filter_status1, fn1)
 
 print('checking results')
-results = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+results1 = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
 for i_r in range(ds.row_count()):
-    results[hct_results[i_r]][tcp_results[i_r]] += 1
+    results1[hct_results1[i_r]][tcp_results1[i_r]] += 1
 print('results')
-print(results)
-print(np.count_nonzero(filter_status == 0))
+print(results1)
+print(np.count_nonzero(filter_status1 == 0))
 
+
+print('trying schema 1HCTFix')
+ds.sort(('patient_id', 'updated_at'))
+print('setting up validation test')
+hct_results1f = np.zeros_like(hct, dtype=np.uint8)
+tcp_results1f = np.zeros_like(tcp, dtype=np.uint8)
+filter_status1f = np.zeros(ds.row_count(), dtype=np.uint32)
+fn1f = parsing_schemas.ValidateCovidTestResultsFacVersion1HCTFix(hct, tcp, filter_status1f, None, hct_results1f, tcp_results1f, 0x1,
+                                                                 )
+                                                                 # show_debug=True)
+print('performing validation test')
+pipeline.iterate_over_patient_assessments(ds.fields_, filter_status1f, fn1f)
+
+print('checking results')
+results1f = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+for i_r in range(ds.row_count()):
+    results1f[hct_results1f[i_r]][tcp_results1f[i_r]] += 1
+print('results')
+print(results1f)
+print(np.count_nonzero(filter_status1f == 0))
+
+print(np.array_equal(tcp_results1, tcp_results1f))
 # tcp_index = ds.field_to_index('tested_covid_positive')
 # strings_to_values = categorical_maps['tested_covid_positive'].strings_to_values
 # patients = defaultdict(int)

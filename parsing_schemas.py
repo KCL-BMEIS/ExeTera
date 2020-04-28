@@ -469,14 +469,61 @@ class ValidateCovidTestResultsFacVersion1:
             for j in range(start, end + 1):
                 self.results[j] = self.tcps[j]
                 filter_status[j] |= self.filter_flag
-            # if self.show_debug:
-            #     print(self.tcps[j], end=': ')
-            #     for j in range(start, end + 1):
-            #         if j > start:
-            #             print(' ->', end=' ')
-            #         value = self.tcps[j]
-            #         print(value)
-            #     print('')
+
+        self.hct_results[start:end+1] = self.hcts[start:end+1]
+        if invalid:
+            for j in range(start, end + 1):
+                filter_status[j] |= self.filter_flag
+
+        if self.show_debug == True:
+            if invalid or not np.array_equal(self.hcts[start:end+1], self.hct_results[start:end+1])\
+               or not np.array_equal(self.tcps[start:end+1], self.results[start:end+1]):
+                reason = 'inv' if invalid else 'diff'
+                print(reason, start, 'hct:', self.hcts[start:end+1], self.hct_results[start:end+1])
+                print(reason, start, 'tcp:', self.tcps[start:end+1], self.results[start:end+1])
+
+        # TODO: remove before v0.1.8
+        # for j in range(start, end + 1):
+        #     self.hct_results[j] = self.hcts[j]
+
+        # if invalid:
+        #     for j in range(start, end + 1):
+        #         if self.hct_results[j] == 1 and self.results[j] != 0:
+        #             print('hct:', start, self.hcts[start:end+1], self.hct_results[start:end+1])
+        #             print('tcp:', start, self.tcps[start:end+1], self.results[start:end+1])
+        #             break
+
+
+class ValidateCovidTestResultsFacVersion1HCTFix:
+    def __init__(self, hcts, tcps, filter_status, results_key, hct_results, results, filter_flag, show_debug=False):
+        self.valid_transitions = {0: (0, 1, 2, 3), 1: (0, 1, 2, 3), 2: (0, 2), 3: (0, 3)}
+        self.upgrades = {0: (0, 1, 2, 3), 1: (2, 3), 2: tuple(), 3: tuple()}
+        self.hcts = hcts
+        self.tcps = tcps
+        self.hct_results = hct_results
+        self.results = results
+        self.filter_status = filter_status
+        self.filter_flag = filter_flag
+        self.show_debug = show_debug
+
+    def __call__(self, patient_id, filter_status, start, end):
+        # validate the subrange
+        invalid = False
+        max_value = 0
+        for j in range(start, end + 1):
+            # allowable transitions
+            value = self.tcps[j]
+            if value not in self.valid_transitions[max_value]:
+                invalid = True
+                break
+            if value in self.upgrades[max_value]:
+                max_value = value
+            self.results[j] = max_value
+
+        if invalid:
+            for j in range(start, end + 1):
+                self.results[j] = self.tcps[j]
+                filter_status[j] |= self.filter_flag
 
         if not invalid:
             first_hct_false = -1
@@ -633,7 +680,7 @@ class ParsingSchema:
             'validate_temperature': [
                 ClassEntry('validate_temperature', ValidateTemperature1, 1, None)],
             'clean_covid_progression': [
-                ClassEntry('validate_covid_fields', ValidateCovidTestResultsFacVersion1, 1, 2),
+                ClassEntry('validate_covid_fields', ValidateCovidTestResultsFacVersion1HCTFix, 1, 2),
                 ClassEntry('validate_covid_fields', ValidateCovidTestResultsFacVersion2, 2, None)]
         }
 
