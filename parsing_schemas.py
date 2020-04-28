@@ -439,7 +439,7 @@ class ValidateTemperature1:
         return temperature_c
 
 
-class ValidateCovidTestResultsFacVersion1:
+class ValidateCovidTestResultsFacVersion1PreHCTFix:
     def __init__(self, hcts, tcps, filter_status, results_key, hct_results, results, filter_flag, show_debug=False):
         self.valid_transitions = {0: (0, 1, 2, 3), 1: (0, 1, 2, 3), 2: (0, 2), 3: (0, 3)}
         self.upgrades = {0: (0, 1, 2, 3), 1: (2, 3), 2: tuple(), 3: tuple()}
@@ -494,7 +494,7 @@ class ValidateCovidTestResultsFacVersion1:
         #             break
 
 
-class ValidateCovidTestResultsFacVersion1HCTFix:
+class ValidateCovidTestResultsFacVersion1:
     def __init__(self, hcts, tcps, filter_status, results_key, hct_results, results, filter_flag, show_debug=False):
         self.valid_transitions = {0: (0, 1, 2, 3), 1: (0, 1, 2, 3), 2: (0, 2), 3: (0, 3)}
         self.upgrades = {0: (0, 1, 2, 3), 1: (2, 3), 2: tuple(), 3: tuple()}
@@ -680,7 +680,7 @@ class ParsingSchema:
             'validate_temperature': [
                 ClassEntry('validate_temperature', ValidateTemperature1, 1, None)],
             'clean_covid_progression': [
-                ClassEntry('validate_covid_fields', ValidateCovidTestResultsFacVersion1HCTFix, 1, 2),
+                ClassEntry('validate_covid_fields', ValidateCovidTestResultsFacVersion1, 1, 2),
                 ClassEntry('validate_covid_fields', ValidateCovidTestResultsFacVersion2, 2, None)]
         }
 

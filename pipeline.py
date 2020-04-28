@@ -357,7 +357,7 @@ symptomatic_fields = ["fatigue", "shortness_of_breath", "abdominal_pain", "chest
 flattened_fields = [("fatigue", "fatigue_binary"), ("shortness_of_breath", "shortness_of_breath_binary")]
 exposure_fields = ["always_used_shortage", "have_used_PPE", "never_used_shortage", "sometimes_used_shortage",
                    "treated_patients_with_covid"]
-miscellaneous_fields = ['health_status', 'location', 'level_of_isolation', 'had_covid_test']
+miscellaneous_fields = ['health_status', 'location', 'level_of_isolation', 'had_covid_test', 'tested_covid_positive']
 
 
 def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema, territory=None):
@@ -583,8 +583,10 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print(f'{assessment_flag_descs[FILTER_INVALID_COVID_PROGRESSION]}:',
           count_flag_set(asmt_filter_status, FILTER_INVALID_COVID_PROGRESSION))
 
-    asmt_dest_fields['tested_covid_positive'] = sanitised_covid_results
-    asmt_dest_keys['tested_covid_positive'] = sanitised_covid_results_key
+    asmt_dest_fields['tested_covid_positive_clean'] = sanitised_covid_results
+    asmt_dest_keys['tested_covid_positive_clean'] = sanitised_covid_results_key
+    asmt_dest_fields['had_covid_test_clean'] = sanitised_hct_covid_results
+    asmt_dest_keys['had_covid_test_clean'] = sanitised_covid_results_key
 
     print('remaining assessments before squashing', asmt_filter_status.count(0))
 
@@ -631,8 +633,8 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     class MergeAssessmentRows:
         def __init__(self, resulting_fields, created_fields, existing_field_indices):
             print(created_fields.keys())
-            print(created_fields['tested_covid_positive'].dtype, created_fields['tested_covid_positive'])
-            print(resulting_fields['tested_covid_positive'].dtype, resulting_fields['tested_covid_positive'])
+            print(created_fields['tested_covid_positive_clean'].dtype, created_fields['tested_covid_positive_clean'])
+            print(resulting_fields['tested_covid_positive_clean'].dtype, resulting_fields['tested_covid_positive_clean'])
             self.rfindex = 0
             self.resulting_fields = resulting_fields
             self.created_fields = created_fields
@@ -689,7 +691,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print('remaining_dest_len:', len(remaining_dest_fields['fatigue_binary']))
     print('resulting_fields:', len(resulting_fields['patient_id']))
 
-    print(build_histogram_from_list(remaining_dest_fields['tested_covid_positive']))
+    print(build_histogram_from_list(remaining_dest_fields['tested_covid_positive_clean']))
     merge = MergeAssessmentRows(resulting_fields, remaining_dest_fields, existing_field_indices)
     iterate_over_patient_assessments(remaining_asmt_fields, remaining_asmt_filter_status, merge)
     print(merge.rfindex)

@@ -91,7 +91,10 @@ class DataSchema:
         ('location', [na_value_to, 'home', 'hospital', 'back_from_hospital'], None, np.uint8, 1, None),
         ('level_of_isolation', [na_value_to, 'not_left_the_house', 'rarely_left_the_house', 'rarely_left_the_house_but_visited_lots', 'often_left_the_house'], None, np.uint8, 1, None),
         ('had_covid_test', leaky_boolean_to, None, np.uint8, 1, None),
-        ('tested_covid_positive', [na_value_to, 'waiting', 'no', 'yes'], None, np.uint8, 1, None)]
+        ('tested_covid_positive', [na_value_to, 'waiting', 'no', 'yes'], None, np.uint8, 1, None),
+        ('had_covid_test_clean', leaky_boolean_to, None, np.uint8, 1, None),
+        ('tested_covid_positive_clean', [na_value_to, 'waiting', 'no', 'yes'], None, np.uint8, 1, None)
+    ]
 
     field_entries = dict()
 

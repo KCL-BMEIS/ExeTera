@@ -60,7 +60,7 @@ print('setting up validation test')
 hct_results1 = np.zeros_like(hct, dtype=np.uint8)
 tcp_results1 = np.zeros_like(tcp, dtype=np.uint8)
 filter_status1 = np.zeros(ds.row_count(), dtype=np.uint32)
-fn1 = parsing_schemas.ValidateCovidTestResultsFacVersion1(hct, tcp, filter_status1, None, hct_results1, tcp_results1, 0x1,
+fn1 = parsing_schemas.ValidateCovidTestResultsFacVersion1PreHCTFix(hct, tcp, filter_status1, None, hct_results1, tcp_results1, 0x1,
                                                          )
                                                          # show_debug=True)
 print('performing validation test')
@@ -81,7 +81,7 @@ print('setting up validation test')
 hct_results1f = np.zeros_like(hct, dtype=np.uint8)
 tcp_results1f = np.zeros_like(tcp, dtype=np.uint8)
 filter_status1f = np.zeros(ds.row_count(), dtype=np.uint32)
-fn1f = parsing_schemas.ValidateCovidTestResultsFacVersion1HCTFix(hct, tcp, filter_status1f, None, hct_results1f, tcp_results1f, 0x1,
+fn1f = parsing_schemas.ValidateCovidTestResultsFacVersion1(hct, tcp, filter_status1f, None, hct_results1f, tcp_results1f, 0x1,
                                                                  )
                                                                  # show_debug=True)
 print('performing validation test')
