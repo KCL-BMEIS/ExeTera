@@ -17,24 +17,45 @@ import numpy_buffer
 
 
 class Dataset:
-
-    def __init__(self, source, field_descriptors=None, progress=False, stop_after=None):
+    """
+    field_descriptors: a dictionary of field names to field descriptors that describe how the field
+                       should be transformed when loading
+    keys: a list of field names that represent the fields you wish to load and in what order they
+          should be put. Leaving this blankloads all of the keys in csv column order
+    """
+    def __init__(self, source, field_descriptors=None, keys=None, progress=False, stop_after=None):
         self.names_ = list()
         self.fields_ = list()
         self.names_ = list()
         self.index_ = None
 
-        if source:
-            csvf = csv.DictReader(source, delimiter=',', quotechar='"')
-            self.names_ = csvf.fieldnames
+        csvf = csv.DictReader(source, delimiter=',', quotechar='"')
+        #self.names_ = csvf.fieldnames
+        available_keys = csvf.fieldnames
+
+        if not keys:
+            fields_to_use = available_keys
+            index_map = [i for i in range(len(fields_to_use))]
+        else:
+            fields_to_use = keys
+            index_map = [available_keys.index(k) for k in keys]
 
         tstart = time.time()
         transforms_by_index = list()
         new_fields = list()
-        for i_n, n in enumerate(self.names_):
+
+        # build a full list of transforms by index whether they are are being filtered by 'keys' or not
+        for i_n, n in enumerate(available_keys):
             if field_descriptors and n in field_descriptors:
+                # transforms by csv field index
                 transforms_by_index.append(field_descriptors[n])
-                to_datatype = field_descriptors[n].to_datatype
+            else:
+                transforms_by_index.append(None)
+
+        # build a new list of collections for every field that is to be loaded
+        for i_n in index_map:
+            if transforms_by_index[i_n] is not None:
+                to_datatype = transforms_by_index[i_n].to_datatype
                 if to_datatype == str:
                     new_fields.append(list())
                     # new_fields.append(numpy_buffer.ListBuffer())
@@ -42,7 +63,6 @@ class Dataset:
                     # new_fields.append(numpy_buffer.NumpyBuffer(dtype=to_datatype))
                     new_fields.append(numpy_buffer.NumpyBuffer2(dtype=to_datatype))
             else:
-                transforms_by_index.append(None)
                 new_fields.append(list())
                 # new_fields.append(numpy_buffer.ListBuffer())
 
@@ -53,18 +73,20 @@ class Dataset:
         # read the cvs rows into the fields
         csvf = csv.reader(source, delimiter=',', quotechar='"')
         ecsvf = iter(csvf)
-        for i, fields in enumerate(ecsvf):
-            for i_f, f in enumerate(fields):
+        for i_r, row in enumerate(ecsvf):
+            # for i_f, f in enumerate(fields):
+            for i_df, i_f in enumerate(index_map):
+                f = row[i_f]
                 t = transforms_by_index[i_f]
-                new_fields[i_f].append(f if not t else t.strings_to_values[f])
-            del fields
+                new_fields[i_df].append(f if not t else t.strings_to_values[f])
+            del row
             if progress:
-                if i % 100000 == 0:
-                    print(i)
-            if stop_after and i >= stop_after:
+                if i_r % 100000 == 0:
+                    print(i_r)
+            if stop_after and i_r >= stop_after:
                 break
         if progress:
-            print(i)
+            print(i_r)
 
         # assign the built sequences to fields_
         for i_f, f in enumerate(new_fields):
@@ -73,6 +95,7 @@ class Dataset:
             else:
                 self.fields_.append(f.finalise())
         self.index_ = np.asarray([i for i in range(len(self.fields_[0]))], dtype=np.uint32)
+        self.names_ = fields_to_use
         print('loading took', time.time() - tstart, "seconds")
 
         #     if i > 0 and i % lines_per_dot == 0:

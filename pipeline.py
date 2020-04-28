@@ -13,12 +13,15 @@ import copy
 import csv
 import time
 from collections import defaultdict
+
 import numpy as np
 
 import dataset
 import data_schemas
 import filtered_field
 import parsing_schemas
+
+from utils import count_flag_set
 
 
 def read_header_and_n_lines(filename, n):
@@ -114,14 +117,6 @@ def replace_if_invalid(replacement):
         else:
             return float(value)
     return inner_
-
-
-def count_flag_set(flags, flag_to_test):
-    count = 0
-    for f in flags:
-        if f & flag_to_test:
-            count += 1
-    return count
 
 
 def clear_set_flag(values, to_clear):
@@ -373,7 +368,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print('load patients')
     print('-------------')
     with open(patient_filename) as f:
-        geoc_ds = dataset.Dataset(f, data_schema.patient_categorical_maps, True)
+        geoc_ds = dataset.Dataset(f, data_schema.patient_categorical_maps, progress=True)
     geoc_ds.sort(('id',))
     geoc_ds.show()
 
@@ -382,7 +377,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print('load assessments')
     print('----------------')
     with open(assessment_filename) as f:
-        asmt_ds = dataset.Dataset(f, data_schema.assessment_categorical_maps, True)
+        asmt_ds = dataset.Dataset(f, data_schema.assessment_categorical_maps, progress=True)
     print('sorting patient ids')
     asmt_ds.sort(('patient_id', 'updated_at'))
     asmt_ds.show()
@@ -463,7 +458,12 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     ptnt_dest_fields['weight_clean'] = weight_clean
     ptnt_dest_fields['height_clean'] = height_clean
     ptnt_dest_fields['bmi_clean'] = bmi_clean
-
+    print(f'weight: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_WEIGHT)} missing_values')
+    print(f'weight: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_WEIGHT)} missing_values')
+    print(f'height: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_HEIGHT)} missing_values')
+    print(f'height: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_HEIGHT)} missing_values')
+    print(f'bmi: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_BMI)} missing_values')
+    print(f'bmi: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_BMI)} missing_values')
 
     print(); print('unfiltered patients:', geoc_filter_status.count(0))
 
@@ -486,6 +486,8 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
             asmt_filter_status[ir] |= AFILTER_PATIENT_FILTERED
 
     print('assessments filtered due to patient filtering:',
+          count_flag_set(asmt_filter_status, AFILTER_PATIENT_FILTERED))
+    print('assessments filtered total:',
           count_flag_set(asmt_filter_status, FILTERA_ALL))
 
     print(); print("checking temperature")
@@ -565,12 +567,15 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print(); print()
     print("validate covid progression")
     print("--------------------------")
+    sanitised_hct_covid_results = np.ndarray(asmt_ds.row_count(), dtype=np.uint8)
     sanitised_covid_results = np.ndarray(asmt_ds.row_count(), dtype=np.uint8)
     sanitised_covid_results_key = categorical_maps['tested_covid_positive'].values_to_strings[:]
 
     fn_fac = parsing_schema.class_entries['clean_covid_progression']
-    fn = fn_fac(asmt_ds.field_by_name('tested_covid_positive'), asmt_filter_status,
-                sanitised_covid_results_key, sanitised_covid_results,
+    fn = fn_fac(asmt_ds.field_by_name('had_covid_test'), asmt_ds.field_by_name('tested_covid_positive'),
+                asmt_filter_status,
+                sanitised_covid_results_key,
+                sanitised_hct_covid_results, sanitised_covid_results,
                 FILTER_INVALID_COVID_PROGRESSION)
     iterate_over_patient_assessments2(
         asmt_ds.field_by_name('patient_id'), asmt_filter_status, fn)
@@ -711,57 +716,105 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
             remaining_asmt_fields, remaining_asmt_filter_status,
             resulting_fields, resulting_field_keys)
 
+def na_or_value(value):
+    if value == '':
+        return 'na'
+    return value
+
+def na_compare(value1, value2):
+    lv1 = value1.lower()
+    lv2 = value2.lower()
+    if lv1 == 'na' and lv2 in ('', 'na'):
+        return True
+    return lv1 == lv2
+
+def check_row(r_ds, r_index, p_ds, p_index, keys, custom_checks):
+    disparities = None
+    for k in keys:
+        if isinstance(k, str):
+            kp, kr = k, k
+        else:
+            kp, kr = k
+        if kr in custom_checks:
+            check = custom_checks[kr]
+        else:
+            check = na_compare
+        r_value = r_ds.field_by_name(kr)[r_index]
+        p_value = p_ds.field_by_name(kp)[p_index]
+        if not check(r_value, p_value):
+            if disparities is None:
+                disparities = list()
+            if kr == kp:
+                disparities.append(f'{kr} : {str(na_or_value(r_value))} / {str(na_or_value(p_value))}')
+            else:
+                disparities.append(f'{kr} / {kp} : {str(na_or_value(r_value))} / {str(na_or_value(p_value))}')
+    return disparities
+
+
 
 def regression_test_assessments(old_assessments, new_assessments):
+
     with open(old_assessments) as f:
         r_a_ds = dataset.Dataset(f)
-        # r_a_ds.parse_file(f)
     r_a_ds.sort(('patient_id', 'id'))
     with open(new_assessments) as f:
         p_a_ds = dataset.Dataset(f)
-        # p_a_ds.parse_file(f)
     p_a_ds.sort(('patient_id', 'id'))
 
-    r_a_fields = r_a_ds.fields_
-    p_a_fields = p_a_ds.fields_
+    # r_a_fields = r_a_ds.fields_
+    # p_a_fields = p_a_ds.fields_
 
     r_a_keys = set(r_a_ds.names_)
     p_a_keys = set(p_a_ds.names_)
-    print('diff:', r_a_keys.difference(p_a_keys))
     print(r_a_keys)
     print(p_a_keys)
+    print('keys only in r:', r_a_keys.difference(p_a_keys))
+    print('keys only in p:', p_a_keys.difference(r_a_keys))
 
     diagnostic_row_keys = ['id', 'patient_id', 'created_at', 'updated_at', 'health_status', 'fatigue', 'fatigue_binary', 'had_covid_test', 'tested_covid_positive']
+    comparison_keys = diagnostic_row_keys
     r_fns = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
 
     patients_with_disparities = set()
     r = 0
     p = 0
-    while r < len(r_a_fields) and p < len(p_a_fields):
-        rkey = (r_a_fields[2][r], r_a_fields[1][r])
-        pkey = (p_a_fields[1][p], p_a_fields[0][p])
+    r_ids = r_a_ds.field_by_name('id')
+    r_pids = r_a_ds.field_by_name('patient_id')
+    r_upda = r_a_ds.field_by_name('day')
+    r_hct = r_a_ds.field_by_name('had_covid_test')
+    r_tcp = r_a_ds.field_by_name('tested_covid_positive')
+
+    p_ids = p_a_ds.field_by_name('id')
+    p_pids = p_a_ds.field_by_name('patient_id')
+    p_upda = r_a_ds.field_by_name('day')
+    p_hct = p_a_ds.field_by_name('had_covid_test')
+    p_tcp = p_a_ds.field_by_name('tested_covid_positive')
+    while r < r_a_ds.row_count() and p < p_a_ds.row_count():
+        rkey = (r_pids[r], r_upda[r])
+        pkey = (p_pids[p], p_upda[p])
         if rkey < pkey:
             print(f'{r}, {p}: {rkey} not in python dataset')
             print_diagnostic_row('', r_a_ds, r, diagnostic_row_keys, fns=r_fns)
             print_diagnostic_row('', p_a_ds, p, diagnostic_row_keys)
-            patients_with_disparities.add(r_a_fields[2][r])
-            patients_with_disparities.add(p_a_fields[1][p])
+            patients_with_disparities.add(r_pids[r])
             r += 1
         elif pkey < rkey:
             print(f'{r}, {p}: {pkey} not in r dataset')
             print_diagnostic_row('', r_a_ds, r, diagnostic_row_keys, fns=r_fns)
             print_diagnostic_row('', p_a_ds, p, diagnostic_row_keys)
-            patients_with_disparities.add(r_a_fields[2][r])
-            patients_with_disparities.add(p_a_fields[1][p])
+            patients_with_disparities.add(p_pids[p])
             p += 1
         else:
             r += 1
             p += 1
+            disparities = check_row(r_a_ds, r, p_a_ds, p, comparison_keys, dict())
+            if disparities != None:
+                print(p_ids[p], ','.join(disparities))
 
-        if r < r_a_ds.row_count():
-            treatment = r_a_fields[r_a_ds.field_to_index('treatment')][r]
-            if treatment not in ('NA', '', 'none'):
-                print(r, treatment)
+        # if r < r_a_ds.row_count():
+        #     treatment = r_a_fields[r_a_ds.field_to_index('treatment')][r]
+        #     if treatment not in ('NA', '', 'none'):
+        #         print(r, treatment)
 
 
     # r_a_fields = sorted(r_a_fields, key=lambda r: (r[2], r[4]))
@@ -786,47 +839,62 @@ def regression_test_patients(old_patients, new_patients):
     print('new_patients:', new_patients)
     with open(old_patients) as f:
         r_a_ds = dataset.Dataset(f)
-        # r_a_ds.parse_file(f)
     r_a_ds.sort(('id',))
     with open(new_patients) as f:
         p_a_ds = dataset.Dataset(f)
-        # p_a_ds.parse_file(f)
     p_a_ds.sort(('id',))
-
-    r_a_fields = r_a_ds.fields_
-    p_a_fields = p_a_ds.fields_
 
     r_a_keys = set(r_a_ds.names_)
     p_a_keys = set(p_a_ds.names_)
     print('r_a_keys:', r_a_keys)
     print('p_a_keys:', p_a_keys)
-
-    r_a_fields = sorted(r_a_fields, key=lambda r: r[1])
-    p_a_fields = sorted(p_a_fields, key=lambda p: p[0])
+    print('keys only in r:', r_a_keys.difference(p_a_keys))
+    print('keys only in p:', p_a_keys.difference(r_a_keys))
 
     print('checking for disparities')
     patients_with_disparities = set()
     r = 0
     p = 0
-    while r < len(r_a_fields) and p < len(p_a_fields):
-        rkey = r_a_fields[r][1]
-        pkey = p_a_fields[p][0]
+    r_ids = r_a_ds.field_by_name('id')
+    r_ages = r_a_ds.field_by_name('age')
+    r_weight = r_a_ds.field_by_name('weight_kg')
+    r_height = r_a_ds.field_by_name('height_cm')
+    r_bmi = r_a_ds.field_by_name('bmi')
+    p_ids = p_a_ds.field_by_name('id')
+    p_ages = p_a_ds.field_by_name('age')
+    p_weight = p_a_ds.field_by_name('weight_clean')
+    p_height = p_a_ds.field_by_name('height_clean')
+    p_bmi = p_a_ds.field_by_name('bmi_clean')
+    while r < r_a_ds.row_count() and p < p_a_ds.row_count():
+        rkey = r_ids[r]
+        pkey = p_ids[p]
         if rkey < pkey:
             print(f'{r}, {p}: {rkey} not in python dataset')
-            patients_with_disparities.add(r_a_fields[r][1])
+            patients_with_disparities.add(rkey)
             r += 1
         elif pkey < rkey:
             print(f'{r}, {p}: {pkey} not in r dataset')
-            patients_with_disparities.add(p_a_fields[p][0])
+            patients_with_disparities.add(pkey)
             p += 1
         else:
-            age_same = r_a_fields[r][r_a_ds.field_to_index('age')] == p_a_fields[p][p_a_ds.field_to_index('age')]
-            print(r, p, age_same)
+            age_same = r_ages[r] == p_ages[p]
+            weight_same = abs(float(r_weight[r]) - float(p_weight[p])) < 0.00001
+            height_same = abs(float(r_height[r]) - float(p_height[p])) < 0.00001
+            bmi_same = abs(float(r_bmi[r]) - float(p_bmi[p])) < 0.00001
+            if not age_same or not weight_same or not height_same or not bmi_same:
+                print(r, p,
+                      r_ids[r], p_ids[p],
+                      'na' if r_ages[r] is '' else r_ages[r], p_ages[p] if '' else p_ages[p],
+                      'na' if r_weight[r] is '' else r_weight[r], 'na' if p_weight[p] is '' else p_weight[p],
+                      'na' if r_height[r] is '' else r_height[r], 'na' if p_height[p] is '' else p_height[p],
+                      'na' if r_bmi[r] is '' else r_bmi[r], 'na' if p_bmi[p] is '' else p_bmi[p]
+                      )
             r += 1
             p += 1
 
     for pd in patients_with_disparities:
         print(); print(pd)
+    print('checking_for_disparities: done')
 
 def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema):
 
