@@ -20,6 +20,7 @@ import dataset
 import data_schemas
 import filtered_field
 import parsing_schemas
+import regression
 
 from utils import count_flag_set
 
@@ -718,41 +719,6 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
             remaining_asmt_fields, remaining_asmt_filter_status,
             resulting_fields, resulting_field_keys)
 
-def na_or_value(value):
-    if value == '':
-        return 'na'
-    return value
-
-def na_compare(value1, value2):
-    lv1 = value1.lower()
-    lv2 = value2.lower()
-    if lv1 == 'na' and lv2 in ('', 'na'):
-        return True
-    return lv1 == lv2
-
-def check_row(r_ds, r_index, p_ds, p_index, keys, custom_checks):
-    disparities = None
-    for k in keys:
-        if isinstance(k, str):
-            kp, kr = k, k
-        else:
-            kp, kr = k
-        if kr in custom_checks:
-            check = custom_checks[kr]
-        else:
-            check = na_compare
-        r_value = r_ds.field_by_name(kr)[r_index]
-        p_value = p_ds.field_by_name(kp)[p_index]
-        if not check(r_value, p_value):
-            if disparities is None:
-                disparities = list()
-            if kr == kp:
-                disparities.append(f'{kr} : {str(na_or_value(r_value))} / {str(na_or_value(p_value))}')
-            else:
-                disparities.append(f'{kr} / {kp} : {str(na_or_value(r_value))} / {str(na_or_value(p_value))}')
-    return disparities
-
-
 
 def regression_test_assessments(old_assessments, new_assessments):
 
@@ -809,7 +775,7 @@ def regression_test_assessments(old_assessments, new_assessments):
         else:
             r += 1
             p += 1
-            disparities = check_row(r_a_ds, r, p_a_ds, p, comparison_keys, dict())
+            disparities = regression.check_row(r_a_ds, r, p_a_ds, p, comparison_keys, dict())
             if disparities != None:
                 print(p_ids[p], ','.join(disparities))
 

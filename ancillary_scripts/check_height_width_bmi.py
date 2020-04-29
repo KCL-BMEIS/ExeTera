@@ -9,12 +9,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import defaultdict
 import numpy as np
 
 import dataset
 import data_schemas
 import parsing_schemas
 import pipeline
+import regression
+import utils
 
 def value_ranges():
     lbs_to_kgs = 0.453592
@@ -55,12 +58,14 @@ def value_ranges():
 
 value_ranges()
 
-filename = '/home/ben/covid/patients_export_geocodes_20200421050002.csv'
+filename = '/home/ben/covid/patients_export_geocodes_20200428050002.csv'
 # filename = '/home/ben/covid/patients_short.csv'
 
 print(f"loading {filename}")
 with open(filename) as f:
-    ds = dataset.Dataset(f, keys=['id', 'gender', 'height_cm', 'weight_kg', 'bmi', 'year_of_birth'], progress=True) #, stop_after=100000)
+    ds = dataset.Dataset(f, keys=['id', 'created_at', 'updated_at', 'gender', 'height_cm', 'weight_kg', 'bmi', 'year_of_birth'],
+                         progress=True)
+                         # progress=True, stop_after=10000)
 print('loaded')
 
 #ds.sort(('patient_id', 'updated_at'))
@@ -93,6 +98,70 @@ for k, v in zip(cast_weights_hist[1], cast_weights_hist[0]):
     print(f'{k}: {v}')
 print('min ; max =', min(cast_weights), max(cast_weights))
 
+results = [0, 0, 0, 0]
+ambiguous = list()
+for i_r in range(len(src_weights)):
+    value = 0
+    if src_weights[i_r] != '':
+        value += 1
+    if src_heights[i_r] != '':
+        value += 2
+    if value == 1 or value == 2:
+        print(i_r, regression.na_or_value(src_weights[i_r]), regression.na_or_value(src_heights[i_r]))
+    results[value] += 1
+
+print(results)
+
+
+class ValueRange:
+    def __init__(self):
+        self.min = None
+        self.max = None
+        self.count = 0
+
+    def add_value(self, value):
+        if self.min is None:
+            self.min = value
+        else:
+            self.min = min(self.min, value)
+        if self.max is None:
+            self.max = value
+        else:
+            self.max = max(self.max, value)
+        self.count += 1
+
+max_height = None
+for i_r in range(len(src_heights)):
+    if src_heights[i_r] != '':
+        fheight = float(src_heights[i_r])
+        if max_height is None or fheight > max_height:
+            max_height = fheight
+            print(i_r, src_heights[i_r])
+
+float_heights = np.zeros_like(src_heights, dtype=np.float)
+for i_r in range(len(src_heights)):
+    float_heights[i_r] = float(src_heights[i_r]) if src_heights[i_r] is not '' else 0.0
+
+sorted_float_heights = np.sort(float_heights)
+print(sorted_float_heights[-100:])
+print(np.percentile(float_heights, [0, 1, 5, 10, 50, 90, 95, 99, 100]))
+
+created_at = ds.field_by_name('created_at')
+updated_at = ds.field_by_name('updated_at')
+weight_range_by_day = defaultdict(ValueRange)
+height_range_by_day = defaultdict(ValueRange)
+for i_r in range(len(updated_at)):
+    if src_weights[i_r] != '':
+        weight_range_by_day[utils.timestamp_to_day(created_at[i_r])].add_value(float(src_weights[i_r]))
+    if src_heights[i_r] != '':
+        height_range_by_day[utils.timestamp_to_day(created_at[i_r])].add_value(float(src_heights[i_r]))
+
+weight_ranges = sorted(weight_range_by_day.items())
+height_ranges = sorted(height_range_by_day.items())
+for w in weight_ranges:
+    print(w[0], w[1].count, w[1].min, w[1].max)
+for h in height_ranges:
+    print(h[0], h[1].count, h[1].min, h[1].max)
 
 compare_schemas = False
 if compare_schemas:
