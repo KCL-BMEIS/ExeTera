@@ -1,8 +1,20 @@
+# Copyright 2020 KCL-BMEIS - King's College London
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import unittest
 
 import numpy as np
 
 import parsing_schemas
+import processing.covid_test
 
 
 class TestCovidProgression1(unittest.TestCase):
@@ -17,7 +29,7 @@ class TestCovidProgression1(unittest.TestCase):
         filter_flags = np.zeros_like(hcts_start, dtype=np.uint32)
         flags_expected = np.asarray(flags_expected, dtype=np.uint32)
         validator =\
-            parsing_schemas.ValidateCovidTestResultsFacVersion1(
+            processing.covid_test.ValidateCovidTestResultsFacVersion1(
                 hcts_start, tcps_start, filter_flags, None, hct_results, tcp_results, 0x1)
 
         validator('abcd',filter_flags, 0, len(hcts_start)-1)

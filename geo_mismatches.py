@@ -3,6 +3,7 @@ import pipeline
 
 # fn1 = '/home/ben/covid/patients_export_geocodes_20200406050002.csv'
 # fn2 = '/home/ben/covid/patients_export_geocodes_20200413050002.csv'
+import utils
 
 fn1 = '/home/ben/covid/patients_export_geocodes_20200413050002.csv'
 fn2 = '/home/ben/covid/patients_export_geocodes_20200416050002.csv'
@@ -36,8 +37,8 @@ while i < ds1.row_count() and j < ds2.row_count():
         j += 1
     else:
         if i < 100:
-            pipeline.print_diagnostic_row(f'{matches} {i}:', ds1, ds1.fields_, i, fields)
-            pipeline.print_diagnostic_row(f'{matches} {j}:', ds2, ds2.fields_, j, fields)
+            utils.print_diagnostic_row(f'{matches} {i}:', ds1, ds1.fields_, i, fields)
+            utils.print_diagnostic_row(f'{matches} {j}:', ds2, ds2.fields_, j, fields)
         vzip1 = ds1.value(i, zip1)
         vzip2 = ds2.value(j, zip2)
         vowp1 = ds1.value(i, owp1)

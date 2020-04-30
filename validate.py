@@ -12,11 +12,13 @@
 import csv
 import argparse
 import os
+import datetime
 
 import data_schemas
 import dataset
 import parsing_schemas
 import pipeline
+import utils
 
 equivalence_map = {
     'na': ('', 'na'),
@@ -153,7 +155,7 @@ def show_rows(filename, fields_to_show):
     ds.sort(('patient_id', 'updated_at'))
     for i_f, f in enumerate(ds.fields_):
         if ds.value_from_fieldname(i_f, 'patient_id') == 'e88bfabe5b16897866f91deb8a7a90f2':
-            pipeline.print_diagnostic_row(f'{i_f}:', ds, ds.fields_, i_f, fields_to_show)
+            utils.print_diagnostic_row(f'{i_f}:', ds, ds.fields_, i_f, fields_to_show)
 
 
 if __name__ == '__main__':
@@ -172,6 +174,7 @@ if __name__ == '__main__':
                         default=None)
     parser.add_argument('-ps', '--parsing_schema', default=1,
                         help='the schema number to use for parsing and cleaning data')
+    parser.add_argument('-y', '--year', default=datetime.datetime.now().year, type=int)
     parser.add_argument('-v', '--verbose',
                         action='store_true',
                         help='increase verbosity')
@@ -184,7 +187,8 @@ if __name__ == '__main__':
     # run the current pipeline
     pipeline_output = pipeline.pipeline(patient_filename=args.patients_input,
                                         assessment_filename=args.assessments_input,
-                                        data_schema=data_schema, parsing_schema=parsing_schema)
+                                        data_schema=data_schema, parsing_schema=parsing_schema,
+                                        year=args.year)
     pipeline.save_csv(pipeline_output,
                       patient_data_out='patients_output_test.csv',
                       assessment_data_out='assessments_output_test.csv',

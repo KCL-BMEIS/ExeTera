@@ -11,6 +11,7 @@
 
 import copy
 import csv
+import datetime
 import time
 from collections import defaultdict
 
@@ -21,194 +22,21 @@ import data_schemas
 import filtered_field
 import parsing_schemas
 import regression
+from processing.age_from_year_of_birth import CalculateAgeFromYearOfBirth
+from processing.assessment_merge import CalculateMergedFieldCount, MergeAssessmentRows
+from processing.inconsistent_symptoms import CheckInconsistentSymptoms
+from processing.inconsistent_testing import CheckTestingConsistency
 
-from utils import count_flag_set
+from utils import count_flag_empty, count_flag_set, build_histogram, map_between_categories, \
+    to_categorical, print_diagnostic_row, valid_range_fac_inc, iterate_over_patient_assessments, \
+    iterate_over_patient_assessments2, datetime_to_seconds
 
-
-def read_header_and_n_lines(filename, n):
-    with open(filename) as f:
-        print(f.readline())
-        for i in range(n):
-            print(f.readline())
-
-
-def build_histogram(dataset, field_index, filtered_records=None, tx=None):
-    if False:
-        # TODO: memory_efficiency: test and replace defaultdict with this code when tested
-        dataset = sorted(dataset, dataset.field_index)
-        histogram = list()
-        histogram.append((dataset[0][1], 0))
-        for r in dataset:
-            if histogram[-1][0] != r[1]:
-                histogram.append((r[1], 1))
-            else:
-                histogram[-1] = (histogram[-1][0], histogram[-1][1] + 1)
-    else:
-        histogram = defaultdict(int)
-        for ir, r in enumerate(dataset):
-            if not filtered_records or not filtered_records[ir]:
-                if tx is not None:
-                    value = tx(r[field_index])
-                else:
-                    value = r[field_index]
-                histogram[value] += 1
-        hlist = list(histogram.items())
-        del histogram
-        return hlist
-
-
-def build_histogram_from_list(dataset, filtered_records=None, tx=None):
-    # TODO: memory_efficiency: see build_histogram function
-    histogram = defaultdict(int)
-    for ir, r in enumerate(dataset):
-        if not filtered_records or not filtered_records[ir]:
-            if tx is not None:
-                value = tx(r)
-            else:
-                value = r
-            histogram[value] += 1
-    hlist = list(histogram.items())
-    del histogram
-    return hlist
-
-
-def is_int(value):
-    try:
-        int(float(value))
-        return True
-    except:
-        return False
-
-
-def is_float(value):
-    try:
-        float(value)
-        return True
-    except:
-        return False
-
-
-def to_int(value):
-    try:
-        fvalue = float(value)
-    except ValueError as e:
-        raise ValueError(f'{value} cannot be converted to float')
-
-    try:
-        ivalue = int(fvalue)
-    except ValueError as e:
-        raise ValueError(f'{fvalue} cannot be converted to int')
-
-    return ivalue
-
-
-def to_float(value):
-    try:
-        fvalue = float(value)
-    except ValueError as e:
-        raise ValueError(f'{value} cannot be converted to float')
-
-    return fvalue
-
-
-def replace_if_invalid(replacement):
-    def inner_(value):
-        if value is '':
-            return replacement
-        else:
-            return float(value)
-    return inner_
-
-
-def clear_set_flag(values, to_clear):
-    for v in range(len(values)):
-        values[v] &= ~to_clear
-    return values
-
-
-def valid_range_fac(f_min, f_max, default_value=''):
-    def inner_(x):
-        return x == default_value or x > f_min and x < f_max
-    return inner_
-
-
-def valid_range_fac_inc(f_min, f_max, default_value=''):
-    def inner_(x):
-        return x == default_value or x >= f_min and x <= f_max
-    return inner_
-
-
-def filter_fields(fields, filter_list, index, f_missing, f_bad, is_type_fn, type_fn, valid_fn):
-    for ir, r in enumerate(fields):
-        if not is_type_fn(r[index]):
-            if f_missing != 0:
-                filter_list[ir] |= f_missing
-        else:
-            value = type_fn(r[index])
-            if not valid_fn(value):
-                if f_bad != 0:
-                    filter_list[ir] |= f_bad
-
-
-def filter_list(fields, filter_list, f_missing, f_bad, is_type_fn, type_fn, valid_fn):
-    for ir, r in enumerate(fields):
-        if not is_type_fn(r):
-            if f_missing != 0:
-                filter_list[ir] |= f_missing
-        else:
-            value = type_fn(r)
-            if not valid_fn(value):
-                if f_bad != 0:
-                    filter_list[ir] |= f_bad
-
-
-def sort_mixed_list(values, check_fn, sort_fn):
-    # pass to find the single entry that fails check_fn
-    for iv in range(len(values)):
-        checked_item = None
-        if not check_fn(values[iv]):
-            #swap the current item with the last if it isn't last
-            found_checked_item = True
-            if iv != len(values) - 1:
-                values[iv], values[-1] = values[-1], values[iv]
-                checked_item = values.pop()
-        break
-
-    list.sort(values, key=sort_fn)
-    if found_checked_item:
-        values.append(checked_item)
-
-    return values
-
-
-def to_categorical(fields, field_index, desttype, mapdict):
-    results = np.ndarray((len(fields),), dtype=desttype)
-    for ir, r in enumerate(fields):
-        v = r[field_index]
-        result = mapdict[v]
-        results[ir] = result
-    return results
 
 def copy_field(field):
     if isinstance(field, list):
         return copy.deepcopy(field)
     else:
         return field.copy()
-
-
-
-def map_between_categories(first_map, second_map):
-    result_map = dict()
-    for m in first_map.keys():
-        result_map[first_map[m]] = second_map[m]
-    return result_map
-
-
-def to_categorical2(field, transform):
-    results = np.zeros_like(field, dtype=field.dtype)
-    for ir, r in enumerate(field):
-        results[ir] = transform[r]
-    return results
 
 
 def map_patient_ids(geoc, asmt, map_fn):
@@ -226,73 +54,9 @@ def map_patient_ids(geoc, asmt, map_fn):
             a += 1
 
 
-def iterate_over_patient_assessments(fields, filter_status, visitor):
-    patient_ids = fields[1]
-    cur_id = patient_ids[0]
-    cur_start = 0
-    cur_end = 0
-    i = 1
-    while i < len(filter_status):
-        while patient_ids[i] == cur_id:
-            cur_end = i
-            i += 1
-            if i >= len(filter_status):
-                break
-
-        visitor(fields, filter_status, cur_start, cur_end)
-
-        if i < len(filter_status):
-            cur_start = i
-            cur_end = cur_start
-            cur_id = patient_ids[i]
-
-
-def iterate_over_patient_assessments2(patient_ids, filter_status, visitor):
-    cur_id = patient_ids[0]
-    cur_start = 0
-    cur_end = 0
-    i = 1
-    while i < len(patient_ids):
-        while patient_ids[i] == cur_id:
-            cur_end = i
-            i += 1
-            if i >= len(patient_ids):
-                break
-
-        visitor(cur_id, filter_status, cur_start, cur_end)
-
-        if i < len(patient_ids):
-            cur_start = i
-            cur_end = cur_start
-            cur_id = patient_ids[i]
-
-
-def datetime_to_seconds(dt):
-    return f'{dt[0:4]}-{dt[5:7]}-{dt[8:10]} {dt[11:13]}:{dt[14:16]}:{dt[17:19]}'
-
-
-def print_diagnostic_row(preamble, ds, ir, keys, fns=None):
-    if fns is None:
-        fns = dict()
-    # indices = [ds.field_to_index(k) for k in keys]
-    # indexed_fns = [None if k not in fns else fns[k] for k in keys]
-    values = [None] * len(keys)
-    # for ii, i in enumerate(indices):
-    for i, k in enumerate(keys):
-        if not fns or k not in fns:
-            values[i] = ds.value_from_fieldname(ir, k)
-        else:
-            values[i] = fns[k](ds.value_from_fieldname(ir, k))
-        # if indexed_fns[ii] is None:
-        #     values[ii] = fields[ir][i]
-        # else:
-        #     values[ii] = indexed_fns[ii](fields[ir][i])
-    print(f'{preamble}: {values}')
-
-
 #patient limits
-MIN_YOB = 1930
-MAX_YOB = 2004
+MIN_AGE = 16
+MAX_AGE = 90
 MIN_HEIGHT = 110
 MAX_HEIGHT = 220
 MIN_WEIGHT = 40
@@ -305,10 +69,10 @@ MAX_TEMP = 42
 
 # patient filter values
 PFILTER_OTHER_TERRITORY = 0x1
-PFILTER_NO_ASSESSMENTS = 0x2
-PFILTER_ONE_ASSESSMENT = 0x4
-FILTER_MISSING_YOB = 0x8
-FILTER_BAD_YOB = 0x10
+# PFILTER_NO_ASSESSMENTS = 0x2
+# PFILTER_ONE_ASSESSMENT = 0x4
+FILTER_MISSING_AGE = 0x8
+FILTER_BAD_AGE = 0x10
 FILTER_MISSING_HEIGHT = 0x20
 FILTER_BAD_HEIGHT = 0x40
 FILTER_MISSING_WEIGHT = 0x80
@@ -335,8 +99,8 @@ FILTER_MISSING_TEMP = 0x0
 FILTER_BAD_TEMP = 0x8
 FILTER_INCONSISTENT_NOT_TESTED = 0x10
 FILTER_INCONSISTENT_TESTED = 0x20
-FILTER_INCONSISTENT_SYMPTOMS = 0x40
-FILTER_INCONSISTENT_NO_SYMPTOMS = 0x80
+FILTER_HEALTHY_BUT_SYMPTOMS = 0x40
+FILTER_NOT_HEALTHY_BUT_NO_SYMPTOMS = 0x80
 FILTER_INVALID_COVID_PROGRESSION = 0X100
 FILTERA_ALL = 0xffffffff
 
@@ -361,7 +125,7 @@ exposure_fields = ["always_used_shortage", "have_used_PPE", "never_used_shortage
 miscellaneous_fields = ['health_status', 'location', 'level_of_isolation', 'had_covid_test', 'tested_covid_positive']
 
 
-def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema, territory=None):
+def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema, year, territory=None):
 
     categorical_maps = data_schema.assessment_categorical_maps
     # TODO: use proper logging throughout
@@ -385,25 +149,15 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
 
 
     print(); print()
-    print('generate dataset indices')
-    print("------------------------")
-    symptomatic_indices = [asmt_ds.field_to_index(c) for c in symptomatic_fields]
-    print(symptomatic_indices)
-    exposure_indices = [asmt_ds.field_to_index(c) for c in exposure_fields]
-    print(exposure_indices)
-
-
-    print(); print()
     print("pre-sort by patient id")
     print("----------------------")
 
     print("pre-sort patient data")
-    geoc_fields = geoc_ds.fields_
-    geoc_filter_status = [0] * geoc_ds.row_count()
+    geoc_filter_status = np.zeros(geoc_ds.row_count(), dtype=np.uint32)
     print("geoc field count:", geoc_ds.row_count())
 
     print(); print("pre-sort assessment data")
-    asmt_filter_status = [0] * asmt_ds.row_count()
+    asmt_filter_status = np.zeros(asmt_ds.row_count(), dtype=np.uint32)
     print("asmt field count:", asmt_ds.row_count())
 
     if territory is not None:
@@ -411,18 +165,18 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
         print("filter patients from outside the territory of interest")
         print("------------------------------------------------------")
 
-        country_codes = geoc_fields[geoc_ds.field_to_index('country_code')]
+        country_codes = geoc_ds.field_by_name('country_code')
         for ir, r in enumerate(country_codes):
             if r != territory:
                 geoc_filter_status[ir] |= PFILTER_OTHER_TERRITORY
         print(f'other territories: filtered {count_flag_set(geoc_filter_status, PFILTER_OTHER_TERRITORY)} missing values')
 
     print('patients:', len(geoc_filter_status))
-    print('patients with no assessments:',
-          count_flag_set(geoc_filter_status, PFILTER_NO_ASSESSMENTS))
-    print('patients with one assessment:',
-          count_flag_set(geoc_filter_status, PFILTER_ONE_ASSESSMENT))
-    print('patients with sufficient assessments:', geoc_filter_status.count(0))
+    # print('patients with no assessments:',
+    #       count_flag_set(geoc_filter_status, PFILTER_NO_ASSESSMENTS))
+    # print('patients with one assessment:',
+    #       count_flag_set(geoc_filter_status, PFILTER_ONE_ASSESSMENT))
+    # print('patients with sufficient assessments:', geoc_filter_status.count(0))
 
     print(); print()
     print("patients")
@@ -430,26 +184,25 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
 
     ptnt_dest_fields = dict()
 
-    print(); print("checking yob")
+    print()
+    print("checking age")
+    src_yobs = geoc_ds.field_by_name('year_of_birth')
+    ages = np.zeros(len(src_yobs), dtype=np.uint32)
+    fn = CalculateAgeFromYearOfBirth(FILTER_MISSING_AGE, FILTER_BAD_AGE,
+                                     valid_range_fac_inc(MIN_AGE, MAX_AGE), year)
+    fn(src_yobs, ages, geoc_filter_status)
+    ptnt_dest_fields['age'] = ages
+    print(f'age: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_AGE)} missing values')
+    print(f'age: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_AGE)} bad values')
 
-    src_yobs = geoc_fields[geoc_ds.field_to_index('year_of_birth')]
-    filter_list(src_yobs, geoc_filter_status, FILTER_MISSING_YOB, FILTER_BAD_YOB,
-                is_int, to_int, valid_range_fac_inc(MIN_YOB, MAX_YOB))
-    print(f'yob: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_YOB)} missing values')
-    print(f'yob: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_YOB)} bad values')
-    print(geoc_filter_status.count(0))
-    age = np.zeros_like(src_yobs, dtype=np.int16)
-    for ir, r in enumerate(src_yobs):
-        if geoc_filter_status[ir] & (FILTER_MISSING_YOB | FILTER_BAD_YOB):
-            age[ir] = 0
-        else:
-            age[ir] = 2020 - to_int(r)
-    ptnt_dest_fields['age'] = age
+
+    print()
+    print('checking weight / height / bmi')
+    src_weights = geoc_ds.field_by_name('weight_kg')
+    src_heights = geoc_ds.field_by_name('height_cm')
+    src_bmis = geoc_ds.field_by_name('bmi')
 
     fn_fac = parsing_schema.class_entries['validate_weight_height_bmi']
-    src_weights = geoc_fields[geoc_ds.field_to_index('weight_kg')]
-    src_heights = geoc_fields[geoc_ds.field_to_index('height_cm')]
-    src_bmis = geoc_fields[geoc_ds.field_to_index('bmi')]
     fn = fn_fac(MIN_WEIGHT, MAX_WEIGHT, MIN_HEIGHT, MAX_HEIGHT, MIN_BMI, MAX_BMI,
                 FILTER_MISSING_WEIGHT, FILTER_BAD_WEIGHT,
                 FILTER_MISSING_HEIGHT, FILTER_BAD_HEIGHT,
@@ -466,7 +219,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print(f'bmi: filtered {count_flag_set(geoc_filter_status, FILTER_MISSING_BMI)} missing_values')
     print(f'bmi: filtered {count_flag_set(geoc_filter_status, FILTER_BAD_BMI)} missing_values')
 
-    print(); print('unfiltered patients:', geoc_filter_status.count(0))
+    print(); print('unfiltered patients:', count_flag_empty(geoc_filter_status))
 
 
     print(); print()
@@ -477,11 +230,11 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     asmt_dest_keys = dict()
 
     patient_ids = set()
-    src_patient_ids = geoc_fields[0]
+    src_patient_ids = geoc_ds.field_by_name('id')
     for ir, r in enumerate(src_patient_ids):
         if geoc_filter_status[ir] == 0:
             patient_ids.add(r)
-    src_asmt_patient_ids = asmt_ds.fields_[1]
+    src_asmt_patient_ids = asmt_ds.field_by_name('patient_id')
     for ir, r in enumerate(src_asmt_patient_ids):
         if r not in patient_ids:
             asmt_filter_status[ir] |= AFILTER_PATIENT_FILTERED
@@ -501,18 +254,13 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print(); print("checking inconsistent test / test results fields")
     src_had_test = asmt_ds.field_by_name('had_covid_test')
     src_tested_covid_positive = asmt_ds.field_by_name('tested_covid_positive')
-
-    for ir in range(asmt_ds.row_count()):
-        had_test = src_had_test[ir]
-        test_result = src_tested_covid_positive[ir]
-        if had_test != 2 and test_result != 0:
-            asmt_filter_status[ir] |= FILTER_INCONSISTENT_NOT_TESTED
-        if had_test == 2 and test_result == 0:
-            asmt_filter_status[ir] |= FILTER_INCONSISTENT_TESTED
-
+    fn = CheckTestingConsistency(FILTER_INCONSISTENT_NOT_TESTED, FILTER_INCONSISTENT_TESTED)
+    fn(src_had_test, src_tested_covid_positive, asmt_filter_status)
     print(f'inconsistent_not_tested: filtered {count_flag_set(asmt_filter_status, FILTER_INCONSISTENT_NOT_TESTED)} missing values')
     print(f'inconsistent_tested: filtered {count_flag_set(asmt_filter_status, FILTER_INCONSISTENT_TESTED)} missing values')
-    print(); print('unfiltered assessments:', asmt_filter_status.count(0))
+
+
+    print(); print('unfiltered assessments:', np.count_nonzero(asmt_filter_status == 0))
 
 
     print(); print()
@@ -528,14 +276,14 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
         print(np.count_nonzero(asmt_dest_fields[s] == True))
         print(np.count_nonzero(any_symptoms == True))
 
-    print(build_histogram_from_list(asmt_ds.field_by_name('tested_covid_positive')))
+    print(build_histogram(asmt_ds.field_by_name('tested_covid_positive')))
 
     for f in flattened_fields:
         print(f"flattened_field '{f[0]}' to categorical field '{f[1]}'")
         remap = map_between_categories(categorical_maps[f[0]].strings_to_values,
                                        categorical_maps[f[1]].strings_to_values)
         asmt_dest_fields[f[1]] =\
-            to_categorical2(asmt_ds.field_by_name(f[0]), remap)
+            to_categorical(asmt_ds.field_by_name(f[0]), remap)
         # TODO: this shouldn't be necessary as the fields were covered in 'symptomatic_fields'
         any_symptoms |= asmt_dest_fields[f[1]] > 1
 
@@ -546,23 +294,20 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
         print(f"miscellaneous_field '{m}' to categorical")
         asmt_dest_fields[m] = copy_field(asmt_ds.field_by_name(m))
 
-    print(); print()
-    print("filter inconsistent health status")
-    print("---------------------------------")
-    # TODO: can use the processed field
-    src_health_status = asmt_ds.field_by_name('health_status')
-    i_healthy = categorical_maps['health_status'].strings_to_values['healthy']
-    i_not_healthy = categorical_maps['health_status'].strings_to_values['not_healthy']
-    for ir in range(asmt_ds.row_count()):
-        if src_health_status[ir] == i_healthy and any_symptoms[ir]:
-            asmt_filter_status[ir] |= FILTER_INCONSISTENT_SYMPTOMS
-        elif src_health_status[ir] == i_not_healthy and not any_symptoms[ir]:
-            asmt_filter_status[ir] |= FILTER_INCONSISTENT_NO_SYMPTOMS
 
-    for f in (FILTER_INCONSISTENT_SYMPTOMS, FILTER_INCONSISTENT_NO_SYMPTOMS):
+    print(); print()
+    print("validate health status with symptoms")
+    print("---------------------------------")
+    fn = CheckInconsistentSymptoms(FILTER_HEALTHY_BUT_SYMPTOMS, FILTER_NOT_HEALTHY_BUT_NO_SYMPTOMS)
+    # TODO: keys should be got from the dataset once it is loaded rather than referring to the categorical maps directly
+    fn(asmt_dest_fields['health_status'], any_symptoms, asmt_filter_status,
+       categorical_maps['health_status'].strings_to_values['healthy'],
+       categorical_maps['health_status'].strings_to_values['not_healthy'])
+    for f in (FILTER_HEALTHY_BUT_SYMPTOMS, FILTER_NOT_HEALTHY_BUT_NO_SYMPTOMS):
         print(f'{assessment_flag_descs[f]}: {count_flag_set(asmt_filter_status, f)}')
 
-    print(); print('unfiltered assessments:', asmt_filter_status.count(0))
+    print(); print('unfiltered assessments:', np.count_nonzero(asmt_filter_status == 0))
+
 
     # validate assessments per patient
     print(); print()
@@ -589,7 +334,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     asmt_dest_fields['had_covid_test_clean'] = sanitised_hct_covid_results
     asmt_dest_keys['had_covid_test_clean'] = sanitised_covid_results_key
 
-    print('remaining assessments before squashing', asmt_filter_status.count(0))
+    print('remaining assessments before squashing', np.count_nonzero(asmt_filter_status == 0))
 
     # create a new assessment space with only unfiltered rows
     print(); print()
@@ -616,57 +361,6 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print("quantise assessments by day")
     print("---------------------------")
 
-    class CalculateMergedFieldCount:
-        def __init__(self, updated_ats):
-            self.updated_ats = updated_ats
-            self.merged_row_count = 0
-
-        def __call__(self, patient_id, filter_status, start, end):
-            for i in range(start + 1, end + 1):
-                last_date_str = self.updated_ats[i-1]
-                last_date = (last_date_str[0:4], last_date_str[5:7], last_date_str[8:10])
-                cur_date_str = self.updated_ats[i]
-                cur_date = (cur_date_str[0:4], cur_date_str[5:7], cur_date_str[8:10])
-                if last_date == cur_date:
-                    self.merged_row_count += 1
-
-
-    class MergeAssessmentRows:
-        def __init__(self, resulting_fields, created_fields, existing_field_indices):
-            print(created_fields.keys())
-            print(created_fields['tested_covid_positive_clean'].dtype, created_fields['tested_covid_positive_clean'])
-            print(resulting_fields['tested_covid_positive_clean'].dtype, resulting_fields['tested_covid_positive_clean'])
-            self.rfindex = 0
-            self.resulting_fields = resulting_fields
-            self.created_fields = created_fields
-            self.existing_field_indices = existing_field_indices
-
-        def populate_row(self, source_fields, source_index):
-            for e in self.existing_field_indices:
-                self.resulting_fields[e[0]][self.rfindex] = source_fields[e[1]][source_index]
-            for ck, cv in self.created_fields.items():
-                self.resulting_fields[ck][self.rfindex] =\
-                    max(self.resulting_fields[ck][self.rfindex], cv[source_index])
-
-        def __call__(self, fields, dummy, start, end):
-            # write the first row to the current resulting field index
-            prev_date_str = fields[3][start]
-            prev_date = (prev_date_str[0:4], prev_date_str[5:7], prev_date_str[8:10])
-            self.populate_row(fields, start)
-
-            for i in range(start + 1, end + 1):
-                cur_date_str = fields[3][i]
-                cur_date = (cur_date_str[0:4], cur_date_str[5:7], cur_date_str[8:10])
-                if cur_date != prev_date:
-                    self.rfindex += 1
-                if i % 1000000 == 0 and i > 0:
-                    print('.')
-                self.populate_row(fields, i)
-                prev_date = cur_date
-
-            # finally, update the resulting field index one more time
-            self.rfindex += 1
-
     fn = CalculateMergedFieldCount(remaining_asmt_fields[asmt_ds.field_to_index('updated_at')])
     print(len(filter_map))
     print(len(remaining_asmt_filter_status))
@@ -692,7 +386,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print('remaining_dest_len:', len(remaining_dest_fields['fatigue_binary']))
     print('resulting_fields:', len(resulting_fields['patient_id']))
 
-    print(build_histogram_from_list(remaining_dest_fields['tested_covid_positive_clean']))
+    print(build_histogram(remaining_dest_fields['tested_covid_positive_clean']))
     merge = MergeAssessmentRows(resulting_fields, remaining_dest_fields, existing_field_indices)
     iterate_over_patient_assessments(remaining_asmt_fields, remaining_asmt_filter_status, merge)
     print(merge.rfindex)
@@ -714,8 +408,8 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     for v in assessment_flag_descs.keys():
         print(f'{assessment_flag_descs[v]}: {count_flag_set(asmt_filter_status, v)}')
 
-    return (geoc_ds, geoc_fields, geoc_filter_status, ptnt_dest_fields,
-            asmt_ds, asmt_ds.fields_, asmt_filter_status,
+    return (geoc_ds, geoc_filter_status, ptnt_dest_fields,
+            asmt_ds, asmt_filter_status,
             remaining_asmt_fields, remaining_asmt_filter_status,
             resulting_fields, resulting_field_keys)
 
@@ -785,8 +479,6 @@ def regression_test_assessments(old_assessments, new_assessments):
         #         print(r, treatment)
 
 
-    # r_a_fields = sorted(r_a_fields, key=lambda r: (r[2], r[4]))
-    # p_a_fields = sorted(p_a_fields, key=lambda p: (p[1], p[3]))
     r_a_ds.sort(('patient_id', 'updated_at'))
     p_a_ds.sort(('patient_id', 'updated_at'))
 
@@ -868,8 +560,8 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema
 
     categorical_maps = data_schema.assessment_categorical_maps
 
-    p_ds, p_fields, p_status, p_dest_fields,\
-    a_ds, a_fields, a_status, ra_fields, ra_status, res_fields, res_keys \
+    p_ds, p_status, p_dest_fields,\
+    a_ds, a_status, ra_fields, ra_status, res_fields, res_keys \
         = pipeline_output
     remaining_patients = set()
     for p in res_fields['patient_id']:
@@ -888,7 +580,7 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema
         csvw.writerow(p_ds.names_ + dest_keys)
         for ir in range(p_ds.row_count()):
             if p_status[ir] == 0:
-                for iv, v in enumerate(p_fields):
+                for iv, v in enumerate(p_ds.fields_):
                     values[iv] = v[ir]
                 for iv in range(len(dest_keys)):
                     values[len(p_ds.names_) + iv] = p_dest_fields[dest_keys[iv]][ir]
@@ -947,13 +639,13 @@ if __name__ == '__main__':
                         help='the location and name of the output assessment data csv file')
     parser.add_argument('-ps', '--parsing_schema', default=1, type=int,
                         help='the schema number to use for parsing and cleaning data')
+    parser.add_argument('-y', '--year', default=datetime.datetime.now().year, type=int)
     args = parser.parse_args()
 
     if args.parsing_schema not in parsing_schemas.parsing_schemas:
         error_str = "the parsing schema must be one of {} for this version"
         print(error_str.format(parsing_schemas.parsing_schemas))
         exit(-1)
-
 
     if args.regression_test:
         regression_test_assessments('assessments_cleaned_short.csv', args.assessment_data)
@@ -967,7 +659,7 @@ if __name__ == '__main__':
         parsing_schema_version = args.parsing_schema
         parsing_schema = parsing_schemas.ParsingSchema(parsing_schema_version)
         pipeline_output = pipeline(args.patient_data, args.assessment_data,
-                                   data_schema, parsing_schema,
+                                   data_schema, parsing_schema, args.year,
                                    territory=args.territory)
         print(f'cleaning completed in {time.time() - tstart} seconds')
 

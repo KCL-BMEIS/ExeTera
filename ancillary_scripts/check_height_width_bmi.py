@@ -16,6 +16,7 @@ import dataset
 import data_schemas
 import parsing_schemas
 import pipeline
+import processing.weight_height_bmi
 import regression
 import utils
 
@@ -78,7 +79,7 @@ data_schema = data_schemas.DataSchema(1)
 yob = ds.field_by_name('year_of_birth')
 for ir in range(ds.row_count()):
     if yob[ir] == '' or\
-       int(float(yob[ir])) < pipeline.MIN_YOB or int(float(yob[ir])) > pipeline.MAX_YOB:
+       int(float(yob[ir])) < pipeline.MIN_AGE or int(float(yob[ir])) > pipeline.MAX_AGE:
         filter_status[ir] |= 0x1000
 
 src_genders = ds.field_by_name('gender')
@@ -187,7 +188,7 @@ if compare_schemas:
     weight_clean_2, height_clean_2, bmi_clean_2 =\
         fn_2(src_weights, src_heights, src_bmis, filter_status)
 
-    histogram = pipeline.build_histogram_from_list(filter_status)
+    histogram = utils.build_histogram(filter_status)
     histogram = sorted(histogram, key=lambda x: x[0])
 
     print('no flag,', 'first,', 'second,', 'both')
@@ -211,7 +212,7 @@ if compare_schemas:
 
     print(np.count_nonzero(filter_status & 0x8 != 0))
 else:
-    fn_fac_3 = parsing_schemas.ValidateHeight3
+    fn_fac_3 = processing.weight_height_bmi.ValidateHeight3
     fn_3 = fn_fac_3(pipeline.MIN_WEIGHT, pipeline.MAX_WEIGHT,
                     pipeline.MIN_HEIGHT, pipeline.MAX_HEIGHT,
                     pipeline.MIN_BMI, pipeline.MAX_BMI,
