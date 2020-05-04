@@ -30,6 +30,37 @@ def patient_splitter(input_filename, output_filenames, output_ranges):
                 start = 0 if subset == 0 else output_ranges[subset - 1]
                 print(f"complete: {rows_parsed - start}")
 
+def patient_splitter_2(input_filename, output_filenames, sorted_indices, bucket_size):
+    ch_del = ','
+    ch_quote = '"'
+    rows_parsed = 0
+    with open(input_filename) as f_i:
+        csvr = csv.reader(f_i, delimiter=ch_del, quotechar=ch_quote)
+
+        keys = next(csvr)
+
+        input_rows = list()
+        for r in csvr:
+            input_rows.append(r)
+
+    remaining_rows = len(input_rows)
+
+    accumulated = 0
+    for ofn in output_filenames:
+        with open(ofn, 'w') as f_o:
+            print("writing", ofn)
+            csvw = csv.writer(f_o, delimiter=ch_del, quotechar=ch_quote)
+
+            csvw.writerow(keys)
+
+            for i_r in range(min(bucket_size, remaining_rows)):
+                ind = sorted_indices[accumulated + i_r]
+                csvw.writerow(input_rows[ind])
+            accumulated += bucket_size
+            remaining_rows -= bucket_size
+
+
+
 
 def assessment_splitter(input_filename, output_filename, assessment_buckets, bucket):
     ch_del = ','
@@ -92,10 +123,10 @@ def split_data(patient_data, assessment_data, bucket_size=500000):
         destination_filename = patient_data[:-4] + f"_{b:04d}" + ".csv"
         filenames.append(destination_filename)
     print(filenames)
+    sorted_indices = p_ds.index_
     del p_ds
 
-
-    patient_splitter(patient_data, filenames, ranges)
+    patient_splitter_2(patient_data, filenames, sorted_indices, bucket_size)
 
     print('buckets:', bucket_index)
     with open(assessment_data) as f:
