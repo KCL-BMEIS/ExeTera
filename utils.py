@@ -12,7 +12,7 @@
 from collections.__init__ import defaultdict
 
 import numpy as np
-from numba import jit, prange
+# from numba import jit, prange
 
 
 def count_flag_empty(flags):
