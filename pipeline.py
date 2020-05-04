@@ -198,17 +198,19 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
 
     print()
     print('checking weight / height / bmi')
+    src_genders = geoc_ds.field_by_name('gender')
     src_weights = geoc_ds.field_by_name('weight_kg')
     src_heights = geoc_ds.field_by_name('height_cm')
     src_bmis = geoc_ds.field_by_name('bmi')
 
     fn_fac = parsing_schema.class_entries['validate_weight_height_bmi']
     fn = fn_fac(MIN_WEIGHT, MAX_WEIGHT, MIN_HEIGHT, MAX_HEIGHT, MIN_BMI, MAX_BMI,
+                FILTER_MISSING_AGE, FILTER_BAD_AGE,
                 FILTER_MISSING_WEIGHT, FILTER_BAD_WEIGHT,
                 FILTER_MISSING_HEIGHT, FILTER_BAD_HEIGHT,
                 FILTER_MISSING_BMI, FILTER_BAD_BMI)
     weight_clean, height_clean, bmi_clean =\
-        fn(src_weights, src_heights, src_bmis, geoc_filter_status)
+        fn(src_genders, ages, src_weights, src_heights, src_bmis, geoc_filter_status)
     ptnt_dest_fields['weight_clean'] = weight_clean
     ptnt_dest_fields['height_clean'] = height_clean
     ptnt_dest_fields['bmi_clean'] = bmi_clean

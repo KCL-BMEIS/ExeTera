@@ -7,6 +7,7 @@ import numba
 import dataset
 import pipeline
 import data_schemas
+import utils
 
 from utils import count_flag_set
 
@@ -54,6 +55,7 @@ count_flag_set = timed_fn(count_flag_set)
 with open('/home/ben/covid/patients_export_geocodes_20200428050002.csv') as f:
     p_ds = dataset.Dataset(f, keys=['id', 'year_of_birth', 'weight_kg', 'height_cm', 'bmi'],
                            progress=True)
+                           # Sureprogress=True, stop_after=1000000)
 
 p_filter_flags = np.zeros(p_ds.row_count(), dtype=np.uint32)
 
@@ -83,19 +85,53 @@ for name, value in p_fields_to_check:
 print('combined:', count_flag_set(p_filter_flags, 0xffff))
 
 p_ids = p_ds.field_by_name('id')
-filtered_patients = set()
+filtered_patients = dict()
 for i_f, f in enumerate(p_filter_flags):
     if f != 0:
-        filtered_patients.add(p_ids[i_f])
+        filtered_patients[p_ids[i_f]] = None
+
 
 with open('/home/ben/covid/assessments_export_20200428050002.csv') as f:
-    a_ds = dataset.Dataset(f, keys=['id', 'patient_id'], progress=True)
+    a_ds = dataset.Dataset(f, keys=['id', 'patient_id', 'updated_at'],
+                           progress=True)
+                           # progress=True, stop_after=1000000)
 
 a_pids = a_ds.field_by_name('patient_id')
+a_updateds = a_ds.field_by_name('updated_at')
+
+
+class AsmtEntry:
+    def __init__(self, day):
+        self.u = day
+        self.c = 1
+    def add(self, day):
+        self.u = max(self.u, day)
+        self.c += 1
 
 assessment_filter_count = 0
 for i_p, p in enumerate(a_pids):
     if p in filtered_patients:
         assessment_filter_count += 1
+        day = utils.timestamp_to_day(a_updateds[i_p])
+        if filtered_patients[p] is None:
+            filtered_patients[p] = AsmtEntry(day)
+        else:
+            filtered_patients[p].add(day)
 
+updated_ats = [v.u for v in filtered_patients.values() if v is not None]
+asmt_counts = [v.c for v in filtered_patients.values() if v is not None]
+# print(updated_ats)
+h_updated_ats = sorted(utils.build_histogram(updated_ats))
+print(h_updated_ats)
+sumv = 0
+for h in h_updated_ats:
+    sumv += h[1]
+    print(h[0], 31310 - sumv)
+print(sumv)
+
+h_asmt_counts = sorted(utils.build_histogram(asmt_counts))
+# print(h_asmt_counts)
+print(assessment_filter_count - sumv)
+for h in h_asmt_counts:
+    print(h[0], h[1])
 print('assessments filtered by patient_filtering:', assessment_filter_count)

@@ -19,6 +19,7 @@ import pipeline
 import processing.weight_height_bmi
 import regression
 import utils
+from processing.age_from_year_of_birth import CalculateAgeFromYearOfBirth
 
 def value_ranges():
     lbs_to_kgs = 0.453592
@@ -65,8 +66,8 @@ filename = '/home/ben/covid/patients_export_geocodes_20200428050002.csv'
 print(f"loading {filename}")
 with open(filename) as f:
     ds = dataset.Dataset(f, keys=['id', 'created_at', 'updated_at', 'gender', 'height_cm', 'weight_kg', 'bmi', 'year_of_birth'],
-                         progress=True)
-                         # progress=True, stop_after=10000)
+                         # progress=True)
+                         progress=True, stop_after=100000)
 print('loaded')
 
 #ds.sort(('patient_id', 'updated_at'))
@@ -76,17 +77,25 @@ filter_status = np.zeros(ds.row_count(), dtype=np.uint32)
 data_schema = data_schemas.DataSchema(1)
 
 
-yob = ds.field_by_name('year_of_birth')
-for ir in range(ds.row_count()):
-    if yob[ir] == '' or\
-       int(float(yob[ir])) < pipeline.MIN_AGE or int(float(yob[ir])) > pipeline.MAX_AGE:
-        filter_status[ir] |= 0x1000
 
 src_genders = ds.field_by_name('gender')
 src_yobs = ds.field_by_name('year_of_birth')
 src_weights = ds.field_by_name('weight_kg')
 src_heights = ds.field_by_name('height_cm')
 src_bmis = ds.field_by_name('bmi')
+
+
+# ages
+age_fn = CalculateAgeFromYearOfBirth(0x1, 0x2, utils.valid_range_fac_inc(0, 90), 2020)
+ages = np.zeros(len(src_yobs), dtype=np.uint32)
+age_fn(src_yobs, ages, filter_status)
+
+print(sorted(utils.build_histogram(ages)))
+
+# gender check
+print('gender:', utils.build_histogram(src_genders))
+
+
 cast_weights = [-1.0 if v == '' else float(v) for v in src_weights]
 bins = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
         10, 20, 30, 32, 34, 36, 38, 40, 50, 60, 70, 80, 90,
@@ -175,7 +184,7 @@ if compare_schemas:
                     0x1, 0x4, 0x10, 0x40, 0x100, 0x400)
 
     weight_clean_1, height_clean_1, bmi_clean_1 =\
-        fn_1(src_weights, src_heights, src_bmis, filter_status)
+        fn_1(src_genders, ages, src_weights, src_heights, src_bmis, filter_status)
 
     parsing_schema_2 = parsing_schemas.ParsingSchema(2)
 
@@ -186,7 +195,7 @@ if compare_schemas:
                     0x2, 0x8, 0x20, 0x80, 0x200, 0x800)
 
     weight_clean_2, height_clean_2, bmi_clean_2 =\
-        fn_2(src_weights, src_heights, src_bmis, filter_status)
+        fn_2(src_genders, ages, src_weights, src_heights, src_bmis, filter_status)
 
     histogram = utils.build_histogram(filter_status)
     histogram = sorted(histogram, key=lambda x: x[0])
@@ -216,10 +225,10 @@ else:
     fn_3 = fn_fac_3(pipeline.MIN_WEIGHT, pipeline.MAX_WEIGHT,
                     pipeline.MIN_HEIGHT, pipeline.MAX_HEIGHT,
                     pipeline.MIN_BMI, pipeline.MAX_BMI,
-                    0x1, 0x4, 0x10, 0x40, 0x100, 0x400)
+                    0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80)
 
     weight_clean_3, height_clean_3, bmi_clean_3 = \
-        fn_3(src_genders, src_yobs, src_weights, src_heights, src_bmis, filter_status)
+        fn_3(src_genders, ages, src_weights, src_heights, src_bmis, filter_status)
 
 # for i in range(1000):
 #     r = ds.fields_[i]

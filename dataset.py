@@ -23,7 +23,7 @@ class Dataset:
     keys: a list of field names that represent the fields you wish to load and in what order they
           should be put. Leaving this blankloads all of the keys in csv column order
     """
-    def __init__(self, source, field_descriptors=None, keys=None, progress=False, stop_after=None):
+    def __init__(self, source, field_descriptors=None, keys=None, filter_fn= None, progress=False, stop_after=None):
         self.names_ = list()
         self.fields_ = list()
         self.names_ = list()
@@ -73,18 +73,24 @@ class Dataset:
         # read the cvs rows into the fields
         csvf = csv.reader(source, delimiter=',', quotechar='"')
         ecsvf = iter(csvf)
+        filtered_count = 0
         for i_r, row in enumerate(ecsvf):
-            # for i_f, f in enumerate(fields):
-            for i_df, i_f in enumerate(index_map):
-                f = row[i_f]
-                t = transforms_by_index[i_f]
-                new_fields[i_df].append(f if not t else t.strings_to_values[f])
-            del row
             if progress:
                 if i_r % 100000 == 0:
-                    print(i_r)
-            if stop_after and i_r >= stop_after:
-                break
+                    if filtered_count == i_r:
+                        print(i_r)
+                    else:
+                        print(f"{i_r} ({filtered_count})")
+            if not filter_fn or filter_fn(i_r):
+                # for i_f, f in enumerate(fields):
+                for i_df, i_f in enumerate(index_map):
+                    f = row[i_f]
+                    t = transforms_by_index[i_f]
+                    new_fields[i_df].append(f if not t else t.strings_to_values[f])
+                del row
+                filtered_count += 1
+                if stop_after and i_r >= stop_after:
+                    break
         if progress:
             print(i_r)
 

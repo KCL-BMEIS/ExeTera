@@ -17,6 +17,7 @@ class ValidateHeight1:
                  min_weight_inc, max_weight_inc,
                  min_height_inc, max_height_inc,
                  min_bmi_inc, max_bmi_inc,
+                 f_missing_age, f_bad_age,
                  f_missing_weight, f_bad_weight,
                  f_missing_height, f_bad_height,
                  f_missing_bmi, f_bad_bmi):
@@ -27,6 +28,8 @@ class ValidateHeight1:
         self.min_bmi_inc = min_bmi_inc
         self.max_bmi_inc = max_bmi_inc
 
+        self.f_missing_age = f_missing_age
+        self.f_bad_age = f_bad_age
         self.f_missing_weight = f_missing_weight
         self.f_bad_weight = f_bad_weight
         self.f_missing_height = f_missing_height
@@ -41,7 +44,7 @@ class ValidateHeight1:
     def valid(self, value):
         return self.min_height_inc <= value <= self.max_height_inc
 
-    def __call__(self, weights, heights, bmis, filter_list):
+    def __call__(self, dummy_sexes, dummy_ages, weights, heights, bmis, filter_list):
         if len(weights) != len(heights):
             raise ValueError("'weights' and 'heights' are different lengths")
         if len(weights) != len(bmis):
@@ -88,6 +91,7 @@ class ValidateHeight2:
                  min_weight_inc, max_weight_inc,
                  min_height_inc, max_height_inc,
                  min_bmi_inc, max_bmi_inc,
+                 f_missing_age, f_bad_age,
                  f_missing_weight, f_bad_weight,
                  f_missing_height, f_bad_height,
                  f_missing_bmi, f_bad_bmi):
@@ -98,6 +102,8 @@ class ValidateHeight2:
         self.min_bmi_inc = min_bmi_inc
         self.max_bmi_inc = max_bmi_inc
 
+        self.f_missing_age = f_missing_age
+        self.f_bad_age = f_bad_age
         self.f_missing_weight = f_missing_weight
         self.f_bad_weight = f_bad_weight
         self.f_missing_height = f_missing_height
@@ -120,7 +126,7 @@ class ValidateHeight2:
     def valid(self, value):
         return self.min_height_inc <= value <= self.max_height_inc
 
-    def __call__(self, weights, heights, bmis, filter_list):
+    def __call__(self, sexes, ages, weights, heights, bmis, filter_list):
         if len(weights) != len(heights):
             raise ValueError("'weights' and 'heights' are different lengths")
         if len(weights) != len(bmis):
@@ -189,6 +195,7 @@ class ValidateHeight3:
                  min_weight_inc, max_weight_inc,
                  min_height_inc, max_height_inc,
                  min_bmi_inc, max_bmi_inc,
+                 f_missing_age, f_bad_age,
                  f_missing_weight, f_bad_weight,
                  f_missing_height, f_bad_height,
                  f_missing_bmi, f_bad_bmi):
@@ -199,6 +206,8 @@ class ValidateHeight3:
         self.min_bmi_inc = min_bmi_inc
         self.max_bmi_inc = max_bmi_inc
 
+        self.f_missing_age = f_missing_age
+        self.f_bad_age = f_bad_age
         self.f_missing_weight = f_missing_weight
         self.f_bad_weight = f_bad_weight
         self.f_missing_height = f_missing_height
@@ -255,14 +264,25 @@ class ValidateHeight3:
                                     (58.0, 70.3)]
 
         self.mean_height_mults = (1.0, 1.0)
-        min_height_mult = 110 / self.mean_heights_by_age[-1][1]
-        max_height_mult = 220 / self.mean_heights_by_age[-1][1]
-        self.min_height_mults = (self.mean_heights_by_age[-1][0] * min_height_mult,
-                                 self.mean_heights_by_age[-1][1] * min_height_mult)
-        self.max_height_mults = (self.mean_heights_by_age[-1][0] * max_height_mult,
-                                 self.mean_heights_by_age[-1][1] * max_height_mult)
-        print('max_height_mults =', self.max_height_mults)
-        print('min_height_mults =', self.min_height_mults)
+        self.min_height_mult = self.min_height_inc / self.mean_heights_by_age[-1][1]
+        self.max_height_mult = self.max_height_inc / self.mean_heights_by_age[-1][1]
+        # self.min_height_mults = (self.mean_heights_by_age[-1][0] * min_height_mult,
+        #                          self.mean_heights_by_age[-1][1] * min_height_mult)
+        # self.max_height_mults = (self.mean_heights_by_age[-1][0] * max_height_mult,
+        #                          self.mean_heights_by_age[-1][1] * max_height_mult)
+        # print('max_height_mults =', self.max_height_mults)
+        # print('min_height_mults =', self.min_height_mults)
+        
+        self.mean_weight_mults = (1.0, 1.0)
+        self.min_weight_mult = self.min_weight_inc / self.mean_weights_by_age[-1][1]
+        self.max_weight_mult = self.max_weight_inc / self.mean_weights_by_age[-1][1]
+        # self.min_weight_mults = (self.mean_weights_by_age[-1][0] * min_weight_mult,
+        #                          self.mean_weights_by_age[-1][1] * min_weight_mult)
+        # self.max_weight_mults = (self.mean_weights_by_age[-1][0] * max_weight_mult,
+        #                          self.mean_weights_by_age[-1][1] * max_weight_mult)
+        # print('max_weight_mults =', self.max_weight_mults)
+        # print('min_weight_mults =', self.min_weight_mults)
+
         # self.kgs_per_stone = 6.35029
         # self.kgs_per_lb = 0.453592
         # self.stones_per_kg = 1 / self.kgs_per_stone
@@ -274,11 +294,52 @@ class ValidateHeight3:
         self.weight_kg_clean = None
         self.height_cm_clean = None
         self.bmi_clean = None
+        
+    def _height_limits(self, gender, age):
+        if gender == '0.0':
+            # min_height = self.min_height_mults[0] * self.mean_heights_by_age[age][0]
+            # max_height = self.max_height_mults[0] * self.mean_heights_by_age[age][0]
+            min_height = self.min_height_mult * self.mean_heights_by_age[age][0]
+            max_height = self.max_height_mult * self.mean_heights_by_age[age][0]
+        elif gender == '1.0':
+            # min_height = self.min_height_mults[1] * self.mean_heights_by_age[age][1]
+            # max_height = self.max_height_mults[1] * self.mean_heights_by_age[age][1]
+            min_height = self.min_height_mult * self.mean_heights_by_age[age][1]
+            max_height = self.max_height_mult * self.mean_heights_by_age[age][1]
+        else:
+            # min_height = \
+            #     (self.min_height_mults[0] + self.min_height_mults[1]) * 0.5 *\
+            #     (self.mean_heights_by_age[age][0] + self.mean_heights_by_age[age][1]) * 0.5
+            # max_height = \
+            #     (self.max_height_mults[0] + self.max_height_mults[1]) * 0.5 *\
+            #     (self.mean_heights_by_age[age][0] + self.mean_heights_by_age[age][1]) * 0.5
+            min_height = self.min_height_mult *\
+                (self.mean_heights_by_age[age][0] + self.mean_heights_by_age[age][1]) * 0.5
+            max_height = \
+                self.max_height_mult *\
+                (self.mean_heights_by_age[age][0] + self.mean_heights_by_age[age][1]) * 0.5
+        return min_height, max_height
+
+    def _weight_limits(self, gender, age):
+        if gender == '0.0':
+            min_weight = self.min_weight_mult * self.mean_weights_by_age[age][0]
+            max_weight = self.max_weight_mult * self.mean_weights_by_age[age][0]
+        elif gender == '1.0':
+            min_weight = self.min_weight_mult * self.mean_weights_by_age[age][1]
+            max_weight = self.max_weight_mult * self.mean_weights_by_age[age][1]
+        else:
+            min_weight = \
+                self.min_weight_mult *\
+                (self.mean_weights_by_age[age][0] + self.mean_weights_by_age[age][1]) * 0.5
+            max_weight = \
+                self.max_weight_mult *\
+                (self.mean_weights_by_age[age][0] + self.mean_weights_by_age[age][1]) * 0.5
+        return min_weight, max_weight
 
     def _in_range(self, minv, maxv, v):
         return minv <= v <= maxv
 
-    def __call__(self, sexes, yobs, weights, heights, bmis, filter_list):
+    def __call__(self, sexes, ages, weights, heights, bmis, filter_list):
         if len(weights) != len(heights):
             raise ValueError("'weights' and 'heights' are different lengths")
         if len(weights) != len(bmis):
@@ -289,21 +350,27 @@ class ValidateHeight3:
 
         under_16 = 0
         missing_height_count = 0
+        missing_weight_count = 0
         valid_heights = 0
+        valid_weights = 0
         height_alternatives_histogram = [0, 0, 0, 0, 0]
+        weight_alternatives_histogram = [0, 0, 0]
         height_units_histogram = {'none': 0, 'm': 0, 'ft': 0, 'in': 0, 'cm': 0, 'mm': 0}
+        weight_units_histogram = {'none': 0, 'st': 0, 'kg': 0, 'lb': 0}
         for ir in range(len(heights)):
-            if yobs[ir] is not '' and int(float(yobs[ir])) > 2004:
-                under_16 += 1
-                continue
+            if filter_list[ir] & (self.f_missing_age | self.f_bad_age):
+                age = len(self.mean_heights_by_age) - 1
+            else:
+                age = min(ages[ir], len(self.mean_heights_by_age) - 1)
 
             missing_height = False
             if heights[ir] == '':
                 missing_height = True
                 missing_height_count += 1
             else:
+                min_height, max_height = self._height_limits(sexes[ir], age)
                 height_cm = float(heights[ir])
-                height_cm_valid = self._in_range(self.min_height_inc, self.max_height_inc, height_cm)
+                height_cm_valid = self._in_range(min_height, max_height, height_cm)
                 if height_cm_valid:
                     valid_heights += 1
                     height_units_histogram['cm'] += 1
@@ -311,84 +378,99 @@ class ValidateHeight3:
                 else:
                     valid_alternatives = 0
                     height_m = height_cm * self.m_to_cm
-                    height_m_valid = self._in_range(self.min_height_inc, self.max_height_inc, height_m)
+                    height_m_valid = self._in_range(min_height, max_height, height_m)
                     if height_m_valid:
                         valid_alternatives += 1
                         height_units_histogram['m'] += 1
                     height_ft = height_cm * self.ft_to_cm
-                    height_ft_valid = self._in_range(self.min_height_inc, self.max_height_inc, height_ft)
+                    height_ft_valid = self._in_range(min_height, max_height, height_ft)
                     if height_ft_valid:
                         valid_alternatives += 1
                         height_units_histogram['ft'] += 1
                     height_in = height_cm * self.in_to_cm
-                    height_in_valid = self._in_range(self.min_height_inc, self.max_height_inc, height_in)
+                    height_in_valid = self._in_range(min_height, max_height, height_in)
                     if height_in_valid:
                         valid_alternatives += 1
                         height_units_histogram['in'] += 1
                     height_mm = height_cm * self.mm_to_cm
-                    height_mm_valid = self._in_range(self.min_height_inc, self.max_height_inc, height_mm)
+                    height_mm_valid = self._in_range(min_height, max_height, height_mm)
                     if height_mm_valid:
                         valid_alternatives += 1
                         height_units_histogram['mm'] += 1
                     height_alternatives_histogram[valid_alternatives] += 1
                     if valid_alternatives == 0:
                         height_units_histogram['none'] += 1
+                        
+            missing_weight = False
+            if weights[ir] == '':
+                missing_weight = True
+                missing_weight_count += 1
+            else:
+                min_weight, max_weight = self._weight_limits(sexes[ir], age)
+                weight_kg = float(weights[ir])
+                weight_kg_valid = self._in_range(min_weight, max_weight, weight_kg)
+                if weight_kg_valid:
+                    valid_weights += 1
+                    weight_units_histogram['kg'] += 1
+
         print('under_16 =', under_16)
         print('missing height count =', missing_height_count)
         print('valid heights =', valid_heights)
         print('valid alternatives =', height_alternatives_histogram)
         print('height units histogram =', height_units_histogram)
 
-        for ir in range(len(weights)):
-            if weights[ir] == '':
-                if self.f_missing_weight != 0:
-                    filter_list[ir] |= self.f_missing_weight
-            else:
-                weight_clean = float(weights[ir])
-                if weight_clean < 25:
-                    weight_clean *= self.kgs_per_stone
-                elif 150 <= weight_clean < 300:
-                    weight_clean *= self.kgs_per_lb
-                elif 300 <= weight_clean < 450:
-                    weight_clean *= self.stones_per_kg
-                elif 450 <= weight_clean < 1500:
-                    weight_clean *= 0.1
-                # second pass on partially sanitised figure
-                if 450 <= weight_clean < 600:
-                    weight_clean *= self.stones_per_kg
-
-                if weight_clean < self.min_weight_inc or weight_clean > self.max_weight_inc:
-                    filter_list[ir] |= self.f_bad_weight
-                else:
-                    self.weight_kg_clean[ir] = weight_clean
-
-            if heights[ir] == '':
-                if self.f_missing_height != 0:
-                    filter_list[ir] |= self.f_missing_height
-            else:
-                height_clean = float(heights[ir])
-                if height_clean < 2.4:
-                    height_clean *= 100
-                elif height_clean < 7.4:
-                    height_clean *= self.cms_per_foot
-                elif height_clean > 4000:
-                    height_clean *= self.feet_per_cm
-
-                if height_clean < self.min_height_inc or height_clean > self.max_height_inc:
-                    filter_list[ir] |= self.f_bad_height
-                else:
-                    self.height_cm_clean[ir] = height_clean
-
-                # Cleaning up bmi
-                if weights[ir] == '' or heights[ir] == '' or height_clean == 0.0:
-                    if self.f_missing_bmi != 0:
-                        filter_list[ir] |= self.f_missing_bmi
-                else:
-                    bmi_clean = weight_clean / ((height_clean / 100) ** 2)
-
-                    if bmi_clean < self.min_bmi_inc or bmi_clean > self.max_bmi_inc:
-                        filter_list[ir] |= self.f_bad_bmi
-                    else:
-                        self.bmi_clean[ir] = bmi_clean
+        # OLD
+        # for ir in range(len(weights)):
+        #     if weights[ir] == '':
+        #         if self.f_missing_weight != 0:
+        #             filter_list[ir] |= self.f_missing_weight
+        #     else:
+        #         min_weight, max_weight = self._weight_limits(sexes[ir], age)
+        #         weight_clean = float(weights[ir])
+        #         if weight_clean < 25:
+        #             weight_clean *= self.kgs_per_stone
+        #         elif 150 <= weight_clean < 300:
+        #             weight_clean *= self.kgs_per_lb
+        #         elif 300 <= weight_clean < 450:
+        #             weight_clean *= self.stones_per_kg
+        #         elif 450 <= weight_clean < 1500:
+        #             weight_clean *= 0.1
+        #         # second pass on partially sanitised figure
+        #         if 450 <= weight_clean < 600:
+        #             weight_clean *= self.stones_per_kg
+        # 
+        #         if weight_clean < self.min_weight_inc or weight_clean > self.max_weight_inc:
+        #             filter_list[ir] |= self.f_bad_weight
+        #         else:
+        #             self.weight_kg_clean[ir] = weight_clean
+        # 
+        #     if heights[ir] == '':
+        #         if self.f_missing_height != 0:
+        #             filter_list[ir] |= self.f_missing_height
+        #     else:
+        #         height_clean = float(heights[ir])
+        #         if height_clean < 2.4:
+        #             height_clean *= 100
+        #         elif height_clean < 7.4:
+        #             height_clean *= self.cms_per_foot
+        #         elif height_clean > 4000:
+        #             height_clean *= self.feet_per_cm
+        # 
+        #         if height_clean < self.min_height_inc or height_clean > self.max_height_inc:
+        #             filter_list[ir] |= self.f_bad_height
+        #         else:
+        #             self.height_cm_clean[ir] = height_clean
+        # 
+        #         # Cleaning up bmi
+        #         if weights[ir] == '' or heights[ir] == '' or height_clean == 0.0:
+        #             if self.f_missing_bmi != 0:
+        #                 filter_list[ir] |= self.f_missing_bmi
+        #         else:
+        #             bmi_clean = weight_clean / ((height_clean / 100) ** 2)
+        # 
+        #             if bmi_clean < self.min_bmi_inc or bmi_clean > self.max_bmi_inc:
+        #                 filter_list[ir] |= self.f_bad_bmi
+        #             else:
+        #                 self.bmi_clean[ir] = bmi_clean
 
         return self.weight_kg_clean, self.height_cm_clean, self.bmi_clean
