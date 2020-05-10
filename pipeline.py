@@ -29,7 +29,7 @@ from processing.inconsistent_testing import CheckTestingConsistency
 
 from utils import count_flag_empty, count_flag_set, build_histogram, map_between_categories, \
     to_categorical, print_diagnostic_row, valid_range_fac_inc, iterate_over_patient_assessments, \
-    iterate_over_patient_assessments2, datetime_to_seconds
+    iterate_over_patient_assessments2, datetime_to_seconds, concatenate_maybe_strs
 
 
 def copy_field(field):
@@ -123,42 +123,49 @@ flattened_fields = [("fatigue", "fatigue_binary"), ("shortness_of_breath", "shor
 exposure_fields = ["always_used_shortage", "have_used_PPE", "never_used_shortage", "sometimes_used_shortage",
                    "treated_patients_with_covid"]
 miscellaneous_fields = ['health_status', 'location', 'level_of_isolation', 'had_covid_test', 'tested_covid_positive']
+existing_fields = ('id', 'patient_id', 'created_at', 'updated_at', 'version',
+                   'country_code', 'treatment', 'other_symptoms')
+custom_field_aggregators = {
+    'treatment': concatenate_maybe_strs,
+    'other_symptoms': concatenate_maybe_strs
+}
 
 
 def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema, year, territory=None):
 
     categorical_maps = data_schema.assessment_categorical_maps
     # TODO: use proper logging throughout
-    print(); print();
+    print(); print()
     print('load patients')
-    print('-------------')
+    print('=============')
     with open(patient_filename) as f:
         geoc_ds = dataset.Dataset(f, data_schema.patient_categorical_maps, progress=True)
+    print("sorting patients")
     geoc_ds.sort(('id',))
     geoc_ds.show()
+    print("patient row count:", geoc_ds.row_count())
 
 
     print(); print()
     print('load assessments')
-    print('----------------')
+    print('================')
     with open(assessment_filename) as f:
         asmt_ds = dataset.Dataset(f, data_schema.assessment_categorical_maps, progress=True)
-    print('sorting patient ids')
+    print('sorting assessments')
     asmt_ds.sort(('patient_id', 'updated_at'))
     asmt_ds.show()
+    print("assessment row count:", asmt_ds.row_count())
 
 
     print(); print()
     print("pre-sort by patient id")
-    print("----------------------")
+    print("======================")
 
     print("pre-sort patient data")
     geoc_filter_status = np.zeros(geoc_ds.row_count(), dtype=np.uint32)
-    print("geoc field count:", geoc_ds.row_count())
 
     print(); print("pre-sort assessment data")
     asmt_filter_status = np.zeros(asmt_ds.row_count(), dtype=np.uint32)
-    print("asmt field count:", asmt_ds.row_count())
 
     if territory is not None:
         print(); print();
@@ -322,7 +329,6 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     fn_fac = parsing_schema.class_entries['clean_covid_progression']
     fn = fn_fac(asmt_ds.field_by_name('had_covid_test'), asmt_ds.field_by_name('tested_covid_positive'),
                 asmt_filter_status,
-                sanitised_covid_results_key,
                 sanitised_hct_covid_results, sanitised_covid_results,
                 FILTER_INVALID_COVID_PROGRESSION)
     iterate_over_patient_assessments2(
@@ -371,8 +377,6 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     remaining_asmt_row_count = len(filter_map) - fn.merged_row_count
     print(f'{len(filter_map)} - {fn.merged_row_count} = {remaining_asmt_row_count}')
 
-    existing_fields = ('id', 'patient_id', 'created_at', 'updated_at', 'version',
-                       'country_code')
     existing_field_indices = [(f, asmt_ds.field_to_index(f)) for f in existing_fields]
 
     resulting_fields = dict()
@@ -389,7 +393,11 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print('resulting_fields:', len(resulting_fields['patient_id']))
 
     print(build_histogram(remaining_dest_fields['tested_covid_positive_clean']))
-    merge = MergeAssessmentRows(resulting_fields, remaining_dest_fields, existing_field_indices)
+    concat_field_indices =\
+        [asmt_ds.field_to_index('other_symptoms'), asmt_ds.field_to_index('treatment')]
+    merge = MergeAssessmentRows(concat_field_indices,
+                                resulting_fields, remaining_dest_fields,
+                                existing_field_indices, custom_field_aggregators)
     iterate_over_patient_assessments(remaining_asmt_fields, remaining_asmt_filter_status, merge)
     print(merge.rfindex)
 
@@ -437,7 +445,8 @@ def regression_test_assessments(old_assessments, new_assessments):
 
     diagnostic_row_keys = ['id', 'patient_id', 'created_at', 'updated_at', 'health_status', 'fatigue', 'fatigue_binary', 'had_covid_test', 'tested_covid_positive']
     comparison_keys = diagnostic_row_keys
-    r_fns = {'created_at': datetime_to_seconds, 'updated_at': datetime_to_seconds}
+    r_fns = {'created_at': regression.datetime_compare_to_secs,
+             'updated_at': regression.datetime_compare_to_secs}
 
     patients_with_disparities = set()
     r = 0
@@ -450,7 +459,7 @@ def regression_test_assessments(old_assessments, new_assessments):
 
     p_ids = p_a_ds.field_by_name('id')
     p_pids = p_a_ds.field_by_name('patient_id')
-    p_upda = r_a_ds.field_by_name('day')
+    p_upda = p_a_ds.field_by_name('day')
     p_hct = p_a_ds.field_by_name('had_covid_test')
     p_tcp = p_a_ds.field_by_name('tested_covid_positive')
     while r < r_a_ds.row_count() and p < p_a_ds.row_count():
@@ -469,11 +478,11 @@ def regression_test_assessments(old_assessments, new_assessments):
             patients_with_disparities.add(p_pids[p])
             p += 1
         else:
-            r += 1
-            p += 1
-            disparities = regression.check_row(r_a_ds, r, p_a_ds, p, comparison_keys, dict())
+            disparities = regression.check_row(r_a_ds, r, p_a_ds, p, comparison_keys, r_fns)
             if disparities != None:
                 print(p_ids[p], ','.join(disparities))
+            r += 1
+            p += 1
 
         # if r < r_a_ds.row_count():
         #     treatment = r_a_fields[r_a_ds.field_to_index('treatment')][r]
@@ -628,6 +637,7 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument('--version', action='version', version='v0.1.9')
     parser.add_argument('-r', '--regression_test', action='store_true')
     parser.add_argument('-t', '--territory', default=None,
                         help='the territory to filter the dataset on (runs on all territories if not set)')
@@ -653,7 +663,6 @@ if __name__ == '__main__':
         regression_test_assessments('assessments_cleaned_short.csv', args.assessment_data)
         regression_test_patients('patients_cleaned_short.csv', args.patient_data)
     else:
-        print(); print(f'cleaning')
         tstart = time.time()
 
         data_schema_version = 1

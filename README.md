@@ -31,6 +31,10 @@ Proper documentation and packaging to follow
 
 ## Changes
 
+### v0.1.8 -> v0.1.9
+* Fix: added `treatments` and `other_symptoms` to cleaned assessment file. These fields are
+  concatenated during the merge step using ";"
+
 ### v0.1.7 -> v0.1.8
 * Fix: `had_covid_test` was not being patched up along with `tested_covid_positive`'
 * Breaking change: output fields renamed

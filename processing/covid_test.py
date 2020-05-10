@@ -68,7 +68,7 @@ class ValidateCovidTestResultsFacVersion1PreHCTFix:
 
 
 class ValidateCovidTestResultsFacVersion1:
-    def __init__(self, hcts, tcps, filter_status, results_key, hct_results, results, filter_flag, show_debug=False):
+    def __init__(self, hcts, tcps, filter_status, hct_results, results, filter_flag, show_debug=False):
         self.valid_transitions = {0: (0, 1, 2, 3), 1: (0, 1, 2, 3), 2: (0, 2), 3: (0, 3)}
         self.upgrades = {0: (0, 1, 2, 3), 1: (2, 3), 2: tuple(), 3: tuple()}
         self.hcts = hcts
@@ -142,7 +142,7 @@ class ValidateCovidTestResultsFacVersion1:
 
 
 class ValidateCovidTestResultsFacVersion2:
-    def __init__(self, tcps, filter_status, results_key, results, filter_flag, show_debug=False):
+    def __init__(self, hcts, tcps, filter_status, results, filter_flag, show_debug=False):
         self.valid_transitions = {0: (0, 1, 2, 3), 1: (0, 1, 2, 3), 2: (0, 2), 3: (0, 3)}
         self.valid_transitions_before_yes =\
             {0: (0, 1, 2, 3), 1: (0, 1, 2, 3), 2: (0, 1, 2, 3), 3: (0, 3)}

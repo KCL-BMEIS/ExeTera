@@ -23,7 +23,7 @@ class Dataset:
     keys: a list of field names that represent the fields you wish to load and in what order they
           should be put. Leaving this blankloads all of the keys in csv column order
     """
-    def __init__(self, source, field_descriptors=None, keys=None, filter_fn= None, progress=False, stop_after=None):
+    def __init__(self, source, field_descriptors=None, keys=None, filter_fn=None, progress=False, stop_after=None):
         self.names_ = list()
         self.fields_ = list()
         self.names_ = list()

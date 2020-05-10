@@ -1,3 +1,17 @@
+# Copyright 2020 KCL-BMEIS - King's College London
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import utils
+
+
 def na_or_value(value):
     if value == '':
         return 'na'
@@ -9,6 +23,11 @@ def na_compare(value1, value2):
     if lv1 == 'na' and lv2 in ('', 'na'):
         return True
     return lv1 == lv2
+
+def datetime_compare_to_secs(value1, value2):
+    dt1 = utils.datetime_to_seconds(value1)
+    dt2 = utils.datetime_to_seconds(value2)
+    return dt1 == dt2
 
 def check_row(exp_ds, exp_index, act_ds, act_index, keys, custom_checks):
     disparities = None

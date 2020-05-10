@@ -1,3 +1,14 @@
+# Copyright 2020 KCL-BMEIS - King's College London
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import csv
 
 import dataset
@@ -6,31 +17,8 @@ import utils
 # read patients in batches of n
 # read assessments for those pages and output them to n
 
-def patient_splitter(input_filename, output_filenames, output_ranges):
-    ch_del = ','
-    ch_quote = '"'
-    rows_parsed = 0
-    with open(input_filename) as f_i:
-        csvdr = csv.DictReader(f_i, delimiter=ch_del, quotechar=ch_quote)
-        keys = csvdr.fieldnames
-        csvr = csv.reader(f_i, delimiter=ch_del, quotechar=ch_quote)
 
-        for subset in range(len(output_filenames)):
-            output_filename = output_filenames[subset]
-            limit = output_ranges[subset]
-            with open(output_filename, 'w') as f_o:
-                csvw = csv.writer(f_o, delimiter=ch_del, quotechar=ch_quote)
-                csvw.writerow(keys)
-                while rows_parsed < limit:
-                    r = next(csvr)
-                    if rows_parsed > 0 and rows_parsed % 100000 == 0:
-                        print(f"{rows_parsed}")
-                    csvw.writerow(r)
-                    rows_parsed += 1
-                start = 0 if subset == 0 else output_ranges[subset - 1]
-                print(f"complete: {rows_parsed - start}")
-
-def patient_splitter_2(input_filename, output_filenames, sorted_indices, bucket_size):
+def patient_splitter(input_filename, output_filenames, sorted_indices, bucket_size):
     ch_del = ','
     ch_quote = '"'
     rows_parsed = 0
@@ -58,8 +46,6 @@ def patient_splitter_2(input_filename, output_filenames, sorted_indices, bucket_
                 csvw.writerow(input_rows[ind])
             accumulated += bucket_size
             remaining_rows -= bucket_size
-
-
 
 
 def assessment_splitter(input_filename, output_filename, assessment_buckets, bucket):
@@ -97,8 +83,7 @@ def split_data(patient_data, assessment_data, bucket_size=500000):
         p_ids = p_ds.field_by_name('id')
         p_dts = p_ds.field_by_name('created_at')
 
-    # put ids into buckets
-    #bucket_size = 1 << 20
+    # put assessment ids into buckets
     buckets = dict()
     bucket_index = 0
     bucket_count = 0
@@ -109,15 +94,6 @@ def split_data(patient_data, assessment_data, bucket_size=500000):
         buckets[p_ids[i_r]] = bucket_count
         bucket_index += 1
 
-    ranges = list()
-    acc_row_count = bucket_size
-    while acc_row_count <= p_ds.row_count():
-        ranges.append(acc_row_count)
-        acc_row_count += bucket_size
-    if ranges[-1] < p_ds.row_count():
-        ranges.append(p_ds.row_count())
-    print(ranges)
-
     filenames = list()
     for b in range(bucket_count+1):
         destination_filename = patient_data[:-4] + f"_{b:04d}" + ".csv"
@@ -126,7 +102,7 @@ def split_data(patient_data, assessment_data, bucket_size=500000):
     sorted_indices = p_ds.index_
     del p_ds
 
-    patient_splitter_2(patient_data, filenames, sorted_indices, bucket_size)
+    patient_splitter(patient_data, filenames, sorted_indices, bucket_size)
 
     print('buckets:', bucket_index)
     with open(assessment_data) as f:
@@ -176,6 +152,9 @@ if __name__ == '__main__':
     if args.bucket_size < 10000:
         print('--bucket_size cannot be less than 10000')
         exit(-1)
+
+    utils.validate_file_exists(args.patient_data)
+    utils.validate_file_exists(args.assessment_data)
 
     try:
         split_data(args.patient_data, args.assessment_data, args.bucket_size)

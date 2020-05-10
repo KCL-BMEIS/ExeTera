@@ -9,10 +9,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections.__init__ import defaultdict
+from collections import defaultdict
+import csv
+from io import StringIO
 
 import numpy as np
 # from numba import jit, prange
+
+
+def validate_file_exists(file_name):
+    import os
+    if not os.path.exists(file_name):
+        raise FileExistsError(f"{file_name} doesn't exist'")
+    if not os.path.isfile(file_name):
+        raise FileNotFoundError(f"{file_name} is not a file'")
+
+
+def find_longest_sequence_of(string, char):
+    longest = 0
+    current = 0
+    for s in string:
+        if s == char:
+            current += 1
+        else:
+            if current > longest:
+                longest = current
+            current = 0
+    if current > longest:
+        longest = current
+    return longest
 
 
 def count_flag_empty(flags):
@@ -97,7 +122,8 @@ def print_diagnostic_row(preamble, ds, ir, keys, fns=None):
         if not fns or k not in fns:
             values[i] = ds.value_from_fieldname(ir, k)
         else:
-            values[i] = fns[k](ds.value_from_fieldname(ir, k))
+            # values[i] = fns[k](ds.value_from_fieldname(ir, k))
+            values[i] = ds.value_from_fieldname(ir, k)
         # if indexed_fns[ii] is None:
         #     values[ii] = fields[ir][i]
         # else:
@@ -218,6 +244,53 @@ def to_float(value):
         raise ValueError(f'{value} cannot be converted to float')
 
     return fvalue
+
+
+def list_to_escaped(strings):
+    s = StringIO()
+    w = csv.writer(s)
+    w.writerow(strings)
+    return s.getvalue()
+
+
+def to_escaped(string, separator=',', delimiter='"'):
+    comma = False
+    quotes = False
+    for c in string:
+        if c == separator:
+            comma = True
+        elif c == delimiter:
+            quotes = True
+
+    if comma or quotes:
+        s = StringIO()
+        s.write(delimiter)
+        for c in string:
+            if c == delimiter:
+                s.write(c)
+            s.write(c)
+        s.write(delimiter)
+        return s.getvalue()
+    else:
+        return string
+
+def from_escaped(string):
+    s = StringIO(string)
+    r = csv.reader(s)
+    return next(r)
+
+
+def concatenate_maybe_strs(sequence, value, separator=',', delimiter='"'):
+    if sequence in (None, '', 'NA'):
+        if value in (None, '', 'NA'):
+            return ''
+        else:
+            return to_escaped(value)
+    else:
+        if value in (None, '', 'NA'):
+            return sequence
+        else:
+            return f"{sequence}{separator}{to_escaped(value)}"
 
 
 def replace_if_invalid(replacement):

@@ -9,6 +9,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from utils import find_longest_sequence_of
+
 class CalculateMergedFieldCount:
     def __init__(self, updated_ats):
         self.updated_ats = updated_ats
@@ -25,23 +27,40 @@ class CalculateMergedFieldCount:
 
 
 class MergeAssessmentRows:
-    def __init__(self, resulting_fields, created_fields, existing_field_indices):
+    def __init__(self, concat_field_indices,
+                 resulting_fields, created_fields, existing_field_indices,
+                 custom_field_aggregators):
         print(created_fields.keys())
-        print(created_fields['tested_covid_positive_clean'].dtype, created_fields['tested_covid_positive_clean'])
-        print(resulting_fields['tested_covid_positive_clean'].dtype, resulting_fields['tested_covid_positive_clean'])
         self.rfindex = 0
+        self.concat_indices = concat_field_indices
         self.resulting_fields = resulting_fields
         self.created_fields = created_fields
         self.existing_field_indices = existing_field_indices
+        self.custom_field_aggregators = custom_field_aggregators
+
 
     def populate_row(self, source_fields, source_index):
         for e in self.existing_field_indices:
-            self.resulting_fields[e[0]][self.rfindex] = source_fields[e[1]][source_index]
+            if e[0] in self.custom_field_aggregators:
+                self.resulting_fields[e[0]][self.rfindex] =\
+                    self.custom_field_aggregators[e[0]](
+                        self.resulting_fields[e[0]][self.rfindex],
+                        source_fields[e[1]][source_index])
+            else:
+                self.resulting_fields[e[0]][self.rfindex] = source_fields[e[1]][source_index]
         for ck, cv in self.created_fields.items():
-            self.resulting_fields[ck][self.rfindex] = \
+            self.resulting_fields[ck][self.rfindex] =\
                 max(self.resulting_fields[ck][self.rfindex], cv[source_index])
 
     def __call__(self, fields, dummy, start, end):
+        # first pass: determine escape sequences for fields that need concatenation
+        esq_sequences = [1] * len(self.concat_indices)
+        for i in range(start + 1, end + 1):
+            for i_c, c in enumerate(self.concat_indices):
+                esq_sequences[i_c] =\
+                    max(esq_sequences[i_c], find_longest_sequence_of(fields[c][i], '`'))
+        if esq_sequences != [1, 1]:
+            print(fields[1], esq_sequences)
         # write the first row to the current resulting field index
         prev_date_str = fields[3][start]
         prev_date = (prev_date_str[0:4], prev_date_str[5:7], prev_date_str[8:10])
