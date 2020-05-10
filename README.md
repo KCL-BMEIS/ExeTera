@@ -1,5 +1,8 @@
 The KCL covid19 joinzoe data preparation pipeline.
 
+## Current version
+v0.1.8
+
 ## Pipeline help
 ```
 python pipeline.py --help
@@ -31,7 +34,7 @@ Proper documentation and packaging to follow
 
 ## Changes
 
-### v0.1.8 -> v0.1.9
+### v0.1.8 -> v0.1.9 (Upcoming)
 * Fix: added `treatments` and `other_symptoms` to cleaned assessment file. These fields are
   concatenated during the merge step using ";"
 
