@@ -77,7 +77,7 @@ python split.py --version
 * Feature: provision of the `split.py` script to split the dataset up into subsets of patients
   and their associated assessments
 * Fix: added `treatments` and `other_symptoms` to cleaned assessment file. These fields are
-  concatenated during the merge step using ";"
+  concatenated during the merge step using using csv-style delimiters and escapes
 
 ### v0.1.7 -> v0.1.8
 * Fix: `had_covid_test` was not being patched up along with `tested_covid_positive`'
