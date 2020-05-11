@@ -1,16 +1,18 @@
 The KCL covid19 joinzoe data preparation pipeline.
 
-## Pipeline help
-```
-python pipeline.py --help
-```
+# Cleaning scripts
 
-## Running the pipeline
+Current version: v0.1.9
+
+---
+## `pipeline.py`
+
+### Running the pipeline
 ```
 python pipeline.py -t <territory> -p <input patient csv> -a <input assessor csv> -po <output patient csv -ao <output assessor csv>
 ```
 
-### options
+#### options
  * `-t` / `--territory`: the territory to filter the dataset on (runs on all territories if not set)
  * `-p` / `--patient_data`: the location and name of the patient data csv file
  * `-a` / `--assessment_data`: the location and name of the assessment data csv file
@@ -18,20 +20,62 @@ python pipeline.py -t <territory> -p <input patient csv> -a <input assessor csv>
  * `-ao` / `--assessment_data_out`: the location and name of the output assessment data csv file
  * `-ps` / `--parsing_schema`: the schema number to use for parsing and cleaning data
 
-### parsing schema
+### Pipeline help
+```
+python pipeline.py --help
+```
+
+### Pipeline version
+```
+python pipeline.py --version
+```
+
+#### parsing schema
 There are currently 2 parsing schema versions:
 * 1: The baseline cleaning behaviour, intented to match the R script
 * 2 (in progress): Improved cleaning for height/weight/BMI and covid symptom progression
-## Including in a script
+
+#### Including in a script
 
 Use the function `pipeline()` from `pipeline.py`.
 
 Proper documentation and packaging to follow
 
+---
+## `split.py`
 
+### Running the split script
+```
+python split.py -t <territory> -p <input patient csv> -a <input assessor csv> -b <bucket size>
+```
+
+The output of the split script is a series of patient and assessment files with the following structure:
+```
+<filename>.csv -> <filename>_<index>.csv
+```
+where index is the padded index of the subset (0000, 0001, 0002...).
+
+#### options
+ * `-p` / `--patient_data`: the location and name of the patient data csv file
+ * `-a` / `--assessment_data`: the location and name of the assessment data csv file
+ * `-b` / `--bucket_size`: the maximum number of patients to include in a subset
+
+### Split script help
+```
+python split.py --help
+```
+
+### Split script version
+```
+python split.py --version
+```
+
+---
 ## Changes
 
 ### v0.1.8 -> v0.1.9
+* Feature: provision of the `split.py` script to split the dataset up into subsets of patients
+  and their associated assessments
 * Fix: added `treatments` and `other_symptoms` to cleaned assessment file. These fields are
   concatenated during the merge step using ";"
 

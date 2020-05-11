@@ -141,6 +141,7 @@ def split_data(patient_data, assessment_data, bucket_size=500000):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument('--version', action='version', version='v0.1.9')
     parser.add_argument('-p', '--patient_data',
                         help='the location and name of the patient data csv file')
     parser.add_argument('-a', '--assessment_data',
