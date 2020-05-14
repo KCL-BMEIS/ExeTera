@@ -139,7 +139,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print('load patients')
     print('=============')
     with open(patient_filename) as f:
-        geoc_ds = dataset.Dataset(f, data_schema.patient_categorical_maps, progress=True)
+        geoc_ds = dataset.Dataset(f, data_schema.patient_categorical_maps, show_progress_every=500000)
     print("sorting patients")
     geoc_ds.sort(('id',))
     geoc_ds.show()
@@ -150,7 +150,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print('load assessments')
     print('================')
     with open(assessment_filename) as f:
-        asmt_ds = dataset.Dataset(f, data_schema.assessment_categorical_maps, progress=True)
+        asmt_ds = dataset.Dataset(f, data_schema.assessment_categorical_maps, show_progress_every=500000)
     print('sorting assessments')
     asmt_ds.sort(('patient_id', 'updated_at'))
     asmt_ds.show()
@@ -504,6 +504,7 @@ def regression_test_assessments(old_assessments, new_assessments):
 
     print('done')
 
+
 def regression_test_patients(old_patients, new_patients):
     print(); print('regression test patients')
     print('old_patients:', old_patients)
@@ -566,6 +567,7 @@ def regression_test_patients(old_patients, new_patients):
     for pd in patients_with_disparities:
         print(); print(pd)
     print('checking_for_disparities: done')
+
 
 def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema):
 

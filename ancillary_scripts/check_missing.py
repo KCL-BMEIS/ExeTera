@@ -65,8 +65,8 @@ count_flag_set = timed_fn(count_flag_set)
 
 with open('/home/ben/covid/patients_export_geocodes_20200428050002.csv') as f:
     p_ds = dataset.Dataset(f, keys=['id', 'year_of_birth', 'weight_kg', 'height_cm', 'bmi'],
-                           progress=True)
-                           # Sureprogress=True, stop_after=1000000)
+                           show_progress_every=500000)
+                           # Sureshow_progress_every=500000, stop_after=1000000)
 
 p_filter_flags = np.zeros(p_ds.row_count(), dtype=np.uint32)
 
@@ -104,8 +104,8 @@ for i_f, f in enumerate(p_filter_flags):
 
 with open('/home/ben/covid/assessments_export_20200428050002.csv') as f:
     a_ds = dataset.Dataset(f, keys=['id', 'patient_id', 'updated_at'],
-                           progress=True)
-                           # progress=True, stop_after=1000000)
+                           show_progress_every=500000)
+                           # show_progress_every=500000, stop_after=1000000)
 
 a_pids = a_ds.field_by_name('patient_id')
 a_updateds = a_ds.field_by_name('updated_at')

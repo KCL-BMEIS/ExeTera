@@ -66,8 +66,8 @@ filename = '/home/ben/covid/patients_export_geocodes_20200428050002.csv'
 print(f"loading {filename}")
 with open(filename) as f:
     ds = dataset.Dataset(f, keys=['id', 'created_at', 'updated_at', 'gender', 'height_cm', 'weight_kg', 'bmi', 'year_of_birth'],
-                         # progress=True)
-                         progress=True, stop_after=100000)
+                         # show_progress_every=500000)
+                         show_progress_every=500000, stop_after=100000)
 print('loaded')
 
 #ds.sort(('patient_id', 'updated_at'))

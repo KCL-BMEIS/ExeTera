@@ -77,8 +77,8 @@ def split_data(patient_data, assessment_data, bucket_size=500000):
 
     with open(patient_data) as f:
         p_ds = dataset.Dataset(f, keys=('id', 'created_at'),
-                               progress=True)
-                               # progress=True, stop_after=500000)
+                               show_progress_every=500000)
+                               # show_progress_every=500000, stop_after=500000)
         p_ds.sort(('created_at', 'id'))
         p_ids = p_ds.field_by_name('id')
         p_dts = p_ds.field_by_name('created_at')
@@ -106,7 +106,7 @@ def split_data(patient_data, assessment_data, bucket_size=500000):
 
     print('buckets:', bucket_index)
     with open(assessment_data) as f:
-        a_ds = dataset.Dataset(f, keys=('patient_id', 'other_symptoms'), progress=True)
+        a_ds = dataset.Dataset(f, keys=('patient_id', 'other_symptoms'), show_progress_every=500000)
 
     print(utils.build_histogram(buckets.values()))
 
@@ -131,7 +131,7 @@ def split_data(patient_data, assessment_data, bucket_size=500000):
         destination_filename = assessment_data[:-4] + f"_{i:04d}" + ".csv"
         print(destination_filename)
         # with open(assessment_data) as f:
-        #     a_ds = dataset.Dataset(f, filter_fn=lambda j: a_buckets[j] == i, progress=True)
+        #     a_ds = dataset.Dataset(f, filter_fn=lambda j: a_buckets[j] == i, show_progress_every=500000)
         #
         # del a_ds
         assessment_splitter(assessment_data, destination_filename, a_buckets, i)

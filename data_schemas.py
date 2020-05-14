@@ -65,7 +65,13 @@ class DataSchema:
     # 2: string_to_values or None if it should be calculated from values_to_string
     # 3: inclusive version from
     # 4: exclusive version to
-    categorical_fields = [
+    patient_categorical_fields = [
+        ('age_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None),
+        ('weight_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None),
+        ('height_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None),
+        ('bmi_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None)
+    ]
+    assessment_categorical_fields = [
         ('health_status', [na_value_to, 'healthy', 'not_healthy'], None, np.uint8, 1, None),
         ('fatigue', [na_value_to, 'no', 'mild', 'significant', 'severe'], None, np.uint8, 1, None),
         ('shortness_of_breath', [na_value_to, 'no', 'mild', 'significant', 'severe'], None, np.uint8, 1, None),
@@ -96,20 +102,28 @@ class DataSchema:
         ('tested_covid_positive_clean', [na_value_to, 'waiting', 'no', 'yes'], None, np.uint8, 1, None)
     ]
 
-    field_entries = dict()
-
-    for cf in categorical_fields:
+    assessment_field_entries = dict()
+    for cf in assessment_categorical_fields:
         entry = FieldEntry(FieldDesc(cf[0], _build_map(cf[1]) if cf[2] is None else cf[2], cf[1], cf[3]),
                            cf[4], cf[5])
         entry_list = \
-            list() if field_entries.get(cf[0]) is None else field_entries[cf[0]]
+            list() if assessment_field_entries.get(cf[0]) is None else assessment_field_entries[cf[0]]
         entry_list.append(entry)
-        field_entries[cf[0]] = entry_list
+        assessment_field_entries[cf[0]] = entry_list
+
+    patient_field_entries = dict()
+    for cf in patient_categorical_fields:
+        entry = FieldEntry(FieldDesc(cf[0], _build_map(cf[1]) if cf[2] is None else cf[2], cf[1], cf[3]),
+                           cf[4], cf[5])
+        entry_list = \
+            list() if patient_field_entries.get(cf[0]) is None else patient_field_entries[cf[0]]
+        entry_list.append(entry)
+        patient_field_entries[cf[0]] = entry_list
 
 
     def __init__(self, version):
         # TODO: field entries for patients!
-        self.patient_categorical_maps = dict()
+        self.patient_categorical_maps = self._get_patient_categorical_maps(version)
         self.assessment_categorical_maps = self._get_assessment_categorical_maps(version)
 
 
@@ -118,18 +132,27 @@ class DataSchema:
             raise DataSchemaVersionError(f'{schema} is not a valid cleaning schema value')
 
 
+    def _get_patient_categorical_maps(self, version):
+        return self._get_categorical_maps(DataSchema.patient_field_entries, version)
+
+
     def _get_assessment_categorical_maps(self, version):
+        return self._get_categorical_maps(DataSchema.assessment_field_entries, version)
+
+
+    def _get_categorical_maps(self, field_entries, version):
         self._validate_schema_number(version)
 
         selected_field_entries = dict()
         # get fields for which the schema number is in range
-        for fe in self.field_entries.items():
+        for fe in field_entries.items():
             for e in fe[1]:
                 if version >= e.version_from and (e.version_to is None or version < e.version_to):
                     selected_field_entries[fe[0]] = e.field_desc
                     break
 
         return selected_field_entries
+
 
     def string_field_desc(self):
         return FieldDesc('', None, None, str)

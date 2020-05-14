@@ -27,8 +27,8 @@ past_symptom_keys =\
 
 with open(patient_filename) as f:
     ds = dataset.Dataset(f, keys=core_keys + past_symptom_keys,
-                         progress=True)
-                         # progress=True, stop_after=999999)
+                         show_progress_every=500000)
+                         # show_progress_every=500000, stop_after=999999)
     ds.sort(('created_at', 'id'))
 
 for p in past_symptom_keys:

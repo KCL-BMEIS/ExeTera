@@ -32,7 +32,7 @@ def jury_rigged_split_sanity_check():
 
     with open(patient_filename) as pds:
         p_ds = dataset.Dataset(pds, keys=patient_keys,
-                               progress=True)
+                               show_progress_every=500000)
 
     p_ds.sort(keys=('created_at', 'id'))
     print(p_ds.row_count())
@@ -46,7 +46,7 @@ def jury_rigged_split_sanity_check():
     orphaned_assessment_ids = 0
     with open(assessment_filename) as ads:
         a_ds = dataset.Dataset(ads, keys=assessment_keys,
-                               progress=True)
+                               show_progress_every=500000)
     print(a_ds.row_count())
     a_pids = a_ds.field_by_name('patient_id')
     for aid in a_pids:
@@ -71,11 +71,11 @@ def jury_rigged_split_sanity_check():
 
         with open(patient_filename[:-4] + f"_{d:04d}" + ".csv") as spds:
             sp_ds = dataset.Dataset(spds, keys=patient_keys,
-                                                progress=True)
+                                                show_progress_every=500000)
         print(f'sp_ds{d}', sp_ds.row_count())
         with open(assessment_filename[:-4] + f"_{d:04d}" + ".csv") as sads:
             sa_ds = dataset.Dataset(sads, keys=assessment_keys,
-                                                progress=True)
+                                                show_progress_every=500000)
         print(f'sa_ds{d}', sa_ds.row_count())
 
         sp_ids = sp_ds.field_by_name('id')

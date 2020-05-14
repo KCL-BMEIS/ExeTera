@@ -18,12 +18,12 @@ assessments_filename = '/home/ben/covid/assessments_export_20200423050002.csv'
 #fn = '/home/ben/covid/assessments_short.csv'
 print(f'loading {patients_filename}')
 with open(patients_filename) as f:
-    ds = dataset.Dataset(f, progress=True)
+    ds = dataset.Dataset(f, show_progress_every=500000)
 
 print(utils.build_histogram(ds.field_by_name('version')))
 
 print(f'loading {assessments_filename}')
 with open(assessments_filename) as f:
-    ds = dataset.Dataset(f, progress=True)
+    ds = dataset.Dataset(f, show_progress_every=500000)
 
 print(utils.build_histogram(ds.field_by_name('version')))

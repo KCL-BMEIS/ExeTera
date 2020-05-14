@@ -27,10 +27,10 @@ diagnostic_keys = [s for s in sort_keys]
 keys_to_compare = ['health_status', 'fatigue', 'fatigue_binary', ('had_covid_test', 'had_covid_test_clean'), 'tested_covid_positive', ('tested_covid_positive', 'tested_covid_positive_clean')]
 
 with open(filename1) as f:
-    ds1 = dataset.Dataset(f, progress=True, stop_after=99999)
+    ds1 = dataset.Dataset(f, show_progress_every=500000, stop_after=99999)
 
 with open(filename2) as f:
-    ds2 = dataset.Dataset(f, progress=True, stop_after=99999)
+    ds2 = dataset.Dataset(f, show_progress_every=500000, stop_after=99999)
 
 
 print(ds1.row_count())

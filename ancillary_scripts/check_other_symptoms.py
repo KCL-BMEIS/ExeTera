@@ -46,8 +46,8 @@ def check_other_symptoms(input_filename):
         ds = dataset.Dataset(f,
                              keys=('patient_id', 'updated_at', 'other_symptoms', 'treatment',
                                    'location'),
-                             progress=True)
-                             # progress=True, stop_after=2999999)
+                             show_progress_every=500000)
+                             # show_progress_every=500000, stop_after=2999999)
 
     by_patient = defaultdict(Locations)
     p_id = ds.field_by_name('patient_id')

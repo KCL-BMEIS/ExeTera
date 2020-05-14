@@ -21,7 +21,7 @@ with open(filename) as f:
     a_ds = dataset.Dataset(f,
                            keys=('id', 'patient_id', 'created_at', 'had_covid_test',
                                  'tested_covid_positive'),
-                           progress=True)
+                           show_progress_every=500000)
 
 class TestCount:
     def __init__(self):

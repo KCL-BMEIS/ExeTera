@@ -38,7 +38,7 @@ print(f"loading {filename}")
 with open(filename) as f:
     ds = dataset.Dataset(f, data_schemas.DataSchema(1).assessment_categorical_maps,
                          keys=['id', 'patient_id', 'updated_at', 'had_covid_test', 'tested_covid_positive'],
-                         # progress=True)
+                         # show_progress_every=500000)
                          progress = True, stop_after = 1000000)
 print('loaded')
 

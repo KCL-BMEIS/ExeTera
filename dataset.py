@@ -23,7 +23,8 @@ class Dataset:
     keys: a list of field names that represent the fields you wish to load and in what order they
           should be put. Leaving this blankloads all of the keys in csv column order
     """
-    def __init__(self, source, field_descriptors=None, keys=None, filter_fn=None, progress=False, stop_after=None):
+    def __init__(self, source, field_descriptors=None, keys=None, filter_fn=None,
+                 show_progress_every=False, stop_after=None):
         self.names_ = list()
         self.fields_ = list()
         self.names_ = list()
@@ -75,8 +76,8 @@ class Dataset:
         ecsvf = iter(csvf)
         filtered_count = 0
         for i_r, row in enumerate(ecsvf):
-            if progress:
-                if i_r % 100000 == 0:
+            if show_progress_every:
+                if i_r % show_progress_every == 0:
                     if filtered_count == i_r:
                         print(i_r)
                     else:
@@ -91,7 +92,7 @@ class Dataset:
                 filtered_count += 1
                 if stop_after and i_r >= stop_after:
                     break
-        if progress:
+        if show_progress_every:
             print(i_r)
 
         # assign the built sequences to fields_
