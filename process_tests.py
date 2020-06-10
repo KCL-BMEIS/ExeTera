@@ -1,24 +1,17 @@
-from collections import defaultdict
 import datetime
+import numpy as np
 
 import dataset
 import utils
 
-from analytics import TestIndices, group_new_test_indices_by_patient
+from analytics import group_new_test_indices_by_patient, get_patients_with_old_format_tests, \
+    filter_duplicate_new_tests
+from processing.convert_old_assessments import ConvertOldAssessmentsV1
 
 strformat = '%Y-%m-%d'
-# t_file_name = '/home/ben/covid/covid_test_export_20200512030002.csv'
-# a_file_name = '/home/ben/covid/assessments_export_20200512030002.csv'
-# today = datetime.datetime.strptime("2020-05-12", strformat)
-# t_file_name = '/home/ben/covid/covid_test_export_20200513030002.csv'
-# a_file_name = '/home/ben/covid/assessments_export_20200513030002.csv'
-# today = datetime.datetime.strptime("2020-05-13", strformat)
-t_prev_file_name = '/home/ben/covid/covid_test_export_20200513030002.csv'
-a_prev_file_name = '/home/ben/covid/assessments_export_20200513030002.csv'
-prev_day = datetime.datetime.strptime("2020-05-13", strformat)
-t_cur_file_name = '/home/ben/covid/covid_test_export_20200514030002.csv'
-a_cur_file_name = '/home/ben/covid/assessments_export_20200514030002.csv'
-cur_day = datetime.datetime.strptime("2020-05-14", strformat)
+t_file_name = '/home/ben/covid/covid_test_export_20200601030001.csv'
+a_file_name = '/home/ben/covid/assessments_export_20200601030001.csv'
+cur_day = datetime.datetime.strptime("2020-05-18", strformat)
 
 
 class LastActivity:
@@ -35,112 +28,141 @@ class LastActivity:
         return f"{self.active}"
 
 
-# get stats and print delta for new tests
-# ---------------------------------------
-
-with open(t_prev_file_name) as f:
-    t_prev_ds = dataset.Dataset(f)
-t_prev_patients = group_new_test_indices_by_patient(t_prev_ds)
-
-with open(t_cur_file_name) as f:
-    t_cur_ds = dataset.Dataset(f)
-t_cur_patients = group_new_test_indices_by_patient(t_cur_ds)
-
-print(f'patients with new format tests ({prev_day}):', len(t_prev_patients))
-
-print(f'patients with new format tests ({cur_day}):', len(t_cur_patients))
-
-print(f'new format test delta:', len(t_cur_patients) - len(t_prev_patients))
+def sort_by_test_index_count(test_indices_by_patient):
+    sorted_patient_text_index_pairs = sorted([t for t in test_indices_by_patient.items()],
+                                             key=lambda t: len(t[1].indices), reverse=True)
+    return sorted_patient_text_index_pairs
 
 
-def get_patients_with_old_format_tests(a_ds):
-    apids = a_ds.field_by_name('patient_id')
-    ahcts = a_ds.field_by_name('had_covid_test')
-    atcps = a_ds.field_by_name('tested_covid_positive')
-    auats = a_ds.field_by_name('updated_at')
-    print('row count:', a_ds.row_count())
-
-    apatients = defaultdict(int)
-    for i_r in range(a_ds.row_count()):
-        if ahcts[i_r] == 'True' or atcps[i_r] in ('waiting', 'no', 'yes'):
-            apatients[apids[i_r]] += 1
-
-    apatient_test_count = 0
-    for k, v in apatients.items():
-        if v > 0:
-            apatient_test_count += 1
-
-    return apatients
+# start
+with open(t_file_name) as f:
+    t_ds = dataset.Dataset(f)
+t_dtss = t_ds.field_by_name('date_taken_specific')
+t_patients = group_new_test_indices_by_patient(t_ds)
 
 
 # get stats and print delta for old tests
 # ---------------------------------------
 
-a_keys = ('patient_id', 'created_at', 'updated_at', 'had_covid_test', 'tested_covid_positive')
-with open(a_prev_file_name) as f:
-    a_ds = dataset.Dataset(f, keys=a_keys, show_progress_every=5000000, stop_after=4999999)
-a_prev_patients = get_patients_with_old_format_tests(a_ds)
-del a_ds
+# a_keys = ('id', 'patient_id', 'country_code', 'created_at', 'updated_at', 'version', 'had_covid_test', 'tested_covid_positive')
+a_keys = ('patient_id', 'updated_at', 'had_covid_test', 'tested_covid_positive')
+with open(a_file_name) as f:
+    a_ds = dataset.Dataset(f, keys=a_keys,
+                           show_progress_every=5000000)
+                           # show_progress_every=5000000, stop_after=1000000)
+print('sorting')
+a_ds.sort(keys='updated_at')
 
-with open(a_cur_file_name) as f:
-    a_ds = dataset.Dataset(f, keys=a_keys, show_progress_every=5000000, stop_after=4999999)
-a_cur_patients = get_patients_with_old_format_tests(a_ds)
-del a_ds
+# a_ids = a_ds.field_by_name('id')
+a_pids = a_ds.field_by_name('patient_id')
+# a_cats = a_ds.field_by_name('created_at')
+a_uats = a_ds.field_by_name('updated_at')
+# a_vsns = a_ds.field_by_name('version')
+# a_ccs = a_ds.field_by_name('country_code')
+a_hcts = a_ds.field_by_name('had_covid_test')
+a_tcps = a_ds.field_by_name('tested_covid_positive')
+a_patients = get_patients_with_old_format_tests(a_ds)
 
-print(f'patients with old format tests ({prev_day}):', len(a_prev_patients))
 
-print(f'patients with old format tests ({cur_day}):', len(a_cur_patients))
-
-print(f'new format test delta:', len(a_cur_patients) - len(a_prev_patients))
-
+print('patients with old tests:', len(a_patients))
+print('patients with new tests:', len(t_patients))
 
 # build a dictionary of test counts by patient under the new system
 # -----------------------------------------------------------------
 
 
-s_prev_new_patients = set(t_prev_patients.keys())
-s_cur_new_patients = set(t_cur_patients.keys())
-s_prev_old_patients = set(a_prev_patients.keys())
-s_cur_old_patients = set(a_cur_patients.keys())
-s_prev_only_in_old = s_prev_old_patients.difference(s_prev_new_patients)
-s_cur_only_in_old = s_cur_old_patients.difference(s_cur_new_patients)
-print(len(s_prev_only_in_old))
-print(len(s_cur_only_in_old))
-print(len(s_cur_only_in_old) - len(s_prev_only_in_old))
+s_new_patients = set(t_patients.keys())
+s_old_patients = set(a_patients.keys())
+s_only_in_old = s_old_patients.difference(s_new_patients)
+s_only_in_new = s_new_patients.difference(s_old_patients)
+s_in_both = s_old_patients.intersection(s_new_patients)
+print('only in old:', len(s_only_in_old))
+print('only in new:', len(s_only_in_new))
+print('in_both:', len(s_in_both))
+
+t_cleaned_patients = filter_duplicate_new_tests(t_ds, t_patients, threshold_for_diagnostic_print=10)
+
+t_cleaned_patient_entries = sort_by_test_index_count(t_cleaned_patients)
+
+# p_0 = t_cleaned_patient_entries[0]
+
+print(utils.build_histogram([len(x[1].indices) for x in t_cleaned_patient_entries]))
 
 
-def filter_duplicate_tests(ds, patients, threshold_for_diagnostic_print=1000000):
-    tids = ds.field_by_name('id')
-    pids = ds.field_by_name('patient_id')
-    cats = ds.field_by_name('created_at')
-    edates = ds.field_by_name('date_taken_specific')
-    edate_los = ds.field_by_name('date_taken_between_start')
-    edate_his = ds.field_by_name('date_taken_between_end')
+# a_new_rows = dict({'id': list(), 'patient_id': list(), 'created_at': list(), 'updated_at': list(),
+#                    'version': list(), 'country_code': list(), 'result': list(), 'mechanism': list(),
+#                    'date_taken_specific': list()})
+#
+# # create new test rows for patients that have had only old tests
+# for pk, pv in a_patients.items():
+#     if pk in s_only_in_old:
+#         if pv.seen_negative + pv.seen_positive == 1:
+#             if pv.seen_negative:
+#                 result = 'negative'
+#             else:
+#                 result = 'positive'
+#             # take the first entry
+#             i_r = pv.indices[0]
+#             a_new_rows['id'].append(a_ids[i_r])
+#             a_new_rows['patient_id'].append(a_pids[i_r])
+#             a_new_rows['created_at'].append(a_cats[i_r])
+#             a_new_rows['updated_at'].append(a_uats[i_r])
+#             a_new_rows['version'].append(a_vsns[i_r])
+#             a_new_rows['country_code'].append(a_vsns[i_r])
+#             a_new_rows['result'].append(result)
+#             a_new_rows['date_taken_specific'].append(a_cats[i_r])
 
-    cleaned_patients = defaultdict(TestIndices)
-    for p in patients.items():
-        # print(p[0], len(p[1].indices))
-        test_dates = set()
-        for i_r in reversed(p[1].indices):
-            test_dates.add((edates[i_r], edate_los[i_r], edate_his[i_r]))
-        if len(test_dates) == 1:
-            istart = p[1].indices[-1]
-            # utils.print_diagnostic_row(f"{istart}", ds, istart, ds.names_)
-            cleaned_patients[p[0]].add(istart)
-        else:
-            cleaned_entries = dict()
-            for t in test_dates:
-                cleaned_entries[t] = list()
-            for i_r in reversed(p[1].indices):
-                cleaned_entries[(edates[i_r], edate_los[i_r], edate_his[i_r])].append(i_r)
+# print('adapted test count:', len(a_new_rows['id']))
 
-            for e in sorted(cleaned_entries.items(), key=lambda x: x[0]):
-                last_index = e[1][0]
-                if len(test_dates) > threshold_for_diagnostic_print:
-                    utils.print_diagnostic_row(f"{p[0]}-{last_index}:", ds, last_index, ds.names_)
-                cleaned_patients[p[0]].add(last_index)
+value_map = {
+    '': 0,
+    'waiting': 1,
+    'no': 2,
+    'yes': 3
+}
+fn = ConvertOldAssessmentsV1(a_ds, t_ds, value_map)
+results = fn(a_patients, s_new_patients, np.zeros(a_ds.row_count(), dtype=np.uint32))
 
-    return cleaned_patients
+# for i in range(100):
+#     print(results['id'][i], results['patient_id'][i], results['created_at'][i],
+#           results['updated_at'][i],
+#           results['result'][i], results['date_taken_specific'][i])
+#     for i_n in a_patients[results['patient_id'][i]].indices:
+#         utils.print_diagnostic_row(f"{i_n}", a_ds, i_n, keys=a_keys)
+#
+
+dest_row_count = t_ds.row_count() + len(results['id'])
+destination_tests = dict()
+for n, f in zip(t_ds.names_, t_ds.fields_):
+    if isinstance(f, list):
+        field = [None] * dest_row_count
+    else:
+        field = np.zeros(dest_row_count, dtype=f.dtype)
+    field[:t_ds.row_count()] = f
+    field[t_ds.row_count():] = results[n]
 
 
-t_cur_cleaned_patients = filter_duplicate_tests(t_cur_ds, t_cur_patients, threshold_for_diagnostic_print=10)
+
+print(len(results['id']))
+
+exit()
+
+# visually compare tests for patients that have both old and new tests
+for p in t_cleaned_patient_entries:
+    if len(p[1].indices) == 4:
+        print(p[0])
+        #get indices for the given patient sorted by test date
+        t_sorted_indices = sorted(p[1].indices, key=lambda t: t_dtss[t])
+        for s in t_sorted_indices:
+            utils.print_diagnostic_row(f"{p[0]}-{s}", t_ds, s, t_ds.names_)
+
+        # sort assessments belonging to that patient by date
+        a_indices = list()
+        for i_r in range(a_ds.row_count()):
+            if a_pids[i_r] == p[0]:
+                if a_hcts[i_r] == 'True' or a_tcps[i_r] in ('no', 'yes'):
+                    a_indices.append(i_r)
+
+        a_sorted_indices = sorted(a_indices, key=lambda t: a_uats[t])
+        for s in a_sorted_indices:
+            utils.print_diagnostic_row(f"{p[0]}-{s}", a_ds, s, a_keys)

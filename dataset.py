@@ -24,7 +24,7 @@ class Dataset:
           should be put. Leaving this blankloads all of the keys in csv column order
     """
     def __init__(self, source, field_descriptors=None, keys=None, filter_fn=None,
-                 show_progress_every=False, stop_after=None):
+                 show_progress_every=False, start_from=None, stop_after=None):
         self.names_ = list()
         self.fields_ = list()
         self.names_ = list()
@@ -82,6 +82,11 @@ class Dataset:
                         print(i_r)
                     else:
                         print(f"{i_r} ({filtered_count})")
+
+            if start_from is not None and i_r < start_from:
+                del row
+                continue
+
             if not filter_fn or filter_fn(i_r):
                 # for i_f, f in enumerate(fields):
                 for i_df, i_f in enumerate(index_map):
@@ -115,15 +120,28 @@ class Dataset:
 
     def sort(self, keys):
         #map names to indices
-        kindices = [self.field_to_index(k) for k in keys]
+        if isinstance(keys, str):
 
-        def index_sort(indices):
-            def inner_(r):
-                t = tuple(self.fields_[i][r] for i in indices)
-                return t
-            return inner_
+            def single_index_sort(index):
+                field = self.fields_[index]
 
-        self.index_ = sorted(self.index_, key=index_sort(kindices))
+                def inner_(r):
+                    return field[r]
+
+                return inner_
+            self.index_ = sorted(self.index_,
+                                 key=single_index_sort(self.field_to_index(keys)))
+        else:
+
+            kindices = [self.field_to_index(k) for k in keys]
+
+            def index_sort(indices):
+                def inner_(r):
+                    t = tuple(self.fields_[i][r] for i in indices)
+                    return t
+                return inner_
+
+            self.index_ = sorted(self.index_, key=index_sort(kindices))
 
         for i_f in range(len(self.fields_)):
             unsorted_field = self.fields_[i_f]

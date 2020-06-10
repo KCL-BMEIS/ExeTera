@@ -1,10 +1,11 @@
 from collections import defaultdict
 import datetime
+import time
 
 import dataset
 import utils
+import analytics
 
-from analytics import TestIndices, group_new_test_indices_by_patient, get_patients_with_old_format_tests
 
 strformat = '%Y-%m-%d'
 # t_file_name = '/home/ben/covid/covid_test_export_20200512030002.csv'
@@ -13,12 +14,12 @@ strformat = '%Y-%m-%d'
 # t_file_name = '/home/ben/covid/covid_test_export_20200513030002.csv'
 # a_file_name = '/home/ben/covid/assessments_export_20200513030002.csv'
 # today = datetime.datetime.strptime("2020-05-13", strformat)
-t_prev_file_name = '/home/ben/covid/covid_test_export_20200513030002.csv'
-a_prev_file_name = '/home/ben/covid/assessments_export_20200513030002.csv'
-prev_day = datetime.datetime.strptime("2020-05-13", strformat)
-t_cur_file_name = '/home/ben/covid/covid_test_export_20200514030002.csv'
-a_cur_file_name = '/home/ben/covid/assessments_export_20200514030002.csv'
-cur_day = datetime.datetime.strptime("2020-05-14", strformat)
+t_prev_file_name = '/home/ben/covid/covid_test_export_20200601030001.csv'
+a_prev_file_name = '/home/ben/covid/assessments_export_20200601030001.csv'
+prev_day = datetime.datetime.strptime("2020-06-01", strformat)
+t_cur_file_name = '/home/ben/covid/covid_test_export_20200604030001.csv'
+a_cur_file_name = '/home/ben/covid/assessments_export_20200604030001.csv'
+cur_day = datetime.datetime.strptime("2020-06-04", strformat)
 
 
 class LastActivity:
@@ -40,11 +41,13 @@ class LastActivity:
 
 with open(t_prev_file_name) as f:
     t_prev_ds = dataset.Dataset(f)
-t_prev_patients = group_new_test_indices_by_patient(t_prev_ds)
+t_prev_patients = analytics.group_new_test_indices_by_patient(t_prev_ds)
+
+print(utils.build_histogram(t_prev_ds.field_by_name('result')))
 
 with open(t_cur_file_name) as f:
     t_cur_ds = dataset.Dataset(f)
-t_cur_patients = group_new_test_indices_by_patient(t_cur_ds)
+t_cur_patients = analytics.group_new_test_indices_by_patient(t_cur_ds)
 
 print(f'patients with new format tests ({prev_day}):', len(t_prev_patients))
 
@@ -57,13 +60,17 @@ print(f'new format test delta:', len(t_cur_patients) - len(t_prev_patients))
 
 a_keys = ('patient_id', 'created_at', 'updated_at', 'had_covid_test', 'tested_covid_positive')
 with open(a_prev_file_name) as f:
-    a_ds = dataset.Dataset(f, keys=a_keys, show_progress_every=5000000, stop_after=4999999)
-a_prev_patients = get_patients_with_old_format_tests(a_ds)
+    a_ds = dataset.Dataset(f, keys=a_keys, show_progress_every=5000000)
+t0 = time.time()
+a_ds.sort(('patient_id', 'updated_at'))
+print('tuple sort:', time.time() - t0)
+t0 = time.time()
+a_prev_patients = analytics.get_patients_with_old_format_tests(a_ds)
 del a_ds
 
 with open(a_cur_file_name) as f:
-    a_ds = dataset.Dataset(f, keys=a_keys, show_progress_every=5000000, stop_after=4999999)
-a_cur_patients = get_patients_with_old_format_tests(a_ds)
+    a_ds = dataset.Dataset(f, keys=a_keys, show_progress_every=5000000)
+a_cur_patients = analytics.get_patients_with_old_format_tests(a_ds)
 del a_ds
 
 print(f'patients with old format tests ({prev_day}):', len(a_prev_patients))
@@ -96,7 +103,7 @@ def filter_duplicate_tests(ds, patients, threshold_for_diagnostic_print=1000000)
     edate_los = ds.field_by_name('date_taken_between_start')
     edate_his = ds.field_by_name('date_taken_between_end')
 
-    cleaned_patients = defaultdict(TestIndices)
+    cleaned_patients = defaultdict(analytics.TestIndices)
     for p in patients.items():
         # print(p[0], len(p[1].indices))
         test_dates = set()
@@ -129,8 +136,8 @@ def link_new_tests_to_old_tests(t_ds, a_ds):
     pass
 
 
-patients = defaultdict(TestIndices)
-for i_r in range(ds.row_count()):
+patients = defaultdict(analytics.TestIndices)
+for i_r in range(tds.row_count()):
     patients[pids[i_r]].add(i_r)
 
 # report patient count under new system
@@ -164,7 +171,7 @@ patients = sorted(patients, key=lambda x: len(x[1].indices), reverse=True)
 patient_test_counts = [(p[0], len(p[1].indices)) for p in patients]
 print(utils.build_histogram(patient_test_counts, tx=lambda x: x[1]))
 
-cleaned_patients = defaultdict(TestIndices)
+cleaned_patients = defaultdict(analytics.TestIndices)
 for p in patients:
     # print(p[0], len(p[1].indices))
     test_dates = set()

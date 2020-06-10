@@ -23,6 +23,8 @@ with open(filename) as f:
                                  'tested_covid_positive'),
                            show_progress_every=500000)
 
+print(utils.build_histogram(a_ds.field_by_name('tested_covid_positive')))
+
 class TestCount:
     def __init__(self):
         self.count = 0

@@ -11,12 +11,27 @@
 
 import unittest
 import io
+
 import dataset
+import utils
 
 small_dataset = ('id,patient_id,foo\n'
                  '0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,11111111111111111111111111111111,,\n'
                  '07777777777777777777777777777777,33333333333333333333333333333333,True,\n'
                  '02222222222222222222222222222222,11111111111111111111111111111111,False,\n')
+
+sorting_dataset = ('id,patient_id,created_at,updated_at\n'
+                   'a_1,p_1,100,100\n'
+                   'a_2,p_1,101,102\n'
+                   'a_3,p_2,101,101\n'
+                   'a_4,p_1,101,101\n'
+                   'a_5,p_2,102,102\n'
+                   'a_6,p_1,102,102\n'
+                   'a_7,p_2,102,103\n'
+                   'a_8,p_1,102,104\n'
+                   'a_9,p_2,103,105\n'
+                   'a_10,p_2,104,105\n'
+                   'a_11,p_1,104,104\n')
 
 class TestDataset(unittest.TestCase):
 
@@ -81,3 +96,27 @@ class TestDataset(unittest.TestCase):
             values[i], values[pi] = values[pi], values[i]
 
         print(values)
+
+    def test_single_key_sorts(self):
+        ds1 = dataset.Dataset(io.StringIO(sorting_dataset))
+        ds1.sort('patient_id')
+        print(ds1.index_)
+
+        ds2 = dataset.Dataset(io.StringIO(sorting_dataset))
+        ds2.sort(('patient_id',))
+        print(ds2.index_)
+
+    def test_multi_key_sorts(self):
+        ds1 = dataset.Dataset(io.StringIO(sorting_dataset))
+        ds1.sort('created_at')
+        ds1.sort('patient_id')
+        print(ds1.index_)
+        for i in range(ds1.row_count()):
+            utils.print_diagnostic_row(f"i", ds1, i, ds1.names_)
+
+        ds2 = dataset.Dataset(io.StringIO(sorting_dataset))
+        ds2.sort(('patient_id', 'created_at'))
+        # ds2.sort(('created_at', 'patient_id'))
+        print(ds2.index_)
+        for i in range(ds2.row_count()):
+            utils.print_diagnostic_row(f"i", ds2, i, ds2.names_)

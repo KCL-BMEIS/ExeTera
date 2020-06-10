@@ -16,7 +16,7 @@ class CalculateMergedFieldCount:
         self.updated_ats = updated_ats
         self.merged_row_count = 0
 
-    def __call__(self, patient_id, filter_status, start, end):
+    def __call__(self, patient_id, dummy_filter_status, start, end):
         for i in range(start + 1, end + 1):
             last_date_str = self.updated_ats[i - 1]
             last_date = (last_date_str[0:4], last_date_str[5:7], last_date_str[8:10])
@@ -29,10 +29,13 @@ class CalculateMergedFieldCount:
 class MergeAssessmentRows:
     def __init__(self, concat_field_indices,
                  resulting_fields, created_fields, existing_field_indices,
-                 custom_field_aggregators):
+                 custom_field_aggregators,
+                 source_filter, resulting_filter):
         print(created_fields.keys())
         self.rfindex = 0
         self.concat_indices = concat_field_indices
+        self.source_filter = source_filter
+        self.resulting_filter = resulting_filter
         self.resulting_fields = resulting_fields
         self.created_fields = created_fields
         self.existing_field_indices = existing_field_indices
@@ -51,16 +54,17 @@ class MergeAssessmentRows:
         for ck, cv in self.created_fields.items():
             self.resulting_fields[ck][self.rfindex] =\
                 max(self.resulting_fields[ck][self.rfindex], cv[source_index])
+        self.resulting_filter[self.rfindex] |= self.source_filter[source_index]
 
     def __call__(self, fields, dummy, start, end):
         # first pass: determine escape sequences for fields that need concatenation
-        esq_sequences = [1] * len(self.concat_indices)
-        for i in range(start + 1, end + 1):
-            for i_c, c in enumerate(self.concat_indices):
-                esq_sequences[i_c] =\
-                    max(esq_sequences[i_c], find_longest_sequence_of(fields[c][i], '`'))
-        if esq_sequences != [1, 1]:
-            print(fields[1], esq_sequences)
+        # esq_sequences = [1] * len(self.concat_indices)
+        # for i in range(start + 1, end + 1):
+        #     for i_c, c in enumerate(self.concat_indices):
+        #         esq_sequences[i_c] =\
+        #             max(esq_sequences[i_c], find_longest_sequence_of(fields[c][i], '`'))
+        # if esq_sequences != [1, 1]:
+        #     print(fields[1], esq_sequences)
         # write the first row to the current resulting field index
         prev_date_str = fields[3][start]
         prev_date = (prev_date_str[0:4], prev_date_str[5:7], prev_date_str[8:10])

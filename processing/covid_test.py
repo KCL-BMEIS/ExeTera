@@ -13,7 +13,7 @@ import numpy as np
 
 
 class ValidateCovidTestResultsFacVersion1PreHCTFix:
-    def __init__(self, hcts, tcps, filter_status, results_key, hct_results, results, filter_flag, show_debug=False):
+    def __init__(self, hcts, tcps, filter_status, hct_results, results, filter_flag, show_debug=False):
         self.valid_transitions = {0: (0, 1, 2, 3), 1: (0, 1, 2, 3), 2: (0, 2), 3: (0, 3)}
         self.upgrades = {0: (0, 1, 2, 3), 1: (2, 3), 2: tuple(), 3: tuple()}
         self.hcts = hcts
@@ -116,6 +116,8 @@ class ValidateCovidTestResultsFacVersion1:
                 if j == first_hct_true:
                     max_value = 2
 
+                if self.hct_results is None or self.hct_results[j] is None:
+                    print(j, self.hct_results[j], max_value)
                 self.hct_results[j] = max_value
         else:
             for j in range(start, end + 1):
@@ -142,7 +144,7 @@ class ValidateCovidTestResultsFacVersion1:
 
 
 class ValidateCovidTestResultsFacVersion2:
-    def __init__(self, hcts, tcps, filter_status, results, filter_flag, show_debug=False):
+    def __init__(self, hcts, tcps, filter_status, hct_results, results, filter_flag, show_debug=False):
         self.valid_transitions = {0: (0, 1, 2, 3), 1: (0, 1, 2, 3), 2: (0, 2), 3: (0, 3)}
         self.valid_transitions_before_yes =\
             {0: (0, 1, 2, 3), 1: (0, 1, 2, 3), 2: (0, 1, 2, 3), 3: (0, 3)}

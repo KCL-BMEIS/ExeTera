@@ -179,11 +179,6 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
         print(f'other territories: filtered {count_flag_set(geoc_filter_status, PFILTER_OTHER_TERRITORY)} missing values')
 
     print('patients:', len(geoc_filter_status))
-    # print('patients with no assessments:',
-    #       count_flag_set(geoc_filter_status, PFILTER_NO_ASSESSMENTS))
-    # print('patients with one assessment:',
-    #       count_flag_set(geoc_filter_status, PFILTER_ONE_ASSESSMENT))
-    # print('patients with sufficient assessments:', geoc_filter_status.count(0))
 
     print(); print()
     print("patients")
@@ -230,6 +225,9 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
 
     print(); print('unfiltered patients:', count_flag_empty(geoc_filter_status))
 
+    #TODO: save patients here, including filter flags
+
+
 
     print(); print()
     print("assessments")
@@ -260,13 +258,13 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     asmt_dest_fields['temperature_C'] = temperature_c
     print(f'temperature: filtered {count_flag_set(asmt_filter_status, FILTER_BAD_TEMP)} bad values')
 
-    print(); print("checking inconsistent test / test results fields")
-    src_had_test = asmt_ds.field_by_name('had_covid_test')
-    src_tested_covid_positive = asmt_ds.field_by_name('tested_covid_positive')
-    fn = CheckTestingConsistency(FILTER_INCONSISTENT_NOT_TESTED, FILTER_INCONSISTENT_TESTED)
-    fn(src_had_test, src_tested_covid_positive, asmt_filter_status)
-    print(f'inconsistent_not_tested: filtered {count_flag_set(asmt_filter_status, FILTER_INCONSISTENT_NOT_TESTED)} missing values')
-    print(f'inconsistent_tested: filtered {count_flag_set(asmt_filter_status, FILTER_INCONSISTENT_TESTED)} missing values')
+    # print(); print("checking inconsistent test / test results fields")
+    # src_had_test = asmt_ds.field_by_name('had_covid_test')
+    # src_tested_covid_positive = asmt_ds.field_by_name('tested_covid_positive')
+    # fn = CheckTestingConsistency(FILTER_INCONSISTENT_NOT_TESTED, FILTER_INCONSISTENT_TESTED)
+    # fn(src_had_test, src_tested_covid_positive, asmt_filter_status)
+    # print(f'inconsistent_not_tested: filtered {count_flag_set(asmt_filter_status, FILTER_INCONSISTENT_NOT_TESTED)} missing values')
+    # print(f'inconsistent_tested: filtered {count_flag_set(asmt_filter_status, FILTER_INCONSISTENT_TESTED)} missing values')
 
 
     print(); print('unfiltered assessments:', np.count_nonzero(asmt_filter_status == 0))
@@ -342,6 +340,12 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     asmt_dest_fields['had_covid_test_clean'] = sanitised_hct_covid_results
     asmt_dest_keys['had_covid_test_clean'] = sanitised_covid_results_key
 
+    print(); print("checking inconsistent test / test results fields")
+    fn = CheckTestingConsistency(FILTER_INCONSISTENT_NOT_TESTED, FILTER_INCONSISTENT_TESTED)
+    fn(sanitised_hct_covid_results, sanitised_covid_results, asmt_filter_status)
+    print(f'inconsistent_not_tested: filtered {count_flag_set(asmt_filter_status, FILTER_INCONSISTENT_NOT_TESTED)} missing values')
+    print(f'inconsistent_tested: filtered {count_flag_set(asmt_filter_status, FILTER_INCONSISTENT_TESTED)} missing values')
+
     print('remaining assessments before squashing', np.count_nonzero(asmt_filter_status == 0))
 
     # create a new assessment space with only unfiltered rows
@@ -389,6 +393,8 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     for dk, dv in asmt_dest_keys.items():
         resulting_field_keys[dk] = dv
 
+    resulting_filter_status = np.zeros(remaining_asmt_row_count, dtype=np.uint32)
+
     print('remaining_dest_len:', len(remaining_dest_fields['fatigue_binary']))
     print('resulting_fields:', len(resulting_fields['patient_id']))
 
@@ -397,7 +403,8 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
         [asmt_ds.field_to_index('other_symptoms'), asmt_ds.field_to_index('treatment')]
     merge = MergeAssessmentRows(concat_field_indices,
                                 resulting_fields, remaining_dest_fields,
-                                existing_field_indices, custom_field_aggregators)
+                                existing_field_indices, custom_field_aggregators,
+                                remaining_asmt_filter_status, resulting_filter_status)
     iterate_over_patient_assessments(remaining_asmt_fields, remaining_asmt_filter_status, merge)
     print(merge.rfindex)
 
@@ -629,6 +636,17 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema
                 for irv in range(len(row_values)):
                     row_values[irv] = None
     print(f'written to {assessment_data_out} in {time.time() - tstart} seconds')
+
+
+def save_patient_npys(pipeline_output,
+                      patient_data_out, assessment_data_out, test_data_out,
+                      data_schema):
+
+    categorical_maps = data_schema.assessment_categorical_maps
+
+    p_ds, p_status, p_dest_fields,\
+    a_ds, a_status, ra_fields, ra_status, res_fields, res_keys \
+        = pipeline_output
 
 
 # TODO: add json based config option
