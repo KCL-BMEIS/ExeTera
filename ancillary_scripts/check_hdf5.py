@@ -70,6 +70,11 @@ with h5py.File(filename, 'r') as hf:
         total += c
     print('healthy:', total)
 
+    distinct = set()
+    for s in persistence.indexed_string_iterator(hf['patients'], 'version'):
+        distinct.add(s)
+    print('version:', distinct)
+
     # t0 = time.time()
     # print('full copy')
     # total = 0

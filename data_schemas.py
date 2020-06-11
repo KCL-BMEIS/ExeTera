@@ -227,6 +227,10 @@ class DataSchema:
         'vs_probiotics': 'categoricaltype',
         'vs_zinc': 'categoricaltype',
         'vs_asked_at': 'datetimetype',
+        'has_asthma': 'categoricaltype',
+        'has_eczema': 'categoricaltype',
+        'has_hayfever': 'categoricaltype',
+        'has_lung_disease_only': 'categoricaltype',
         'zipcode': 'indexedstringtype',
         'se_postcode': 'indexedstringtype',
         'outward_postcode': 'indexedstringtype',
@@ -289,7 +293,14 @@ class DataSchema:
         'never_used_shortage': 'categoricaltype',
         'sometimes_used_shortage': 'categoricaltype',
         'interacted_any_patients': 'categoricaltype',
-        'treated_patients_with_covid': 'categoricaltype'
+        'treated_patients_with_covid': 'categoricaltype',
+        'worn_face_mask': 'categoricaltype',
+        'mask_cloth_or_scarf': 'categoricaltype',
+        'mask_surgical': 'categoricaltype',
+        'mask_not_sure_pfnts': 'categoricaltype',
+        'mask_n95_ffp': 'categoricaltype',
+        'mask_other': 'categoricaltype',
+        'typical_hayfever': 'categoricaltype',
     }
 
     test_field_types = {
@@ -440,6 +451,10 @@ class DataSchema:
         ('vs_garlic', leaky_boolean_to, None, np.uint8, 1, None),
         ('vs_probiotics', leaky_boolean_to, None, np.uint8, 1, None),
         ('vs_zinc', leaky_boolean_to, None, np.uint8, 1, None),
+        ('has_asthma', leaky_boolean_to, None, np.uint8, 1, None),
+        ('has_eczema', leaky_boolean_to, None, np.uint8, 1, None),
+        ('has_hayfever', leaky_boolean_to, None, np.uint8, 1, None),
+        ('has_lung_disease_only', leaky_boolean_to, None, np.uint8, 1, None),
         ('age_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None),
         ('weight_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None),
         ('height_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None),
@@ -483,7 +498,16 @@ class DataSchema:
         ('dizzy_light_headed', leaky_boolean_to, None, np.uint8, 1, None),
         ('nausea', leaky_boolean_to, None, np.uint8, 1, None),
         ('red_welts_on_face_or_lips', leaky_boolean_to, None, np.uint8, 1, None),
-        ('interacted_any_patients', leaky_boolean_to, None, np.uint8, 1, None)
+        ('interacted_any_patients', leaky_boolean_to, None, np.uint8, 1, None),
+        ('worn_face_mask', leaky_boolean_to, None, np.uint8, 1, None),
+        ('categoricaltype', leaky_boolean_to, None, np.uint8, 1, None),
+        ('mask_cloth_or_scarf', leaky_boolean_to, None, np.uint8, 1, None),
+        ('categoricaltype', leaky_boolean_to, None, np.uint8, 1, None),
+        ('mask_surgical', leaky_boolean_to, None, np.uint8, 1, None),
+        ('mask_not_sure_pfnts', leaky_boolean_to, None, np.uint8, 1, None),
+        ('mask_n95_ffp', leaky_boolean_to, None, np.uint8, 1, None),
+        ('mask_other', leaky_boolean_to, None, np.uint8, 1, None),
+        ('typical_hayfever', leaky_boolean_to, None, np.uint8, 1, None),
     ]
     test_categorical_fields = [
         ('result', ['waiting', 'failed', 'negative', 'positive'], None, np.uint8, 1, None),

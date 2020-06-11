@@ -4,7 +4,7 @@ import dataset
 import data_schemas
 import utils
 
-pfilename = '/home/ben/covid/patients_export_geocodes_20200604030001.csv'
+pfilename = '/home/ben/covid/patients_export_geocodes_20200610030002.csv'
 
 # pcatfields  = (
 #     'race_is_uk_white', 'need_inside_help', 'on_cancer_clinical_trial', 'race_is_uk_mixed_white_black',
@@ -40,14 +40,14 @@ pfilename = '/home/ben/covid/patients_export_geocodes_20200604030001.csv'
 #     'have_worked_in_hospital_home_health', 'takes_any_blood_pressure_medications', 'ht_mirena_or_other_coil',
 #     'has_diabetes')
 pcatfields = (
-    'vs_vitamin_d', 'vs_other', 'vs_omega_3', 'vs_none', 'vs_vitamin_c', 'vs_pftns', 'vs_multivitamins',
+    'has_hayfever', 'has_asthma', 'has_lung_disease_only', 'has_eczema', 'vs_vitamin_d', 'vs_other', 'vs_omega_3', 'vs_none', 'vs_vitamin_c', 'vs_pftns', 'vs_multivitamins',
     'vs_garlic', 'vs_probiotics', 'vs_zinc', 'vs_asked_at')
 data_schema = data_schemas.DataSchema(1)
 with open(pfilename) as f:
     ds = dataset.Dataset(f, keys=pcatfields, show_progress_every=100000)
 
     for n in ds.names_:
-        if data_schema.patient_field_types.get(n, None) == 'categoricaltype':
+        if data_schema.patient_field_types.get(n, 'categoricaltype') == 'categoricaltype':
             print(n)
             h = utils.build_histogram(ds.field_by_name(n))
             if len(h) > 100:

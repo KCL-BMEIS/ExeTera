@@ -1,3 +1,13 @@
+# Copyright 2020 KCL-BMEIS - King's College London
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from datetime import datetime
 from io import BytesIO
@@ -421,6 +431,46 @@ def _slice_for_chunk(c, chunkmax, dataset, chunksize):
     else:
         length = chunksize
     return c * chunksize, c * chunksize + length
+
+
+def indexed_string_iterator(group, name):
+    field = group[name]
+    if field.attrs['fieldtype'].split(',')[0] != 'indexedstring':
+        raise ValueError(
+            f"{field} must be 'indexedstring' but is {field.attrs['fieldtype']}")
+    chunksize = field.attrs['chunksize']
+
+    index = field['index']
+    ichunkmax = _chunkmax(index, chunksize)
+
+    values = field['values']
+    vchunkmax = _chunkmax(values, chunksize)
+
+    hackpadding = 10000
+    vc = 0
+    vistart, viend = _slice_for_chunk(vc, vchunkmax, values, chunksize)
+    vcur = values[vistart:min(viend+hackpadding, values.size)]
+    lastindex, curindex = None, None
+    for ic in range(ichunkmax):
+        istart, iend = _slice_for_chunk(ic, ichunkmax, index, chunksize)
+        icur = index[istart:iend]
+        if istart == 0:
+            lastindex = icur[0]
+            inchunkstart = 1
+        else:
+            inchunkstart = 0
+        for i in range(inchunkstart, len(icur)):
+            curindex = icur[i]
+            relativelastindex = lastindex - vistart
+            relativecurindex = curindex - vistart
+
+            yield vcur[relativelastindex:relativecurindex].tostring().decode()
+
+            if curindex >= viend:
+                vc += 1
+                vistart, viend = _slice_for_chunk(vc, vchunkmax, values, chunksize)
+                vcur = values[vistart:min(viend+hackpadding, values.size)]
+            lastindex = curindex
 
 
 def categorical_iterator(group, name):
