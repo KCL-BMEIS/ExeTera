@@ -5,7 +5,7 @@ import persistence
 import h5py
 
 
-filename = '/home/ben/covid/dataset.hdf5'
+filename = '/home/ben/covid/ds_20200610.hdf5'
 
 
 def to_numpy(source, name, slice=None):

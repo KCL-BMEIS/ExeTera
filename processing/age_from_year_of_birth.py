@@ -10,6 +10,7 @@
 # limitations under the License.
 
 from utils import check_input_lengths
+from persistence import indexed_string_iterator, NumericWriter
 
 
 class CalculateAgeFromYearOfBirth:
@@ -34,3 +35,22 @@ class CalculateAgeFromYearOfBirth:
                     age[i_r] = a
             else:
                 flags[i_r] |= self.f_missing_age
+
+
+def calculate_age_from_year_of_birth(chunksize, timestamp, in_range_fn, current_year,
+                                     year_of_birth, patients):
+    bad_age = NumericWriter(patients, chunksize, 'bad_age', timestamp, 'numeric,uint8')
+    age = NumericWriter(patients, chunksize, 'age', timestamp, 'numeric,int32')
+    for y in indexed_string_iterator(year_of_birth):
+        try:
+            a = current_year - int(float(y))
+            bad_age.append(0)
+
+        except ValueError:
+            bad_age.append(1)
+            age.append(None)
+        if in_range_fn(a):
+            bad_age.append(0)
+            age.append(age)
+
+

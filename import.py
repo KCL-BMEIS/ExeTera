@@ -156,7 +156,7 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
 
 
             p_show_progress_every = show_every
-            p_stop_after = None
+            p_stop_after = None # 500000
             p_keys = None # ('id', 'patient_id', 'updated_at', 'created_at', 'tested_covid_positive')
             pdi = DatasetImporter(p_file_name, hf, 'patients',
                                  writer_factory, patient_writers, patient_maps, timestamp,
@@ -174,7 +174,7 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
             print(a_mapped_fields)
             print(a_categorical_fields.difference(a_mapped_fields))
             a_show_progress_every = show_every
-            a_stop_after = None
+            a_stop_after = None # 5000000
             a_keys = None # ('id', 'patient_id', 'updated_at', 'created_at', 'tested_covid_positive')
             adi = DatasetImporter(a_file_name, hf, 'assessments',
                                  writer_factory, assessment_writers, assessment_maps, timestamp,

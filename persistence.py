@@ -44,84 +44,84 @@ chunk_sizes = {
     'patient': (1 << 18,), 'assessment': (1 << 18,), 'test': (1 << 18,)
 }
 
-def save_to_hdf5(doc, space, fields, categories={}, filters={}, formats={}):
-    for fk, fv in fields.items():
-        gspace = doc[space]
-        if isinstance(fv, list):
-            if fk not in formats:
-                save_variable_strs_to_hdf5(gspace, fk, fv)
-            elif formats[fk] == 'datetime':
-                save_datetimes_to_hdf5(gspace, fk, fv)
-
-        else:
-            save_nparray_to_hdf5(gspace, fk, fv)
-
-        # if fk in categories:
-        #     cats = categories[fk].values_to_strings
-        #     values = gspace.create_dataset('category_names', (len(cats),), dtype=h5py.string_dtype())
-        #     values[:] = cats
-        #
-        # if fk in filters:
-        #     fltr = filters[fk]
-        #     gspace.create_dataset('filter', (fltr.size,),
-        #                           chunks=chunk_sizes[space], maxshape=(None,), data=fltr)
-
-
-def save_nparray_to_hdf5(parent, name, values, chunksize=None):
-    gspace = parent.create_group(name)
-    if chunksize is None:
-        gspace.create_dataset('values', (values.size,), maxshape=(None,), data=values)
-    else:
-        gspace.create_dataset('values', (values.size,),
-                              chunks=(chunksize,), maxshape=(None,), data=values)
+# def save_to_hdf5(doc, space, fields, categories={}, filters={}, formats={}):
+#     for fk, fv in fields.items():
+#         gspace = doc[space]
+#         if isinstance(fv, list):
+#             if fk not in formats:
+#                 save_variable_strs_to_hdf5(gspace, fk, fv)
+#             elif formats[fk] == 'datetime':
+#                 save_datetimes_to_hdf5(gspace, fk, fv)
+#
+#         else:
+#             save_nparray_to_hdf5(gspace, fk, fv)
+#
+#         # if fk in categories:
+#         #     cats = categories[fk].values_to_strings
+#         #     values = gspace.create_dataset('category_names', (len(cats),), dtype=h5py.string_dtype())
+#         #     values[:] = cats
+#         #
+#         # if fk in filters:
+#         #     fltr = filters[fk]
+#         #     gspace.create_dataset('filter', (fltr.size,),
+#         #                           chunks=chunk_sizes[space], maxshape=(None,), data=fltr)
 
 
-def save_variable_strs_to_hdf5(parent, name, values):
-    bytestream = BytesIO()
-    count = len(values) + 1
-    indices = np.zeros(count, dtype=np.uint32)
-    index = 0
-    indices[0] = index
-    for i in range(len(values)):
-        bseq = values[i].encode()
-        bytestream.write(bseq)
-        index += len(bseq)
-        indices[i+1] = index
-    bytevalues = np.frombuffer(bytestream.getvalue(), dtype="S1")
-    group = parent.create_group(name) if name not in parent.keys() else parent[name]
-    group.create_dataset('values', (bytevalues.size,), data=bytevalues)
-    group.create_dataset('index', (count,), data=indices)
+# def save_nparray_to_hdf5(parent, name, values, chunksize=None):
+#     gspace = parent.create_group(name)
+#     if chunksize is None:
+#         gspace.create_dataset('values', (values.size,), maxshape=(None,), data=values)
+#     else:
+#         gspace.create_dataset('values', (values.size,),
+#                               chunks=(chunksize,), maxshape=(None,), data=values)
 
 
-def save_datetimes_to_hdf5(parent, name, values):
-    group = parent.create_group(name)
-    count = len(values)
-    years = np.zeros(count, dtype='u2')
-    months = np.zeros(count, dtype='u1')
-    days = np.zeros(count, dtype='u1')
-    hours = np.zeros(count, dtype='u1')
-    minutes = np.zeros(count, dtype='u1')
-    seconds = np.zeros(count, dtype='u1')
-    fractions = np.zeros(count, dtype='u4')
-    for i, sts in enumerate(values):
-        try:
-            ts = datetime.strptime(sts, '%Y-%m-%d %H:%M:%S.%f')
-        except ValueError:
-            ts = datetime.strptime(sts, '%Y-%m-%d %H:%M:%S')
-        years[i] = ts.year
-        months[i] = ts.month
-        days[i] = ts.day
-        hours[i] = ts.hour
-        minutes[i] = ts.minute
-        seconds[i] = ts.second
-        fractions[i] = ts.microsecond
-    group['years'] = years
-    group['months'] = months
-    group['days'] = days
-    group['hours'] = hours
-    group['minutes'] = minutes
-    group['seconds'] = seconds
-    group['fractions'] = fractions
+# def save_variable_strs_to_hdf5(parent, name, values):
+#     bytestream = BytesIO()
+#     count = len(values) + 1
+#     indices = np.zeros(count, dtype=np.uint32)
+#     index = 0
+#     indices[0] = index
+#     for i in range(len(values)):
+#         bseq = values[i].encode()
+#         bytestream.write(bseq)
+#         index += len(bseq)
+#         indices[i+1] = index
+#     bytevalues = np.frombuffer(bytestream.getvalue(), dtype="S1")
+#     group = parent.create_group(name) if name not in parent.keys() else parent[name]
+#     group.create_dataset('values', (bytevalues.size,), data=bytevalues)
+#     group.create_dataset('index', (count,), data=indices)
+
+
+# def save_datetimes_to_hdf5(parent, name, values):
+#     group = parent.create_group(name)
+#     count = len(values)
+#     years = np.zeros(count, dtype='u2')
+#     months = np.zeros(count, dtype='u1')
+#     days = np.zeros(count, dtype='u1')
+#     hours = np.zeros(count, dtype='u1')
+#     minutes = np.zeros(count, dtype='u1')
+#     seconds = np.zeros(count, dtype='u1')
+#     fractions = np.zeros(count, dtype='u4')
+#     for i, sts in enumerate(values):
+#         try:
+#             ts = datetime.strptime(sts, '%Y-%m-%d %H:%M:%S.%f')
+#         except ValueError:
+#             ts = datetime.strptime(sts, '%Y-%m-%d %H:%M:%S')
+#         years[i] = ts.year
+#         months[i] = ts.month
+#         days[i] = ts.day
+#         hours[i] = ts.hour
+#         minutes[i] = ts.minute
+#         seconds[i] = ts.second
+#         fractions[i] = ts.microsecond
+#     group['years'] = years
+#     group['months'] = months
+#     group['days'] = days
+#     group['hours'] = hours
+#     group['minutes'] = minutes
+#     group['seconds'] = seconds
+#     group['fractions'] = fractions
 
 
 class DataWriter:
@@ -160,21 +160,21 @@ class DataWriter:
             gv[-count:] = field[:count]
 
 
-def save_variable_strs_to_hdf5(parent, name, values):
-    bytestream = BytesIO()
-    count = len(values) + 1
-    indices = np.zeros(count, dtype=np.uint32)
-    index = 0
-    indices[0] = index
-    for i in range(len(values)):
-        bseq = values[i].encode()
-        bytestream.write(bseq)
-        index += len(bseq)
-        indices[i+1] = index
-    bytevalues = np.frombuffer(bytestream.getvalue(), dtype="S1")
-    group = parent.create_group(name) if name not in parent.keys() else parent[name]
-    group.create_dataset('values', (bytevalues.size,), data=bytevalues)
-    group.create_dataset('index', (count,), data=indices)
+# def save_variable_strs_to_hdf5(parent, name, values):
+#     bytestream = BytesIO()
+#     count = len(values) + 1
+#     indices = np.zeros(count, dtype=np.uint32)
+#     index = 0
+#     indices[0] = index
+#     for i in range(len(values)):
+#         bseq = values[i].encode()
+#         bytestream.write(bseq)
+#         index += len(bseq)
+#         indices[i+1] = index
+#     bytevalues = np.frombuffer(bytestream.getvalue(), dtype="S1")
+#     group = parent.create_group(name) if name not in parent.keys() else parent[name]
+#     group.create_dataset('values', (bytevalues.size,), data=bytevalues)
+#     group.create_dataset('index', (count,), data=indices)
 
 
 class BaseWriter:
@@ -260,8 +260,21 @@ class CategoricalWriter(BaseWriter):
 
 
 class NumericWriter(BaseWriter):
-    def __init__(self, group, chunksize, name, timestamp, nformat):
+    format_checks = {
+        'uint8': lambda x: int(x), 'uint16': lambda x: int(x),
+        'uint32': lambda x: int(x), 'uint64': lambda x: int(x),
+        'int8': lambda x: int(x), 'int16': lambda x: int(x),
+        'int32': lambda x: int(x), 'int64': lambda x: int(x),
+        'float32': lambda x: float(x), 'float64': lambda x: float(x)
+    }
+
+    def __init__(self, group, chunksize, name, timestamp, nformat, converter=None):
         BaseWriter.__init__(self, group, name, chunksize, f"numeric,{nformat}", timestamp)
+        if nformat not in NumericWriter.format_checks.keys():
+            error_str = "'nformat' must be one of {} but is {}"
+            raise ValueError(error_str.format(NumericWriter.format_checks.keys(), nformat))
+        self.converter =\
+            NumericWriter.format_checks[nformat] if converter is None else converter
         self.name = name
         self.values = np.zeros(chunksize, dtype=nformat)
         self.filter = np.zeros(chunksize, dtype=np.bool)
@@ -269,9 +282,9 @@ class NumericWriter(BaseWriter):
 
     def append(self, value):
         try:
-            v = float(value)
+            v = self.converter(value)
             f = False
-        except:
+        except ValueError:
             v = 0
             f = True
         self.values[self.index] = v
@@ -419,11 +432,14 @@ class DatetimeWriter(BaseWriter):
 
 # Readers
 # =======
+
+
 def _chunkmax(dataset, chunksize):
     chunkmax = int(dataset.size / chunksize)
     if dataset.size % chunksize != 0:
         chunkmax += 1
     return chunkmax
+
 
 def _slice_for_chunk(c, chunkmax, dataset, chunksize):
     if c == chunkmax - 1:
@@ -473,6 +489,22 @@ def indexed_string_iterator(group, name):
             lastindex = curindex
 
 
+def fixed_string_iterator(group, name):
+    field = group[name]
+    if field.attrs['fieldtype'].split(',')[0] != 'fixedstring':
+        raise ValueError(
+            f"{field} must be 'fixedstring' but is {field.attrs['fieldtype']}")
+    chunksize = field.attrs['chunksize']
+
+    values = field['values']
+    chunkmax = _chunkmax(values, chunksize)
+    for c in range(chunkmax):
+        istart, iend = _slice_for_chunk(c, chunkmax, values, chunksize)
+        vcur = values[istart:iend]
+        for i in range(len(vcur)):
+            yield vcur[i].tostring().decode()
+
+
 def categorical_iterator(group, name):
     field = group[name]
     if field.attrs['fieldtype'] != 'categorical':
@@ -505,9 +537,9 @@ def numeric_iterator(group, name, invalid=None):
         vflt = filter[istart:iend]
         for i in range(len(vcur)):
             if vflt[i] == False:
-                yield vcur[i]
+                yield vflt[i], vcur[i]
             else:
-                yield invalid
+                yield vflt[i], invalid
 
 
 def years_iterator(field):
