@@ -59,21 +59,24 @@ with h5py.File(filename, 'r') as hf:
     print(hf['assessments']['version'].attrs.keys())
     # to_numpy(hf['assessments'], 'version')
 
-    values_set = 0
-    for p in persistence.numeric_iterator(hf['patients'], 'height_cm', invalid=None):
-        if p is not None:
-            values_set += 1
-    print("'height' values set:", values_set)
+    def test_numeric_iterator():
+        values_set = 0
+        for p in persistence.numeric_iterator(hf['patients'], 'height_cm', invalid=None):
+            if p is not None:
+                values_set += 1
+        print("'height' values set:", values_set)
 
-    total = 0
-    for c in persistence.categorical_iterator(hf['assessments'], 'health_status'):
-        total += c
-    print('healthy:', total)
+    def test_categorical_iterator():
+        total = 0
+        for c in persistence.categorical_iterator(hf['assessments'], 'health_status'):
+            total += c
+        print('healthy:', total)
 
-    distinct = set()
-    for s in persistence.indexed_string_iterator(hf['patients'], 'version'):
-        distinct.add(s)
-    print('version:', distinct)
+    def test_indexed_string_iterator():
+        distinct = set()
+        for s in persistence.indexed_string_iterator(hf['patients'], 'version'):
+            distinct.add(s)
+        print('version:', distinct)
 
     # t0 = time.time()
     # print('full copy')
@@ -104,14 +107,15 @@ with h5py.File(filename, 'r') as hf:
     #         total += vcur[i]
     # print(f"{time.time() - t0}: {total}")
 
-    t0 = time.time()
-    values = hf['assessments']['sore_throat']
-    print(values.keys())
-    print(values['keys'])
-    print(sum(values['values'][()]))
-    print(time.time() - t0)
-    print(hf['tests']['patient_id']['values'])
-    print(hf['tests']['patient_id']['values'].attrs.keys())
+    def test_raw_performance():
+        t0 = time.time()
+        values = hf['assessments']['sore_throat']
+        print(values.keys())
+        print(values['keys'])
+        print(sum(values['values'][()]))
+        print(time.time() - t0)
+        print(hf['tests']['patient_id']['values'])
+        print(hf['tests']['patient_id']['values'].attrs.keys())
 
     # t0 = time.time()
     # print('stream')
@@ -122,4 +126,40 @@ with h5py.File(filename, 'r') as hf:
     #     total += v
     # print(f"{time.time() - t0}: {total}")
 
+    def test_sort():
+        print(hf['assessments']['id']['values'].size)
+        index = np.arange(hf['assessments']['id']['values'].size, dtype=np.uint32)
 
+
+        print("sorting")
+        t0 = time.time()
+        # sindex =\
+        #     persistence.dataset_sort(index,
+        #                              (hf['assessments']['id']['values'][()],
+        #                               hf['assessments']['created_at']['timestamps'][()]
+        #                              ))
+        sindex = \
+            index = persistence.dataset_sort(
+                # hf['assessments'],
+                index,
+                (hf['assessments']['patient_id'],
+                hf['assessments']['created_at']))
+        print(time.time() - t0)
+
+        print('check order')
+        pids = persistence.fixed_string_reader(hf['assessments']['patient_id'])
+        cats = persistence.timestamps_reader(hf['assessments']['created_at'])
+        lastval = (pids[sindex[0]], cats[sindex[0]])
+        for s in range(1, len(sindex)):
+            curval = (pids[sindex[s]], cats[sindex[s]])
+            if curval <= lastval:
+                print(s, sindex[s], lastval, curval)
+            lastval = curval
+
+
+
+    # test_numeric_iterator()
+    # test_categorical_iterator()
+    # test_indexed_string_iterator()
+    # test_raw_performance()
+    test_sort()

@@ -24,14 +24,13 @@ class Dataset:
           should be put. Leaving this blankloads all of the keys in csv column order
     """
     def __init__(self, source, field_descriptors=None, keys=None, filter_fn=None,
-                 show_progress_every=False, start_from=None, stop_after=None):
+                 show_progress_every=False, start_from=None, stop_after=None, early_filter=None):
         self.names_ = list()
         self.fields_ = list()
         self.names_ = list()
         self.index_ = None
 
         csvf = csv.DictReader(source, delimiter=',', quotechar='"')
-        #self.names_ = csvf.fieldnames
         available_keys = csvf.fieldnames
 
         if not keys:
@@ -40,6 +39,13 @@ class Dataset:
         else:
             fields_to_use = keys
             index_map = [available_keys.index(k) for k in keys]
+
+        early_key_index = None
+        if early_filter is not None:
+            if early_filter[0] not in available_keys:
+                raise ValueError(
+                    f"'early_filter': tuple element zero must be a key that is in the dataset")
+            early_key_index = available_keys.index(early_filter[0])
 
         tstart = time.time()
         transforms_by_index = list()
@@ -59,17 +65,10 @@ class Dataset:
                 to_datatype = transforms_by_index[i_n].to_datatype
                 if to_datatype == str:
                     new_fields.append(list())
-                    # new_fields.append(numpy_buffer.ListBuffer())
                 else:
-                    # new_fields.append(numpy_buffer.NumpyBuffer(dtype=to_datatype))
                     new_fields.append(numpy_buffer.NumpyBuffer2(dtype=to_datatype))
             else:
                 new_fields.append(list())
-                # new_fields.append(numpy_buffer.ListBuffer())
-
-        # self.new_fields = [None] * len(self.names_)
-        # for i_t, t in enumerate(transforms_by_index):
-        #     self.new_fields[i_t] = [None] *
 
         # read the cvs rows into the fields
         csvf = csv.reader(source, delimiter=',', quotechar='"')
@@ -87,6 +86,12 @@ class Dataset:
                 del row
                 continue
 
+            # TODO: decide whether True means filter or not filter consistently
+            if early_filter is not None:
+                if not early_filter[1](row[early_key_index]):
+                    continue
+
+            # TODO: decide whether True means filter or not filter consistently
             if not filter_fn or filter_fn(i_r):
                 # for i_f, f in enumerate(fields):
                 for i_df, i_f in enumerate(index_map):
@@ -97,6 +102,7 @@ class Dataset:
                 filtered_count += 1
                 if stop_after and i_r >= stop_after:
                     break
+
         if show_progress_every:
             print(i_r)
 

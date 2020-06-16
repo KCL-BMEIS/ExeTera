@@ -10,7 +10,7 @@
 # limitations under the License.
 
 from utils import check_input_lengths
-from persistence import indexed_string_iterator, NumericWriter
+import persistence as persist
 
 
 class CalculateAgeFromYearOfBirth:
@@ -37,11 +37,13 @@ class CalculateAgeFromYearOfBirth:
                 flags[i_r] |= self.f_missing_age
 
 
-def calculate_age_from_year_of_birth(chunksize, timestamp, in_range_fn, current_year,
-                                     year_of_birth, patients):
-    bad_age = NumericWriter(patients, chunksize, 'bad_age', timestamp, 'numeric,uint8')
-    age = NumericWriter(patients, chunksize, 'age', timestamp, 'numeric,int32')
-    for y in indexed_string_iterator(year_of_birth):
+def calculate_age_from_year_of_birth(patients, year_of_birth, in_range_fn, current_year,
+                                     chunksize=None, timestamp=None, name='age'):
+    bad_age = persist.NumericWriter(
+        patients, chunksize, 'bad_age', timestamp, 'numeric,uint8')
+    age = persist.NumericWriter(
+        patients, chunksize, 'age', timestamp, 'numeric,int32')
+    for y in persist.indexed_string_iterator(year_of_birth):
         try:
             a = current_year - int(float(y))
             bad_age.append(0)
@@ -53,4 +55,7 @@ def calculate_age_from_year_of_birth(chunksize, timestamp, in_range_fn, current_
             bad_age.append(0)
             age.append(age)
 
-
+def filter_by_range(dataset, source, name, in_range_fn, chunksize=None, timestamp=None):
+    s_it = persist.iterator(source)
+    flags = persist.NumericWriter(
+        dataset, source.attrs['chunksize'], name, timestamp, 'uint8')

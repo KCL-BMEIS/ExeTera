@@ -9,6 +9,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import uuid
+from contextlib import contextmanager
 from datetime import datetime
 from io import BytesIO
 
@@ -261,6 +264,7 @@ class CategoricalWriter(BaseWriter):
 
 class NumericWriter(BaseWriter):
     format_checks = {
+        'bool': lambda x: bool(x),
         'uint8': lambda x: int(x), 'uint16': lambda x: int(x),
         'uint32': lambda x: int(x), 'uint64': lambda x: int(x),
         'int8': lambda x: int(x), 'int16': lambda x: int(x),
@@ -328,6 +332,7 @@ class DateWriter(BaseWriter):
     def __init__(self, group, chunksize, name, timestamp):
         BaseWriter.__init__(self, group, name, chunksize, "date", timestamp)
         self.name = name
+        self.timestamps = np.zeros(chunksize, dtype='float64')
         self.years = np.zeros(chunksize, dtype='u2')
         self.months = np.zeros(chunksize, dtype='u1')
         self.days = np.zeros(chunksize, dtype='u1')
@@ -335,17 +340,20 @@ class DateWriter(BaseWriter):
 
     def append(self, value):
         if value == '':
+            self.timestamps[self.index] = 0
             self.years[self.index] = 0
             self.months[self.index] = 0
             self.days[self.index] = 0
         else:
             ts = datetime.strptime(value, '%Y-%m-%d')
+            self.timestamps[self.index] = 0
             self.years[self.index] = ts.year
             self.months[self.index] = ts.month
             self.days[self.index] = ts.day
         self.index += 1
 
         if self.index == self.chunksize:
+            DataWriter._write(self.group, 'timestamps', self.timestamps, self.index)
             DataWriter._write(self.group, 'years', self.years, self.index)
             DataWriter._write(self.group, 'months', self.months, self.index)
             DataWriter._write(self.group, 'days', self.days, self.index)
@@ -353,6 +361,7 @@ class DateWriter(BaseWriter):
 
     def flush(self):
         if self.index != 0:
+            DataWriter._write(self.group, 'timestamps', self.timestamps, self.index)
             DataWriter._write(self.group, 'years', self.years, self.index)
             DataWriter._write(self.group, 'months', self.months, self.index)
             DataWriter._write(self.group, 'days', self.days, self.index)
@@ -364,6 +373,7 @@ class DatetimeWriter(BaseWriter):
     def __init__(self, group, chunksize, name, timestamp):
         BaseWriter.__init__(self, group, name, chunksize, "datetime", timestamp)
         self.name = name
+        self.timestamps = np.zeros(chunksize, dtype='float64')
         self.years = np.zeros(chunksize, dtype='u2')
         self.months = np.zeros(chunksize, dtype='u1')
         self.days = np.zeros(chunksize, dtype='u1')
@@ -377,6 +387,7 @@ class DatetimeWriter(BaseWriter):
     def append(self, value):
         fraction = None
         if value == '':
+            self.timestamps[self.index] = 0
             self.years[self.index] = 0
             self.months[self.index] = 0
             self.days[self.index] = 0
@@ -394,6 +405,7 @@ class DatetimeWriter(BaseWriter):
 
                 #print(ts.microsecond)
 
+            self.timestamps[self.index] = ts.timestamp()
             self.years[self.index] = ts.year
             self.months[self.index] = ts.month
             self.days[self.index] = ts.day
@@ -406,6 +418,7 @@ class DatetimeWriter(BaseWriter):
         self.index += 1
 
         if self.index == self.chunksize:
+            DataWriter._write(self.group, 'timestamps', self.timestamps, self.index)
             DataWriter._write(self.group, 'years', self.years, self.index)
             DataWriter._write(self.group, 'months', self.months, self.index)
             DataWriter._write(self.group, 'days', self.days, self.index)
@@ -418,6 +431,7 @@ class DatetimeWriter(BaseWriter):
 
     def flush(self):
         if self.index != 0:
+            DataWriter._write(self.group, 'timestamps', self.timestamps, self.index)
             DataWriter._write(self.group, 'years', self.years, self.index)
             DataWriter._write(self.group, 'months', self.months, self.index)
             DataWriter._write(self.group, 'days', self.days, self.index)
@@ -434,33 +448,70 @@ class DatetimeWriter(BaseWriter):
 # =======
 
 
-def _chunkmax(dataset, chunksize):
-    chunkmax = int(dataset.size / chunksize)
-    if dataset.size % chunksize != 0:
+def _chunkcount(dataset, chunksize, istart=0, iend=None):
+    if iend is None:
+        iend = dataset.size
+    requested_size = iend - istart
+    chunkmax = int(requested_size / chunksize)
+    if requested_size % chunksize != 0:
         chunkmax += 1
     return chunkmax
 
 
-def _slice_for_chunk(c, chunkmax, dataset, chunksize):
-    if c == chunkmax - 1:
-        length = dataset.size % chunksize
+def _slice_for_chunk(c, dataset, chunksize, istart=0, iend=None):
+    if iend is None:
+        iend = dataset.size
+    requested_size = iend - istart
+    # if c == chunkmax - 1:
+    if c >= _chunkcount(dataset, chunksize, istart, iend):
+        raise ValueError("Asking for out of range chunk")
+
+    if istart + (c + 1) * chunksize> iend:
+        length = requested_size % chunksize
     else:
         length = chunksize
-    return c * chunksize, c * chunksize + length
+    return istart + c * chunksize, istart + c * chunksize + length
 
 
-def indexed_string_iterator(group, name):
-    field = group[name]
+def iterator(field):
+    iterator_map = {
+        'indexedstring': indexed_string_iterator,
+        'fixedstring': fixed_string_iterator,
+        'categorical': categorical_iterator,
+        # 'boolean': boolean_iterator,
+        'numeric': numeric_iterator,
+        'datetime': timestamps_iterator,
+        'date': timestamps_iterator
+    }
+    fieldtype = field.attrs['fieldtype'].split(',')[0]
+    return iterator_map[fieldtype](field)
+
+
+def reader(field, istart=0, iend=None):
+    getter_map = {
+        'indexedstring': indexed_string_reader,
+        'fixedstring': fixed_string_reader,
+        'categorical': categorical_reader,
+        'boolean': boolean_reader,
+        'numeric': numeric_reader,
+        'datetime': timestamps_reader,
+        'date': timestamps_reader
+    }
+    fieldtype = field.attrs['fieldtype'].split(',')[0]
+    return getter_map[fieldtype](field, istart, iend)
+
+
+def indexed_string_iterator(field):
     if field.attrs['fieldtype'].split(',')[0] != 'indexedstring':
         raise ValueError(
             f"{field} must be 'indexedstring' but is {field.attrs['fieldtype']}")
     chunksize = field.attrs['chunksize']
 
     index = field['index']
-    ichunkmax = _chunkmax(index, chunksize)
+    ichunkmax = _chunkcount(index, chunksize)
 
     values = field['values']
-    vchunkmax = _chunkmax(values, chunksize)
+    vchunkmax = _chunkcount(values, chunksize)
 
     hackpadding = 10000
     vc = 0
@@ -489,40 +540,87 @@ def indexed_string_iterator(group, name):
             lastindex = curindex
 
 
-def fixed_string_iterator(group, name):
-    field = group[name]
+def indexed_string_reader(field, istart=0, iend=None):
+    if field.attrs['fieldtype'].split(',')[0] != 'indexedstring':
+        raise ValueError(
+            f"{field} must be 'indexedstring' but is {field.attrs['fieldtype']}")
+
+    iend = field['values'].size-1
+    indices = field['index'][istart:iend+1]
+    values = field['values'][indices[istart]:indices[iend+1]]
+    results = [None] * len(indices) - 1
+    for i in range(0, len(indices)-1):
+        results[i] = values[indices[i], indices[i+1]].tostring().decode()
+    return results
+
+
+def fixed_string_iterator(field):
     if field.attrs['fieldtype'].split(',')[0] != 'fixedstring':
         raise ValueError(
             f"{field} must be 'fixedstring' but is {field.attrs['fieldtype']}")
     chunksize = field.attrs['chunksize']
 
     values = field['values']
-    chunkmax = _chunkmax(values, chunksize)
+    chunkmax = _chunkcount(values, chunksize)
     for c in range(chunkmax):
-        istart, iend = _slice_for_chunk(c, chunkmax, values, chunksize)
+        istart, iend = _slice_for_chunk(c, values, chunksize)
         vcur = values[istart:iend]
         for i in range(len(vcur)):
             yield vcur[i].tostring().decode()
 
 
-def categorical_iterator(group, name):
-    field = group[name]
+def fixed_string_reader(field, istart=0, iend=None):
+    if field.attrs['fieldtype'].split(',')[0] != 'fixedstring':
+        raise ValueError(
+            f"{field} must be 'fixedstring' but is {field.attrs['fieldtype']}")
+    iend = field['values'].size
+    fieldlength = field.attrs['fieldtype'].split(',')[1]
+    values = field['values'][istart:iend]
+    results = np.zeros(len(values), dtype=f'U{fieldlength}')
+    results = [v.tostring().decode() for v in values]
+    return results
+
+
+def categorical_iterator(field):
     if field.attrs['fieldtype'] != 'categorical':
         raise ValueError(
             f"{field} must be 'categorical' but is {field.attrs['fieldtype']}")
     chunksize = field.attrs['chunksize']
 
     values = field['values']
-    chunkmax = _chunkmax(values, chunksize)
+    chunkmax = _chunkcount(values, chunksize)
     for c in range(chunkmax):
-        istart, iend = _slice_for_chunk(c, chunkmax, values, chunksize)
+        istart, iend = _slice_for_chunk(c, values, chunksize)
         vcur = values[istart:iend]
         for i in range(len(vcur)):
             yield vcur[i]
 
 
-def numeric_iterator(group, name, invalid=None):
-    field = group[name]
+def categorical_reader(field, istart=0, iend=None):
+    if field.attrs['fieldtype'] != 'categorical':
+        raise ValueError(
+            f"{field} must be 'categorical' but is {field.attrs['fieldtype']}")
+    iend = field['values'].size
+    values = field['values'][istart:iend]
+    return values
+
+
+def boolean_reader(field, istart=0, iend=None, invalid=None):
+    if field.attrs['fieldtype'].split(',')[0] != 'numeric':
+        raise ValueError(
+            f"{field} must be 'boolean' but is {field.attrs['fieldtype']}")
+    if iend is None:
+        iend = field['values'].size
+    values = field['values'][istart:iend]
+    filter = field['filter'][istart:iend]
+    if invalid is not None:
+        for i_v in range(len(values)):
+            if filter[i_v]:
+                values[i_v] = invalid
+    return values
+
+
+def numeric_iterator(field, invalid=None):
     if field.attrs['fieldtype'].split(',')[0] != 'numeric':
         raise ValueError(
             f"{field} must be 'numeric' but is {field.attrs['fieldtype']}")
@@ -530,9 +628,9 @@ def numeric_iterator(group, name, invalid=None):
 
     values = field['values']
     filter = field['filter']
-    chunkmax = _chunkmax(values, chunksize)
+    chunkmax = _chunkcount(values, chunksize)
     for c in range(chunkmax):
-        istart, iend = _slice_for_chunk(c, chunkmax, values, chunksize)
+        istart, iend = _slice_for_chunk(c, values, chunksize)
         vcur = values[istart:iend]
         vflt = filter[istart:iend]
         for i in range(len(vcur)):
@@ -540,6 +638,49 @@ def numeric_iterator(group, name, invalid=None):
                 yield vflt[i], vcur[i]
             else:
                 yield vflt[i], invalid
+
+
+def numeric_reader(field, istart=0, iend=None, invalid=None):
+    if field.attrs['fieldtype'].split(',')[0] != 'numeric':
+        raise ValueError(
+            f"{field} must be 'numeric' but is {field.attrs['fieldtype']}")
+    if iend is None:
+        iend = field['values'].size
+    values = field['values'][istart:iend]
+    filter = field['filter'][istart:iend]
+    if invalid is not None:
+        for i_v in range(len(values)):
+            if filter[i_v]:
+                values[i_v] = invalid
+    return values
+
+
+def timestamps_iterator(field):
+    valid_types = ('date', 'datetime')
+    if field.attrs['fieldtype'] not in valid_types:
+        raise ValueError(
+            f"{field} must be one of {value_types} but is {field.attrs['fieldtype']}")
+
+    chunksize = field.attrs['chunksize']
+    timestamps = field['timestamps']
+    chunkmax = _chunkcount(timestamps, chunksize)
+    for c in range(chunkmax):
+        istart, iend = _slice_for_chunk(c, timestamps, chunksize)
+        tcur = timestamps[istart:iend]
+        for i in range(len(tcur)):
+            yield tcur[i]
+
+
+def timestamps_reader(field, istart=0, iend=None):
+    valid_types = ('date', 'datetime')
+    if field.attrs['fieldtype'] not in valid_types:
+        raise ValueError(
+            f"{field} must be one of {value_types} but is {field.attrs['fieldtype']}")
+
+    if iend is None:
+        iend = field['timestamps'].size
+    timestamps = field['timestamps'][istart:iend]
+    return timestamps
 
 
 def years_iterator(field):
@@ -550,12 +691,24 @@ def years_iterator(field):
 
     chunksize = field.attrs['chunksize']
     years = field['years']
-    chunkmax = _chunkmax(years, chunksize)
+    chunkmax = _chunkcount(years, chunksize)
     for c in range(chunkmax):
-        istart, iend = _slice_for_chunk(c, chunkmax, years, chunksize)
+        istart, iend = _slice_for_chunk(c, years, chunksize)
         ycur = years[istart:iend]
         for i in range(len(ycur)):
             yield ycur[i]
+
+
+def years_getter(field, istart=0, iend=None):
+    valid_types = ('date', 'datetime')
+    if field.attrs['fieldtype'] not in valid_types:
+        raise ValueError(
+            f"{field} must be one of {value_types} but is {field.attrs['fieldtype']}")
+
+    if iend is None:
+        iend = field['years'].size
+    years = field['years'][istart:iend]
+    return years
 
 
 def months_iterator(field):
@@ -567,13 +720,27 @@ def months_iterator(field):
     chunksize = field.attrs['chunksize']
     years = field['years']
     months = field['months']
-    chunkmax = _chunkmax(years, chunksize)
+    chunkmax = _chunkcount(years, chunksize)
     for c in range(chunkmax):
-        istart, iend = _slice_for_chunk(c, chunkmax, years, chunksize)
+        istart, iend = _slice_for_chunk(c, years, chunksize)
         ycur = years[istart:iend]
         mcur = months[istart:iend]
         for i in range(len(ycur)):
             yield (ycur[i], mcur[i])
+
+
+def months_getter(field, istart=0, iend=None):
+    valid_types = ('date', 'datetime')
+    if field.attrs['fieldtype'] not in valid_types:
+        raise ValueError(
+            f"{field} must be one of {value_types} but is {field.attrs['fieldtype']}")
+
+    if iend is None:
+        iend = field['years'].size
+    years = field['years'][istart:iend]
+    months = field['months'][istart:iend]
+    results = zip(years, months)
+    return results
 
 
 def days_iterator(field):
@@ -586,14 +753,28 @@ def days_iterator(field):
     years = field['years']
     months = field['months']
     days = field['days']
-    chunkmax = _chunkmax(years, chunksize)
+    chunkmax = _chunkcount(years, chunksize)
     for c in range(chunkmax):
-        istart, iend = _slice_for_chunk(c, chunkmax, years, chunksize)
+        istart, iend = _slice_for_chunk(c, years, chunksize)
         ycur = years[istart:iend]
         mcur = months[istart:iend]
         dcur = days[istart:iend]
         for i in range(len(ycur)):
             yield (ycur[i], mcur[i], dcur[i])
+
+
+def days_getter(field, istart=0, iend=None):
+    valid_types = ('date', 'datetime')
+    if field.attrs['fieldtype'] not in valid_types:
+        raise ValueError(
+            f"{field} must be one of {value_types} but is {field.attrs['fieldtype']}")
+
+    if iend is None:
+        iend = field['years'].size
+    years = field['years'][istart:iend]
+    months = field['months'][istart:iend]
+    days = field['days'][istart:iend]
+    return zip(years, months, days)
 
 
 def hours_iterator(field):
@@ -605,15 +786,29 @@ def hours_iterator(field):
     months = field['months']
     days = field['days']
     hours = field['hours']
-    chunkmax = _chunkmax(years, chunksize)
+    chunkmax = _chunkcount(years, chunksize)
     for c in range(chunkmax):
-        istart, iend = _slice_for_chunk(c, chunkmax, years, chunksize)
+        istart, iend = _slice_for_chunk(c, years, chunksize)
         ycur = years[istart:iend]
         mcur = months[istart:iend]
         dcur = days[istart:iend]
         hcur = hours[istart:iend]
         for i in range(len(ycur)):
             yield (ycur[i], mcur[i], dcur[i], hcur[i])
+
+
+def hours_getter(field, istart=0, iend=None):
+    if field.attrs['fieldtype'] != 'datetime':
+        raise ValueError(
+            f"{field} must be 'datetime' but is {field.attrs['fieldtype']}")
+
+    if iend is None:
+        iend = field['years'].size
+    years = field['years'][istart:iend]
+    months = field['months'][istart:iend]
+    days = field['days'][istart:iend]
+    hours = field['hours'][istart:iend]
+    return zip(years, months, days, hours)
 
 
 def minutes_iterator(field):
@@ -626,9 +821,9 @@ def minutes_iterator(field):
     days = field['days']
     hours = field['hours']
     minutes = field['minutes']
-    chunkmax = _chunkmax(years, chunksize)
+    chunkmax = _chunkcount(years, chunksize)
     for c in range(chunkmax):
-        istart, iend = _slice_for_chunk(c, chunkmax, years, chunksize)
+        istart, iend = _slice_for_chunk(c, years, chunksize)
         ycur = years[istart:iend]
         mocur = months[istart:iend]
         dcur = days[istart:iend]
@@ -636,6 +831,21 @@ def minutes_iterator(field):
         micur = minutes[istart:iend]
         for i in range(len(ycur)):
             yield (ycur[i], mocur[i], dcur[i], hcur[i], micur[i])
+
+
+def minutes_getter(field, istart=0, iend=None):
+    if field.attrs['fieldtype'] != 'datetime':
+        raise ValueError(
+            f"{field} must be 'datetime' but is {field.attrs['fieldtype']}")
+
+    if iend is None:
+        iend = field['years'].size
+    years = field['years'][istart:iend]
+    months = field['months'][istart:iend]
+    days = field['days'][istart:iend]
+    hours = field['hours'][istart:iend]
+    minutes = field['minutes'][istart:iend]
+    return zip(years, months, days, hours, minutes)
 
 
 def seconds_iterator(field):
@@ -649,9 +859,9 @@ def seconds_iterator(field):
     hours = field['hours']
     minutes = field['minutes']
     seconds = field['seconds']
-    chunkmax = _chunkmax(years, chunksize)
+    chunkmax = _chunkcount(years, chunksize)
     for c in range(chunkmax):
-        istart, iend = _slice_for_chunk(c, chunkmax, years, chunksize)
+        istart, iend = _slice_for_chunk(c, years, chunksize)
         ycur = years[istart:iend]
         mocur = months[istart:iend]
         dcur = days[istart:iend]
@@ -660,6 +870,22 @@ def seconds_iterator(field):
         scur = seconds[istart:iend]
         for i in range(len(ycur)):
             yield (ycur[i], mocur[i], dcur[i], hcur[i], micur[i], scur[i])
+
+
+def seconds_getter(field, istart=0, iend=None):
+    if field.attrs['fieldtype'] != 'datetime':
+        raise ValueError(
+            f"{field} must be 'datetime' but is {field.attrs['fieldtype']}")
+
+    if iend is None:
+        iend = field['years'].size
+    years = field['years'][istart:iend]
+    months = field['months'][istart:iend]
+    days = field['days'][istart:iend]
+    hours = field['hours'][istart:iend]
+    minutes = field['minutes'][istart:iend]
+    seconds = field['seconds'][istart:iend]
+    return zip(years, months, days, hours, minutes, seconds)
 
 
 def microseconds_iterator(field):
@@ -674,9 +900,9 @@ def microseconds_iterator(field):
     minutes = field['minutes']
     seconds = field['seconds']
     microseconds = field['microseconds']
-    chunkmax = _chunkmax(years, chunksize)
+    chunkmax = _chunkcount(years, chunksize)
     for c in range(chunkmax):
-        istart, iend = _slice_for_chunk(c, chunkmax, years, chunksize)
+        istart, iend = _slice_for_chunk(c, years, chunksize)
         ycur = years[istart:iend]
         mocur = months[istart:iend]
         dcur = days[istart:iend]
@@ -688,3 +914,126 @@ def microseconds_iterator(field):
             yield (ycur[i], mocur[i], dcur[i], hcur[i], micur[i], scur[i], mscur[i])
 
 
+def microseconds_getter(field, istart=0, iend=None):
+    if field.attrs['fieldtype'] != 'datetime':
+        raise ValueError(
+            f"{field} must be 'datetime' but is {field.attrs['fieldtype']}")
+
+    if iend is None:
+        iend = field['years'].size
+    years = field['years'][istart:iend]
+    months = field['months'][istart:iend]
+    days = field['days'][istart:iend]
+    hours = field['hours'][istart:iend]
+    minutes = field['minutes'][istart:iend]
+    seconds = field['seconds'][istart:iend]
+    microseconds = field['microseconds'][istart:iend]
+    return zip(years, months, days, hours, minutes, seconds, microseconds)
+
+
+def dataset_sort(index, fields):
+    rfields = reversed(fields)
+
+    for f in rfields:
+        fdata = reader(f)
+        index = sorted(index, key=lambda x: fdata[x])
+    return index
+
+
+def dataset_merge_sort(group, index, fields):
+    def sort_comparison(*args):
+        if len(args) == 1:
+            a0 = args[0]
+            def _inner(r):
+                return a0[r]
+            return _inner
+        if len(args) == 2:
+            a0 = args[0]
+            a1 = args[1]
+            def _inner(r):
+                return a0[r], a1[r]
+            return _inner
+        if len(args) == 3:
+            a0 = args[0]
+            a1 = args[1]
+            a2 = args[2]
+            def _inner(r):
+                return a0[r], a1[r], a2[r]
+            return _inner
+        if len(args) > 3:
+            def _inner(r):
+                return tuple(a[r] for a in args)
+            return _inner
+
+    def sort_function(index, fields):
+        sort_group = temp_dataset()
+
+        # sort each chunk individually
+        chunksize = 1 << 24
+        chunkcount = _chunkcount(index, chunksize)
+        for c in range(chunkcount):
+            istart, iend = _slice_for_chunk(c, index, chunksize)
+            length = iend - istart
+            fieldchunks = [None] * len(fields)
+            indexchunk = index[istart:iend]
+            for i_f, f in enumerate(fields):
+                fc = reader(f, istart, iend)
+                fieldchunks[i_f] = fc
+            sfn = sort_comparison(*fieldchunks)
+            sindexchunk = sorted(indexchunk, key=sfn)
+            sort_group.create_dataset(f'chunk{c}', (length,), data=sindexchunk)
+
+    sort_function(index, fields)
+
+
+@contextmanager
+def temp_dataset():
+    try:
+        uid = str(uuid.uuid4())
+        while os.path.exists(uid + '.hdf5'):
+            uid = str(uuid.uuid4())
+        hd = h5py.File(uid, 'w')
+        yield hd
+    finally:
+        hd.flush()
+        hd.close()
+
+
+class CachedArray:
+
+    def __init__(self, dataset, chunksize):
+        self.dataset = dataset
+        self.istart = None
+        self.iend = None
+        self.curchunk = None
+        self.curchunkindex = None
+        self.curchunkdirty = None
+        self.chunksize = chunksize
+
+
+    def __getitem__(self, index):
+        self._updatechunk(index)
+        return self.curchunk[index - self.istart]
+
+
+    def __setitem__(self, index, value):
+        self._updatechunk(index)
+        self.curchunk[index - self.istart] = value
+
+
+    def _updatechunk(self, index):
+        nextchunkindex = self._chunkindex(index)
+        if self.curchunkindex is None or self.curchunkindex != nextchunkindex:
+            istart, iend = _slice_for_chunk(nextchunkindex, self.dataset, self.chunksize)
+            nextchunk = self.dataset[istart:iend]
+            if self.curchunkdirty is True:
+                self.dataset[self.istart:self.iend] = self.curchunk
+            self.curchunkdirty = False
+            self.curchunk = nextchunk
+            self.curchunkindex = nextchunkindex
+            self.istart = istart
+            self.iend = iend
+
+
+    def _chunkindex(self, iarg):
+        return int(iarg / self.chunksize)

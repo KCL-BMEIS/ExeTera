@@ -133,13 +133,17 @@ custom_field_aggregators = {
 
 def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema, year, territory=None):
 
+    if territory is not None:
+        early_filter = ('country_code', lambda x: x == territory)
+
     categorical_maps = data_schema.assessment_categorical_maps
     # TODO: use proper logging throughout
     print(); print()
     print('load patients')
     print('=============')
     with open(patient_filename) as f:
-        geoc_ds = dataset.Dataset(f, data_schema.patient_categorical_maps, show_progress_every=500000)
+        geoc_ds = dataset.Dataset(f, data_schema.patient_categorical_maps,
+                                  show_progress_every=1000000, early_filter=early_filter)
     print("sorting patients")
     geoc_ds.sort(('id',))
     geoc_ds.show()
@@ -686,6 +690,7 @@ if __name__ == '__main__':
         tstart = time.time()
 
         data_schema_version = 1
+        early_filter = None
         data_schema = data_schemas.DataSchema(data_schema_version)
         parsing_schema_version = args.parsing_schema
         parsing_schema = parsing_schemas.ParsingSchema(parsing_schema_version)

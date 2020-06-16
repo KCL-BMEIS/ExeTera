@@ -3,11 +3,37 @@ import unittest
 from datetime import datetime, timezone
 from io import BytesIO
 
+import numpy as np
 import h5py
 
 import persistence
 
 class TestPersistence(unittest.TestCase):
+
+
+    def test_slice_for_chunk(self):
+        dataset = np.zeros(1050)
+        for i in range(11):
+            print(persistence._slice_for_chunk(i, dataset, 100))
+        for i in range(7):
+            print(persistence._slice_for_chunk(i, dataset, 100, 200, 850))
+
+
+    def test_cached_array_read(self):
+        dataset = np.arange(95, dtype=np.uint32)
+        arr = persistence.CachedArray(dataset, 10)
+        for i in range(dataset.size):
+            print(arr[i])
+
+
+    def test_cached_array_write(self):
+        dataset = np.zeros(95, dtype=np.uint32)
+        arr = persistence.CachedArray(dataset, 10)
+        for i in range(dataset.size):
+            arr[i] = i
+        for i in range(dataset.size):
+            print(arr[i])
+
 
     def test_indexed_string_importer(self):
 
@@ -90,6 +116,15 @@ class TestPersistence(unittest.TestCase):
             for f in persistence.fixed_string_iterator(hf, 'foo'):
                 print(f)
 
+
+    def test_numeric_importer_bool(self):
+
+        ts = str(datetime.now(timezone.utc))
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            hf.create_group('test')
+            foo = persistence.NumericWriter(hf, 10, 'foo', ts, 'bool')
+            values= [False,]
 
     def test_numeric_importer_float32(self):
 

@@ -15,10 +15,10 @@ import io
 import dataset
 import utils
 
-small_dataset = ('id,patient_id,foo\n'
-                 '0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,11111111111111111111111111111111,,\n'
-                 '07777777777777777777777777777777,33333333333333333333333333333333,True,\n'
-                 '02222222222222222222222222222222,11111111111111111111111111111111,False,\n')
+small_dataset = ('id,patient_id,foo,bar\n'
+                 '0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,11111111111111111111111111111111,,a\n'
+                 '07777777777777777777777777777777,33333333333333333333333333333333,True,b\n'
+                 '02222222222222222222222222222222,11111111111111111111111111111111,False,a\n')
 
 sorting_dataset = ('id,patient_id,created_at,updated_at\n'
                    'a_1,p_1,100,100\n'
@@ -44,11 +44,38 @@ class TestDataset(unittest.TestCase):
 
         self.assertEqual(ds.row_count(), 3)
 
-        self.assertEqual(ds.names_, ['id', 'patient_id', 'foo'])
+        self.assertEqual(ds.names_, ['id', 'patient_id', 'foo', 'bar'])
 
-        expected_values = [(0, ['0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '11111111111111111111111111111111', '']),
-                           (1, ['07777777777777777777777777777777', '33333333333333333333333333333333', 'True']),
-                           (2, ['02222222222222222222222222222222', '11111111111111111111111111111111', 'False'])]
+        expected_values = [(0, ['0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '11111111111111111111111111111111', '', 'a']),
+                           (1, ['07777777777777777777777777777777', '33333333333333333333333333333333', 'True', 'b']),
+                           (2, ['02222222222222222222222222222222', '11111111111111111111111111111111', 'False', 'a'])]
+
+        # value works as expected
+        for row in range(len(expected_values)):
+            for col in range(len(expected_values[0][1])):
+                self.assertEqual(ds.value(row, col), expected_values[row][1][col])
+
+        # value_from_fieldname works as expected
+        sorted_names = sorted(ds.names_)
+        for n in sorted_names:
+            index = ds.names_.index(n)
+            for row in range(len(expected_values)):
+                self.assertEqual(ds.value_from_fieldname(row, n), expected_values[row][1][index])
+
+
+    def test_construction_with_early_filter(self):
+        s = io.StringIO(small_dataset)
+        ds = dataset.Dataset(s, early_filter=('bar', lambda x: x in ('a',)))
+
+        # field names and fields must match in length
+        self.assertEqual(len(ds.names_), len(ds.fields_))
+
+        self.assertEqual(ds.row_count(), 3)
+
+        self.assertEqual(ds.names_, ['id', 'patient_id', 'foo', 'bar'])
+
+        expected_values = [(0, ['0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '11111111111111111111111111111111', '', 'a']),
+                           (2, ['02222222222222222222222222222222', '11111111111111111111111111111111', 'False', 'a'])]
 
         # value works as expected
         for row in range(len(expected_values)):
