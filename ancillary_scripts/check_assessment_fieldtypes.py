@@ -4,7 +4,7 @@ import dataset
 import data_schemas
 import utils
 
-pfilename = '/home/ben/covid/assessments_export_20200610030002.csv'
+pfilename = '/home/ben/covid/assessments_export_20200617030002.csv'
 # keys = None
 keys = ('worn_face_mask', 'mask_cloth_or_scarf', 'mask_surgical', 'mask_not_sure_pfnts', 'mask_n95_ffp',
         'typical_hayfever', 'mask_other')
@@ -23,7 +23,7 @@ end = min(step, len(keys))
 while True:
     print('start =', start)
     with open(pfilename) as f:
-        ds = dataset.Dataset(f, keys=keys, start_from=60000000, show_progress_every=1000000)
+        ds = dataset.Dataset(f, keys=keys, show_progress_every=1000000)
         for n in keys[start:end]:
             if data_schema.assessment_field_types.get(n, 'categoricaltype') == 'categoricaltype':
                 print(n)

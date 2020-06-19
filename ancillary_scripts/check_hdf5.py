@@ -143,18 +143,29 @@ with h5py.File(filename, 'r') as hf:
                 # hf['assessments'],
                 index,
                 (hf['assessments']['patient_id'],
-                hf['assessments']['created_at']))
+                 hf['assessments']['updated_at']))
         print(time.time() - t0)
 
         print('check order')
         pids = persistence.fixed_string_reader(hf['assessments']['patient_id'])
-        cats = persistence.timestamps_reader(hf['assessments']['created_at'])
-        lastval = (pids[sindex[0]], cats[sindex[0]])
-        for s in range(1, len(sindex)):
-            curval = (pids[sindex[s]], cats[sindex[s]])
-            if curval <= lastval:
-                print(s, sindex[s], lastval, curval)
-            lastval = curval
+        cats = persistence.timestamps_reader(hf['assessments']['updated_at'])
+
+        print('unsorted')
+        for i in range(0, len(index)):
+            if pids[i] == '00018da6407d86e2fd6c464bc2487d49':
+                print(pids[i], cats[i])
+
+        print('sorted')
+        for s in range(0, len(sindex)):
+            if pids[sindex[s]] == '00018da6407d86e2fd6c464bc2487d49':
+                print(pids[sindex[s]], cats[sindex[s]])
+
+        # lastval = (pids[sindex[0]], cats[sindex[0]])
+        # for s in range(1, len(sindex)):
+        #     curval = (pids[sindex[s]], cats[sindex[s]])
+        #     if curval <= lastval:
+        #         print(s, sindex[s], lastval, curval)
+        #     lastval = curval
 
 
 

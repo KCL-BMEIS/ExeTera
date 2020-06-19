@@ -104,7 +104,7 @@ class Dataset:
                     break
 
         if show_progress_every:
-            print(i_r)
+            print(f"{i_r} ({filtered_count})")
 
         # assign the built sequences to fields_
         for i_f, f in enumerate(new_fields):

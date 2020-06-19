@@ -131,10 +131,11 @@ custom_field_aggregators = {
 }
 
 
-def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema, year, territory=None):
+def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema, year, territories=None):
 
-    if territory is not None:
-        early_filter = ('country_code', lambda x: x == territory)
+    if territories is not None:
+        territories = tuple(territories.split(','))
+        early_filter = ('country_code', lambda x: x in territories)
 
     categorical_maps = data_schema.assessment_categorical_maps
     # TODO: use proper logging throughout
@@ -143,7 +144,8 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print('=============')
     with open(patient_filename) as f:
         geoc_ds = dataset.Dataset(f, data_schema.patient_categorical_maps,
-                                  show_progress_every=1000000, early_filter=early_filter)
+                                  early_filter=early_filter,
+                                  show_progress_every=1000000,)
     print("sorting patients")
     geoc_ds.sort(('id',))
     geoc_ds.show()
@@ -154,7 +156,9 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print('load assessments')
     print('================')
     with open(assessment_filename) as f:
-        asmt_ds = dataset.Dataset(f, data_schema.assessment_categorical_maps, show_progress_every=500000)
+        asmt_ds = dataset.Dataset(f, data_schema.assessment_categorical_maps,
+                                  early_filter=early_filter,
+                                  show_progress_every=1000000)
     print('sorting assessments')
     asmt_ds.sort(('patient_id', 'updated_at'))
     asmt_ds.show()
@@ -171,16 +175,16 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print(); print("pre-sort assessment data")
     asmt_filter_status = np.zeros(asmt_ds.row_count(), dtype=np.uint32)
 
-    if territory is not None:
-        print(); print();
-        print("filter patients from outside the territory of interest")
-        print("------------------------------------------------------")
-
-        country_codes = geoc_ds.field_by_name('country_code')
-        for ir, r in enumerate(country_codes):
-            if r != territory:
-                geoc_filter_status[ir] |= PFILTER_OTHER_TERRITORY
-        print(f'other territories: filtered {count_flag_set(geoc_filter_status, PFILTER_OTHER_TERRITORY)} missing values')
+    # if territories is not None:
+    #     print(); print();
+    #     print("filter patients from outside the territory of interest")
+    #     print("------------------------------------------------------")
+    #
+    #     country_codes = geoc_ds.field_by_name('country_code')
+    #     for ir, r in enumerate(country_codes):
+    #         if r != territories:
+    #             geoc_filter_status[ir] |= PFILTER_OTHER_TERRITORY
+    #     print(f'other territories: filtered {count_flag_set(geoc_filter_status, PFILTER_OTHER_TERRITORY)} missing values')
 
     print('patients:', len(geoc_filter_status))
 
@@ -663,8 +667,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', action='version', version='v0.1.9')
     parser.add_argument('-r', '--regression_test', action='store_true')
-    parser.add_argument('-t', '--territory', default=None,
-                        help='the territory to filter the dataset on (runs on all territories if not set)')
+    parser.add_argument('-te', '--territories', default=None,
+                        help='the territories to filter the dataset on (runs on all territories if not set)')
     parser.add_argument('-p', '--patient_data',
                         help='the location and name of the patient data csv file')
     parser.add_argument('-po', '--patient_data_out',
@@ -696,7 +700,8 @@ if __name__ == '__main__':
         parsing_schema = parsing_schemas.ParsingSchema(parsing_schema_version)
         pipeline_output = pipeline(args.patient_data, args.assessment_data,
                                    data_schema, parsing_schema, args.year,
-                                   territory=args.territory)
+                                   territories=args.territories)
         print(f'cleaning completed in {time.time() - tstart} seconds')
 
-        save_csv(pipeline_output, args.patient_data_out, args.assessment_data_out, data_schema)
+        save_csv(pipeline_output, args.patient_data_out, args.assessment_data_out,
+                 data_schema)

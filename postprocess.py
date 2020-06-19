@@ -3,8 +3,18 @@ import utils
 import processing
 
 
+# TODO: base filter for all hard filtered things, or should they be blitzed
+# from the dataset completely?
 
-
+# TODO: postprocessing activities
+# * assessment sort by (patient_id, created_at)
+# * aggregate from assessments to patients
+#   * was first unwell
+#   * first assessment
+#   * last assessment
+#   * assessment count
+#   * assessment index start
+#   * assessment index end
 
 def postprocess(dataset, data_scheme, process_schema, timestamp):
 

@@ -55,7 +55,8 @@ class DatasetImporter:
     def __init__(self, source, hf, space,
                  writer_factory, writers, field_entries, timestamp,
                  keys=None, field_descriptors=None,
-                 stop_after=None, show_progress_every=None, filter_fn=None):
+                 stop_after=None, show_progress_every=None, filter_fn=None,
+                 early_filter=None):
         self.names_ = list()
         self.index_ = None
 
@@ -85,6 +86,13 @@ class DatasetImporter:
                 else:
                     transforms_by_index.append(None)
 
+            early_key_index = None
+            if early_filter is not None:
+                if early_filter[0] not in available_keys:
+                    raise ValueError(
+                        f"'early_filter': tuple element zero must be a key that is in the dataset")
+                early_key_index = available_keys.index(early_filter[0])
+
             chunk_size = 1 << 18
             new_fields = dict()
             new_field_list = list()
@@ -109,6 +117,10 @@ class DatasetImporter:
                     if i_r % show_progress_every == 0:
                         print(i_r)
 
+                if early_filter is not None:
+                    if not early_filter[1](row[early_key_index]):
+                        continue
+
                 if i_r == stop_after:
                     break
 
@@ -127,7 +139,12 @@ class DatasetImporter:
 
 
 def import_to_hdf5(timestamp, dest_file_name, data_schema,
-                   p_file_name=None, a_file_name=None, t_file_name=None):
+                   p_file_name=None, a_file_name=None, t_file_name=None,
+                   territories=None):
+
+    early_filter = None
+    if territories is not None:
+        early_filter = ('country_code', lambda x: x in tuple(territories.split(',')))
 
     with h5py.File(dest_file_name, 'w') as hf:
         writer_factory = data_schema.field_writers
@@ -159,9 +176,10 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
             p_stop_after = None # 500000
             p_keys = None # ('id', 'patient_id', 'updated_at', 'created_at', 'tested_covid_positive')
             pdi = DatasetImporter(p_file_name, hf, 'patients',
-                                 writer_factory, patient_writers, patient_maps, timestamp,
-                                 keys=p_keys, field_descriptors=patient_maps,
-                                 show_progress_every=p_show_progress_every, stop_after=p_stop_after)
+                                  writer_factory, patient_writers, patient_maps, timestamp,
+                                  keys=p_keys, field_descriptors=patient_maps,
+                                  show_progress_every=p_show_progress_every, stop_after=p_stop_after,
+                                  early_filter=early_filter)
             print("patients done")
 
 
@@ -177,9 +195,10 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
             a_stop_after = None # 5000000
             a_keys = None # ('id', 'patient_id', 'updated_at', 'created_at', 'tested_covid_positive')
             adi = DatasetImporter(a_file_name, hf, 'assessments',
-                                 writer_factory, assessment_writers, assessment_maps, timestamp,
-                                 keys=a_keys, field_descriptors=assessment_maps,
-                                 show_progress_every=a_show_progress_every, stop_after=a_stop_after)
+                                  writer_factory, assessment_writers, assessment_maps, timestamp,
+                                  keys=a_keys, field_descriptors=assessment_maps,
+                                  show_progress_every=a_show_progress_every, stop_after=a_stop_after,
+                                  early_filter=early_filter)
             print("assessments_done")
 
 
@@ -197,7 +216,8 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
             tdi = DatasetImporter(t_file_name, hf, 'tests',
                                   writer_factory, test_writers, test_maps, timestamp,
                                   keys=t_keys, field_descriptors=test_maps,
-                                  show_progress_every=t_show_progress_every, stop_after=t_stop_after)
+                                  show_progress_every=t_show_progress_every, stop_after=t_stop_after,
+                                  early_filter=early_filter)
             print("test_done")
 
 
@@ -206,14 +226,16 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', action='version', version='v0.2.0')
-    parser.add_argument('-te', '--territory', default=None,
-                        help='the territory to filter the dataset on (runs on all territories if not set)')
+    parser.add_argument('-te', '--territories', default=None,
+                        help='the territory/territories to filter the dataset on (runs on all territories if not set)')
     parser.add_argument('-p', '--patient_data',
                         help='the location and name of the patient data csv file')
     parser.add_argument('-a', '--assessment_data',
                         help='the location and name of the assessment data csv file')
     parser.add_argument('-t', '--test_data',
                         help='the location and name of the assessment data csv file')
+    parser.add_argument('-c', '--consent_data', default=None,
+                        help='the location and name of the consent data csv file')
     parser.add_argument('-o', '--output_hdf5',
                         help='the location and name of the output hdf5 file')
     parser.add_argument('-d', '--data_schema', default=1, type=int,
@@ -240,4 +262,5 @@ if __name__ == '__main__':
     data_schema = data_schemas.DataSchema(data_schema_version)
     data_schema = data_schemas.DataSchema(1)
     import_to_hdf5(args.timestamp, args.output_hdf5, data_schema,
-                   args.patient_data, args.assessment_data, args.test_data)
+                   args.patient_data, args.assessment_data, args.test_data,
+                   args.territories)

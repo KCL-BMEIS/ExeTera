@@ -73,7 +73,7 @@ def assessment_splitter(input_filename, output_filename, assessment_buckets, buc
     print(f"complete: {rows_parsed} ({rows_written})")
 
 
-def split_data(patient_data, assessment_data, bucket_size=500000):
+def split_data(patient_data, assessment_data, bucket_size=500000, territories=None):
 
     with open(patient_data) as f:
         p_ds = dataset.Dataset(f, keys=('id', 'created_at'),
@@ -142,6 +142,8 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', action='version', version='v0.1.9')
+    parser.add_argument('-te', '--territories', default=None,
+                        help='the territories to filter the dataset on (runs on all territories if not set)')
     parser.add_argument('-p', '--patient_data',
                         help='the location and name of the patient data csv file')
     parser.add_argument('-a', '--assessment_data',
@@ -158,7 +160,7 @@ if __name__ == '__main__':
     utils.validate_file_exists(args.assessment_data)
 
     try:
-        split_data(args.patient_data, args.assessment_data, args.bucket_size)
+        split_data(args.patient_data, args.assessment_data, args.bucket_size, args.territories)
     except Exception as e:
         print(e)
         exit(-1)

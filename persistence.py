@@ -12,11 +12,17 @@
 import os
 import uuid
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 
 import h5py
 import numpy as np
+
+DEFAULT_CHUNKSIZE = 1 << 18
+
+# TODO: rename this persistence file to hdf5persistence
+# TODO: wrap the dataset in a withable so that different underlying
+# data stores can be used
 
 # schema
 # * schema
@@ -46,85 +52,6 @@ import numpy as np
 chunk_sizes = {
     'patient': (1 << 18,), 'assessment': (1 << 18,), 'test': (1 << 18,)
 }
-
-# def save_to_hdf5(doc, space, fields, categories={}, filters={}, formats={}):
-#     for fk, fv in fields.items():
-#         gspace = doc[space]
-#         if isinstance(fv, list):
-#             if fk not in formats:
-#                 save_variable_strs_to_hdf5(gspace, fk, fv)
-#             elif formats[fk] == 'datetime':
-#                 save_datetimes_to_hdf5(gspace, fk, fv)
-#
-#         else:
-#             save_nparray_to_hdf5(gspace, fk, fv)
-#
-#         # if fk in categories:
-#         #     cats = categories[fk].values_to_strings
-#         #     values = gspace.create_dataset('category_names', (len(cats),), dtype=h5py.string_dtype())
-#         #     values[:] = cats
-#         #
-#         # if fk in filters:
-#         #     fltr = filters[fk]
-#         #     gspace.create_dataset('filter', (fltr.size,),
-#         #                           chunks=chunk_sizes[space], maxshape=(None,), data=fltr)
-
-
-# def save_nparray_to_hdf5(parent, name, values, chunksize=None):
-#     gspace = parent.create_group(name)
-#     if chunksize is None:
-#         gspace.create_dataset('values', (values.size,), maxshape=(None,), data=values)
-#     else:
-#         gspace.create_dataset('values', (values.size,),
-#                               chunks=(chunksize,), maxshape=(None,), data=values)
-
-
-# def save_variable_strs_to_hdf5(parent, name, values):
-#     bytestream = BytesIO()
-#     count = len(values) + 1
-#     indices = np.zeros(count, dtype=np.uint32)
-#     index = 0
-#     indices[0] = index
-#     for i in range(len(values)):
-#         bseq = values[i].encode()
-#         bytestream.write(bseq)
-#         index += len(bseq)
-#         indices[i+1] = index
-#     bytevalues = np.frombuffer(bytestream.getvalue(), dtype="S1")
-#     group = parent.create_group(name) if name not in parent.keys() else parent[name]
-#     group.create_dataset('values', (bytevalues.size,), data=bytevalues)
-#     group.create_dataset('index', (count,), data=indices)
-
-
-# def save_datetimes_to_hdf5(parent, name, values):
-#     group = parent.create_group(name)
-#     count = len(values)
-#     years = np.zeros(count, dtype='u2')
-#     months = np.zeros(count, dtype='u1')
-#     days = np.zeros(count, dtype='u1')
-#     hours = np.zeros(count, dtype='u1')
-#     minutes = np.zeros(count, dtype='u1')
-#     seconds = np.zeros(count, dtype='u1')
-#     fractions = np.zeros(count, dtype='u4')
-#     for i, sts in enumerate(values):
-#         try:
-#             ts = datetime.strptime(sts, '%Y-%m-%d %H:%M:%S.%f')
-#         except ValueError:
-#             ts = datetime.strptime(sts, '%Y-%m-%d %H:%M:%S')
-#         years[i] = ts.year
-#         months[i] = ts.month
-#         days[i] = ts.day
-#         hours[i] = ts.hour
-#         minutes[i] = ts.minute
-#         seconds[i] = ts.second
-#         fractions[i] = ts.microsecond
-#     group['years'] = years
-#     group['months'] = months
-#     group['days'] = days
-#     group['hours'] = hours
-#     group['minutes'] = minutes
-#     group['seconds'] = seconds
-#     group['fractions'] = fractions
 
 
 class DataWriter:
@@ -163,34 +90,20 @@ class DataWriter:
             gv[-count:] = field[:count]
 
 
-# def save_variable_strs_to_hdf5(parent, name, values):
-#     bytestream = BytesIO()
-#     count = len(values) + 1
-#     indices = np.zeros(count, dtype=np.uint32)
-#     index = 0
-#     indices[0] = index
-#     for i in range(len(values)):
-#         bseq = values[i].encode()
-#         bytestream.write(bseq)
-#         index += len(bseq)
-#         indices[i+1] = index
-#     bytevalues = np.frombuffer(bytestream.getvalue(), dtype="S1")
-#     group = parent.create_group(name) if name not in parent.keys() else parent[name]
-#     group.create_dataset('values', (bytevalues.size,), data=bytevalues)
-#     group.create_dataset('index', (count,), data=indices)
-
-
 class BaseWriter:
     def __init__(self, group, name, chunksize, fieldtype, timestamp):
         self.group = group.create_group(name)
-        self.chunksize = chunksize
+        self.chunksize_ = chunksize
         self.fieldtype = fieldtype
         self.timestamp = timestamp
+
+    def chunksize(self):
+        return self.chunksize_
 
     def flush(self):
         self.group.attrs['fieldtype'] = self.fieldtype
         self.group.attrs['timestamp'] = self.timestamp
-        self.group.attrs['chunksize'] = self.chunksize
+        self.group.attrs['chunksize'] = self.chunksize_
         self.group.attrs['completed'] = True
 
 
@@ -210,18 +123,18 @@ class IndexedStringWriter(BaseWriter):
         for v in evalue:
             self.values[self.value_index] = v
             self.value_index += 1
-            if self.value_index == self.chunksize:
+            if self.value_index == self.chunksize_:
                 DataWriter._write(self.group, 'values', self.values, self.value_index)
                 self.value_index = 0
             self.accumulated += 1
         self.indices[self.index_index] = self.accumulated
         self.index_index += 1
-        if self.index_index == self.chunksize:
+        if self.index_index == self.chunksize_:
             DataWriter._write(self.group, 'index', self.indices, self.index_index)
             self.index_index = 0
 
     def flush(self):
-        print('flush: value_index =', self.value_index)
+        print(f'flush {self.name}: value_index =', self.value_index)
         if self.value_index != 0:
             DataWriter._write(self.group, 'values', self.values, self.value_index)
             self.value_index = 0
@@ -246,7 +159,7 @@ class CategoricalWriter(BaseWriter):
         self.values[self.index] = self.keys[value]
         self.index += 1
 
-        if self.index == self.chunksize:
+        if self.index == self.chunksize_:
             DataWriter._write(self.group, 'values', self.values, self.index)
             self.index = 0
 
@@ -256,53 +169,109 @@ class CategoricalWriter(BaseWriter):
             self.index = 0
         key_index = [None] * len(self.keys)
         for k, v in self.keys.items():
-            key_index[v] = k
+            try:
+                key_index[v] = k
+            except:
+                print(f"{self.name}: index {v} is out of range for key {k}")
+                raise
         DataWriter._write(self.group, 'keys', key_index, len(self.keys),
                           dtype=h5py.string_dtype())
         BaseWriter.flush(self)
 
 
-class NumericWriter(BaseWriter):
-    format_checks = {
-        'bool': lambda x: bool(x),
-        'uint8': lambda x: int(x), 'uint16': lambda x: int(x),
-        'uint32': lambda x: int(x), 'uint64': lambda x: int(x),
-        'int8': lambda x: int(x), 'int16': lambda x: int(x),
-        'int32': lambda x: int(x), 'int64': lambda x: int(x),
-        'float32': lambda x: float(x), 'float64': lambda x: float(x)
-    }
+class BooleanWriter(BaseWriter):
 
-    def __init__(self, group, chunksize, name, timestamp, nformat, converter=None):
-        BaseWriter.__init__(self, group, name, chunksize, f"numeric,{nformat}", timestamp)
-        if nformat not in NumericWriter.format_checks.keys():
-            error_str = "'nformat' must be one of {} but is {}"
-            raise ValueError(error_str.format(NumericWriter.format_checks.keys(), nformat))
-        self.converter =\
-            NumericWriter.format_checks[nformat] if converter is None else converter
+    def __init__(self, group, chunksize, name, timestamp):
+        BaseWriter.__init__(self, group, name, chunksize, f"boolean", timestamp)
         self.name = name
-        self.values = np.zeros(chunksize, dtype=nformat)
-        self.filter = np.zeros(chunksize, dtype=np.bool)
+        self.values = np.zeros(chunksize, dtype=np.bool)
         self.index = 0
 
     def append(self, value):
-        try:
-            v = self.converter(value)
-            f = False
-        except ValueError:
-            v = 0
-            f = True
-        self.values[self.index] = v
-        self.filter[self.index] = f
+        self.values[self.index] = value
         self.index += 1
-        if self.index == self.chunksize:
+
+        if self.index == self.chunksize_:
             DataWriter._write(self.group, 'values', self.values, self.index)
-            DataWriter._write(self.group, 'filter', self.filter, self.index)
             self.index = 0
 
     def flush(self):
         if self.index != 0:
             DataWriter._write(self.group, 'values', self.values, self.index)
-            DataWriter._write(self.group, 'filter', self.filter, self.index)
+        BaseWriter.flush(self)
+
+
+def str_to_float(value):
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def str_to_int(value):
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+class NumericWriter(BaseWriter):
+    # format_checks = {
+    #     'bool': lambda x: bool(x),
+    #     'uint8': lambda x: int(x), 'uint16': lambda x: int(x),
+    #     'uint32': lambda x: int(x), 'uint64': lambda x: int(x),
+    #     'int8': lambda x: int(x), 'int16': lambda x: int(x),
+    #     'int32': lambda x: int(x), 'int64': lambda x: int(x),
+    #     'float32': lambda x: float(x), 'float64': lambda x: float(x)
+    # }
+    supported_formats = ('bool',
+                         'uint8', 'uint16', 'uint32', 'uint64',
+                         'int8', 'int16', 'int32', 'int64',
+                         'float32', 'float64')
+
+    def __init__(self, group, chunksize, name, timestamp, nformat,
+                 converter=None, needs_filter=False):
+        BaseWriter.__init__(self, group, name, chunksize, f"numeric,{nformat}", timestamp)
+        if nformat not in NumericWriter.supported_formats:
+            error_str = "'nformat' must be one of {} but is {}"
+            raise ValueError(error_str.format(NumericWriter.supported_formats, nformat))
+        if converter is None:
+            self.converter = lambda x: x
+        else:
+            self.converter = converter
+        # self.converter =\
+        #     lambda x: x if converter is None else converter
+        self.name = name
+        self.values = np.zeros(chunksize, dtype=nformat)
+        self.needs_filter = needs_filter
+        if self.needs_filter:
+            self.filter = np.zeros(chunksize, dtype=np.bool)
+        self.index = 0
+
+    def append(self, value):
+        v = self.converter(value)
+        # try:
+        #     v = self.converter(value) if self.converter else
+        #     f = False
+        # except ValueError:
+        #     v = 0
+        #     f = True
+        self.values[self.index] = 0 if v is None else v
+        if self.needs_filter:
+            f = v is None
+            self.filter[self.index] = f
+        self.index += 1
+        if self.index == self.chunksize_:
+            DataWriter._write(self.group, 'values', self.values, self.index)
+            if self.needs_filter:
+                DataWriter._write(self.group, 'filter', self.filter, self.index)
+            self.index = 0
+
+    def flush(self):
+        if self.index != 0:
+            DataWriter._write(self.group, 'values', self.values, self.index)
+            if self.needs_filter:
+                DataWriter._write(self.group, 'filter', self.filter, self.index)
             self.index = 0
         BaseWriter.flush(self)
 
@@ -317,7 +286,7 @@ class FixedStringWriter(BaseWriter):
     def append(self, value):
         self.values[self.index] = value
         self.index += 1
-        if self.index == self.chunksize:
+        if self.index == self.chunksize_:
             DataWriter._write(self.group, 'values', self.values, self.index)
             self.index = 0
 
@@ -352,7 +321,7 @@ class DateWriter(BaseWriter):
             self.days[self.index] = ts.day
         self.index += 1
 
-        if self.index == self.chunksize:
+        if self.index == self.chunksize_:
             DataWriter._write(self.group, 'timestamps', self.timestamps, self.index)
             DataWriter._write(self.group, 'years', self.years, self.index)
             DataWriter._write(self.group, 'months', self.months, self.index)
@@ -417,7 +386,7 @@ class DatetimeWriter(BaseWriter):
             self.utcoffsets[self.index] = utco.days * 86400 + utco.seconds
         self.index += 1
 
-        if self.index == self.chunksize:
+        if self.index == self.chunksize_:
             DataWriter._write(self.group, 'timestamps', self.timestamps, self.index)
             DataWriter._write(self.group, 'years', self.years, self.index)
             DataWriter._write(self.group, 'months', self.months, self.index)
@@ -460,7 +429,7 @@ def _chunkcount(dataset, chunksize, istart=0, iend=None):
 
 def _slice_for_chunk(c, dataset, chunksize, istart=0, iend=None):
     if iend is None:
-        iend = dataset.size
+        iend = len(dataset)
     requested_size = iend - istart
     # if c == chunkmax - 1:
     if c >= _chunkcount(dataset, chunksize, istart, iend):
@@ -999,32 +968,74 @@ def temp_dataset():
         hd.close()
 
 
-class CachedArray:
-
-    def __init__(self, dataset, chunksize):
+# TODO: indexed chunks can be written do, but you have to append to the end and
+# then resort
+class IndexedSeries:
+    def __init__(self, dataset, chunksize=DEFAULT_CHUNKSIZE):
         self.dataset = dataset
         self.istart = None
         self.iend = None
         self.curchunk = None
         self.curchunkindex = None
         self.curchunkdirty = None
-        self.chunksize = chunksize
-
+        self.chunksize_ = chunksize
 
     def __getitem__(self, index):
         self._updatechunk(index)
         return self.curchunk[index - self.istart]
 
+    def __len__(self):
+        return self.dataset
+
+    def chunksize(self):
+        return self.chunksize_
+
+    def _updatechunk(self, index):
+        nextchunkindex = self._chunkindex(index)
+        if self.curchunkindex is None or self.curchunkindex != nextchunkindex:
+            istart, iend = _slice_for_chunk(nextchunkindex, self.dataset, self.chunksize_)
+            nextchunk = self.dataset[istart:iend]
+            # if self.curchunkdirty is True:
+            #     self.dataset[self.istart:self.iend] = self.curchunk
+            self.curchunkdirty = False
+            self.curchunk = nextchunk
+            self.curchunkindex = nextchunkindex
+            self.istart = istart
+            self.iend = iend
+
+    def _chunkindex(self, iarg):
+        return int(iarg / self.chunksize())
+
+
+class Series:
+
+    def __init__(self, dataset, chunksize=DEFAULT_CHUNKSIZE):
+        self.dataset = dataset
+        self.istart = None
+        self.iend = None
+        self.curchunk = None
+        self.curchunkindex = None
+        self.curchunkdirty = None
+        self.chunksize_ = chunksize
+
+    def __getitem__(self, index):
+        self._updatechunk(index)
+        return self.curchunk[index - self.istart]
 
     def __setitem__(self, index, value):
         self._updatechunk(index)
         self.curchunk[index - self.istart] = value
 
+    def __len__(self):
+        return self.dataset.size
+
+    def chunksize(self):
+        return self.chunksize_
 
     def _updatechunk(self, index):
         nextchunkindex = self._chunkindex(index)
         if self.curchunkindex is None or self.curchunkindex != nextchunkindex:
-            istart, iend = _slice_for_chunk(nextchunkindex, self.dataset, self.chunksize)
+            istart, iend = _slice_for_chunk(nextchunkindex, self.dataset, self.chunksize_)
             nextchunk = self.dataset[istart:iend]
             if self.curchunkdirty is True:
                 self.dataset[self.istart:self.iend] = self.curchunk
@@ -1034,6 +1045,244 @@ class CachedArray:
             self.istart = istart
             self.iend = iend
 
-
     def _chunkindex(self, iarg):
-        return int(iarg / self.chunksize)
+        return int(iarg / self.chunksize())
+
+
+def filter(dataset, field, name, predicate, timestamp=datetime.now(timezone.utc)):
+    c = Series(field)
+    writer = BooleanWriter(dataset, DEFAULT_CHUNKSIZE, name, timestamp)
+    for r in c:
+        writer.append(predicate(r))
+    writer.flush()
+    return dataset[name]
+
+
+def distinct(dataset, field, name, filter=None, timestamp=datetime.now(timezone.utc)):
+    d = Series(field)
+    distinct_values = set()
+    if filter is not None:
+        f = Series(filter)
+        for i_r in range(len(d)):
+            if f[i_r] == 0:
+                distinct_values.add(d[i_r])
+    else:
+        for i_r in range(len(d)):
+            distinct_values.add(d[i_r])
+
+    return distinct_values
+
+
+def get_reader(dataset, field_name):
+    fieldtype_map = {
+        'indexedstring': IndexedStringReader,
+        'fixedstring': FixedStringReader,
+        'categorical': CategoricalReader,
+        'boolean': NumericReader,
+        'numeric': NumericReader,
+        'datetime': TimestampReader,
+        'date': TimestampReader
+    }
+    if field_name not in dataset.keys():
+        error = "{} is not a field in {}. The following fields are available: {}"
+        raise ValueError(error.format(field_name, dataset, dataset.keys()))
+
+    group = dataset[field_name]
+    if 'fieldtype' not in group.attrs.keys():
+        error = "'fieldtype' is not a field in {}."
+        raise ValueError(error.format(group))
+
+    fieldtype_elems = group.attrs['fieldtype'].split(',')
+
+
+class FixedStringReader:
+    def __init__(self, field, as_string=False):
+        if 'fieldtype' not in field.attrs.keys():
+            error = "{} must have 'fieldtype' in its attrs property"
+            raise ValueError(error.format(field))
+        fieldtype, fieldlen = field.attrs['fieldtype'].split(',')
+        if fieldtype != 'fixedstring':
+            error = "'fieldtype of '{} should be 'categorical' but is {}"
+            raise ValueError(error.format(field, fieldtype))
+
+        self.dataset = field['values']
+        self.istart = None
+        self.iend = None
+        self.curchunk = None
+        self.curchunkindex = None
+        self.curchunkdirty = None
+        self.chunksize_ = field.attrs['chunksize']
+        if as_string:
+            self.converter = lambda x: x.decode()
+        else:
+            self.converter = lambda x: x
+
+    def __getitem__(self, index):
+        self._updatechunk(index)
+        return self.converter(self.curchunk[index - self.istart])
+
+    def __len__(self):
+        return self.dataset.size
+
+    def _updatechunk(self, index):
+        nextchunkindex = self._chunkindex(index)
+        if self.curchunkindex is None or self.curchunkindex != nextchunkindex:
+            istart, iend = _slice_for_chunk(nextchunkindex, self.dataset, self.chunksize_)
+            nextchunk = self.dataset[istart:iend]
+            if self.curchunkdirty is True:
+                self.dataset[self.istart:self.iend] = self.curchunk
+            self.curchunkdirty = False
+            self.curchunk = nextchunk
+            self.curchunkindex = nextchunkindex
+            self.istart = istart
+            self.iend = iend
+
+    def _chunkindex(self, index):
+        return int(index / self.chunksize_)
+
+
+class CategoricalReader:
+
+    def __init__(self, field, as_string=False):
+        if 'fieldtype' not in field.attrs.keys():
+            error = "{} must have 'fieldtype' in its attrs property"
+            raise ValueError(error.format(field))
+        fieldtype = field.attrs['fieldtype']
+        if fieldtype != 'categorical':
+            error = "'fieldtype of '{} should be 'categorical' but is {}"
+            raise ValueError(error.format(field, fieldtype))
+
+        self.dataset = field['values']
+        self.key = field['keys']
+        self.istart = None
+        self.iend = None
+        self.curchunk = None
+        self.curchunkindex = None
+        self.curchunkdirty = None
+        self.chunksize_ = field.attrs['chunksize']
+        if as_string:
+            self.converter = lambda x: self.key[x]
+        else:
+            self.converter = lambda x: x
+
+    def __getitem__(self, index):
+        self._updatechunk(index)
+        return self.converter(self.curchunk[index - self.istart])
+
+    def __len__(self):
+        return self.dataset.size
+
+    def _updatechunk(self, index):
+        nextchunkindex = self._chunkindex(index)
+        if self.curchunkindex is None or self.curchunkindex != nextchunkindex:
+            istart, iend = _slice_for_chunk(nextchunkindex, self.dataset, self.chunksize_)
+            nextchunk = self.dataset[istart:iend]
+            if self.curchunkdirty is True:
+                self.dataset[self.istart:self.iend] = self.curchunk
+            self.curchunkdirty = False
+            self.curchunk = nextchunk
+            self.curchunkindex = nextchunkindex
+            self.istart = istart
+            self.iend = iend
+
+    def _chunkindex(self, index):
+        return int(index / self.chunksize_)
+
+
+class NumericReader:
+
+    def __init__(self, field, flagged_value=None):
+        if 'fieldtype' not in field.attrs.keys():
+            error = "{} must have 'fieldtype' in its attrs property"
+            raise ValueError(error.format(field))
+        fieldtype = field.attrs['fieldtype'].split(',')
+        if fieldtype[0] != 'numeric':
+            error = "'fieldtype of '{} should be 'categorical' but is {}"
+            raise ValueError(error.format(field, fieldtype))
+
+        self.dataset = field['values']
+        self.flags = None
+        if 'filter' in field.keys():
+            self.flags = field['filter']
+        self.istart = None
+        self.iend = None
+        self.curchunk = None
+        self.curflags = None
+        self.curchunkindex = None
+        self.curchunkdirty = None
+        self.chunksize_ = field.attrs['chunksize']
+        if self.flags is not None:
+            self.converter = lambda i, v, f: flagged_value if f[i] else v[i]
+        else:
+            self.converter = lambda i, v, _: v[i]
+
+    def __getitem__(self, index):
+        self._updatechunk(index)
+        return self.converter(index - self.istart, self.curchunk, self.curflags)
+
+    def __len__(self):
+        return self.dataset.size
+
+    def _updatechunk(self, index):
+        nextchunkindex = self._chunkindex(index)
+        if self.curchunkindex is None or self.curchunkindex != nextchunkindex:
+            istart, iend = _slice_for_chunk(nextchunkindex, self.dataset, self.chunksize_)
+            nextchunk = self.dataset[istart:iend]
+            if self.flags is not None:
+                nextflags = self.flags[istart:iend]
+            if self.curchunkdirty is True:
+                self.dataset[self.istart:self.iend] = self.curchunk
+                if self.flags is not None:
+                    self.flags[self.istart:self.iend] = self.curflags
+            self.curchunkdirty = False
+            self.curchunk = nextchunk
+            if self.flags is not None:
+                self.curflags = nextflags
+            self.curchunkindex = nextchunkindex
+            self.istart = istart
+            self.iend = iend
+
+    def _chunkindex(self, index):
+        return int(index / self.chunksize_)
+
+
+# class Series:
+#
+#     def __init__(self, dataset, chunksize=DEFAULT_CHUNKSIZE):
+#         self.dataset = dataset
+#         self.istart = None
+#         self.iend = None
+#         self.curchunk = None
+#         self.curchunkindex = None
+#         self.curchunkdirty = None
+#         self.chunksize_ = chunksize
+#
+#     def __getitem__(self, index):
+#         self._updatechunk(index)
+#         return self.curchunk[index - self.istart]
+#
+#     def __setitem__(self, index, value):
+#         self._updatechunk(index)
+#         self.curchunk[index - self.istart] = value
+#
+#     def __len__(self):
+#         return self.dataset.size
+#
+#     def chunksize(self):
+#         return self.chunksize_
+#
+#     def _updatechunk(self, index):
+#         nextchunkindex = self._chunkindex(index)
+#         if self.curchunkindex is None or self.curchunkindex != nextchunkindex:
+#             istart, iend = _slice_for_chunk(nextchunkindex, self.dataset, self.chunksize_)
+#             nextchunk = self.dataset[istart:iend]
+#             if self.curchunkdirty is True:
+#                 self.dataset[self.istart:self.iend] = self.curchunk
+#             self.curchunkdirty = False
+#             self.curchunk = nextchunk
+#             self.curchunkindex = nextchunkindex
+#             self.istart = istart
+#             self.iend = iend
+#
+#     def _chunkindex(self, iarg):
+#         return int(iarg / self.chunksize())
