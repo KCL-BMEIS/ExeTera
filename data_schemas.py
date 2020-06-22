@@ -63,18 +63,18 @@ class DataSchema:
 
 
     field_writers = {
-        'idtype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, ts, 32),
-        'datetimetype': lambda g, cs, n, ts: persistence.DatetimeWriter(g, cs, n, ts),
-        'datetype': lambda g, cs, n, ts: persistence.DateWriter(g, cs, n, ts),
-        'indexedstringtype': lambda g, cs, n, ts: persistence.IndexedStringWriter(g, cs, n, ts),
-        'countrycodetype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, ts, 2),
-        'unittype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, ts, 1),
-        'categoricaltype': lambda g, cs, n, ts, stv: persistence.CategoricalWriter(g, cs, n, ts, stv),
-        'float32type': lambda g, cs, n, ts: persistence.NumericWriter(
+        'idtype': lambda g, cs, n, ts: persistence.FixedStringWriter2(g, cs, n, ts, 32),
+        'datetimetype': lambda g, cs, n, ts: persistence.TimestampWriter2(g, cs, n, ts),
+        'datetype': lambda g, cs, n, ts: persistence.TimestampWriter2(g, cs, n, ts),
+        'indexedstringtype': lambda g, cs, n, ts: persistence.IndexedStringWriter2(g, cs, n, ts),
+        'countrycodetype': lambda g, cs, n, ts: persistence.FixedStringWriter2(g, cs, n, ts, 2),
+        'unittype': lambda g, cs, n, ts: persistence.FixedStringWriter2(g, cs, n, ts, 1),
+        'categoricaltype': lambda g, cs, n, ts, stv: persistence.CategoricalWriter2(g, cs, n, ts, stv),
+        'float32type': lambda g, cs, n, ts: persistence.NumericWriter2(
             g, cs, n, ts, 'float32', persistence.str_to_float, True),
-        'uint16type': lambda g, cs, n, ts: persistence.NumericWriter(
+        'uint16type': lambda g, cs, n, ts: persistence.NumericWriter2(
             g, cs, n, ts, 'uint16', persistence.str_to_int, True),
-        'geocodetype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, ts, 9)
+        'geocodetype': lambda g, cs, n, ts: persistence.FixedStringWriter2(g, cs, n, ts, 9)
     }
 
     patient_field_types = {
@@ -85,7 +85,7 @@ class DataSchema:
         'country_code': 'countrycodetype',
         'reported_by_another': 'categoricaltype',
         'same_household_as_reporter': 'categoricaltype',
-        'year_of_birth': 'indexedstringtype',
+        'year_of_birth': 'float32type',
         'height_cm': 'float32type',
         'weight_kg': 'float32type',
         'gender': 'categoricaltype',

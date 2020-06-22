@@ -9,6 +9,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
+import numpy as np
+
 from utils import check_input_lengths
 import persistence as persist
 
@@ -37,25 +40,47 @@ class CalculateAgeFromYearOfBirth:
                 flags[i_r] |= self.f_missing_age
 
 
-def calculate_age_from_year_of_birth(patients, year_of_birth, in_range_fn, current_year,
+def calculate_age_from_year_of_birth(destination,
+                                     year_of_birth, in_range_fn, current_year,
                                      chunksize=None, timestamp=None, name='age'):
-    bad_age = persist.NumericWriter(
-        patients, chunksize, 'bad_age', timestamp, 'numeric,uint8')
+    age_18_to_90 = persist.NumericWriter(
+        destination, chunksize, '18_to_90', timestamp, 'uint8',
+        needs_filter=True)
     age = persist.NumericWriter(
-        patients, chunksize, 'age', timestamp, 'numeric,int32')
-    for y in persist.indexed_string_iterator(year_of_birth):
+        destination, chunksize, 'age', timestamp, 'int32')
+    for y in persist.IndexedStringReader(year_of_birth):
         try:
             a = current_year - int(float(y))
-            bad_age.append(0)
+            age_18_to_90.append(in_range_fn(a))
 
         except ValueError:
-            bad_age.append(1)
+            age_18_to_90.append(0)
             age.append(None)
-        if in_range_fn(a):
-            bad_age.append(0)
-            age.append(age)
 
-def filter_by_range(dataset, source, name, in_range_fn, chunksize=None, timestamp=None):
-    s_it = persist.iterator(source)
-    flags = persist.NumericWriter(
-        dataset, source.attrs['chunksize'], name, timestamp, 'uint8')
+
+def calculate_age_from_year_of_birth_fast(min_age, max_age,
+                                          year_of_birth,
+                                          age, age_filter, year,
+                                          chunksize=None, timestamp=None):
+    yob_v = year_of_birth['values']
+    yob_f = year_of_birth['filter']
+
+    length = len(yob_v)
+    chunksize = age.chunksize if chunksize is None else chunksize
+    for c in range(math.ceil(len(yob_v)) / chunksize):
+        src_index_start = c * chunksize
+        maxindex =\
+            chunksize if (c+1) * chunksize <= length else length % chunksize
+        src_index_end = src_index_start + maxindex
+
+        src_yob_vals = yob_v[src_index_start:src_index_end]
+        src_yob_flts = yob_f[src_index_start:src_index_end]
+        raw_ages = src_yob_vals - year
+        age.values[:maxindex] = raw_ages
+        age_filter.values[:maxindex] =\
+            np.logical_not(src_yob_flts) & (min_age <= raw_ages) & (raw_ages <= max_age)
+        age.write_chunk(maxindex)
+        age_filter.write_chunk(maxindex)
+
+    age.flush()
+    age_filter.flush()

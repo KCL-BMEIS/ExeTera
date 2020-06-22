@@ -93,7 +93,7 @@ class DatasetImporter:
                         f"'early_filter': tuple element zero must be a key that is in the dataset")
                 early_key_index = available_keys.index(early_filter[0])
 
-            chunk_size = 1 << 18
+            chunk_size = 1 << 25
             new_fields = dict()
             new_field_list = list()
             for i_n in range(len(fields_to_use)):

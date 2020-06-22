@@ -133,6 +133,7 @@ custom_field_aggregators = {
 
 def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema, year, territories=None):
 
+    early_filter = None
     if territories is not None:
         territories = tuple(territories.split(','))
         early_filter = ('country_code', lambda x: x in territories)

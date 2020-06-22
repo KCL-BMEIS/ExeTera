@@ -1,6 +1,6 @@
 import unittest
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from io import BytesIO
 
 import numpy as np
@@ -22,6 +22,11 @@ class TestPersistence(unittest.TestCase):
         for i in range(7):
             self.assertEqual(expected[i], persistence._slice_for_chunk(i, dataset, 100, 200, 850))
 
+    def test_chunks(self):
+        for c in persistence.chunks(1050, 100):
+            print(c)
+        for c in persistence.chunks(1000, 100):
+            print(c)
 
     def test_cached_array_read(self):
         dataset = np.arange(95, dtype=np.uint32)
@@ -89,36 +94,42 @@ class TestPersistence(unittest.TestCase):
 
         ts = str(datetime.now(timezone.utc))
         bio = BytesIO()
+        values = ['True', 'False', '', '', 'False', '', 'True',
+                  'Stupendous', '', "I really don't know", 'True',
+                  'Ambiguous', '', '', '', 'Things', 'Zombie driver',
+                  'Perspicacious', 'False', 'Fa,lse', '', '', 'True',
+                  '', 'True', 'Troubador', '', 'Calisthenics', 'The',
+                  '', 'Quick', 'Brown', '', '', 'Fox', 'Jumped', '',
+                  'Over', 'The', '', 'Lazy', 'Dog']
         with h5py.File(bio, 'w') as hf:
             hf.create_group('test')
 
-            foo = persistence.IndexedStringWriter(hf, 10, 'foo', ts)
-            values = ['True', 'False', '', '', 'False', '', 'True',
-                      'Stupendous', '', "I really don't know", 'True',
-                      'Ambiguous', '', '', '', 'Things', 'Zombie driver',
-                      'Perspicacious', 'False', 'Fa,lse', '', '', 'True',
-                      '', 'True', 'Troubador', '', 'Calisthenics', 'The',
-                      '', 'Quick', 'Brown', '', '', 'Fox', 'Jumped', '',
-                      'Over', 'The', '', 'Lazy', 'Dog']
-            for v in values:
-                foo.append(v)
+            # foo = persistence.IndexedStringWriter(hf, 10, 'foo', ts)
+            # for v in values:
+            #     foo.append(v)
+            # foo.flush()
+            foo = persistence.NewIndexedStringWriter(hf, 10, 'foo', ts)
+            foo.write_part(values[0:10])
+            foo.write_part(values[10:20])
+            foo.write_part(values[20:30])
+            foo.write_part(values[30:40])
+            foo.write_part(values[40:42])
             foo.flush()
-            print(hf['foo']['values'][()])
+            print(hf['foo']['index'][()])
+
             index = hf['foo']['index'][()]
-            print('index:', index)
-            print(hf['foo']['values'])
-            print(hf['foo']['values'][0:10])
-            print('fieldtype:', hf['foo'].attrs['fieldtype'])
-            print('timestamp:', hf['foo'].attrs['timestamp'])
-            print('completed:', hf['foo'].attrs['completed'])
 
             actual = list()
             for i in range(index.size - 1):
                 # print(index[i], index[i+1])
                 # print(hf['foo']['values'][index[i]:index[i+1]].tostring().decode())
-                actual.append(hf['foo']['values'][index[i]:index[i+1]].tostring().decode())
+                actual.append(hf['foo']['values'][index[i]:index[i+1]].tobytes().decode())
 
             self.assertListEqual(values, actual)
+
+        with h5py.File(bio, 'r') as hf:
+            foo = persistence.NewIndexedStringReader(hf['foo'])
+            print(foo[:])
 
 
     def test_indexed_string_importer_2(self):
@@ -166,6 +177,26 @@ class TestPersistence(unittest.TestCase):
             for f in persistence.fixed_string_iterator(hf['foo']):
                 print(f)
 
+
+    def test_new_fixed_string_importer_1(self):
+
+        ts = str(datetime.now(timezone.utc))
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            hf.create_group('test')
+
+            foo = persistence.NewFixedStringWriter(hf, 10, 'foo', ts, 5)
+            values = ['', '', '1.0.0', '', '1.0.0', '1.0.0', '1.0.0', '1.0.0', '', '',
+                      '1.0.0', '1.0.0', '', '1.0.0', '1.0.0', '1.0.0', '', '1.0.0', '1.0.0', '']
+            foo.write_part(np.asarray(values[0:10], dtype="S5"))
+            foo.write_part(np.asarray(values[10:20], dtype="S5"))
+            foo.flush()
+            print('fieldtype:', hf['foo'].attrs['fieldtype'])
+            print('timestamp:', hf['foo'].attrs['timestamp'])
+            print('completed:', hf['foo'].attrs['completed'])
+
+            for f in persistence.fixed_string_iterator(hf['foo']):
+                print(f)
 
     def test_fixed_string_reader(self):
         ts = str(datetime.now(timezone.utc))
@@ -235,6 +266,35 @@ class TestPersistence(unittest.TestCase):
                 print(foo[v])
 
 
+    def test_new_numeric_reader_float32(self):
+        ts = str(datetime.now(timezone.utc))
+        bio = BytesIO()
+        values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
+                  '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
+        with h5py.File(bio, 'w') as hf:
+            foov = persistence.NewNumericWriter(hf, 10, 'foo', ts, 'float32')
+            foof = persistence.NewNumericWriter(hf, 10, 'foo_filter', ts, 'bool')
+            out_values = np.zeros(len(values), dtype=np.float32)
+            out_filter = np.zeros(len(values), dtype=np.bool)
+            for i in range(len(values)):
+                try:
+                    out_values[i] = float(values[i])
+                    out_filter[i] = True
+                except:
+                    out_values[i] = 0
+                    out_filter[i] = False
+            foov.write_part(out_values)
+            foof.write_part(out_filter)
+            foov.flush()
+            foof.flush()
+
+        with h5py.File(bio, 'r') as hf:
+            foov = persistence.NewNumericReader(hf['foo'])
+            foof = persistence.NewNumericReader(hf['foo_filter'])
+            print(foov[5:15])
+            print(foof[5:15])
+
+
     def test_numeric_importer_int32(self):
 
         ts = str(datetime.now(timezone.utc))
@@ -278,7 +338,7 @@ class TestPersistence(unittest.TestCase):
             # ds = hf.create_dataset('foo', (10,), dtype=h5py.string_dtype(encoding='utf-8'))
             # ds[:] = values
             # print(ds)
-            foo = persistence.CategoricalWriter(hf, 10, 'foo', ts, {'':0, 'False':1, 'True':2})
+            foo = persistence.CategoricalWriter(hf, 10, 'foo', ts, {'': 0, 'False': 1, 'True': 2})
             for v in values:
                 foo.append(v)
             foo.flush()
@@ -310,6 +370,87 @@ class TestPersistence(unittest.TestCase):
             for i in range(len(foo_int)):
                 self.assertEqual(values[i], foo_str[i])
                 self.assertEqual(value_map[values[i]], foo_int[i])
+            for expected, actual in zip([value_map[v] for v in values], foo_int):
+                self.assertEqual(expected, actual)
+
+
+    def test_timestamp_reader(self):
+        dt = datetime.now(timezone.utc)
+        ts = str(dt)
+        bio = BytesIO()
+        random.seed(12345678)
+        deltas = [random.randint(10, 1000) for _ in range(95)]
+        values = [dt + timedelta(seconds=d) for d in deltas]
+
+        with h5py.File(bio, 'w') as hf:
+            foo = persistence.DatetimeWriter(hf, 10, 'foo', ts)
+            for v in values:
+                foo.append(str(v))
+            foo.flush()
+
+        with h5py.File(bio, 'r') as hf:
+            foo = persistence.TimestampReader(hf['foo'])
+            actual = [f for f in foo]
+            self.assertEqual([v.timestamp() for v in values], actual)
+
+
+    def test_new_timestamp_reader(self):
+        dt = datetime.now(timezone.utc)
+        ts = str(dt)
+        bio = BytesIO()
+        random.seed(12345678)
+        deltas = [random.randint(10, 1000) for _ in range(95)]
+        values = [dt + timedelta(seconds=d) for d in deltas]
+        svalues = [str(v) for v in values]
+        tsvalues = np.asarray([v.timestamp() for v in values], dtype=np.float64)
+
+        with h5py.File(bio, 'w') as hf:
+            foo = persistence.NewDateTimeWriter(hf, 10, 'foo', ts)
+            foo.write_part(svalues[0:20])
+            foo.write_part(svalues[20:40])
+            foo.write_part(svalues[40:60])
+            foo.write_part(svalues[60:80])
+            foo.write_part(svalues[80:95])
+            foo.flush()
+
+        with h5py.File(bio, 'r') as hf:
+            foo = persistence.NewTimestampReader(hf['foo'])
+            actual = foo[:]
+            self.assertTrue(np.alltrue(tsvalues == actual))
+
+
+    def test_np_asarray_str_to_float(self):
+        strs = ['1.0', '', '2.1']
+        vals = np.asarray(strs, dtype=np.float32)
+        print(vals)
+
+    def test_np_filtered_iterator(self):
+        values = np.asarray([1.0, 0.0, 2.1], dtype=np.float32)
+        filter = np.asarray([True, False, True], dtype=np.bool)
+        for v in persistence.filtered_iterator(values, filter):
+            print(v)
+
+
+    def test_predicate(self):
+        values = np.random.randint(low=0, high=1000, size=95, dtype=np.uint32)
+
+        def functor(foo, footwo):
+            #TODO: handle the output being bigger than the final input
+            footwo[:] = foo * 2
+
+        dt = datetime.now(timezone.utc)
+        ts = str(dt)
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            foo = persistence.NewNumericWriter(hf, 10, 'foo', ts, 'uint32')
+            foo.write_part(values)
+            foo.flush()
+
+        with h5py.File(bio, 'w') as hf:
+            footwo = persistence.NewNumericWriter(hf, 10, 'twofoo', ts, 'uint32')
+            foo = persistence.NewNumericReader(hf['foo'])
+
+            persistence.process({'foo': foo}, {'footwo': footwo}, functor)
 
 
 class TestLongPersistence(unittest.TestCase):
