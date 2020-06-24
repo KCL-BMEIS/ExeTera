@@ -15,7 +15,7 @@ import dataset
 import utils
 
 
-filename = '/home/ben/covid/assessments_export_20200504030002.csv'
+filename = '/home/ben/covid/assessments_export_20200617030002.csv'
 
 with open(filename) as f:
     a_ds = dataset.Dataset(f,

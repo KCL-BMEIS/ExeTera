@@ -42,8 +42,10 @@ pfilename = '/home/ben/covid/patients_export_geocodes_20200617030002.csv'
 pcatfields = ('diabetes_type',)
 data_schema = data_schemas.DataSchema(1)
 with open(pfilename) as f:
+    ds = dataset.Dataset(f, stop_after=1)
+    print(len(ds.names_))
+with open(pfilename) as f:
     ds = dataset.Dataset(f, keys=pcatfields, show_progress_every=100000)
-
     for n in ds.names_:
         if data_schema.patient_field_types.get(n, 'categoricaltype') == 'categoricaltype':
             print(n)

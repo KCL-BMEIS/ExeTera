@@ -9,7 +9,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
+
 from utils import check_input_lengths
+import persistence
+
 
 class CheckInconsistentSymptoms:
     def __init__(self, f_healthy_but_symptoms, f_not_healthy_but_no_symptoms):
@@ -24,14 +28,45 @@ class CheckInconsistentSymptoms:
             elif healthy[i_r] == i_not_healthy and not symptoms[i_r]:
                 flags[i_r] |= self.f_not_healthy_but_no_symptoms
 
-# src_health_status = asmt_ds.field_by_name('health_status')
-# i_healthy = categorical_maps['health_status'].strings_to_values['healthy']
-# i_not_healthy = categorical_maps['health_status'].strings_to_values['not_healthy']
-# for ir in range(asmt_ds.row_count()):
-#     if src_health_status[ir] == i_healthy and any_symptoms[ir]:
-#         asmt_filter_status[ir] |= FILTER_INCONSISTENT_SYMPTOMS
-#     elif src_health_status[ir] == i_not_healthy and not any_symptoms[ir]:
-#         asmt_filter_status[ir] |= FILTER_INCONSISTENT_NO_SYMPTOMS
-#
-# for f in (FILTER_INCONSISTENT_SYMPTOMS, FILTER_INCONSISTENT_NO_SYMPTOMS):
-#     print(f'{assessment_flag_descs[f]}: {count_flag_set(asmt_filter_status, f)}')
+
+def check_inconsistent_symptoms_1(src_assessments, dest_assessments, timestamp):
+    generated_health_fields = ()
+    # generated_health_fields = ('has_temperature',)
+
+    # TODO: check that all fields are leaky booleans
+    health_check_fields = (
+        'fever', 'persistent_cough', 'fatigue', 'shortness_of_breath', 'diarrhoea',
+        'delirium', 'skipped_meals', 'abdominal_pain', 'chest_pain', 'hoarse_voice',
+        'loss_of_smell', 'headache', 'chills_or_shivers', 'eye_soreness', 'nausea',
+        'dizzy_light_headed', 'red_welts_on_face_or_lips', 'blisters_on_feet', 'sore_throat',
+        'unusual_muscle_pains'
+    )
+
+    health_status = persistence.NewCategoricalReader(src_assessments['health_status'])
+    health_status_array = health_status[:]
+
+    combined_results = np.zeros(len(health_status), dtype=np.bool)
+
+    for h in health_check_fields:
+        if h not in src_assessments.keys():
+            print(f"warning: field {h} is not present in this dataset")
+        else:
+            f = persistence.NewCategoricalReader(src_assessments[h])
+            combined_results = combined_results & (f[:] != 2)
+
+    for h in generated_health_fields:
+        if h not in src_assessments.keys():
+            print(f"warning: field {h} is not present in this dataset")
+        else:
+            f = persistence.NewCategoricalReader(src_assessments[h])
+            combined_results = combined_results and f[:]
+
+    inconsistent_healthy =\
+        persistence.NewNumericWriter(dest_assessments, health_status.chunksize,
+                                     'inconsistent_healthy', timestamp, 'bool')
+    inconsistent_not_healthy =\
+        persistence.NewNumericWriter(dest_assessments, health_status.chunksize,
+                                     'inconsistent_not_healthy', timestamp, 'bool')
+
+    inconsistent_healthy.write_part((health_status_array == 1) & (combined_results is False))
+    inconsistent_not_healthy.write_part((health_status_array == 2) & (combined_results is True))

@@ -14,6 +14,7 @@ with open(pfilename) as f:
     ds = dataset.Dataset(f, stop_after=1, show_progress_every=1000000)
 names = ds.names_
 snames = set(ds.names_)
+print(len(ds.names_))
 print(snames.difference(data_schema.assessment_field_types.keys()))
 del ds
 

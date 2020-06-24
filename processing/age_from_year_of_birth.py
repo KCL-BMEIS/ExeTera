@@ -59,28 +59,38 @@ def calculate_age_from_year_of_birth(destination,
 
 
 def calculate_age_from_year_of_birth_fast(min_age, max_age,
-                                          year_of_birth,
-                                          age, age_filter, year,
+                                          year_of_birth, year_of_birth_filter,
+                                          age, age_filter, age_range_filter, year,
                                           chunksize=None, timestamp=None):
-    yob_v = year_of_birth['values']
-    yob_f = year_of_birth['filter']
-
-    length = len(yob_v)
-    chunksize = age.chunksize if chunksize is None else chunksize
-    for c in range(math.ceil(len(yob_v)) / chunksize):
-        src_index_start = c * chunksize
-        maxindex =\
-            chunksize if (c+1) * chunksize <= length else length % chunksize
-        src_index_end = src_index_start + maxindex
-
-        src_yob_vals = yob_v[src_index_start:src_index_end]
-        src_yob_flts = yob_f[src_index_start:src_index_end]
-        raw_ages = src_yob_vals - year
-        age.values[:maxindex] = raw_ages
-        age_filter.values[:maxindex] =\
-            np.logical_not(src_yob_flts) & (min_age <= raw_ages) & (raw_ages <= max_age)
-        age.write_chunk(maxindex)
-        age_filter.write_chunk(maxindex)
-
+    yob_v = persist.NewNumericReader(year_of_birth)
+    yob_f = persist.NewNumericReader(year_of_birth_filter)
+    raw_ages = year - yob_v[:]
+    raw_age_filter = yob_f[:]
+    raw_age_range_filter = raw_age_filter & (min_age <= raw_ages) & (raw_ages <= max_age)
+    age.write_part(raw_ages)
+    age_filter.write_part(raw_age_filter)
+    age_range_filter.write_part(raw_age_range_filter)
     age.flush()
     age_filter.flush()
+    age_range_filter.flush()
+
+
+    # length = len(yob_v)
+    # chunksize = age.chunksize if chunksize is None else chunksize
+    # for c in range(math.ceil(len(yob_v)) / chunksize):
+    #     src_index_start = c * chunksize
+    #     maxindex =\
+    #         chunksize if (c+1) * chunksize <= length else length % chunksize
+    #     src_index_end = src_index_start + maxindex
+    #
+    #     src_yob_vals = yob_v[src_index_start:src_index_end]
+    #     src_yob_flts = yob_f[src_index_start:src_index_end]
+    #     raw_ages = src_yob_vals - year
+    #     age.values[:maxindex] = raw_ages
+    #     age_filter.values[:maxindex] =\
+    #         np.logical_not(src_yob_flts) & (min_age <= raw_ages) & (raw_ages <= max_age)
+    #     age.write_chunk(maxindex)
+    #     age_filter.write_chunk(maxindex)
+    #
+    # age.flush()
+    # age_filter.flush()

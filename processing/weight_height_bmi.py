@@ -15,6 +15,8 @@ import numpy as np
 
 import utils
 
+import persistence
+
 
 class ValidateHeight1:
     def __init__(self,
@@ -141,66 +143,61 @@ def weight_height_bmi_1(min_weight, max_weight, min_height, max_height, min_bmi,
 
 def weight_height_bmi_fast_1(
     min_weight, max_weight, min_height, max_height, min_bmi, max_bmi,
-    genders, ages,
-    weights, heights, bmis,
+    genders, gender_filter, ages, age_filter,
+    weights, weight_filter, heights, height_filter, bmis, bmi_filter,
     weights_clean, weights_filter, weights_modified_flag,
     heights_clean, heights_filter, heights_modified_flag,
     bmis_clean, bmis_filter, bmis_modified_flag):
 
-    weightsv = weights['values']
-    weightsf = weights['filter']
-    heightsv = heights['values']
-    heightsf = heights['filter']
-    bmisv = bmis['values']
-    bmisf = bmis['filter']
+    raw_weightsv = persistence.NewNumericReader(weights)[:]
+    raw_weightsf = persistence.NewNumericReader(weight_filter)[:]
+    raw_heightsv = persistence.NewNumericReader(heights)[:]
+    raw_heightsf = persistence.NewNumericReader(height_filter)[:]
+    raw_bmisv = persistence.NewNumericReader(bmis)[:]
+    raw_bmisf = persistence.NewNumericReader(bmi_filter)[:]
 
-    length = len(weights['values'])
-    chunksize = weights_clean.chunksize
-    if len(weights) != len(heights):
-        raise ValueError("'weights' and 'heights' are different lengths")
-    if len(weights) != len(bmis):
-        raise ValueError("'weights' and 'bmis' are different lengths")
+    length = len(raw_weightsv)
+    def test_input(series, name):
+        if len(series) != length:
+            raise ValueError(
+                f"weights (length {length}) and {name} (length {len(series)} must be the same")
 
-    weight_in_range = utils.valid_range_fac_inc(min_weight, max_weight)
-    height_in_range = utils.valid_range_fac_inc(min_height, max_height)
-    bmi_in_range = utils.valid_range_fac_inc(min_bmi, max_bmi)
+    test_input(raw_weightsf, 'weight_filter')
+    test_input(raw_heightsv, 'heights')
+    test_input(raw_heightsf, 'height_filter')
+    test_input(raw_bmisv, 'bmis')
+    test_input(raw_bmisf, 'bmi_filter')
 
-    for c in range(math.ceil(len(weights) / chunksize)):
-        src_index_start = c * chunksize
-        maxindex =\
-            chunksize if (c+1) * chunksize <= length else length % chunksize
-        src_index_end = src_index_start + maxindex
+    weights_clean.write_part(raw_weightsv)
+    weights_filter.write_part(
+        raw_weightsf & (min_weight <= raw_weightsv) & (raw_weightsv <= max_weight))
+    if weights_modified_flag is not None:
+        weights_modified_flag.write_part(np.zeros(length, dtype=np.bool))
 
-        src_wvals = weights['values'][src_index_start:src_index_end]
-        src_wflts = weights['filter'][src_index_start:src_index_end]
-        weights_clean.values[:maxindex] = src_wvals
-        weights_filter.values[:maxindex] =\
-            np.logical_not(src_wflts) & (min_weight <= src_wvals) & (src_wvals <= max_weight)
-        weights_clean.write_chunk(maxindex)
-        weights_filter.write_chunk(maxindex)
+    heights_clean.write_part(raw_heightsv)
+    heights_filter.write_part(
+        raw_heightsf & (min_height <= raw_heightsv) & (raw_heightsv <= max_height))
+    if heights_modified_flag is not None:
+        heights_modified_flag.write_part(np.zeros(length, dtype=np.bool))
 
-        src_hvals = heights['values'][src_index_start:src_index_end]
-        src_hflts = heights['filter'][src_index_start:src_index_end]
-        heights_clean.values[:maxindex] = src_hvals
-        heights_clean.values[:maxindex] =\
-            np.logical_not(src_hflts) & (min_weight <= src_wvals) & (src_wvals <= max_height)
-        heights_clean.write_chunk(maxindex)
-        heights_filter.write_chunk(maxindex)
+    bmis_clean.write_part(raw_bmisv)
+    bmis_filter.write_part(
+        raw_bmisf & (min_bmi <= raw_bmisv) & (raw_bmisv <= max_bmi))
+    if bmis_modified_flag is not None:
+        bmis_modified_flag.write_part(np.zeros(length, dtype=np.bool))
 
-        src_bvals = bmis['values'][src_index_start:src_index_end]
-        src_bflts = bmis['filter'][src_index_start:src_index_end]
-        bmis_clean.values[:maxindex] = src_bvals
-        bmis_clean.values[:maxindex] =\
-            np.logical_not(src_bflts) & (min_bmi <= src_bvals) & (src_bvals <= max_bmi)
-        bmis_clean.write_chunk(maxindex)
-        bmis_filter.write_chunk(maxindex)
-
-        weights_clean.flush(0)
-        weights_filter.flush(0)
-        heights_clean.flush(0)
-        heights_filter.flush(0)
-        bmis_clean.flush(0)
-        bmis_filter.flush(0)
+    weights_clean.flush()
+    weights_filter.flush()
+    if weights_modified_flag is not None:
+        weights_modified_flag.flush()
+    heights_clean.flush()
+    heights_filter.flush()
+    if heights_modified_flag is not None:
+        heights_modified_flag.flush()
+    bmis_clean.flush()
+    bmis_filter.flush()
+    if bmis_modified_flag is not None:
+        bmis_modified_flag.flush()
 
 
 class ValidateHeight2:

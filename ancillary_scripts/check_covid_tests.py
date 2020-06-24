@@ -2,8 +2,8 @@
 import dataset
 import utils
 
-pfilename = '/home/ben/covid/patients_export_geocodes_20200611030002.csv'
-filename = '/home/ben/covid/covid_test_export_20200611030002.csv'
+pfilename = '/home/ben/covid/patients_export_geocodes_20200617030002.csv'
+filename = '/home/ben/covid/covid_test_export_20200617030002.csv'
 keys = ('country_code',)
 
 with open(pfilename) as f:

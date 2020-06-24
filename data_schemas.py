@@ -63,18 +63,24 @@ class DataSchema:
 
 
     field_writers = {
-        'idtype': lambda g, cs, n, ts: persistence.FixedStringWriter2(g, cs, n, ts, 32),
-        'datetimetype': lambda g, cs, n, ts: persistence.TimestampWriter2(g, cs, n, ts),
-        'datetype': lambda g, cs, n, ts: persistence.TimestampWriter2(g, cs, n, ts),
-        'indexedstringtype': lambda g, cs, n, ts: persistence.IndexedStringWriter2(g, cs, n, ts),
-        'countrycodetype': lambda g, cs, n, ts: persistence.FixedStringWriter2(g, cs, n, ts, 2),
-        'unittype': lambda g, cs, n, ts: persistence.FixedStringWriter2(g, cs, n, ts, 1),
-        'categoricaltype': lambda g, cs, n, ts, stv: persistence.CategoricalWriter2(g, cs, n, ts, stv),
-        'float32type': lambda g, cs, n, ts: persistence.NumericWriter2(
-            g, cs, n, ts, 'float32', persistence.str_to_float, True),
-        'uint16type': lambda g, cs, n, ts: persistence.NumericWriter2(
-            g, cs, n, ts, 'uint16', persistence.str_to_int, True),
-        'geocodetype': lambda g, cs, n, ts: persistence.FixedStringWriter2(g, cs, n, ts, 9)
+        'idtype': lambda g, cs, n, ts: persistence.NewFixedStringWriter(g, cs, n, ts, 32),
+        'datetimetype': lambda g, cs, n, ts: persistence.NewDateTimeWriter(g, cs, n, ts),
+        'optionaldatetimetype': lambda g, cs, n, ts: persistence.OptionalDateTimeImporter(
+            g, cs, n, ts),
+        'datetype': lambda g, cs, n, ts: persistence.NewDateWriter(g, cs, n, ts),
+        'optionaldatetype': lambda g, cs, n, ts: persistence.OptionalDateImporter(g, cs, n, ts),
+        'indexedstringtype': lambda g, cs, n, ts: persistence.NewIndexedStringWriter(g, cs, n, ts),
+        'countrycodetype': lambda g, cs, n, ts: persistence.NewFixedStringWriter(g, cs, n, ts, 2),
+        'unittype': lambda g, cs, n, ts: persistence.NewFixedStringWriter(g, cs, n, ts, 1),
+        'categoricaltype': lambda g, cs, n, ts, stv: persistence.NewCategoricalWriter(
+            g, cs, n, ts, stv),
+        'float32type': lambda g, cs, n, ts: persistence.NewNumericImporter(
+            g, cs, n, ts, 'float32', persistence.try_str_to_float),
+        'uint16type': lambda g, cs, n, ts: persistence.NewNumericImporter(
+            g, cs, n, ts, 'uint16', persistence.try_str_to_int),
+        'yeartype': lambda g, cs, n, ts: persistence.NewNumericImporter(
+            g, cs, n, ts, 'uint32', persistence.try_str_to_float_to_int),
+        'geocodetype': lambda g, cs, n, ts: persistence.NewFixedStringWriter(g, cs, n, ts, 9)
     }
 
     patient_field_types = {
@@ -85,13 +91,13 @@ class DataSchema:
         'country_code': 'countrycodetype',
         'reported_by_another': 'categoricaltype',
         'same_household_as_reporter': 'categoricaltype',
-        'year_of_birth': 'float32type',
+        'year_of_birth': 'yeartype',
         'height_cm': 'float32type',
         'weight_kg': 'float32type',
         'gender': 'categoricaltype',
         'race_other': 'indexedstringtype',
         'ethnicity': 'categoricaltype',
-        'profile_attributes_updated_at': 'datetimetype',
+        'profile_attributes_updated_at': 'optionaldatetimetype',
         'has_diabetes': 'categoricaltype',
         'has_heart_disease': 'categoricaltype',
         'has_lung_disease': 'categoricaltype',
@@ -273,7 +279,7 @@ class DataSchema:
         'version': 'indexedstringtype',
         'country_code': 'countrycodetype',
         'health_status': 'categoricaltype',
-        'date_test_occurred': 'datetype',
+        'date_test_occurred': 'optionaldatetype',
         'date_test_occurred_guess': 'categoricaltype',
         'fever': 'categoricaltype',
         'temperature': 'float32type',
@@ -322,6 +328,18 @@ class DataSchema:
         'mask_other': 'indexedstringtype',
         'typical_hayfever': 'categoricaltype',
     }
+
+    generated_health_fields = (
+        'has_temperature'
+    )
+
+    health_check_fields = (
+        'fever', 'persistent_cough', 'fatigue', 'shortness_of_breath', 'diarrhoea',
+        'delirium', 'skipped_meals', 'abdominal_pain', 'chest_pain', 'hoarse_voice',
+        'loss_of_smell', 'headache', 'chills_or_shivers', 'eye_soreness', 'nausea',
+        'dizzy_light_headed', 'red_welts_on_face_or_lips', 'blisters_on_feet', 'sore_throat',
+        'unusual_muscle_pains'
+    )
 
     test_field_types = {
         'id': 'idtype',

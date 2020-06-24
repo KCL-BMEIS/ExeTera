@@ -222,6 +222,29 @@ def str_to_int(value):
     except ValueError:
         return None
 
+def try_str_to_float_to_int(value, invalid=0):
+    try:
+        v = int(float(value))
+        return True, v
+    except ValueError:
+        return False, invalid
+
+
+def try_str_to_int(value, invalid=0):
+    try:
+        v = int(value)
+        return True, v
+    except ValueError:
+        return False, invalid
+
+
+def try_str_to_float(value, invalid=0):
+    try:
+        v = float(value)
+        return True, v
+    except ValueError:
+        return False, invalid
+
 
 class NumericWriter(BaseWriter):
     # format_checks = {
@@ -1007,13 +1030,17 @@ def microseconds_getter(field, istart=0, iend=None):
     return zip(years, months, days, hours, minutes, seconds, microseconds)
 
 
-def dataset_sort(index, fields):
-    rfields = reversed(fields)
+def dataset_sort(index, readers):
+    r_readers = reversed(readers)
 
-    for f in rfields:
-        fdata = reader(f)
+    for f in r_readers:
+        fdata = f[:]
         index = sorted(index, key=lambda x: fdata[x])
-    return index
+    return np.asarray(index, dtype=np.uint32)
+
+
+def apply_sort(index, data):
+    return data[index]
 
 
 def dataset_merge_sort(group, index, fields):
@@ -1186,26 +1213,36 @@ def distinct(dataset, field, name, filter=None, timestamp=datetime.now(timezone.
     return distinct_values
 
 
-def get_reader(dataset, field_name):
+def get_reader_from_field(field):
+    if 'fieldtype' not in field.attrs.keys():
+        raise ValueError(f"'{field_name}' is not a well-formed field")
+
     fieldtype_map = {
-        'indexedstring': IndexedStringReader,
-        'fixedstring': FixedStringReader,
-        'categorical': CategoricalReader,
-        'boolean': NumericReader,
-        'numeric': NumericReader,
-        'datetime': TimestampReader,
-        'date': TimestampReader
+        'indexedstring': NewIndexedStringReader,
+        'fixedstring': NewFixedStringReader,
+        'categorical': NewCategoricalReader,
+        'boolean': NewNumericReader,
+        'numeric': NewNumericReader,
+        'datetime': NewTimestampReader,
+        'date': NewTimestampReader,
+        'timestamp': NewTimestampReader
     }
-    if field_name not in dataset.keys():
-        error = "{} is not a field in {}. The following fields are available: {}"
-        raise ValueError(error.format(field_name, dataset, dataset.keys()))
 
-    group = dataset[field_name]
-    if 'fieldtype' not in group.attrs.keys():
-        error = "'fieldtype' is not a field in {}."
-        raise ValueError(error.format(group))
+    fieldtype = field.attrs['fieldtype'].split(',')[0]
+    return fieldtype_map[fieldtype](field)
 
-    fieldtype_elems = group.attrs['fieldtype'].split(',')
+
+# def get_field(dataset, field_name):
+#     if field_name not in dataset.keys():
+#         error = "{} is not a field in {}. The following fields are available: {}"
+#         raise ValueError(error.format(field_name, dataset, dataset.keys()))
+#     return
+#     return get_reader_from_field(dataset[field_name])
+
+
+def get_writer_from_field(field, dest_group, dest_name):
+    reader = get_reader_from_field(field)
+    return reader.get_writer(dest_group, dest_name)
 
 
 class IndexedStringReader:
@@ -1303,15 +1340,7 @@ class FixedStringReader:
         return int(index / self.chunksize_)
 
 
-# def _get_converted_item(self, index):
-#     self._updatechunk(index)
-#     return self.converter(self.curchunk[index - self.istart])
-#
-# def _get_raw_item(self, index):
-#     self._updatechunk(index)
-#     return self.curchunk[index - self.istart]
-
-class BaseCategoricalReader:
+class CategoricalReader:
 
     def __init__(self, field, as_string=False):
         if 'fieldtype' not in field.attrs.keys():
@@ -1332,11 +1361,12 @@ class BaseCategoricalReader:
         self.chunksize_ = field.attrs['chunksize']
         if as_string:
             self.converter = lambda x: self.key[x]
-            # self.__getitem__ = _get_converted_item.__get__(self)
         else:
-            self.converter = None
-            # self.__getitem__ = _get_raw_item.__get__(self)
+            self.converter = lambda x: x
 
+    def __getitem__(self, index):
+        self._updatechunk(index)
+        return self.converter(self.curchunk[index - self.istart])
 
     def __len__(self):
         return self.dataset.size
@@ -1356,17 +1386,6 @@ class BaseCategoricalReader:
 
     def _chunkindex(self, index):
         return int(index / self.chunksize_)
-
-
-class CategoricalReader(BaseCategoricalReader):
-
-    def __init__(self, field, as_string=False):
-        super().__init__(field, as_string)
-
-    def __getitem__(self, index):
-        if self.curchunk is None or index < self.istart or index >= self.iend:
-            self._updatechunk(index)
-        return self.curchunk[index - self.istart]
 
 
 class NumericReader:
@@ -1589,6 +1608,12 @@ class NewIndexedStringReader(NewReader):
     def __len__(self):
         return len(self.field['index']) - 1
 
+    def getwriter(self, dest_group, dest_name, timestamp):
+        return NewIndexedStringWriter(dest_group, self.chunksize, dest_name, timestamp)
+
+    def dtype(self):
+        return (self.field['index'].dtype, self.field['values'].dtype)
+
 
 class NewNumericReader(NewReader):
     def __init__(self, field):
@@ -1608,6 +1633,12 @@ class NewNumericReader(NewReader):
     def __len__(self):
         return len(self.field['values'])
 
+    def getwriter(self, dest_group, dest_name, timestamp):
+        return NewNumericWriter(dest_group, self.chunksize, dest_name, timestamp,
+                                self.field.attrs['fieldtype'].split(',')[1])
+
+    def dtype(self):
+        return self.field['values'].dtype
 
 class NewCategoricalReader(NewReader):
     def __init__(self, field, flagged_value=None):
@@ -1628,6 +1659,13 @@ class NewCategoricalReader(NewReader):
     def __len__(self):
         return len(self.field['values'])
 
+    def getwriter(self, dest_group, dest_name, timestamp):
+        return NewCategoricalWriter(dest_group, self.chunksize, dest_name, timestamp,
+                                    {v: k for k, v in enumerate(self.field['keys'])})
+
+    def dtype(self):
+        return self.field['values'].dtype
+
 
 class NewFixedStringReader(NewReader):
     def __init__(self, field):
@@ -1647,6 +1685,13 @@ class NewFixedStringReader(NewReader):
     def __len__(self):
         return len(self.field['values'])
 
+    def getwriter(self, dest_group, dest_name, timestamp):
+        return NewFixedStringWriter(dest_group, self.chunksize, dest_name, timestamp,
+                                    self.field.attrs['fieldtype'].split(',')[1])
+
+    def dtype(self):
+        return self.field['values'].dtype
+
 
 class NewTimestampReader(NewReader):
     def __init__(self, field):
@@ -1655,7 +1700,7 @@ class NewTimestampReader(NewReader):
             error = "{} must have 'fieldtype' in its attrs property"
             raise ValueError(error.format(field))
         fieldtype = field.attrs['fieldtype'].split(',')
-        if fieldtype[0] not in ('datetime', 'date'):
+        if fieldtype[0] not in ('datetime', 'date', 'timestamp'):
             error = "'fieldtype of '{} should be 'datetime' or 'date' but is {}"
             raise ValueError(error.format(field, fieldtype))
         self.chunksize = field.attrs['chunksize']
@@ -1665,6 +1710,12 @@ class NewTimestampReader(NewReader):
 
     def __len__(self):
         return len(self.field['values'])
+
+    def getwriter(self, dest_group, dest_name, timestamp):
+        return NewTimestampWriter(dest_group, self.chunksize, dest_name, timestamp)
+
+    def dtype(self):
+        return self.field['values'].dtype
 
 
 class NewWriter:
@@ -1689,6 +1740,10 @@ class NewIndexedStringWriter(NewWriter):
         return [None] * length
 
     def write_part(self, values):
+        """Writes a list of strings in indexed string form to a field
+        Args:
+            values: a list of utf8 strings
+        """
         for s in values:
             evalue = s.encode()
             for v in evalue:
@@ -1716,6 +1771,33 @@ class NewIndexedStringWriter(NewWriter):
         self.field.attrs['chunksize'] = self.chunksize
         self.field.attrs['completed'] = True
 
+    def write(self, values):
+        self.write_part(values)
+        self.flush()
+
+
+class NewCategoricalImporter():
+    def __init__(self, group, chunksize, name, timestamp, categories):
+        self.writer = NewCategoricalWriter(group, chunksize, name, timestamp, categories)
+        self.field_size = max([len(k) for k in categories.keys()])
+
+    def chunk_factory(self, length):
+        return np.zeros(length, dtype=f'U{self.field_size}')
+
+    def write_part(self, values):
+        results = np.zeros(len(values), dtype='uint8')
+        keys = self.writer.keys
+        for i in range(len(values)):
+            results[i] = keys[values[i]]
+        self.writer.write_part(results)
+
+    def flush(self):
+        self.writer.flush()
+
+    def write(self, values):
+        self.write_part(values)
+        self.flush()
+
 
 class NewCategoricalWriter(NewWriter):
     def __init__(self, group, chunksize, name, timestamp, categories):
@@ -1742,11 +1824,51 @@ class NewCategoricalWriter(NewWriter):
         self.field.attrs['chunksize'] = self.chunksize
         self.field.attrs['completed'] = True
 
+    def write(self, values):
+        self.write_part(values)
+        self.flush()
+
+
+class NewNumericImporter:
+    def __init__(self, group, chunksize, name, timestamp, nformat, parser):
+        self.data_writer = NewNumericWriter(group, chunksize, name, timestamp, nformat)
+        self.flag_writer = NewNumericWriter(group, chunksize, f"{name}_valid", timestamp, 'bool')
+        self.parser = parser
+
+    def chunk_factory(self, length):
+        return [None] * length
+
+    def write_part(self, values):
+        """
+        Given a list of strings, parse the strings and write the parsed values. Values that
+        cannot be parsed are written out as zero for the values, and zero for the flags to
+        indicate that that entry is not valid.
+        Args:
+            values: a list of strings to be parsed
+        """
+        elements = np.zeros(len(values), dtype=self.data_writer.nformat)
+        validity = np.zeros(len(values), dtype='bool')
+        for i in range(len(values)):
+            valid, value = self.parser(values[i])
+            elements[i] = value
+            validity[i] = valid
+        self.data_writer.write_part(elements)
+        self.flag_writer.write_part(validity)
+
+    def flush(self):
+        self.data_writer.flush()
+        self.flag_writer.flush()
+
+    def write(self, values):
+        self.write_part(values)
+        self.flush()
+
 
 class NewNumericWriter(NewWriter):
     def __init__(self, group, chunksize, name, timestamp, nformat, needs_filter=False):
         NewWriter.__init__(self, group.create_group(name))
         self.fieldtype = f'numeric,{nformat}'
+        self.nformat = nformat
         self.timestamp = timestamp
         self.chunksize = chunksize
 
@@ -1761,7 +1883,12 @@ class NewNumericWriter(NewWriter):
         self.field.attrs['fieldtype'] = self.fieldtype
         self.field.attrs['timestamp'] = self.timestamp
         self.field.attrs['chunksize'] = self.chunksize
+        self.field.attrs['nformat'] = self.nformat
         self.field.attrs['completed'] = True
+
+    def write(self, values):
+        self.write_part(values)
+        self.flush()
 
 
 class NewFixedStringWriter(NewWriter):
@@ -1784,6 +1911,35 @@ class NewFixedStringWriter(NewWriter):
         self.field.attrs['chunksize'] = self.chunksize
         self.field.attrs['completed'] = True
 
+    def write(self, values):
+        self.write_part(values)
+        self.flush()
+
+
+class OptionalDateTimeImporter:
+    def __init__(self, group, chunksize, name, timestamp):
+        self.datetime = NewDateTimeWriter(group, chunksize, name, timestamp)
+        self.datetimeset = NewNumericWriter(group, chunksize, f"{name}_set", timestamp, 'bool')
+
+    def chunk_factory(self, length):
+        return self.datetime.chunk_factory(length)
+
+    def write_part(self, values):
+        # TODO: use a timestamp writer instead of a datetime writer and do the conversion here
+        flags = self.datetimeset.chunk_factory(len(values))
+        for i in range(len(values)):
+            flags[i] = values[i] != b''
+        self.datetime.write_part(values)
+        self.datetimeset.write_part(flags)
+
+    def flush(self):
+        self.datetime.flush()
+        self.datetimeset.flush()
+
+    def write(self, values):
+        self.write_part(values)
+        self.flush()
+
 
 # TODO writers can write out more than one field; offset could be done this way
 class NewDateTimeWriter(NewWriter):
@@ -1792,19 +1948,25 @@ class NewDateTimeWriter(NewWriter):
         self.fieldtype = f'datetime'
         self.timestamp = timestamp
         self.chunksize = chunksize
+        self.name = name
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype=f'S32')
 
     def write_part(self, values):
-
         timestamps = np.zeros(len(values), dtype=np.float64)
         for i in range(len(values)):
-            try:
-                ts = datetime.strptime(values[i], '%Y-%m-%d %H:%M:%S.%f%z')
-            except ValueError:
-                ts = datetime.strptime(values[i], '%Y-%m-%d %H:%M:%S%z')
-            timestamps[i] = ts.timestamp()
+            value = values[i]
+            if value == b'':
+                timestamps[i] = 0
+            else:
+                if len(value) == 32:
+                    ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S.%f%z')
+                elif len(value) == 25:
+                    ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S%z')
+                else:
+                    raise ValueError(f"Date field '{self.field}' has unexpected format '{value}'")
+                timestamps[i] = ts.timestamp()
         DataWriter._write(self.field, 'values', timestamps, len(timestamps))
 
     def flush(self):
@@ -1812,6 +1974,10 @@ class NewDateTimeWriter(NewWriter):
         self.field.attrs['timestamp'] = self.timestamp
         self.field.attrs['chunksize'] = self.chunksize
         self.field.attrs['completed'] = True
+
+    def write(self, values):
+        self.write_part(values)
+        self.flush()
 
 
 class NewDateWriter(NewWriter):
@@ -1820,6 +1986,7 @@ class NewDateWriter(NewWriter):
         self.fieldtype = f'datetime'
         self.timestamp = timestamp
         self.chunksize = chunksize
+        self.name = name
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype=f'S32')
@@ -1828,8 +1995,12 @@ class NewDateWriter(NewWriter):
 
         timestamps = np.zeros(len(values), dtype=np.float64)
         for i in range(len(values)):
-            ts = datetime.strptime(values[i], '%Y-%m-%d')
-            timestamps[i] = ts.timestamp()
+            value = values[i]
+            if value == b'':
+                timestamps[i] = 0
+            else:
+                ts = datetime.strptime(value.decode(), '%Y-%m-%d')
+                timestamps[i] = ts.timestamp()
         DataWriter._write(self.field, 'values', timestamps, len(timestamps))
 
     def flush(self):
@@ -1837,3 +2008,63 @@ class NewDateWriter(NewWriter):
         self.field.attrs['timestamp'] = self.timestamp
         self.field.attrs['chunksize'] = self.chunksize
         self.field.attrs['completed'] = True
+
+    def write(self, values):
+        self.write_part(values)
+        self.flush()
+
+
+class NewTimestampWriter:
+    def __init__(self, group, chunksize, name, timestamp):
+        NewWriter.__init__(self, group.create_group(name))
+        self.fieldtype = f'timestamp'
+        self.timestamp = timestamp
+        self.chunksize = chunksize
+        self.name = name
+
+    def chunk_factory(self, length):
+        return np.zeros(length, dtype=f'float64')
+
+    def write_part(self, values):
+        DataWriter._write(self.field, 'values', values, len(values))
+
+    def flush(self):
+        self.field.attrs['fieldtype'] = self.fieldtype
+        self.field.attrs['timestamp'] = self.timestamp
+        self.field.attrs['chunksize'] = self.chunksize
+        self.field.attrs['completed'] = True
+
+    def write(self, values):
+        self.write_part(values)
+        self.flush()
+
+
+class OptionalDateImporter:
+    def __init__(self, group, chunksize, name, timestamp):
+        self.date = NewDateWriter(group, chunksize, name, timestamp)
+        self.dateset = NewNumericWriter(group, chunksize, f"{name}_set", timestamp, 'bool')
+
+    def chunk_factory(self, length):
+        return self.date.chunk_factory(length)
+
+    def write_part(self, values):
+        # TODO: use a timestamp writer instead of a datetime writer and do the conversion here
+        flags = self.dateset.chunk_factory(len(values))
+        for i in range(len(values)):
+            flags[i] = values[i] != b''
+        self.date.write_part(values)
+        self.dateset.write_part(flags)
+
+    def flush(self):
+        self.date.flush()
+        self.dateset.flush()
+
+    def write(self, values):
+        self.write_part(values)
+        self.flush()
+
+
+# Sorters
+# =======
+
+# def fixed_string_sorter(index, reader, writer):
