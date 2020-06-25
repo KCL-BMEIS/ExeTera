@@ -40,32 +40,38 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     assessments_src = dataset['assessments']
     assessments_dest = destination.create_group('assessments')
 
-    pre_sort_assessments = True
+    sort_patients = True
     year_from_age = True
     weight_height_bmi = True
+
+    sort_assessments = True
     # post process patients
     # TODO: need an transaction table
 
     print(patients_src.keys())
     print(dataset['assessments'].keys())
 
-    # t0 = time.time()
-    # value = 100
-    # count = len(patients_src['year_of_birth']['values'])
-    # w = persistence.NumericWriter(patients_dest, chunksize, 'stuff', timestamp, 'uint32',
-    #                               needs_filter=True)
-    # for i in range(count):
-    #     w.append(value)
-    # w.flush()
-    # log(f"completed in {time.time() - t0}")
-
+    if sort_patients:
+        sort_keys = ('id',)
+        print(f"sort patients by {sort_keys}")
+        id_reader = persistence.NewFixedStringReader(patients_src['id'])
+        t1 = time.time()
+        sorted_index = persistence.dataset_sort(
+            np.arange(len(id_reader), dtype=np.uint32), (id_reader,))
+        sorted_ids = persistence.apply_sort_to_array(sorted_index, id_reader[:])
+        print(f'sorted {sort_keys} index in {time.time() - t1}s')
+        t0 = time.time()
+        for k in patients_src.keys():
+            t1 = time.time()
+            r = persistence.get_reader_from_field(patients_src[k])
+            w = r.getwriter(patients_dest, k, timestamp)
+            persistence.apply_sort(sorted_index, r, w)
+            print(f"'{k}' reordered in {time.time() - t1}s")
+        print(f"patient fields reordered in {time.time() - t0}s")
 
     if year_from_age:
         log("year of birth -> age; 18 to 90 filter")
         t0 = time.time()
-        # calculate_age_from_year_of_birth(
-        #     patients_dest, patients_src['year_of_birth'],
-        #     utils.valid_range_fac_inc(16, 90), 2020, chunksize, timestamp, name='age')
         age = persistence.NewNumericWriter(patients_dest, chunksize, 'age', timestamp, 'uint32')
         age_filter = persistence.NewNumericWriter(patients_dest, chunksize, 'age_filter',
                                                   timestamp, 'bool')
@@ -109,26 +115,28 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         log(f"completed in {time.time() - t0}")
 
 
-    sort_keys = ('patient_id', 'created_at')
-    print(f"sort assessments by {sort_keys}")
-    t0 = time.time()
-    patient_id_reader = persistence.NewFixedStringReader(assessments_src['patient_id'])
-    raw_patient_ids = patient_id_reader[:]
-    created_at_reader = persistence.NewTimestampReader(assessments_src['created_at'])
-    raw_created_ats = created_at_reader[:]
-    t1 = time.time()
-    sorted_index = persistence.dataset_sort(
-        np.arange(len(raw_patient_ids)), (raw_patient_ids, raw_created_ats))
-    print(f'sorted {sort_keys} index in {time.time() - t1}s')
-    t1 = time.time()
+    if sort_assessments:
+        sort_keys = ('patient_id', 'created_at')
+        print(f"sort assessments by {sort_keys}")
+        t0 = time.time()
+        patient_id_reader = persistence.NewFixedStringReader(assessments_src['patient_id'])
+        raw_patient_ids = patient_id_reader[:]
+        created_at_reader = persistence.NewTimestampReader(assessments_src['created_at'])
+        raw_created_ats = created_at_reader[:]
+        t1 = time.time()
+        sorted_index = persistence.dataset_sort(
+            np.arange(len(raw_patient_ids), dtype=np.uint32),
+            (patient_id_reader, created_at_reader))
+        print(f'sorted {sort_keys} index in {time.time() - t1}s')
 
-    result_patient_ids = persistence.apply_sort(sorted_index, raw_patient_ids)
-    result_created_ats = persistence.apply_sort(sorted_index, raw_created_ats)
-
-    print(f'reindexed_keys in {time.time() - t1}s')
-    persistence.NewFixedStringWriter(assessments_dest, patient_id_reader.chunksize,
-                                     'patient_id', timestamp, patient_id_reader.dtype())
-    print(f'completed in {time.time() - t0}s')
+        t0 = time.time()
+        for k in assessments_src.keys():
+            t1 = time.time()
+            r = persistence.get_reader_from_field(assessments_src[k])
+            w = r.getwriter(assessments_dest, k, timestamp)
+            persistence.apply_sort(sorted_index, r, w)
+            print(f"'{k}' reordered in {time.time() - t1}s")
+        print(f"patient fields reordered in {time.time() - t0}s")
 
     print('check inconsistent health_status')
     t0 = time.time()

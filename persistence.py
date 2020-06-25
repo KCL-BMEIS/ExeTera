@@ -1030,17 +1030,67 @@ def microseconds_getter(field, istart=0, iend=None):
     return zip(years, months, days, hours, minutes, seconds, microseconds)
 
 
+# def dataset_sort(index, readers):
+#     r_readers = reversed(readers)
+#
+#     for f in r_readers:
+#         fdata = f[:]
+#         index = sorted(index, key=lambda x: fdata[x])
+#     return np.asarray(index, dtype=np.uint32)
+
 def dataset_sort(index, readers):
     r_readers = reversed(readers)
 
+    acc_index = index[:]
+    first = True
     for f in r_readers:
-        fdata = f[:]
-        index = sorted(index, key=lambda x: fdata[x])
-    return np.asarray(index, dtype=np.uint32)
+        if first:
+            first = False
+            fdata = f[:]
+        else:
+            fdata = f[:][acc_index]
+
+        index = np.argsort(fdata)
+        acc_index = acc_index[index]
+    return acc_index
 
 
-def apply_sort(index, data):
-    return data[index]
+def apply_sort_to_array(index, values):
+    return values[index]
+
+
+from numba import njit
+@njit
+def apply_sort_to_index_values(index, indices, values):
+
+    s_indices = np.zeros_like(indices)
+    s_values = np.zeros_like(values)
+    accumulated = np.uint64(0)
+    s_indices[0] = 0
+    for di, si in enumerate(index):
+        src_field_start = indices[si]
+        src_field_end = indices[si + 1]
+        length = np.uint64(src_field_end - src_field_start)
+        if length > 0:
+            s_values[accumulated:accumulated + length] =\
+                values[src_field_start:src_field_end]
+        accumulated += length
+        if s_indices[di + 1] != 0:
+            print('non-zero index!')
+        s_indices[di + 1] = accumulated
+
+    return s_indices, s_values
+
+
+def apply_sort(index, reader, writer):
+    if isinstance(reader, NewIndexedStringReader):
+        src_indices = reader.field['index'][:]
+        src_values = reader.field.get('values', np.zeros(0, dtype='S1'))[:]
+        indices, values = apply_sort_to_index_values(index, src_indices, src_values)
+        writer.write_raw(indices, values)
+    else:
+        result = apply_sort_to_array(index, reader[:])
+        writer.write(result)
 
 
 def dataset_merge_sort(group, index, fields):
@@ -1612,7 +1662,21 @@ class NewIndexedStringReader(NewReader):
         return NewIndexedStringWriter(dest_group, self.chunksize, dest_name, timestamp)
 
     def dtype(self):
-        return (self.field['index'].dtype, self.field['values'].dtype)
+        return self.field['index'].dtype, self.field['values'].dtype
+
+    """
+    0 1 3 6 10 15
+    abbcccddddeeeee
+
+    2 3 1 4 0
+    0 3 7 9 14 15
+    cccddddbbeeeeea
+    """
+    def sort(self, index, writer):
+        field_index = self.field['index'][:]
+        field_values = self.field['values'][:]
+        r_field_index, r_field_values = apply_sort_to_index_values(index, field_index, field_values)
+        writer.write_raw(r_field_index, r_field_values)
 
 
 class NewNumericReader(NewReader):
@@ -1639,6 +1703,7 @@ class NewNumericReader(NewReader):
 
     def dtype(self):
         return self.field['values'].dtype
+
 
 class NewCategoricalReader(NewReader):
     def __init__(self, field, flagged_value=None):
@@ -1731,10 +1796,13 @@ class NewIndexedStringWriter(NewWriter):
 
         self.values = np.zeros(chunksize, dtype=np.byte)
         self.indices = np.zeros(chunksize, dtype=np.uint64)
+        self.ever_written = False
         self.accumulated = 0
-        self.indices[0] = self.accumulated
+        # self.indices[0] = self.accumulated
+        # self.value_index = 0
+        # self.index_index = 1
         self.value_index = 0
-        self.index_index = 1
+        self.index_index = 0
 
     def chunk_factory(self, length):
         return [None] * length
@@ -1744,6 +1812,11 @@ class NewIndexedStringWriter(NewWriter):
         Args:
             values: a list of utf8 strings
         """
+        if not self.ever_written:
+            self.indices[0] = self.accumulated
+            self.index_index = 1
+            self.ever_written = True
+
         for s in values:
             evalue = s.encode()
             for v in evalue:
@@ -1773,6 +1846,14 @@ class NewIndexedStringWriter(NewWriter):
 
     def write(self, values):
         self.write_part(values)
+        self.flush()
+
+    def write_part_raw(self, index, values):
+        DataWriter._write(self.field, 'index', index, len(index))
+        DataWriter._write(self.field, 'values', values, len(values))
+
+    def write_raw(self, index, values):
+        self.write_part_raw(index, values)
         self.flush()
 
 

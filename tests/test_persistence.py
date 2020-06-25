@@ -1,6 +1,7 @@
 import unittest
 import random
 from datetime import datetime, timezone, timedelta
+import time
 from io import BytesIO
 
 import numpy as np
@@ -598,14 +599,77 @@ class TestPersistence(unittest.TestCase):
             rvx = persistence.NewFixedStringReader(hf['vx'])
             sindex = persistence.dataset_sort(np.arange(5, dtype='uint32'), (rva, rvb))
 
-            ava = persistence.apply_sort(sindex, rva[:])
-            avb = persistence.apply_sort(sindex, rvb[:])
-            avx = persistence.apply_sort(sindex, rvx[:])
+            ava = persistence.apply_sort_to_array(sindex, rva[:])
+            avb = persistence.apply_sort_to_array(sindex, rvb[:])
+            avx = persistence.apply_sort_to_array(sindex, rvx[:])
 
             self.assertListEqual([1, 1, 1, 2, 2], ava.tolist())
             self.assertListEqual([1, 2, 5, 3, 4], avb.tolist())
             self.assertListEqual([b'e', b'd', b'a', b'c', b'b'], avx.tolist())
 
+        # sindex = np.argsort(vb, kind='stable')
+        # #sindex = sorted(np.arange(len(vb)), key=lambda x: vb[x])
+        # print(np.asarray(va)[sindex])
+        # print(np.asarray(vb)[sindex])
+        # print(np.asarray(vx)[sindex])
+        # accindex = np.asarray(sindex)
+        # sva = np.asarray(va)[sindex]
+        # sindex = np.argsort(sva, kind='stable')
+        # #sindex = np.asarray(sorted(np.arange(len(va)), key=lambda x: sva[x]))
+        # accindex = accindex[sindex]
+        # print(accindex)
+        # print(np.asarray(va)[accindex])
+        # print(np.asarray(vb)[accindex])
+        # print(np.asarray(vx)[accindex])
+
+
+
+class TestSorting(unittest.TestCase):
+
+    def test_sorting_indexed_string(self):
+        string_vals = (
+            ['a', 'bb', 'ccc', 'dddd', 'eeeee'], ['a', 'bb', 'ccc', 'dddd', 'eeeee'],
+            ['', 'a', '', 'bb', '', 'c', ''], ['', 'a', '', 'bb', '', 'c', '']
+        )
+        sorted_indices = (
+            [2, 3, 4, 1, 0], [0, 1, 2, 3, 4],
+            [1, 2, 5, 0, 6, 3, 4], [2, 1, 5, 0, 6, 4, 3]
+        )
+        for sv, si in zip(string_vals, sorted_indices):
+            dt = datetime.now(timezone.utc)
+            ts = str(dt)
+            bio = BytesIO()
+            with h5py.File(bio, 'w') as hf:
+                persistence.NewIndexedStringWriter(hf, 10, 'vals', ts).write(sv)
+
+                vals = persistence.NewIndexedStringReader(hf['vals'])
+                wvals = vals.getwriter(hf, 'sorted_vals', ts)
+                vals.sort(np.asarray(si, dtype=np.uint32), wvals)
+                actual = persistence.NewIndexedStringReader(hf['sorted_vals'])[:]
+                expected = [sv[i] for i in si]
+                self.assertListEqual(expected, actual)
+
+
+class TestJittingSort(unittest.TestCase):
+
+    def test_jitting_sort(self):
+        from numba import jit
+        @jit
+        def predicate(i):
+            return values[i]
+
+        count = 5000000
+        values = np.random.seed(12345678)
+        values = np.random.rand(count)
+        index = np.arange(count, dtype=np.uint32)
+        t0 = time.time()
+        s_index = sorted(index, key=lambda x: values[x])
+        print(f"sorted in {time.time() - t0}s")
+
+        index = np.arange(count, dtype=np.uint32)
+        t0 = time.time()
+        s_index = sorted(index, key=predicate)
+        print(f"sorted in {time.time() - t0}s")
 
 class TestLongPersistence(unittest.TestCase):
 
