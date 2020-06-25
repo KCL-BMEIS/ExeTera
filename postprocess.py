@@ -39,6 +39,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     patients_dest = destination.create_group('patients')
     assessments_src = dataset['assessments']
     assessments_dest = destination.create_group('assessments')
+    daily_assessments_dest = destination.create_group('daily_assessments')
 
     sort_patients = True
     year_from_age = True
@@ -50,6 +51,9 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
 
     print(patients_src.keys())
     print(dataset['assessments'].keys())
+
+    # Patient processing
+    # ==================
 
     if sort_patients:
         sort_keys = ('id',)
@@ -66,7 +70,9 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
             r = persistence.get_reader_from_field(patients_src[k])
             w = r.getwriter(patients_dest, k, timestamp)
             persistence.apply_sort(sorted_index, r, w)
-            print(f"'{k}' reordered in {time.time() - t1}s")
+            del r
+            del w
+            print(f"  '{k}' reordered in {time.time() - t1}s")
         print(f"patient fields reordered in {time.time() - t0}s")
 
     if year_from_age:
@@ -114,6 +120,8 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
                                  bmis_clean, bmis_filter, None)
         log(f"completed in {time.time() - t0}")
 
+    # Assessment processing
+    # =====================
 
     if sort_assessments:
         sort_keys = ('patient_id', 'created_at')
@@ -130,18 +138,49 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         print(f'sorted {sort_keys} index in {time.time() - t1}s')
 
         t0 = time.time()
-        for k in assessments_src.keys():
+        for k in ('patient_id', 'created_at'): # assessments_src.keys():
             t1 = time.time()
             r = persistence.get_reader_from_field(assessments_src[k])
             w = r.getwriter(assessments_dest, k, timestamp)
             persistence.apply_sort(sorted_index, r, w)
-            print(f"'{k}' reordered in {time.time() - t1}s")
+            del r
+            del w
+            print(f"  '{k}' reordered in {time.time() - t1}s")
         print(f"patient fields reordered in {time.time() - t0}s")
+
+        print("checking sort order")
+        t0 = time.time()
+        raw_patient_ids = persistence.NewFixedStringReader(assessments_dest['patient_id'])[:]
+        raw_created_ats = persistence.NewTimestampReader(assessments_dest['created_at'])[:]
+        last_pid = raw_patient_ids[0]
+        last_cat = raw_created_ats[0]
+        duplicates = 0
+        for i_r in range(1, len(patient_id_reader)):
+            pid = raw_patient_ids[i_r]
+            cat = raw_created_ats[i_r]
+            if (last_pid, last_cat) == (pid, cat):
+                duplicates += 1
+            if (last_pid, last_cat) > (pid, cat):
+                print(i_r,
+                      last_pid, datetime.fromtimestamp(last_cat),
+                      pid, datetime.fromtimestamp(cat))
+            last_pid = pid
+            last_cat = cat
+            # if i_r < 1000:
+            #     print(i_r, pid, datetime.fromtimestamp(cat))
+        print(f"sort order checked({duplicates} duplicate row keys found) in {time.time() - t0}")
+
+
+
+
 
     print('check inconsistent health_status')
     t0 = time.time()
     check_inconsistent_symptoms_1(assessments_src, assessments_dest, timestamp)
     print(time.time() - t0)
+
+
+
 
 
 if __name__ == '__main__':

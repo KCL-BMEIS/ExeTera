@@ -68,5 +68,5 @@ def check_inconsistent_symptoms_1(src_assessments, dest_assessments, timestamp):
         persistence.NewNumericWriter(dest_assessments, health_status.chunksize,
                                      'inconsistent_not_healthy', timestamp, 'bool')
 
-    inconsistent_healthy.write_part((health_status_array == 1) & (combined_results is False))
-    inconsistent_not_healthy.write_part((health_status_array == 2) & (combined_results is True))
+    inconsistent_healthy.write((health_status_array == 1) & (combined_results is False))
+    inconsistent_not_healthy.write((health_status_array == 2) & (combined_results is True))

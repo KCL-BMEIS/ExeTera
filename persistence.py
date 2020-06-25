@@ -1050,7 +1050,7 @@ def dataset_sort(index, readers):
         else:
             fdata = f[:][acc_index]
 
-        index = np.argsort(fdata)
+        index = np.argsort(fdata, kind='stable')
         acc_index = acc_index[index]
     return acc_index
 
