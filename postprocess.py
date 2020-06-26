@@ -10,6 +10,7 @@ import utils
 from processing.age_from_year_of_birth import calculate_age_from_year_of_birth_fast
 from processing.weight_height_bmi import weight_height_bmi_fast_1
 from processing.inconsistent_symptoms import check_inconsistent_symptoms_1
+from processing.temperature import validate_temperature_1
 import data_schemas
 import parsing_schemas
 import persistence
@@ -40,12 +41,18 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     assessments_src = dataset['assessments']
     assessments_dest = destination.create_group('assessments')
     daily_assessments_dest = destination.create_group('daily_assessments')
+    tests_src = dataset['tests']
+    tests_dest = destination.create_group('tests')
 
     sort_patients = True
     year_from_age = True
-    weight_height_bmi = True
+    clean_weight_height_bmi = True
 
     sort_assessments = True
+    clean_temperatures = True
+
+    sort_tests = True
+
     # post process patients
     # TODO: need an transaction table
 
@@ -93,7 +100,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         print('age_filter count:', np.sum(patients_dest['age_filter']['values'][:]))
         print('16_to_90_years count:', np.sum(patients_dest['16_to_90_years']['values'][:]))
 
-    if weight_height_bmi:
+    if clean_weight_height_bmi:
         log("height / weight / bmi; standard range filters")
         t0 = time.time()
 
@@ -138,7 +145,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         print(f'sorted {sort_keys} index in {time.time() - t1}s')
 
         t0 = time.time()
-        for k in ('patient_id', 'created_at'): # assessments_src.keys():
+        for k in assessments_src.keys():
             t1 = time.time()
             r = persistence.get_reader_from_field(assessments_src[k])
             w = r.getwriter(assessments_dest, k, timestamp)
@@ -146,7 +153,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
             del r
             del w
             print(f"  '{k}' reordered in {time.time() - t1}s")
-        print(f"patient fields reordered in {time.time() - t0}s")
+        print(f"assessment fields reordered in {time.time() - t0}s")
 
         print("checking sort order")
         t0 = time.time()
@@ -170,8 +177,24 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
             #     print(i_r, pid, datetime.fromtimestamp(cat))
         print(f"sort order checked({duplicates} duplicate row keys found) in {time.time() - t0}")
 
+    # if full_assessment_valid:
 
 
+    if clean_temperatures:
+        print("clean temperatures")
+        t0 = time.time()
+        temps = persistence.NewNumericReader(assessments_dest['temperature'])
+        temp_units = persistence.NewFixedStringReader(assessments_dest['temperature_unit'])
+        temps_valid = persistence.NewNumericReader(assessments_dest['temperature_valid'])
+        dest_temps = temps.getwriter(assessments_dest, 'temperature_c_clean', timestamp)
+        dest_temps_valid =\
+            temps_valid.getwriter(assessments_dest, 'temperature_35_to_42_inclusive', timestamp)
+        dest_temps_modified =\
+            temps_valid.getwriter(assessments_dest, 'temperature_modified', timestamp)
+        validate_temperature_1(35.0, 42.0,
+                               temps, temp_units, temps_valid,
+                               dest_temps, dest_temps_valid, dest_temps_modified)
+        print(f"temperature cleaning done in {time.time() - t0}")
 
 
     print('check inconsistent health_status')
@@ -180,7 +203,43 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     print(time.time() - t0)
 
 
+    # Daily assessments
+    # =================
 
+    spids = set()
+    patient_ids = persistence.get_reader_from_field(assessments_src['patient_id'])
+    utils.iterate_over_patient_assessments2(
+        patient_ids[:], np.ones(len(patient_ids)), lambda curid,_1,_2,_3,: spids.add(curid)
+    )
+
+
+    # Test processing
+    # ===============
+
+    if sort_tests:
+        sort_keys = ('patient_id', 'created_at')
+        print(f"sort tests by {sort_keys}")
+        t0 = time.time()
+        patient_id_reader = persistence.NewFixedStringReader(tests_src['patient_id'])
+        raw_patient_ids = patient_id_reader[:]
+        created_at_reader = persistence.NewTimestampReader(tests_src['created_at'])
+        raw_created_ats = created_at_reader[:]
+        t1 = time.time()
+        sorted_index = persistence.dataset_sort(
+            np.arange(len(raw_patient_ids), dtype=np.uint32),
+            (patient_id_reader, created_at_reader))
+        print(f'sorted {sort_keys} index in {time.time() - t1}s')
+
+        t0 = time.time()
+        for k in tests_src.keys():
+            t1 = time.time()
+            r = persistence.get_reader_from_field(tests_src[k])
+            w = r.getwriter(tests_dest, k, timestamp)
+            persistence.apply_sort(sorted_index, r, w)
+            del r
+            del w
+            print(f"  '{k}' reordered in {time.time() - t1}s")
+        print(f"test fields reordered in {time.time() - t0}s")
 
 
 if __name__ == '__main__':

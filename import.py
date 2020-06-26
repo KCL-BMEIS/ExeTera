@@ -139,6 +139,10 @@ class DatasetImporter:
                         f = row[i_f]
                         categorical_map = categorical_map_list[i_df]
                         if categorical_map is not None:
+                            if f not in categorical_map:
+                                error = "'{}' not valid: must be one of {} for field '{}'"
+                                raise KeyError(
+                                    error.format(f, categorical_map, self.names_[i_f]))
                             f = categorical_map[f]
                         # t = transforms_by_index[i_f]
                         field_chunk_list[i_df][chunk_index] = f
@@ -173,11 +177,12 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
         import_assessments = True
         import_tests = True
 
+        patient_maps = data_schema.patient_categorical_maps
+        patient_writers = data_schema.patient_field_types
+        p_categorical_fields = set([a[0] for a in patient_writers.items() if a[1] == 'categoricaltype'])
+        p_mapped_fields = set([a[0] for a in patient_maps.items()])
+
         if import_patients:
-            patient_maps = data_schema.patient_categorical_maps
-            patient_writers = data_schema.patient_field_types
-            p_categorical_fields = set([a[0] for a in patient_writers.items() if a[1] == 'categoricaltype'])
-            p_mapped_fields = set([a[0] for a in patient_maps.items()])
             print(p_categorical_fields)
             print(p_mapped_fields)
             print(p_categorical_fields.difference(p_mapped_fields))
@@ -186,7 +191,36 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
             p_names = set(pds.names_)
             print(p_names.difference(patient_writers.keys()))
 
+        assessment_maps = data_schema.assessment_categorical_maps
+        assessment_writers = data_schema.assessment_field_types
+        a_categorical_fields = set([a[0] for a in assessment_writers.items() if a[1] == 'categoricaltype'])
+        a_mapped_fields = set([a[0] for a in assessment_maps.items()])
 
+        if import_assessments:
+            print(a_categorical_fields)
+            print(a_mapped_fields)
+            print(a_categorical_fields.difference(a_mapped_fields))
+            with open(a_file_name) as f:
+                ads = dataset.Dataset(f, stop_after=1)
+            a_names = set(ads.names_)
+            print(a_names.difference(assessment_writers.keys()))
+
+        test_maps = data_schema.test_categorical_maps
+        test_writers = data_schema.test_field_types
+        t_categorical_fields = set([t[0] for t in test_writers.items() if t[1] == 'categoricaltype'])
+        t_mapped_fields = set([t[0] for t in test_maps.items()])
+        if import_tests:
+            print(t_categorical_fields)
+            print(t_mapped_fields)
+            print(t_categorical_fields.difference(t_mapped_fields))
+            with open(t_file_name) as f:
+                tds = dataset.Dataset(f, stop_after=1)
+            t_names = set(tds.names_)
+            print(t_names.difference(test_writers.keys()))
+
+        # perform the imports
+
+        if import_patients:
             p_show_progress_every = show_every
             p_stop_after = None
             p_keys = None
@@ -199,13 +233,6 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
 
 
         if import_assessments:
-            assessment_maps = data_schema.assessment_categorical_maps
-            assessment_writers = data_schema.assessment_field_types
-            a_categorical_fields = set([a[0] for a in assessment_writers.items() if a[1] == 'categoricaltype'])
-            a_mapped_fields = set([a[0] for a in assessment_maps.items()])
-            print(a_categorical_fields)
-            print(a_mapped_fields)
-            print(a_categorical_fields.difference(a_mapped_fields))
             a_show_progress_every = show_every
             a_stop_after = None
             a_keys = None
@@ -218,13 +245,6 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
 
 
         if import_tests:
-            test_maps = data_schema.test_categorical_maps
-            test_writers = data_schema.test_field_types
-            t_categorical_fields = set([t[0] for t in test_writers.items() if t[1] == 'categoricaltype'])
-            t_mapped_fields = set([t[0] for t in test_maps.items()])
-            print(t_categorical_fields)
-            print(t_mapped_fields)
-            print(t_categorical_fields.difference(t_mapped_fields))
             t_show_progress_every = show_every
             t_stop_after = None
             t_keys = None

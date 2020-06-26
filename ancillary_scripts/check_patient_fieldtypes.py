@@ -4,7 +4,7 @@ import dataset
 import data_schemas
 import utils
 
-pfilename = '/home/ben/covid/patients_export_geocodes_20200617030002.csv'
+pfilename = '/home/ben/covid/patients_export_geocodes_20200624030002.csv'
 
 # pcatfields  = (
 #     'race_is_uk_white', 'need_inside_help', 'on_cancer_clinical_trial', 'race_is_uk_mixed_white_black',
@@ -39,15 +39,28 @@ pfilename = '/home/ben/covid/patients_export_geocodes_20200617030002.csv'
 #     'is_in_us_environmental_polymorphisms', 'is_smoker', 'is_in_us_covid_flu_near_you', 'mobility_aid',
 #     'have_worked_in_hospital_home_health', 'takes_any_blood_pressure_medications', 'ht_mirena_or_other_coil',
 #     'has_diabetes')
-pcatfields = ('diabetes_type',)
+pcatfields = None # ('diabetes_type',)
 data_schema = data_schemas.DataSchema(1)
 with open(pfilename) as f:
     ds = dataset.Dataset(f, stop_after=1)
     print(len(ds.names_))
+    snames = set(ds.names_)
+    sinschema = set(data_schema.patient_field_types.keys())
+    print(snames.difference(sinschema))
+    print(sinschema.difference(snames))
+
 with open(pfilename) as f:
     ds = dataset.Dataset(f, keys=pcatfields, show_progress_every=100000)
+    check_existing = True
     for n in ds.names_:
-        if data_schema.patient_field_types.get(n, 'categoricaltype') == 'categoricaltype':
+        check = False
+        if n not in data_schema.patient_field_types:
+            check = True
+        else:
+            if data_schema.patient_field_types[n] == 'categoricaltype':
+                check = check_existing
+
+        if check:
             print(n)
             h = utils.build_histogram(ds.field_by_name(n))
             if len(h) > 100:

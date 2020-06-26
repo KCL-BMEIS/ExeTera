@@ -38,3 +38,15 @@ class ValidateTemperature1:
                     temperature_c[ir] = dest_temp
 
         return temperature_c
+
+
+def validate_temperature_1(min_temp, max_temp,
+                           temps, temp_units, temp_set,
+                           dest_temps, dest_temps_valid, dest_temps_modified):
+    raw_temps = temps[:]
+    raw_dest_temps = np.where(raw_temps > max_temp, (raw_temps - 32) / 1.8, raw_temps)
+    raw_dest_temps_valid = temp_set[:] & (min_temp <= raw_dest_temps) & (raw_dest_temps <= max_temp)
+    raw_dest_temps_modified = raw_temps != raw_dest_temps
+    dest_temps.write(raw_dest_temps)
+    dest_temps_valid.write(raw_dest_temps_valid)
+    dest_temps_modified.write(raw_dest_temps_modified)

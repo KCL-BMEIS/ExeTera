@@ -56,10 +56,6 @@ def _build_map(value_list):
 
 class DataSchema:
     data_schemas = [1]
-    na_value_from = ''
-    na_value_to = ''
-    leaky_boolean_to = [na_value_to, 'False', 'True']
-    leaky_boolean_from = _build_map(leaky_boolean_to)
 
 
     field_writers = {
@@ -254,10 +250,21 @@ class DataSchema:
         'diabetes_oral_sglt2': 'categoricaltype',
         'diabetes_oral_sulfonylurea': 'categoricaltype',
         'diabetes_oral_thiazolidinediones': 'categoricaltype',
-        'diabetes_oral_other_medication': 'categoricaltype',
+        'diabetes_oral_other_medication': 'indexedstringtype',
         'diabetes_treatment_other_oral': 'indexedstringtype',
+        'diabetes_treatment_pfnts': 'categoricaltype',
+        'diabetes_treatment_insulin_pump': 'categoricaltype',
+        'diabetes_uses_cgm': 'categoricaltype',
         'a1c_measurement_percent': 'float32type',
         'a1c_measurement_mmol': 'float32type',
+        'lifestyle_version': 'versiontype',
+        'weight_change': 'categoricaltype',
+        'weight_change_kg': 'float32type',
+        'weight_change_pounds': 'float32type',
+        'diet_change': 'categoricaltype',
+        'snacking_change': 'categoricaltype',
+        'activity_change': 'categoricaltype',
+        'alcohol_change': 'categoricaltype',
         'zipcode': 'indexedstringtype',
         'se_postcode': 'indexedstringtype',
         'outward_postcode': 'indexedstringtype',
@@ -356,6 +363,11 @@ class DataSchema:
         'date_taken_between_end': 'datetype'
     }
 
+    na_value_from = ''
+    na_value_to = ''
+    leaky_boolean_to = [na_value_to, 'False', 'True']
+    leaky_boolean_from = _build_map(leaky_boolean_to)
+    leaky_boolean_delta = [na_value_to, 'pfnts', 'decreased', 'same', 'increased']
     # tuple entries
     # 0: name
     # 1: values_to_strings,
@@ -492,7 +504,9 @@ class DataSchema:
         ('diabetes_oral_sglt2', leaky_boolean_to, None, np.uint8, 1, None),
         ('diabetes_oral_sulfonylurea', leaky_boolean_to, None, np.uint8, 1, None),
         ('diabetes_oral_thiazolidinediones', leaky_boolean_to, None, np.uint8, 1, None),
-        ('diabetes_oral_other_medication', leaky_boolean_to, None, np.uint8, 1, None),
+        ('diabetes_treatment_pfnts', leaky_boolean_to, None, np.uint8, 1, None),
+        ('diabetes_treatment_insulin_pump', leaky_boolean_to, None, np.uint8, 1, None),
+        ('diabetes_uses_cgm', leaky_boolean_to, None, np.uint8, 1, None),
         ('vs_vitamin_d', leaky_boolean_to, None, np.uint8, 1, None),
         ('vs_omega_3', leaky_boolean_to, None, np.uint8, 1, None),
         ('vs_none', leaky_boolean_to, None, np.uint8, 1, None),
@@ -506,10 +520,15 @@ class DataSchema:
         ('has_eczema', leaky_boolean_to, None, np.uint8, 1, None),
         ('has_hayfever', leaky_boolean_to, None, np.uint8, 1, None),
         ('has_lung_disease_only', leaky_boolean_to, None, np.uint8, 1, None),
-        ('age_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None),
-        ('weight_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None),
-        ('height_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None),
-        ('bmi_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None)
+        ('weight_change', leaky_boolean_delta, None, np.uint8, 1, None),
+        ('diet_change', leaky_boolean_delta, None, np.uint8, 1, None),
+        ('snacking_change', leaky_boolean_delta, None, np.uint8, 1, None),
+        ('activity_change', leaky_boolean_delta, None, np.uint8, 1, None),
+        ('alcohol_change', leaky_boolean_delta + ['no_alcohol'], None, np.uint8, 1, None),
+        # ('age_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None),
+        # ('weight_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None),
+        # ('height_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None),
+        # ('bmi_filter', [na_value_to, 'bad', 'missing'], None, np.uint8, 1, None)
     ]
     assessment_categorical_fields = [
         ('health_status', [na_value_to, 'healthy', 'not_healthy'], None, np.uint8, 1, None),
