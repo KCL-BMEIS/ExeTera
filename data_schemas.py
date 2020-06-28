@@ -60,17 +60,20 @@ class DataSchema:
 
     field_writers = {
         'idtype': lambda g, cs, n, ts: persistence.NewFixedStringWriter(g, cs, n, ts, 32),
-        'datetimetype': lambda g, cs, n, ts: persistence.NewDateTimeWriter(g, cs, n, ts),
-        'optionaldatetimetype': lambda g, cs, n, ts: persistence.OptionalDateTimeImporter(
-            g, cs, n, ts),
-        'datetype': lambda g, cs, n, ts: persistence.NewDateWriter(g, cs, n, ts),
-        'optionaldatetype': lambda g, cs, n, ts: persistence.OptionalDateImporter(g, cs, n, ts),
+        'datetimetype':
+            lambda g, cs, n, ts: persistence.OptionalDateTimeImporter(g, cs, n, ts, False),
+        'optionaldatetimetype':
+            lambda g, cs, n, ts: persistence.OptionalDateTimeImporter(g, cs, n, ts, True),
+        'datetype':
+            lambda g, cs, n, ts: persistence.OptionalDateImporter(g, cs, n, ts, False),
+        'optionaldatetype':
+            lambda g, cs, n, ts: persistence.OptionalDateImporter(g, cs, n, ts, True),
         'versiontype': lambda g, cs, n, ts: persistence.NewFixedStringWriter(g, cs, n, ts, 10),
         'indexedstringtype': lambda g, cs, n, ts: persistence.NewIndexedStringWriter(g, cs, n, ts),
         'countrycodetype': lambda g, cs, n, ts: persistence.NewFixedStringWriter(g, cs, n, ts, 2),
         'unittype': lambda g, cs, n, ts: persistence.NewFixedStringWriter(g, cs, n, ts, 1),
-        'categoricaltype': lambda g, cs, n, ts, stv: persistence.NewCategoricalWriter(
-            g, cs, n, ts, stv),
+        'categoricaltype':
+            lambda g, cs, n, ts, stv: persistence.NewCategoricalWriter(g, cs, n, ts, stv),
         'float32type': lambda g, cs, n, ts: persistence.NewNumericImporter(
             g, cs, n, ts, 'float32', persistence.try_str_to_float),
         'uint16type': lambda g, cs, n, ts: persistence.NewNumericImporter(

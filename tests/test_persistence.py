@@ -12,22 +12,22 @@ import persistence
 class TestPersistence(unittest.TestCase):
 
 
-    def test_slice_for_chunk(self):
-        dataset = np.zeros(1050)
-        expected = [(0, 100), (100, 200), (200, 300), (300, 400), (400, 500),
-                    (500, 600), (600, 700), (700, 800), (800, 900), (900, 1000), (1000, 1050)]
-        for i in range(11):
-            self.assertEqual(expected[i], persistence._slice_for_chunk(i, dataset, 100))
-        expected = [(200, 300), (300, 400), (400, 500), (500, 600), (600, 700), (700, 800),
-                    (800, 850)]
-        for i in range(7):
-            self.assertEqual(expected[i], persistence._slice_for_chunk(i, dataset, 100, 200, 850))
+    # def test_slice_for_chunk(self):
+    #     dataset = np.zeros(1050)
+    #     expected = [(0, 100), (100, 200), (200, 300), (300, 400), (400, 500),
+    #                 (500, 600), (600, 700), (700, 800), (800, 900), (900, 1000), (1000, 1050)]
+    #     for i in range(11):
+    #         self.assertEqual(expected[i], persistence._slice_for_chunk(i, dataset, 100))
+    #     expected = [(200, 300), (300, 400), (400, 500), (500, 600), (600, 700), (700, 800),
+    #                 (800, 850)]
+    #     for i in range(7):
+    #         self.assertEqual(expected[i], persistence._slice_for_chunk(i, dataset, 100, 200, 850))
 
-    def test_chunks(self):
-        for c in persistence.chunks(1050, 100):
-            print(c)
-        for c in persistence.chunks(1000, 100):
-            print(c)
+    # def test_chunks(self):
+    #     for c in persistence.chunks(1050, 100):
+    #         print(c)
+    #     for c in persistence.chunks(1000, 100):
+    #         print(c)
 
 
     # TODO: reintroduce once filter is reinstated
@@ -519,10 +519,18 @@ class TestPersistence(unittest.TestCase):
             persistence.NewNumericWriter(hf, 10, 'foo', ts, 'int32').write(values)
 
             reader = persistence.NewNumericReader(hf['foo'])
-            writer = reader.getwriter(hf, 'foo', ts)
+            writer = reader.getwriter(hf, 'foo', ts, 'overwrite')
             writer.write(values * 2)
             reader = persistence.NewNumericReader(hf['foo'])
             print(reader[:])
+
+
+    def test_try_create_group(self):
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            a = persistence.get_or_create_group(hf, 'a')
+            b = persistence.get_or_create_group(hf, 'a')
+            self.assertEqual(a, b)
 
 
     def test_get_trash_folder(self):
@@ -530,14 +538,45 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             a = hf.create_group('a')
             b = a.create_group('b')
-            print(persistence.get_trash_folder(b))
-            print(persistence.get_trash_folder(a))
-            print(persistence.get_trash_folder(hf))
+            print(persistence.get_trash_group(b))
+            print(persistence.get_trash_group(a))
+            print(persistence.get_trash_group(hf))
 
 
     def test_move_group(self):
+        dt = datetime.now(timezone.utc)
+        ts = str(dt)
         bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            a = hf.create_group('a')
+            b = hf.create_group('b')
+            x = a.create_dataset('x', data=np.asarray([1, 2, 3, 4, 5]))
+            a.move('x', '/b/y')
+            print(b['y'].name)
+            x = a.create_dataset('x', data=np.asarray([6, 7, 8, 9, 10]))
+            try:
+                a.move('x', '/b/y')
+            except Exception as e:
+                print(e)
+                print(x[:])
+            print(hf['b/y'][:])
 
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            trash = hf.create_group('/trash/asmts')
+            asmts = hf.create_group('asmts')
+            foo = persistence.NewNumericWriter(asmts, 10, 'foo', ts, 'int32')
+            foo.write(np.arange(95, dtype='int32'))
+            trash = persistence.get_trash_group(foo.field)
+            hf.move('/asmts/foo', trash.name)
+            print(hf['/trash/abcd/asmts/foo'])
+        del hf
+
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            a = hf.create_group('a')
+            b = a.create_group('/b')
+            print(hf.keys())
 
 
     def test_predicate(self):
