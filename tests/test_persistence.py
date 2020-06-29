@@ -509,6 +509,31 @@ class TestPersistence(unittest.TestCase):
         for v in persistence.filtered_iterator(values, filter):
             print(v)
 
+
+class TestPersistanceMiscellaneous(unittest.TestCase):
+
+    def test_distinct_multi_field(self):
+        a = np.asarray([1, 2, 1, 1, 2, 2, 1, 3, 2, 1])
+        b = np.asarray(['a', 'a', 'b', 'a', 'b', 'a', 'd', 'c', 'a', 'b'])
+        print(persistence.distinct(fields=(a, b)))
+
+    def test_get_spans_single_field(self):
+        a = np.asarray([1, 2, 2, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 1])
+        print(persistence.get_spans(field=a))
+        a = np.asarray([1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 2, 2, 1])
+        print(persistence.get_spans(field=a))
+        a = np.asarray([1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1])
+        print(persistence.get_spans(field=a))
+        a = np.asarray([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+        print(persistence.get_spans(field=a))
+
+    def test_apply_spans_max(self):
+        spans = np.asarray([0, 1, 3, 4, 7, 8, 12])
+        values = np.asarray([1, 2, 3, 4, 5, 6, 12, 11, 10, 9, 8, 7])
+        results = np.zeros(len(spans)-1, dtype=values.dtype)
+        persistence.apply_spans_max(spans, values, results)
+        print(results)
+
     def test_write_to_existing(self):
         dt = datetime.now(timezone.utc)
         ts = str(dt)

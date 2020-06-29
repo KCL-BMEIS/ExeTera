@@ -294,21 +294,86 @@ def filter(dataset, field, name, predicate, timestamp=datetime.now(timezone.utc)
 
 
 # TODO: write distinct with new readers / writers rather than deleting this
-def distinct(field, filter=None):
-    # raise NotImplementedError()
-    return np.unique(field)
-#     d = Series(field)
-#     distinct_values = set()
-#     if filter is not None:
-#         f = Series(filter)
-#         for i_r in range(len(d)):
-#             if f[i_r] == 0:
-#                 distinct_values.add(d[i_r])
-#     else:
-#         for i_r in range(len(d)):
-#             distinct_values.add(d[i_r])
-#
-#     return distinct_values
+def distinct(field=None, fields=None, filter=None):
+    if field is None and fields is None:
+        return ValueError("One of 'field' and 'fields' must be set")
+    if field is not None and fields is not None:
+        return ValueError("Only one of 'field' and 'fields' may be set")
+
+    if field is not None:
+        return np.unique(field)
+
+    entries = [(f'{i}', f.dtype) for i, f in enumerate(fields)]
+    unified = np.empty_like(fields[0], dtype=np.dtype(entries))
+    for i, f in enumerate(fields):
+        unified[f'{i}'] = f
+
+    uniques = np.unique(unified)
+    results = [uniques[f'{i}'] for i in range(len(fields))]
+    return results
+
+@njit
+def _get_spans_for_field(field0):
+    count = 0
+    spans = np.zeros(len(field0)+1, dtype=np.uint32)
+    spans[0] = 0
+    for i in np.arange(1, len(field0)):
+        if field0[i] != field0[i-1]:
+            count += 1
+            spans[count] = i
+    spans[count+1] = len(field0)
+    return spans[:count+2]
+
+@njit
+def _get_spans_for_2_fields(field0, field1):
+    count = 0
+    spans = np.zeros(len(field0)+1, dtype=np.uint32)
+    spans[0] = 0
+    for i in np.arange(1, len(field0)):
+        if field0[i] != field0[i-1] or field1[i] != field1[i-1]:
+            count += 1
+            spans[count] = i
+    spans[count+1] = len(field0)
+    return spans[:count+2]
+
+
+def get_spans(field=None, fields=None):
+    if field is None and fields is None:
+        return ValueError("One of 'field' and 'fields' must be set")
+    if field is not None and fields is not None:
+        return ValueError("Only one of 'field' and 'fields' may be set")
+
+    if field is not None:
+        return _get_spans_for_field(field)
+    elif len(fields) == 1:
+        return _get_spans_for_field(fields[0])
+    elif len(fields) == 2:
+        return _get_spans_for_2_fields(*fields)
+    else:
+        raise NotImplementedError("This operation does not support more than two fields at present")
+
+
+@njit
+def apply_spans_max(spans, src_field, dest_field):
+
+    for i in range(len(spans)-1):
+        cur = spans[i]
+        next = spans[i+1]
+        if next - cur == 1:
+            dest_field[i] = src_field[cur]
+        else:
+            dest_field[i] = src_field[cur:next].max()
+
+@jit
+def apply_spans_concat(spans, src_field, dest_field):
+    for i in range(len(spans)-1):
+        cur = spans[i]
+        next = spans[i+1]
+        if next - cur == 1:
+            dest_field[i] = src_field[cur]
+        else:
+            raise NotImplementedError
+
 
 def timestamp_to_date(values):
     results = np.zeros(len(values), dtype='|S10')

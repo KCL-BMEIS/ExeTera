@@ -16,8 +16,8 @@ import parsing_schemas
 import persistence
 
 
-# TODO: base filter for all hard filtered things, or should they be blitzed
-# from the dataset completely?
+# TODO: hard filter
+# TODO: journalling for hdf5 robustness
 
 # TODO: postprocessing activities
 # * assessment sort by (patient_id, created_at)
@@ -204,17 +204,35 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
 
     if create_daily:
         print("generate daily assessments")
-        t0 = time.time()
         patient_ids = persistence.get_reader_from_field(sorted_assessments_src['patient_id'])
         raw_patient_ids = patient_ids[:]
-        distinct_pids = persistence.distinct(raw_patient_ids)
-        print(f"{len(distinct_pids)} patients identified from assessments in {time.time() - t0}s")
+        created_at_days =\
+            persistence.get_reader_from_field(sorted_assessments_src['created_at_day'])
+        raw_created_at_days = created_at_days[:]
 
-        print("checking distinct assessments days per patient")
+        print("Calculating spans")
         t0 = time.time()
-        distinct_days = persistence.distinct(
-            persistence.get_reader_from_field(sorted_assessments_src['created_at_day'])[:])
-        print(f"{len(distinct_days)} dates generated in {time.time() - t0}")
+        spans = persistence.get_spans(fields=(raw_patient_ids, raw_created_at_days))
+        print(f"Calculated {len(spans)-1} spans in {time.time() - t0}s")
+
+        print("Applying spans to 'health_status'")
+        t0 = time.time()
+        health_status = persistence.get_reader_from_field(sorted_assessments_src['health_status'])
+        raw_health_status = health_status[:]
+        daily_health_status = np.zeros(len(spans)-1, dtype=raw_health_status.dtype)
+        persistence.apply_spans_max(spans, raw_health_status, daily_health_status)
+        print(f"apply_spans completed in {time.time()-t0}s")
+        # t0 = time.time()
+        # distinct_pids = persistence.distinct(raw_patient_ids)
+        # print(f"{len(distinct_pids)} patients identified from assessments in {time.time() - t0}s")
+
+        # print("checking distinct assessments days per patient")
+        # # TODO - basic implementation
+        # # TODO - look at generating indices for process id boundaries
+        # t0 = time.time()
+        # distinct_days = persistence.distinct(
+        #     persistence.get_reader_from_field(sorted_assessments_src['created_at_day'])[:])
+        # print(f"{len(distinct_days)} dates generated in {time.time() - t0}")
 
 
 if __name__ == '__main__':
