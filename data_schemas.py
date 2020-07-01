@@ -61,9 +61,9 @@ class DataSchema:
     field_writers = {
         'idtype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, ts, 32),
         'datetimetype':
-            lambda g, cs, n, ts: persistence.OptionalDateTimeImporter(g, cs, n, ts, False),
+            lambda g, cs, n, ts: persistence.DateTimeImporter(g, cs, n, ts, False),
         'optionaldatetimetype':
-            lambda g, cs, n, ts: persistence.OptionalDateTimeImporter(g, cs, n, ts, True),
+            lambda g, cs, n, ts: persistence.DateTimeImporter(g, cs, n, ts, True),
         'datetype':
             lambda g, cs, n, ts: persistence.OptionalDateImporter(g, cs, n, ts, False),
         'optionaldatetype':

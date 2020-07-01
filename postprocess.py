@@ -50,12 +50,12 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     sort_assessments = sort_enabled(flags) and True
     sort_tests = sort_enabled(flags) and True
 
-    make_assessment_patient_id_index = process_enabled(flags) and True
+    make_assessment_patient_id_fkey = process_enabled(flags) and True
     year_from_age = process_enabled(flags) and True
     clean_weight_height_bmi = process_enabled(flags) and True
     clean_temperatures = process_enabled(flags) and True
     check_symptoms = process_enabled(flags) and True
-    create_daily = process_enabled(flags) and False
+    create_daily = process_enabled(flags) and True
     make_patient_level_assessment_metrics = process_enabled(flags) and True
 
     # post process patients
@@ -85,9 +85,9 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         # patient_ids = per.get_reader_from_field(patients_dest['id'])
         # assessment_patient_ids =\
         #     per.get_reader_from_field(assessments_dest['patient_id'])
-        # assessment_patient_id_index =\
+        # assessment_patient_id_fkey =\
         #     assessment_patient_ids.getwriter(assessments_dest, 'patient_index', timestamp)
-        # per.get_index(patient_ids, assessment_patient_ids, assessment_patient_id_index)
+        # per.get_index(patient_ids, assessment_patient_ids, assessment_patient_id_fkey)
         # print(f"completed in {time.time() - t0}s")
 
         print("checking sort order")
@@ -174,16 +174,16 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     # Assessment processing
     # =====================
 
-    if make_assessment_patient_id_index:
+    if make_assessment_patient_id_fkey:
         print("creating 'patient_index' foreign key index for 'patient_id'")
         t0 = time.time()
         patient_ids = per.get_reader(sorted_patients_src['id'])
         assessment_patient_ids =\
             per.get_reader(sorted_assessments_src['patient_id'])
-        assessment_patient_id_index =\
-            per.NumericWriter(assessments_dest, chunksize, 'patient_id_index',
+        assessment_patient_id_fkey =\
+            per.NumericWriter(assessments_dest, chunksize, 'patient_id_index_fkey',
                                       timestamp, 'int64')
-        per.get_index(patient_ids, assessment_patient_ids, assessment_patient_id_index)
+        per.get_index(patient_ids, assessment_patient_ids, assessment_patient_id_fkey)
         print(f"completed in {time.time() - t0}s")
 
 
@@ -228,10 +228,10 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
             per.get_reader(sorted_assessments_src['created_at_day'])
         raw_created_at_days = created_at_days[:]
 
-        if 'patient_id_index' in assessments_src.keys():
-            patient_id_index = assessments_src['patient_id_index']
+        if 'patient_id_index_fkey' in assessments_src.keys():
+            patient_id_index = assessments_src['patient_id_index_fkey']
         else:
-            patient_id_index = assessments_dest['patient_id_index']
+            patient_id_index = assessments_dest['patient_id_index_fkey']
         patient_id_indices =\
             per.get_reader(patient_id_index)
         raw_patient_id_indices = patient_id_indices[:]
@@ -294,54 +294,50 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     # TODO - patient measure: assessments per patient
 
     if make_patient_level_assessment_metrics:
-        if 'patient_id_index' in assessments_dest:
-            src = assessments_dest['patient_id_index']
+        if 'patient_id_index_fkey' in assessments_dest:
+            src = assessments_dest['patient_id_index_fkey']
         else:
-            src = assessments_src['patient_id_index']
-        assessment_patient_id_index = per.get_reader(src)
-        spans = per.get_spans(field=assessment_patient_id_index)
-        unique_patient_ids = assessment_patient_id_index[:][spans[:-1]]
-        filter_for_invalid_patient_ids = unique_patient_ids > 0
-        safe_unique_patient_ids = unique_patient_ids[filter_for_invalid_patient_ids]
-        # the filter is required because some patient_ids in assessment space don't exist in
-        # patient space
+            src = assessments_src['patient_id_index_fkey']
+        assessment_patient_id_fkey = per.get_reader(src)
+        # generate spans from the assessment-space patient_id foreign key
+        spans = per.get_spans(field=assessment_patient_id_fkey)
 
         ids = per.get_reader(patients_src['id'])
 
         #TODO: needs a persistence function to perform mapping of values to another space
 
-        # the assessment_counts are in the same space as unique patient ids; this means they
-        # also need to be filtered based on the invalid patient id filter
-        assessment_counts = np.zeros(len(spans)-1, dtype=np.uint32)
-        per.apply_spans_count(spans, assessment_counts)
-        assessment_count_per_patient =\
-            per.NumericWriter(patients_dest, chunksize, 'assessment_count', timestamp, 'uint32')
-        patient_space_counts = assessment_count_per_patient.chunk_factory(len(ids))
-        safe_assessment_counts = assessment_counts[filter_for_invalid_patient_ids]
+        # print('predicate_and_join')
+        # acpp2 = per.NumericWriter(patients_dest, chunksize, 'assessment_count_2', timestamp, 'uint32')
+        # per.predicate_and_join(per.apply_spans_count, ids, assessment_patient_id_fkey, None, acpp2, spans)
 
-        # patient_id_set = set(per.get_reader(sorted_patients_src['id'])[:])
-        # asmt_patient_ids = per.get_reader(sorted_assessments_src['patient_id'])[:]
-        # print('negative patient_ids')
-        # for i_u in range(len(safe_unique_patient_ids)):
-        #     if safe_unique_patient_ids[i_u] < 0:
-        #         missing_patient_id = asmt_patient_ids[spans[i_u]]
-        #         print(i_u, safe_unique_patient_ids[i_u], spans[i_u], missing_patient_id, missing_patient_id in patient_id_set)
+        print('calculate assessment counts per patient')
+        t0 = time.time()
+        writer = per.NumericWriter(patients_dest, chunksize, 'assessment_count', timestamp, 'uint32')
+        aggregated_counts = per.aggregate_count(fkey_index_spans=spans)
+        per.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
+        print(f"calculated assessment counts per patient in {time.time() - t0}")
 
-        patient_space_counts[safe_unique_patient_ids] = safe_assessment_counts
-        assessment_count_per_patient.write(patient_space_counts)
-        print(patient_space_counts[:20])
+        print('calculate first assessment days per patient')
+        t0 = time.time()
+        reader = per.get_reader(sorted_assessments_src['created_at_day'])
+        writer = per.FixedStringWriter(patients_dest, chunksize, 'first_assessment_day', timestamp, 10)
+        aggregated_counts = per.aggregate_first(fkey_index_spans=spans, reader=reader)
+        per.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
+        print(f"calculated first assessment days per patient in {time.time() - t0}")
 
-        first_assessments = np.zeros(len(spans)-1, dtype=np.float64)
-        created_ats = per.get_reader(sorted_assessments_src['created_at'])
-        per.apply_spans_first(spans, created_ats, first_assessments)
-        first_assessment_per_patient =\
-            per.TimestampWriter(patients_dest, chunksize, 'first_assessment', timestamp)
-        patient_space_first_assessments = first_assessment_per_patient.chunk_factory(len(ids))
-        safe_first_assessments = first_assessments[filter_for_invalid_patient_ids]
+        print('calculate last assessment days per patient')
+        t0 = time.time()
+        pids = per.get_reader(sorted_assessments_src['patient_id'])
+        reader = per.get_reader(sorted_assessments_src['created_at_day'])
+        writer = per.FixedStringWriter(patients_dest, chunksize, 'last_assessment_day', timestamp, 10)
+        aggregated_counts = per.aggregate_last(fkey_index_spans=spans, reader=reader)
+        per.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
+        print(f"calculated last assessment days per patient in {time.time() - t0}")
 
-        patient_space_first_assessments[safe_unique_patient_ids] = safe_first_assessments
-        first_assessment_per_patient.write(patient_space_first_assessments)
-        print(patient_space_first_assessments[:20])
+
+        # second_result = per.get_reader(patients_dest['assessment_count_2'])
+        # third_result = per.get_reader(patients_dest['assessment_count_3'])
+        # print(np.array_equal(second_result[:], third_result[:]))
 
 
     # TODO - patient measure: daily assessments per patient

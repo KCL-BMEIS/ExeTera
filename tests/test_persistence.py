@@ -517,8 +517,8 @@ class TestPersistenceConcat(unittest.TestCase):
         ts = str(dt)
         bio = BytesIO()
 
-        src_spans = np.asarray([0, 2, 3, 4, 6, 8], dtype=np.uint64)
-        src_indices = np.asarray([0, 2, 6, 10, 12, 16, 18, 22, 24], dtype=np.uint64)
+        src_spans = np.asarray([0, 2, 3, 4, 6, 8], dtype=np.int64)
+        src_indices = np.asarray([0, 2, 6, 10, 12, 16, 18, 22, 24], dtype=np.int64)
         src_values = np.frombuffer(b'aabbbbccccddeeeeffgggghh', dtype='S1')
 
         with h5py.File(bio, 'w') as hf:
@@ -537,8 +537,8 @@ class TestPersistenceConcat(unittest.TestCase):
         ts = str(dt)
         bio = BytesIO()
 
-        src_spans = np.asarray([0, 2, 3, 4, 6, 8], dtype=np.uint64)
-        src_indices = np.asarray([0, 12, 20, 32, 40, 44, 54, 57, 64], dtype=np.uint64)
+        src_spans = np.asarray([0, 2, 3, 4, 6, 8], dtype=np.int64)
+        src_indices = np.asarray([0, 12, 20, 32, 40, 44, 54, 57, 64], dtype=np.int64)
         src_values = np.frombuffer(
             b'aaaaaaaaaaaabbbbbbbbccccccccccccddddddddeeeeffffffffffggggghhhhh', dtype='S1')
         with h5py.File(bio, 'w') as hf:
@@ -558,8 +558,8 @@ class TestPersistenceConcat(unittest.TestCase):
         ts = str(dt)
         bio = BytesIO()
 
-        src_spans = np.asarray([0, 2, 3, 4, 6, 8, 9], dtype=np.uint64)
-        src_indices = np.asarray([0, 12, 20, 32, 40, 44, 54, 57, 64, 72], dtype=np.uint64)
+        src_spans = np.asarray([0, 2, 3, 4, 6, 8, 9], dtype=np.int64)
+        src_indices = np.asarray([0, 12, 20, 32, 40, 44, 54, 57, 64, 72], dtype=np.int64)
         src_values = np.frombuffer(
             b'aaaaaaaaaaaabbbbbbbbccccccccccccddddddddeeeeffffffffffggggghhhhhiiiiiiii', dtype='S1')
         with h5py.File(bio, 'w') as hf:
@@ -599,6 +599,25 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         persistence._apply_spans_count(spans, results)
         print(results)
 
+    def test_apply_spans_first(self):
+        spans = np.asarray([0, 1, 3, 4, 7, 8, 12, 14])
+        values = np.arange(14)
+        results = np.zeros(len(spans)-1, dtype=np.int64)
+        persistence._apply_spans_first(spans, values, results)
+        print(results)
+
+    def test_apply_spans_last(self):
+        spans = np.asarray([0, 1, 3, 4, 7, 8, 12, 14])
+        values = np.arange(14)
+        results = np.zeros(len(spans)-1, dtype=np.int64)
+        persistence._apply_spans_last(spans, values, results)
+        print(results)
+
+        spans = np.asarray([0, 20, 40])
+        values = np.arange(40)
+        results = np.zeros(len(spans)-1, dtype=np.int64)
+        persistence._apply_spans_last(spans, values, results)
+        print(results)
 
     def test_apply_spans_max(self):
         spans = np.asarray([0, 1, 3, 4, 7, 8, 12])

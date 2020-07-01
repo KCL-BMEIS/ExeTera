@@ -288,10 +288,10 @@ def to_escaped(string, separator=',', delimiter='"'):
 
 @njit
 def bytearray_to_escaped(srcbytearray, destbytearray,
-                         src_start=np.uint64(0), src_end=None, dest_start=np.uint64(0),
+                         src_start=np.int64(0), src_end=None, dest_start=np.int64(0),
                          separator=b',', delimiter=b'"'):
     if src_end is None:
-        src_end = np.uint64(len(srcbytearray))
+        src_end = np.int64(len(srcbytearray))
 
     comma = False
     quotes = False
@@ -317,7 +317,7 @@ def bytearray_to_escaped(srcbytearray, destbytearray,
         d_index += 1
         return d_index
     else:
-        s_len = np.uint64(src_end - src_start)
+        s_len = np.int64(src_end - src_start)
         destbytearray[dest_start:dest_start + s_len] = srcbytearray[src_start:src_end]
         d_index += s_len
         return d_index

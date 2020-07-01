@@ -24,6 +24,7 @@ from numba import jit, njit
 import utils
 
 DEFAULT_CHUNKSIZE = 1 << 18
+INVALID_INDEX = 1 << 62
 
 # TODO: rename this persistence file to hdf5persistence
 # TODO: wrap the dataset in a withable so that different underlying
@@ -55,7 +56,7 @@ DEFAULT_CHUNKSIZE = 1 << 18
 # * values
 
 chunk_sizes = {
-    'patient': (1 << 18,), 'assessment': (1 << 18,), 'test': (1 << 18,)
+    'patient': (DEFAULT_CHUNKSIZE,), 'assessment': (DEFAULT_CHUNKSIZE,), 'test': (DEFAULT_CHUNKSIZE,)
 }
 
 
@@ -153,18 +154,17 @@ def apply_sort_to_array(index, values):
     return values[index]
 
 
-from numba import njit
 @njit
 def apply_sort_to_index_values(index, indices, values):
 
     s_indices = np.zeros_like(indices)
     s_values = np.zeros_like(values)
-    accumulated = np.uint64(0)
+    accumulated = np.int64(0)
     s_indices[0] = 0
     for di, si in enumerate(index):
         src_field_start = indices[si]
         src_field_end = indices[si + 1]
-        length = np.uint64(src_field_end - src_field_start)
+        length = np.int64(src_field_end - src_field_start)
         if length > 0:
             s_values[accumulated:accumulated + length] =\
                 values[src_field_start:src_field_end]
@@ -175,7 +175,7 @@ def apply_sort_to_index_values(index, indices, values):
 
     return s_indices, s_values
 
-
+# TODO: index should be able to be either a reader or an ndarray
 def apply_sort(index, reader, writer):
     if isinstance(reader, IndexedStringReader):
         src_indices = reader.field['index'][:]
@@ -327,10 +327,10 @@ def get_spans(field=None, fields=None):
 @njit
 def _apply_spans_count(spans, dest_array):
     for i in range(len(spans)-1):
-        dest_array[i] = np.uint64(spans[i+1] - spans[i])
+        dest_array[i] = np.int64(spans[i+1] - spans[i])
 
-
-def apply_spans_count(spans, writer):
+# TODO - for all apply_spans methods, spans should be able to be an ndarray
+def apply_spans_count(spans, _, writer):
     if isinstance(writer, Writer):
         dest_values = writer.chunk_factory(len(spans) - 1)
         _apply_spans_count(spans, dest_values)
@@ -347,12 +347,19 @@ def _apply_spans_first(spans, src_array, dest_array):
 
 
 def apply_spans_first(spans, reader, writer):
+    if isinstance(reader, Reader):
+        read_values = reader[:]
+    elif isinstance(reader.np.ndarray):
+        read_values = reader
+    else:
+        raise ValueError(f"'reader' must be one of 'Reader' or 'ndarray' but is {type(reader)}")
+
     if isinstance(writer, Writer):
         dest_values = writer.chunk_factory(len(spans) - 1)
-        _apply_spans_first(spans, reader[:], dest_values)
+        _apply_spans_first(spans, read_values, dest_values)
         writer.write(dest_values)
     elif isinstance(writer, np.ndarray):
-        _apply_spans_first(spans, reader[:], writer)
+        _apply_spans_first(spans, read_values, writer)
     else:
         raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
 
@@ -364,9 +371,22 @@ def _apply_spans_last(spans, src_array, dest_array):
 
 
 def apply_spans_last(spans, reader, writer):
-    dest_values = writer.chunk_factory(len(spans) - 1)
-    _apply_spans_last(spans, reader[:], dest_values)
-    writer.write(dest_values)
+    if isinstance(reader, Reader):
+        read_values = reader[:]
+    elif isinstance(reader.np.ndarray):
+        read_values = reader
+    else:
+        raise ValueError(f"'reader' must be one of 'Reader' or 'ndarray' but is {type(reader)}")
+
+    if isinstance(writer, Writer):
+        dest_values = writer.chunk_factory(len(spans) - 1)
+        _apply_spans_last(spans, read_values, dest_values)
+        writer.write(dest_values)
+    elif isinstance(writer, np.ndarray):
+        _apply_spans_last(spans, read_values, writer)
+    else:
+        raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
+
 
 @njit
 def _apply_spans_max(spans, src_array, dest_array):
@@ -381,41 +401,82 @@ def _apply_spans_max(spans, src_array, dest_array):
 
 
 def apply_spans_max(spans, reader, writer):
-    dest_values = writer.chunk_factory(len(spans) - 1)
-    _apply_spans_max(spans, reader[:], dest_values)
-    writer.write(dest_values)
+    if isinstance(reader, Reader):
+        read_values = reader[:]
+    elif isinstance(reader.np.ndarray):
+        read_values = reader
+    else:
+        raise ValueError(f"'reader' must be one of 'Reader' or 'ndarray' but is {type(reader)}")
+
+    if isinstance(writer, Writer):
+        dest_values = writer.chunk_factory(len(spans) - 1)
+        _apply_spans_max(spans, read_values, dest_values)
+        writer.write(dest_values)
+    elif isinstance(reader, Reader):
+        _apply_spans_max(spans, read_values, writer)
+    else:
+        raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
 
 
-def _apply_spans_concat(spans, src_field):
-    dest_values = [None] * (len(spans)-1)
+@njit
+def _apply_spans_min(spans, src_array, dest_array):
+
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
         if next - cur == 1:
-            dest_values[i] = src_field[cur]
+            dest_array[i] = src_array[cur]
         else:
-            src = [s for s in src_field[cur:next] if len(s) > 0]
-            if len(src) > 0:
-                dest_values[i] = ','.join(utils.to_escaped(src))
-            else:
-                dest_values[i] = ''
-            # if len(dest_values[i]) > 0:
-            #     print(dest_values[i])
-    return dest_values
+            dest_array[i] = src_array[cur:next].min()
+
+
+def apply_spans_min(spans, reader, writer):
+    if isinstance(reader, Reader):
+        read_values = reader[:]
+    elif isinstance(reader.np.ndarray):
+        read_values = reader
+    else:
+        raise ValueError(f"'reader' must be one of 'Reader' or 'ndarray' but is {type(reader)}")
+
+    if isinstance(writer, Writer):
+        dest_values = writer.chunk_factory(len(spans) - 1)
+        _apply_spans_min(spans, read_values, dest_values)
+        writer.write(dest_values)
+    elif isinstance(reader, Reader):
+        _apply_spans_min(spans, read_values, writer)
+    else:
+        raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
+
+# def _apply_spans_concat(spans, src_field):
+#     dest_values = [None] * (len(spans)-1)
+#     for i in range(len(spans)-1):
+#         cur = spans[i]
+#         next = spans[i+1]
+#         if next - cur == 1:
+#             dest_values[i] = src_field[cur]
+#         else:
+#             src = [s for s in src_field[cur:next] if len(s) > 0]
+#             if len(src) > 0:
+#                 dest_values[i] = ','.join(utils.to_escaped(src))
+#             else:
+#                 dest_values[i] = ''
+#             # if len(dest_values[i]) > 0:
+#             #     print(dest_values[i])
+#     return dest_values
 
 
 @njit
 def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
-                        max_index_i, max_value_i, s_start):#, separator, delimiter):
+                        max_index_i, max_value_i, s_start):
     separator = np.frombuffer(b',', dtype=np.uint8)[0]
     delimiter = np.frombuffer(b'"', dtype=np.uint8)[0]
     if s_start == 0:
         index_i = np.uint32(1)
-        index_v = np.uint64(0)
+        index_v = np.int64(0)
         dest_index[0] = spans[0]
     else:
         index_i = np.uint32(0)
-        index_v = np.uint64(0)
+        index_v = np.int64(0)
 
     s_end = len(spans)-1
     for s in range(s_start, s_end):
@@ -430,7 +491,7 @@ def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
         if next_src_i - cur_src_i > 1:
             if next - cur == 1:
                 # only one entry to be copied, so commas not required
-                next_index_v = next_src_i - cur_src_i + np.uint64(index_v)
+                next_index_v = next_src_i - cur_src_i + np.int64(index_v)
                 dest_values[index_v:next_index_v] = src_values[cur_src_i:next_src_i]
                 index_v = next_index_v
             else:
@@ -442,7 +503,7 @@ def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
                        non_empties += 1
                 if non_empties == 1:
                     # only one non-empty entry to be copied, so commas not required
-                    next_index_v = next_src_i - cur_src_i + np.uint64(index_v)
+                    next_index_v = next_src_i - cur_src_i + np.int64(index_v)
                     dest_values[index_v:next_index_v] = src_values[cur_src_i:next_src_i]
                     index_v = next_index_v
                 else:
@@ -459,7 +520,7 @@ def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
                             elif src_values[i_c] == delimiter:
                                 quotes = True
 
-                        d_index = np.uint64(0)
+                        d_index = np.int64(0)
                         if comma or quotes:
                             dest_values[d_index] = delimiter
                             d_index += 1
@@ -472,10 +533,10 @@ def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
                             dest_values[d_index] = delimiter
                             d_index += 1
                         else:
-                            s_len = np.uint64(src_end - src_start)
+                            s_len = np.int64(src_end - src_start)
                             dest_values[index_v:index_v + s_len] = src_values[src_start:src_end]
                             d_index += s_len
-                        index_v += np.uint64(d_index)
+                        index_v += np.int64(d_index)
 
         # if either the index or values are past the threshold, write them
         if index_i >= max_index_i or index_v >= max_value_i:
@@ -484,6 +545,11 @@ def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
 
 
 def apply_spans_concat(spans, reader, writer):
+    if not isinstance(reader, IndexedStringReader):
+        raise ValueError(f"'reader' must be one of 'IndexedStringReader' but is {type(reader)}")
+    if not isinstance(writer, IndexedStringWriter):
+        raise ValueError(f"'writer' must be one of 'IndexedStringWriter' but is {type(writer)}")
+
     src_index = reader.field['index'][:]
     src_values = reader.field['values'][:]
     dest_index = np.zeros(reader.chunksize, src_index.dtype)
@@ -502,6 +568,7 @@ def apply_spans_concat(spans, reader, writer):
     writer.flush()
 
 
+# TODO - this can go if it isn't needed
 def timestamp_to_date(values):
     results = np.zeros(len(values), dtype='|S10')
     template = "{:04d}-{:02d}-{:02d}"
@@ -530,7 +597,7 @@ def get_reader(field):
     return fieldtype_map[fieldtype](field)
 
 
-def get_writer_from_field(field, dest_group, dest_name):
+def get_writer(field, dest_group, dest_name):
     reader = get_reader(field)
     return reader.get_writer(dest_group, dest_name)
 
@@ -575,7 +642,7 @@ def process(inputs, outputs, predicate):
         if isinstance(v, Writer):
             output_writers[k] = v
         else:
-            outputs[k] = get_writer_from_field(v)
+            outputs[k] = get_writer(v)
 
     reader = next(iter(input_readers.values()))
     input_length = len(reader)
@@ -605,29 +672,22 @@ def get_index(target, foreign_key, destination):
         target_lookup[v] = i
     print(f'  target lookup built in {time.time() - t0}s')
 
-    print('perform initial index')
+    print('  perform initial index')
     t0 = time.time()
     foreign_key_elems = foreign_key[:]
     # foreign_key_index = np.asarray([target_lookup.get(i, -1) for i in foreign_key_elems],
     #                                    dtype=np.int64)
     foreign_key_index = np.zeros(len(foreign_key_elems), dtype=np.int64)
 
-    current_invalid = -1
+    current_invalid = np.int64(INVALID_INDEX)
     for i_k, k in enumerate(foreign_key_elems):
         index = target_lookup.get(k, current_invalid)
-        if index < 0:
-            current_invalid -= 1
+        if index >= INVALID_INDEX:
+            current_invalid += 1
             target_lookup[k] = index
         foreign_key_index[i_k] = index
-    print(f'initial index performed in {time.time() - t0}s')
+    print(f'  initial index performed in {time.time() - t0}s')
 
-    print(f'fixing up negative index order')
-    t0 = time.time()
-    # negative values are in the opposite of the key order, so reverse them
-    foreign_key_index = np.where(foreign_key_index < 0,
-                                 current_invalid - foreign_key_index,
-                                 foreign_key_index)
-    print(f'negative index order fix performed in {time.time() - t0}s')
     destination.write(foreign_key_index)
 
 
@@ -674,8 +734,8 @@ class IndexedStringReader(Reader):
             startindex = start
             for ir in range(len(results)):
                 results[ir] =\
-                    bytestr[index[ir]-np.uint64(startindex):
-                            index[ir+1]-np.uint64(startindex)].tobytes().decode()
+                    bytestr[index[ir]-np.int64(startindex):
+                            index[ir+1]-np.int64(startindex)].tobytes().decode()
             return results
 
     def __len__(self):
@@ -687,14 +747,6 @@ class IndexedStringReader(Reader):
     def dtype(self):
         return self.field['index'].dtype, self.field['values'].dtype
 
-    """
-    0 1 3 6 10 15
-    abbcccddddeeeee
-
-    2 3 1 4 0
-    0 3 7 9 14 15
-    cccddddbbeeeeea
-    """
     def sort(self, index, writer):
         field_index = self.field['index'][:]
         field_values = self.field['values'][:]
@@ -843,7 +895,7 @@ class IndexedStringWriter(Writer):
         self.chunksize = chunksize
 
         self.values = np.zeros(chunksize, dtype=np.uint8)
-        self.indices = np.zeros(chunksize, dtype=np.uint64)
+        self.indices = np.zeros(chunksize, dtype=np.int64)
         self.ever_written = False
         self.accumulated = 0
         self.value_index = 0
@@ -895,8 +947,8 @@ class IndexedStringWriter(Writer):
         self.flush()
 
     def write_part_raw(self, index, values):
-        if index.dtype != np.uint64:
-            raise ValueError(f"'index' must be an ndarray of '{np.uint64}'")
+        if index.dtype != np.int64:
+            raise ValueError(f"'index' must be an ndarray of '{np.int64}'")
         if values.dtype != np.uint8:
             raise ValueError(f"'values' must be an ndarray of '{np.uint8}'")
         DataWriter._write(self.field, 'index', index, len(index))
@@ -907,6 +959,8 @@ class IndexedStringWriter(Writer):
         self.flush()
 
 
+# TODO: should produce a warning for unmappable strings and a corresponding filter, rather
+# than raising an exception; or at least have a mode where this is possible
 class CategoricalImporter:
     def __init__(self, group, chunksize, name, timestamp, categories, write_mode='write'):
         self.writer =\
@@ -955,6 +1009,7 @@ class CategoricalWriter(Writer):
         self.field.attrs['timestamp'] = self.timestamp
         self.field.attrs['chunksize'] = self.chunksize
         self.field.attrs['completed'] = True
+        Writer.flush(self)
 
     def write(self, values):
         self.write_part(values)
@@ -1019,6 +1074,7 @@ class NumericWriter(Writer):
         self.field.attrs['chunksize'] = self.chunksize
         self.field.attrs['nformat'] = self.nformat
         self.field.attrs['completed'] = True
+        Writer.flush(self)
 
     def write(self, values):
         self.write_part(values)
@@ -1044,13 +1100,14 @@ class FixedStringWriter(Writer):
         self.field.attrs['timestamp'] = self.timestamp
         self.field.attrs['chunksize'] = self.chunksize
         self.field.attrs['completed'] = True
+        Writer.flush(self)
 
     def write(self, values):
         self.write_part(values)
         self.flush()
 
 
-class OptionalDateTimeImporter:
+class DateTimeImporter:
     def __init__(self, group, chunksize, name, timestamp, optional=True, write_mode='write'):
         self.datetime = DateTimeWriter(group, chunksize, name, timestamp, write_mode)
         self.datestr = FixedStringWriter(group, chunksize, f"{name}_day", timestamp, '10',
@@ -1126,6 +1183,7 @@ class DateTimeWriter(Writer):
         self.field.attrs['timestamp'] = self.timestamp
         self.field.attrs['chunksize'] = self.chunksize
         self.field.attrs['completed'] = True
+        Writer.flush(self)
 
     def write(self, values):
         self.write_part(values)
@@ -1133,15 +1191,15 @@ class DateTimeWriter(Writer):
 
 
 class DateWriter(Writer):
-    def __init__(self, group, chunksize, name, timestamp, write_mode='writer'):
+    def __init__(self, group, chunksize, name, timestamp, write_mode='write'):
         Writer.__init__(self, group, name, write_mode)
-        self.fieldtype = f'datetime'
+        self.fieldtype = f'date'
         self.timestamp = timestamp
         self.chunksize = chunksize
         self.name = name
 
     def chunk_factory(self, length):
-        return np.zeros(length, dtype=f'S32')
+        return np.zeros(length, dtype=f'S10')
 
     def write_part(self, values):
 
@@ -1160,13 +1218,14 @@ class DateWriter(Writer):
         self.field.attrs['timestamp'] = self.timestamp
         self.field.attrs['chunksize'] = self.chunksize
         self.field.attrs['completed'] = True
+        Writer.flush(self)
 
     def write(self, values):
         self.write_part(values)
         self.flush()
 
 
-class TimestampWriter:
+class TimestampWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, write_mode='write'):
         Writer.__init__(self, group, name, write_mode)
         self.fieldtype = f'timestamp'
@@ -1185,6 +1244,7 @@ class TimestampWriter:
         self.field.attrs['timestamp'] = self.timestamp
         self.field.attrs['chunksize'] = self.chunksize
         self.field.attrs['completed'] = True
+        Writer.flush(self)
 
     def write(self, values):
         self.write_part(values)
@@ -1235,12 +1295,12 @@ class OptionalDateImporter:
 
 def sort_on(src_group, dest_group, keys, fields=None, timestamp=datetime.now(timezone.utc),
             write_mode='write'):
-    sort_keys = ('patient_id', 'created_at')
+    # sort_keys = ('patient_id', 'created_at')
     readers = tuple(get_reader(src_group[f]) for f in keys)
     t1 = time.time()
     sorted_index = dataset_sort(
         np.arange(len(readers[0]), dtype=np.uint32), readers)
-    print(f'sorted {sort_keys} index in {time.time() - t1}s')
+    print(f'sorted {keys} index in {time.time() - t1}s')
 
     t0 = time.time()
     for k in src_group.keys():
@@ -1252,3 +1312,149 @@ def sort_on(src_group, dest_group, keys, fields=None, timestamp=datetime.now(tim
         del w
         print(f"  '{k}' reordered in {time.time() - t1}s")
     print(f"fields reordered in {time.time() - t0}s")
+
+
+def aggregate_count(fkey_indices=None, fkey_index_spans=None, reader=None, writer=None):
+    return _aggregate_impl(apply_spans_count, fkey_indices, fkey_index_spans, reader, writer, np.uint32)
+
+
+def aggregate_first(fkey_indices=None, fkey_index_spans=None, reader=None, writer=None):
+    return aggregate_custom(apply_spans_first, fkey_indices, fkey_index_spans, reader, writer)
+
+
+def aggregate_last(fkey_indices=None, fkey_index_spans=None, reader=None, writer=None):
+    return aggregate_custom(apply_spans_last, fkey_indices, fkey_index_spans, reader, writer)
+
+
+def aggregate_min(fkey_indices=None, fkey_index_spans=None, reader=None, writer=None):
+    return aggregate_custom(apply_spans_min, fkey_indices, fkey_index_spans, reader, writer)
+
+
+def aggregate_max(fkey_indices=None, fkey_index_spans=None, reader=None, writer=None):
+    return aggregate_custom(apply_spans_max, fkey_indices, fkey_index_spans, reader, writer)
+
+
+def aggregate_custom(predicate, fkey_indices=None, fkey_index_spans=None, reader=None, writer=None):
+    if reader is None:
+        raise ValueError("'reader' must not be None")
+    if not isinstance(reader, (Reader, np.ndarray)):
+        raise ValueError(f"'reader' must be a Reader or an ndarray but is {type(reader)}")
+    if isinstance(reader, Reader):
+        required_dtype = reader.dtype()
+    else:
+        required_dtype = reader.dtype
+    return _aggregate_impl(predicate, fkey_indices, fkey_index_spans, reader, writer, required_dtype)
+
+
+def _aggregate_impl(predicate,
+                    fkey_indices=None, fkey_index_spans=None, reader=None, writer=None, result_dtype=None):
+    if fkey_indices is None and fkey_index_spans is None:
+        raise ValueError("One of 'fkey_indices' or 'fkey_index_spans' must be set")
+    if fkey_indices is not None and fkey_index_spans is not None:
+        raise ValueError("Only one of 'fkey_indices' and 'fkey_index_spans' may be set")
+    if writer is not None:
+        if not isinstance(writer, (Writer, np.ndarray)):
+            raise ValueError("'writer' must be either a Writer or an ndarray instance")
+
+    if fkey_index_spans is None:
+        fkey_index_spans = get_spans(field=fkey_indices)
+
+    if isinstance(writer, np.ndarray):
+        if len(writer) != len(fkey_index_spans)-1:
+            error = "'writer': ndarray must be of length {} but is of length {}"
+            raise ValueError(error.format(len(fkey_index_spans)-1), len(writer))
+        elif writer.dtype != result_dtype:
+            raise ValueError(f"'writer' dtype must be {result_dtype} but is {writer.dtype}")
+
+    if isinstance(writer, Writer) or writer is None:
+        results = np.zeros(len(fkey_index_spans)-1, dtype=result_dtype)
+    else:
+        results = writer
+
+    # execute the predicate (note that not every predicate requires a reader)
+    predicate(fkey_index_spans, reader, results)
+
+    if isinstance(writer, Writer):
+        writer.write(results)
+
+    return writer if writer is not None else results
+
+
+def join(destination_pkey, fkey_indices, values_to_join, writer=None, fkey_index_spans=None):
+    if values_to_join is not None:
+        if not isinstance(values_to_join, (Reader, np.ndarray)):
+            raise ValueError(f"'values_to_join' must be a type of Reader but is {type(values_to_join)}")
+        if isinstance(values_to_join, IndexedStringReader):
+            raise ValueError(f"Joins on indexed string fields are not supported")
+
+    if isinstance(values_to_join, Reader):
+        raw_values_to_join = values_to_join[:]
+    else:
+        raw_values_to_join = values_to_join
+
+    # generate spans for the sorted key indices if not provided
+    if fkey_index_spans is None:
+        fkey_index_spans = get_spans(field=fkey_indices)
+
+    # select the foreign keys from the start of each span to get an ordered list
+    # of unique id indices in the destination space that the results of the predicate
+    # execution are mapped to
+    unique_fkey_indices = fkey_indices[:][fkey_index_spans[:-1]]
+
+    # generate a filter to remove invalid foreign key indices (where values in the
+    # foreign key don't map to any values in the destination space
+    invalid_filter = unique_fkey_indices < INVALID_INDEX
+    safe_unique_fkey_indices = unique_fkey_indices[invalid_filter]
+
+    # the predicate results are in the same space as the unique_fkey_indices, which
+    # means they may still contain invalid indices, so filter those now
+    safe_values_to_join = raw_values_to_join[invalid_filter]
+
+    # now get the memory that the results will be mapped to
+    destination_space_values = writer.chunk_factory(len(destination_pkey))
+
+    # finally, map the results from the source space to the destination space
+    destination_space_values[safe_unique_fkey_indices] = safe_values_to_join
+
+    writer.write(destination_space_values)
+
+
+def predicate_and_join(predicate, destination_pkey, fkey_indices, reader=None, writer=None, fkey_index_spans=None):
+    if reader is not None:
+        if not isinstance(reader, Reader):
+            raise ValueError(f"'reader' must be a type of Reader but is {type(reader)}")
+        if isinstance(reader, IndexedStringReader):
+            raise ValueError(f"Joins on indexed string fields are not supported")
+
+    # generate spans for the sorted key indices if not provided
+    if fkey_index_spans is None:
+        fkey_index_spans = get_spans(field=fkey_indices)
+
+    # select the foreign keys from the start of each span to get an ordered list
+    # of unique id indices in the destination space that the results of the predicate
+    # execution are mapped to
+    unique_fkey_indices = fkey_indices[:][fkey_index_spans[:-1]]
+
+    # generate a filter to remove invalid foreign key indices (where values in the
+    # foreign key don't map to any values in the destination space
+    invalid_filter = unique_fkey_indices < INVALID_INDEX
+    safe_unique_fkey_indices = unique_fkey_indices[invalid_filter]
+
+    # execute the predicate (note that not every predicate requires a reader)
+    if reader is not None:
+        dtype = reader.dtype()
+    else:
+        dtype = np.uint32
+    results = np.zeros(len(fkey_index_spans)-1, dtype=dtype)
+    predicate(fkey_index_spans, reader, results)
+
+    # the predicate results are in the same space as the unique_fkey_indices, which
+    # means they may still contain invalid indices, so filter those now
+    safe_results = results[invalid_filter]
+
+    # now get the memory that the results will be mapped to
+    destination_space_values = writer.chunk_factory(len(destination_pkey))
+    # finally, map the results from the source space to the destination space
+    destination_space_values[safe_unique_fkey_indices] = safe_results
+
+    writer.write(destination_space_values)
