@@ -149,12 +149,12 @@ def weight_height_bmi_fast_1(
     heights_clean, heights_filter, heights_modified_flag,
     bmis_clean, bmis_filter, bmis_modified_flag):
 
-    raw_weightsv = persistence.NewNumericReader(weights)[:]
-    raw_weightsf = persistence.NewNumericReader(weight_filter)[:]
-    raw_heightsv = persistence.NewNumericReader(heights)[:]
-    raw_heightsf = persistence.NewNumericReader(height_filter)[:]
-    raw_bmisv = persistence.NewNumericReader(bmis)[:]
-    raw_bmisf = persistence.NewNumericReader(bmi_filter)[:]
+    raw_weightsv = persistence.NumericReader(weights)[:]
+    raw_weightsf = persistence.NumericReader(weight_filter)[:]
+    raw_heightsv = persistence.NumericReader(heights)[:]
+    raw_heightsf = persistence.NumericReader(height_filter)[:]
+    raw_bmisv = persistence.NumericReader(bmis)[:]
+    raw_bmisf = persistence.NumericReader(bmi_filter)[:]
 
     length = len(raw_weightsv)
     def test_input(series, name):

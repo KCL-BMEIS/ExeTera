@@ -42,7 +42,7 @@ def check_inconsistent_symptoms_1(src_assessments, dest_assessments, timestamp):
         'unusual_muscle_pains'
     )
 
-    health_status = persistence.NewCategoricalReader(src_assessments['health_status'])
+    health_status = persistence.CategoricalReader(src_assessments['health_status'])
     health_status_array = health_status[:]
 
     combined_results = np.zeros(len(health_status), dtype=np.bool)
@@ -51,21 +51,21 @@ def check_inconsistent_symptoms_1(src_assessments, dest_assessments, timestamp):
         if h not in src_assessments.keys():
             print(f"warning: field {h} is not present in this dataset")
         else:
-            f = persistence.NewCategoricalReader(src_assessments[h])
+            f = persistence.CategoricalReader(src_assessments[h])
             combined_results = combined_results & (f[:] != 2)
 
     for h in generated_health_fields:
         if h not in src_assessments.keys():
             print(f"warning: field {h} is not present in this dataset")
         else:
-            f = persistence.NewCategoricalReader(src_assessments[h])
+            f = persistence.CategoricalReader(src_assessments[h])
             combined_results = combined_results and f[:]
 
     inconsistent_healthy =\
-        persistence.NewNumericWriter(dest_assessments, health_status.chunksize,
+        persistence.NumericWriter(dest_assessments, health_status.chunksize,
                                      'inconsistent_healthy', timestamp, 'bool')
     inconsistent_not_healthy =\
-        persistence.NewNumericWriter(dest_assessments, health_status.chunksize,
+        persistence.NumericWriter(dest_assessments, health_status.chunksize,
                                      'inconsistent_not_healthy', timestamp, 'bool')
 
     inconsistent_healthy.write((health_status_array == 1) & (combined_results is False))

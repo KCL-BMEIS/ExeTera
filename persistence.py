@@ -132,35 +132,6 @@ def try_str_to_float(value, invalid=0):
         return False, invalid
 
 
-# Readers
-# =======
-
-
-# def _chunkcount(dataset, chunksize, istart=0, iend=None):
-#     if iend is None:
-#         iend = dataset.size
-#     requested_size = iend - istart
-#     chunkmax = int(requested_size / chunksize)
-#     if requested_size % chunksize != 0:
-#         chunkmax += 1
-#     return chunkmax
-
-
-# def _slice_for_chunk(c, dataset, chunksize, istart=0, iend=None):
-#     if iend is None:
-#         iend = len(dataset)
-#     requested_size = iend - istart
-#     # if c == chunkmax - 1:
-#     if c >= _chunkcount(dataset, chunksize, istart, iend):
-#         raise ValueError("Asking for out of range chunk")
-#
-#     if istart + (c + 1) * chunksize> iend:
-#         length = requested_size % chunksize
-#     else:
-#         length = chunksize
-#     return istart + c * chunksize, istart + c * chunksize + length
-
-
 def dataset_sort(index, readers):
     r_readers = reversed(readers)
 
@@ -206,7 +177,7 @@ def apply_sort_to_index_values(index, indices, values):
 
 
 def apply_sort(index, reader, writer):
-    if isinstance(reader, NewIndexedStringReader):
+    if isinstance(reader, IndexedStringReader):
         src_indices = reader.field['index'][:]
         src_values = reader.field.get('values', np.zeros(0, dtype='S1'))[:]
         indices, values = apply_sort_to_index_values(index, src_indices, src_values)
@@ -287,13 +258,6 @@ def temp_dataset():
 def filter(dataset, field, name, predicate, timestamp=datetime.now(timezone.utc)):
     raise NotImplementedError()
 
-#     c = Series(field)
-#     writer = BooleanWriter(dataset, DEFAULT_CHUNKSIZE, name, timestamp)
-#     for r in c:
-#         writer.append(predicate(r))
-#     writer.flush()
-#     return dataset[name]
-
 
 # TODO: write distinct with new readers / writers rather than deleting this
 def distinct(field=None, fields=None, filter=None):
@@ -314,14 +278,6 @@ def distinct(field=None, fields=None, filter=None):
     results = [uniques[f'{i}'] for i in range(len(fields))]
     return results
 
-# @njit
-# def _not_equals(a, c):
-#     a_len = len(a)
-#     a0 = a[:-1]
-#     a1 = a[1:]
-#     c0 = c[1:-1]
-#     for i_r in range(a_len):
-#         c0[i_r] = a0[i_r] == a1[i_r]
 
 @njit
 def _not_equals(a, b, c):
@@ -329,62 +285,15 @@ def _not_equals(a, b, c):
     for i_r in range(a_len):
         c[i_r] = a[i_r] != b[i_r]
 
-def _get_spans_for_field(field0):
-    # count = 0
-    # spans = np.empty(len(field0)+1, dtype=np.uint32)
-    # spans[0] = 0
-    # field_count = len(field0)
-    # for i in range(1, field_count):
-    #     if field0[i] != field0[i-1]:
-    #         count += 1
-    #         spans[count] = i
-    # spans[count+1] = len(field0)
-    # return spans[:count+2]
 
+def _get_spans_for_field(field0):
 
     results = np.zeros(len(field0) + 1, dtype=np.bool)
-    # _not_equals(field0, results)
-    t0 = time.time()
-    a = field0[:-1]
-    print(f"    {time.time() - t0}")
-    t0 = time.time()
-    b = field0[1:]
-    print(f"    {time.time() - t0}")
-    t0 = time.time()
     _not_equals(field0[:-1], field0[1:], results[1:])
-    print(f"    {time.time() - t0}")
     results[0] = True
     results[-1] = True
     return np.nonzero(results)[0]
-    # return results
 
-# def find_runs(x):
-#     """Find runs of consecutive items in an array."""
-#
-#     # ensure array
-#     x = np.asanyarray(x)
-#     if x.ndim != 1:
-#         raise ValueError('only 1D array supported')
-#     n = x.shape[0]
-#
-#     # handle empty array
-#     if n == 0:
-#         return np.array([]), np.array([]), np.array([])
-#
-#     else:
-#         # find run starts
-#         loc_run_start = np.empty(n, dtype=bool)
-#         loc_run_start[0] = True
-#         np.not_equal(x[:-1], x[1:], out=loc_run_start[1:])
-#         run_starts = np.nonzero(loc_run_start)[0]
-#
-#         # find run values
-#         run_values = x[loc_run_start]
-#
-#         # find run lengths
-#         run_lengths = np.diff(np.append(run_starts, n))
-#
-#         return run_values, run_starts, run_lengths
 
 @njit
 def _get_spans_for_2_fields(field0, field1):
@@ -419,20 +328,17 @@ def get_spans(field=None, fields=None):
 def _apply_spans_count(spans, dest_array):
     for i in range(len(spans)-1):
         dest_array[i] = np.uint64(spans[i+1] - spans[i])
-        # if spans[i+1] - spans[i] < 0:
-        #     print(spans[i+1] - spans[i], spans[i+1], spans[i], i)
-    print(dest_array.max())
 
 
 def apply_spans_count(spans, writer):
-    if isinstance(writer, NewWriter):
+    if isinstance(writer, Writer):
         dest_values = writer.chunk_factory(len(spans) - 1)
         _apply_spans_count(spans, dest_values)
         writer.write(dest_values)
     elif isinstance(writer, np.ndarray):
         _apply_spans_count(spans, writer)
     else:
-        raise ValueError(f"'writer' must be one of 'NewWriter' or 'ndarray' but is {type(writer)}")
+        raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
 
 
 @njit
@@ -441,9 +347,14 @@ def _apply_spans_first(spans, src_array, dest_array):
 
 
 def apply_spans_first(spans, reader, writer):
-    dest_values = writer.chunk_factory(len(spans) - 1)
-    _apply_spans_first(spans, reader[:], dest_values)
-    writer.write(dest_values)
+    if isinstance(writer, Writer):
+        dest_values = writer.chunk_factory(len(spans) - 1)
+        _apply_spans_first(spans, reader[:], dest_values)
+        writer.write(dest_values)
+    elif isinstance(writer, np.ndarray):
+        _apply_spans_first(spans, reader[:], writer)
+    else:
+        raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
 
 
 @njit
@@ -492,12 +403,6 @@ def _apply_spans_concat(spans, src_field):
             #     print(dest_values[i])
     return dest_values
 
-# 0, 2, 3, 4, 6, 8
-# 0, 2, 6, 10, 12, 16, 18, 22, 24
-# aa bbbb cccc dd eeee ff gggghh
-
-# 0, 6, 10, 12, 18, 24
-# aabbbb cccc dd eeeeff gggghh
 
 @njit
 def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
@@ -544,24 +449,13 @@ def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
                     # the outer conditional already determines that we have a non-empty entry
                     # so there must be multiple non-empty entries and commas are required
                     for e in range(cur, next):
-                        # separator = b','
-                        # delimiter = b'"'
-                        # delta = utils.bytearray_to_escaped(src_values,
-                        #                                    dest_values,
-                        #                                    src_start=src_index[e],
-                        #                                    src_end=src_index[e+1],
-                        #                                    dest_start=index_v)
-                        # index_v += np.uint64(d_index)
                         src_start = src_index[e]
                         src_end = src_index[e+1]
                         comma = False
                         quotes = False
                         for i_c in range(src_start, src_end):
-                            # c = src_values[i_c]
-                            # if c == separator[0]:
                             if src_values[i_c] == separator:
                                 comma = True
-                            # elif c == delimiter[0]:
                             elif src_values[i_c] == delimiter:
                                 quotes = True
 
@@ -570,13 +464,9 @@ def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
                             dest_values[d_index] = delimiter
                             d_index += 1
                             for i_c in range(src_start, src_end):
-                                # c = src_values[i_c]
-                                # if c == delimiter[0]:
                                 if src_values[i_c] == delimiter:
-                                    # dest_values[d_index] = c
                                     dest_values[d_index] = src_values[i_c]
                                     d_index += 1
-                                # dest_values[d_index] = c
                                 dest_values[d_index] = src_values[i_c]
                                 d_index += 1
                             dest_values[d_index] = delimiter
@@ -590,18 +480,12 @@ def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
         # if either the index or values are past the threshold, write them
         if index_i >= max_index_i or index_v >= max_value_i:
             break
-            # return s+1, index_i, index_v
     return s+1, index_i, index_v
 
 
 def apply_spans_concat(spans, reader, writer):
-    separator = np.frombuffer(b',', '|S1')
-    delimiter = np.frombuffer(b'"', '|S1')
     src_index = reader.field['index'][:]
     src_values = reader.field['values'][:]
-    # write chunks to the writer
-    # . read from a given span
-    #   . calculate extra characters required
     dest_index = np.zeros(reader.chunksize, src_index.dtype)
     dest_values = np.zeros(reader.chunksize * 16, src_values.dtype)
 
@@ -612,40 +496,10 @@ def apply_spans_concat(spans, reader, writer):
         s, index_i, index_v = _apply_spans_concat(spans, src_index, src_values,
                                                   dest_index, dest_values,
                                                   max_index_i, max_value_i, s)
-                                                  # separator[0], delimiter[0])
 
         if index_i > 0 or index_v > 0:
             writer.write_raw(dest_index[:index_i], dest_values[:index_v])
     writer.flush()
-    # index_i = 1
-    # index_v = 0
-    # max_index_i = reader.chunksize
-    # max_value_i = reader.chunksize * 8
-    # dest_index[0] = spans[0]
-    # for s in range(len(spans)-1):
-    #     cur = spans[s]
-    #     next = spans[s+1]
-    #     cur_src_i = src_index[cur]
-    #     next_src_i = src_index[next]
-    #
-    #     dest_index[index_i] = next_src_i
-    #     index_i += 1
-    #
-    #     next_index_v = next_src_i - cur_src_i + np.uint64(index_v)
-    #     dest_values[index_v:next_index_v] = src_values[cur_src_i:next_src_i]
-    #     index_v = next_index_v
-    #     # if either the index or values are past the threshold, write them
-    #     if index_i >= max_index_i or index_v >= max_value_i:
-    #         writer.write_raw(dest_index[:index_i], dest_values[:index_v])
-    #         index_i = 0
-    #         index_v = 0
-    #
-    # if index_i > 0 or index_v > 0:
-    #     writer.write_raw(dest_index[:index_i], dest_values[:index_v])
-    #
-    # writer.flush()
-
-
 
 
 def timestamp_to_date(values):
@@ -654,23 +508,22 @@ def timestamp_to_date(values):
     for i_r in range(len(values)):
         dt = datetime.fromtimestamp(values[i_r])
         results[i_r] = template.format(dt.year, dt.month, dt.day).encode()
-        # results[i_r] = dt.strftime("YYYY-MM-DD").encode()
     return results
 
 
-def get_reader_from_field(field):
+def get_reader(field):
     if 'fieldtype' not in field.attrs.keys():
         raise ValueError(f"'{field_name}' is not a well-formed field")
 
     fieldtype_map = {
-        'indexedstring': NewIndexedStringReader,
-        'fixedstring': NewFixedStringReader,
-        'categorical': NewCategoricalReader,
-        'boolean': NewNumericReader,
-        'numeric': NewNumericReader,
-        'datetime': NewTimestampReader,
-        'date': NewTimestampReader,
-        'timestamp': NewTimestampReader
+        'indexedstring': IndexedStringReader,
+        'fixedstring': FixedStringReader,
+        'categorical': CategoricalReader,
+        'boolean': NumericReader,
+        'numeric': NumericReader,
+        'datetime': TimestampReader,
+        'date': TimestampReader,
+        'timestamp': TimestampReader
     }
 
     fieldtype = field.attrs['fieldtype'].split(',')[0]
@@ -678,7 +531,7 @@ def get_reader_from_field(field):
 
 
 def get_writer_from_field(field, dest_group, dest_name):
-    reader = get_reader_from_field(field)
+    reader = get_reader(field)
     return reader.get_writer(dest_group, dest_name)
 
 
@@ -712,14 +565,14 @@ def process(inputs, outputs, predicate):
     # TODO: modifying the dictionaries in place is not great
     input_readers = dict()
     for k, v in inputs.items():
-        if isinstance(v, NewReader):
+        if isinstance(v, Reader):
             input_readers[k] = v
         else:
-            input_readers[k] = get_reader_from_field(v)
+            input_readers[k] = get_reader(v)
     output_writers = dict()
     output_arrays = dict()
     for k, v in outputs.items():
-        if isinstance(v, NewWriter):
+        if isinstance(v, Writer):
             output_writers[k] = v
         else:
             outputs[k] = get_writer_from_field(v)
@@ -780,10 +633,7 @@ def get_index(target, foreign_key, destination):
 
 
 def get_trash_group(group):
-    # parent = group.parent
-    # while (parent != group):
-    #     parent, group = parent.parent, group.parent
-    # return group
+
     group_names = group.name[1:].split('/')
 
     while True:
@@ -795,14 +645,14 @@ def get_trash_group(group):
             pass
 
 
-class NewReader:
+class Reader:
     def __init__(self, field):
         self.field = field
 
 
-class NewIndexedStringReader(NewReader):
+class IndexedStringReader(Reader):
     def __init__(self, field):
-        NewReader.__init__(self, field)
+        Reader.__init__(self, field)
         if 'fieldtype' not in field.attrs.keys():
             error = "{} must have 'fieldtype' in its attrs property"
             raise ValueError(error.format(field))
@@ -832,7 +682,7 @@ class NewIndexedStringReader(NewReader):
         return len(self.field['index']) - 1
 
     def getwriter(self, dest_group, dest_name, timestamp, write_mode='write'):
-        return NewIndexedStringWriter(dest_group, self.chunksize, dest_name, timestamp, write_mode)
+        return IndexedStringWriter(dest_group, self.chunksize, dest_name, timestamp, write_mode)
 
     def dtype(self):
         return self.field['index'].dtype, self.field['values'].dtype
@@ -852,9 +702,9 @@ class NewIndexedStringReader(NewReader):
         writer.write_raw(r_field_index, r_field_values)
 
 
-class NewNumericReader(NewReader):
+class NumericReader(Reader):
     def __init__(self, field):
-        NewReader.__init__(self, field)
+        Reader.__init__(self, field)
         if 'fieldtype' not in field.attrs.keys():
             error = "{} must have 'fieldtype' in its attrs property"
             raise ValueError(error.format(field))
@@ -871,16 +721,16 @@ class NewNumericReader(NewReader):
         return len(self.field['values'])
 
     def getwriter(self, dest_group, dest_name, timestamp, write_mode='write'):
-        return NewNumericWriter(dest_group, self.chunksize, dest_name, timestamp,
-                                self.field.attrs['fieldtype'].split(',')[1], write_mode)
+        return NumericWriter(dest_group, self.chunksize, dest_name, timestamp,
+                             self.field.attrs['fieldtype'].split(',')[1], write_mode)
 
     def dtype(self):
         return self.field['values'].dtype
 
 
-class NewCategoricalReader(NewReader):
+class CategoricalReader(Reader):
     def __init__(self, field):
-        NewReader.__init__(self, field)
+        Reader.__init__(self, field)
         if 'fieldtype' not in field.attrs.keys():
             error = "{} must have 'fieldtype' in its attrs property"
             raise ValueError(error.format(field))
@@ -898,16 +748,16 @@ class NewCategoricalReader(NewReader):
         return len(self.field['values'])
 
     def getwriter(self, dest_group, dest_name, timestamp, write_mode='write'):
-        return NewCategoricalWriter(dest_group, self.chunksize, dest_name, timestamp,
-                                    {v: k for k, v in enumerate(self.field['keys'])}, write_mode)
+        return CategoricalWriter(dest_group, self.chunksize, dest_name, timestamp,
+                                 {v: k for k, v in enumerate(self.field['keys'])}, write_mode)
 
     def dtype(self):
         return self.field['values'].dtype
 
 
-class NewFixedStringReader(NewReader):
+class FixedStringReader(Reader):
     def __init__(self, field):
-        NewReader.__init__(self, field)
+        Reader.__init__(self, field)
         if 'fieldtype' not in field.attrs.keys():
             error = "{} must have 'fieldtype' in its attrs property"
             raise ValueError(error.format(field))
@@ -924,16 +774,16 @@ class NewFixedStringReader(NewReader):
         return len(self.field['values'])
 
     def getwriter(self, dest_group, dest_name, timestamp, write_mode='write'):
-        return NewFixedStringWriter(dest_group, self.chunksize, dest_name, timestamp,
-                                    self.field.attrs['fieldtype'].split(',')[1], write_mode)
+        return FixedStringWriter(dest_group, self.chunksize, dest_name, timestamp,
+                                 self.field.attrs['fieldtype'].split(',')[1], write_mode)
 
     def dtype(self):
         return self.field['values'].dtype
 
 
-class NewTimestampReader(NewReader):
+class TimestampReader(Reader):
     def __init__(self, field):
-        NewReader.__init__(self, field)
+        Reader.__init__(self, field)
         if 'fieldtype' not in field.attrs.keys():
             error = "{} must have 'fieldtype' in its attrs property"
             raise ValueError(error.format(field))
@@ -950,7 +800,7 @@ class NewTimestampReader(NewReader):
         return len(self.field['values'])
 
     def getwriter(self, dest_group, dest_name, timestamp, write_mode='write'):
-        return NewTimestampWriter(dest_group, self.chunksize, dest_name, timestamp, write_mode)
+        return TimestampWriter(dest_group, self.chunksize, dest_name, timestamp, write_mode)
 
     def dtype(self):
         return self.field['values'].dtype
@@ -959,7 +809,7 @@ class NewTimestampReader(NewReader):
 write_modes = {'write', 'overwrite'}
 
 
-class NewWriter:
+class Writer:
     def __init__(self, group, name, write_mode):
         self.trash_field = None
         if write_mode not in write_modes:
@@ -985,9 +835,9 @@ class NewWriter:
             del self.trash_field
 
 
-class NewIndexedStringWriter(NewWriter):
+class IndexedStringWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, write_mode='write'):
-        NewWriter.__init__(self, group, name, write_mode)
+        Writer.__init__(self, group, name, write_mode)
         self.fieldtype = f'indexedstring'
         self.timestamp = timestamp
         self.chunksize = chunksize
@@ -996,9 +846,6 @@ class NewIndexedStringWriter(NewWriter):
         self.indices = np.zeros(chunksize, dtype=np.uint64)
         self.ever_written = False
         self.accumulated = 0
-        # self.indices[0] = self.accumulated
-        # self.value_index = 0
-        # self.index_index = 1
         self.value_index = 0
         self.index_index = 0
 
@@ -1041,7 +888,7 @@ class NewIndexedStringWriter(NewWriter):
         self.field.attrs['timestamp'] = self.timestamp
         self.field.attrs['chunksize'] = self.chunksize
         self.field.attrs['completed'] = True
-        NewWriter.flush(self)
+        Writer.flush(self)
 
     def write(self, values):
         self.write_part(values)
@@ -1060,10 +907,10 @@ class NewIndexedStringWriter(NewWriter):
         self.flush()
 
 
-class NewCategoricalImporter:
+class CategoricalImporter:
     def __init__(self, group, chunksize, name, timestamp, categories, write_mode='write'):
         self.writer =\
-            NewCategoricalWriter(group, chunksize, name, timestamp, categories, write_mode)
+            CategoricalWriter(group, chunksize, name, timestamp, categories, write_mode)
         self.field_size = max([len(k) for k in categories.keys()])
 
     def chunk_factory(self, length):
@@ -1084,9 +931,9 @@ class NewCategoricalImporter:
         self.flush()
 
 
-class NewCategoricalWriter(NewWriter):
+class CategoricalWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, categories, write_mode='write'):
-        NewWriter.__init__(self, group, name, write_mode)
+        Writer.__init__(self, group, name, write_mode)
         self.fieldtype = f'categorical'
         self.timestamp = timestamp
         self.chunksize = chunksize
@@ -1114,12 +961,12 @@ class NewCategoricalWriter(NewWriter):
         self.flush()
 
 
-class NewNumericImporter:
+class NumericImporter:
     def __init__(self, group, chunksize, name, timestamp, nformat, parser, write_mode='write'):
         self.data_writer =\
-            NewNumericWriter(group, chunksize, name, timestamp, nformat, write_mode)
+            NumericWriter(group, chunksize, name, timestamp, nformat, write_mode)
         self.flag_writer =\
-            NewNumericWriter(group, chunksize, f"{name}_valid", timestamp, 'bool', write_mode)
+            NumericWriter(group, chunksize, f"{name}_valid", timestamp, 'bool', write_mode)
         self.parser = parser
 
     def chunk_factory(self, length):
@@ -1151,9 +998,9 @@ class NewNumericImporter:
         self.flush()
 
 
-class NewNumericWriter(NewWriter):
+class NumericWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, nformat, write_mode='write'):
-        NewWriter.__init__(self, group, name, write_mode)
+        Writer.__init__(self, group, name, write_mode)
         self.fieldtype = f'numeric,{nformat}'
         self.nformat = nformat
         self.timestamp = timestamp
@@ -1178,9 +1025,9 @@ class NewNumericWriter(NewWriter):
         self.flush()
 
 
-class NewFixedStringWriter(NewWriter):
+class FixedStringWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, strlen, write_mode='write'):
-        NewWriter.__init__(self, group, name, write_mode)
+        Writer.__init__(self, group, name, write_mode)
         self.strlen = strlen
         self.fieldtype = f'fixedstring,{strlen}'
         self.timestamp = timestamp
@@ -1205,13 +1052,13 @@ class NewFixedStringWriter(NewWriter):
 
 class OptionalDateTimeImporter:
     def __init__(self, group, chunksize, name, timestamp, optional=True, write_mode='write'):
-        self.datetime = NewDateTimeWriter(group, chunksize, name, timestamp, write_mode)
-        self.datestr = NewFixedStringWriter(group, chunksize, f"{name}_day", timestamp, '10',
-                                            write_mode)
+        self.datetime = DateTimeWriter(group, chunksize, name, timestamp, write_mode)
+        self.datestr = FixedStringWriter(group, chunksize, f"{name}_day", timestamp, '10',
+                                         write_mode)
         self.datetimeset = None
         if optional:
             self.datetimeset =\
-                NewNumericWriter(group, chunksize, f"{name}_set", timestamp, 'bool', write_mode)
+                NumericWriter(group, chunksize, f"{name}_set", timestamp, 'bool', write_mode)
 
     def chunk_factory(self, length):
         return self.datetime.chunk_factory(length)
@@ -1247,9 +1094,9 @@ class OptionalDateTimeImporter:
 
 
 # TODO writers can write out more than one field; offset could be done this way
-class NewDateTimeWriter(NewWriter):
+class DateTimeWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, write_mode='write'):
-        NewWriter.__init__(self, group, name, write_mode)
+        Writer.__init__(self, group, name, write_mode)
         self.fieldtype = f'datetime'
         self.timestamp = timestamp
         self.chunksize = chunksize
@@ -1285,9 +1132,9 @@ class NewDateTimeWriter(NewWriter):
         self.flush()
 
 
-class NewDateWriter(NewWriter):
+class DateWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, write_mode='writer'):
-        NewWriter.__init__(self, group, name, write_mode)
+        Writer.__init__(self, group, name, write_mode)
         self.fieldtype = f'datetime'
         self.timestamp = timestamp
         self.chunksize = chunksize
@@ -1319,9 +1166,9 @@ class NewDateWriter(NewWriter):
         self.flush()
 
 
-class NewTimestampWriter:
+class TimestampWriter:
     def __init__(self, group, chunksize, name, timestamp, write_mode='write'):
-        NewWriter.__init__(self, group, name, write_mode)
+        Writer.__init__(self, group, name, write_mode)
         self.fieldtype = f'timestamp'
         self.timestamp = timestamp
         self.chunksize = chunksize
@@ -1346,13 +1193,13 @@ class NewTimestampWriter:
 
 class OptionalDateImporter:
     def __init__(self, group, chunksize, name, timestamp, optional=True, write_mode='write'):
-        self.date = NewDateWriter(group, chunksize, name, timestamp, write_mode)
-        self.datestr = NewFixedStringWriter(group, chunksize, f"{name}_day", timestamp, '10',
-                                            write_mode)
+        self.date = DateWriter(group, chunksize, name, timestamp, write_mode)
+        self.datestr = FixedStringWriter(group, chunksize, f"{name}_day", timestamp, '10',
+                                         write_mode)
         self.dateset = None
         if optional:
             self.dateset =\
-                NewNumericWriter(group, chunksize, f"{name}_set", timestamp, 'bool', write_mode)
+                NumericWriter(group, chunksize, f"{name}_set", timestamp, 'bool', write_mode)
 
     def chunk_factory(self, length):
         return self.date.chunk_factory(length)
@@ -1389,11 +1236,7 @@ class OptionalDateImporter:
 def sort_on(src_group, dest_group, keys, fields=None, timestamp=datetime.now(timezone.utc),
             write_mode='write'):
     sort_keys = ('patient_id', 'created_at')
-    readers = tuple(get_reader_from_field(src_group[f]) for f in keys)
-    # patient_id_reader = NewFixedStringReader(assessments_src['patient_id'])
-    # raw_patient_ids = patient_id_reader[:]
-    # created_at_reader = NewTimestampReader(assessments_src['created_at'])
-    # raw_created_ats = created_at_reader[:]
+    readers = tuple(get_reader(src_group[f]) for f in keys)
     t1 = time.time()
     sorted_index = dataset_sort(
         np.arange(len(readers[0]), dtype=np.uint32), readers)
@@ -1402,7 +1245,7 @@ def sort_on(src_group, dest_group, keys, fields=None, timestamp=datetime.now(tim
     t0 = time.time()
     for k in src_group.keys():
         t1 = time.time()
-        r = get_reader_from_field(src_group[k])
+        r = get_reader(src_group[k])
         w = r.getwriter(dest_group, k, timestamp, write_mode=write_mode)
         apply_sort(sorted_index, r, w)
         del r
