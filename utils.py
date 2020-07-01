@@ -15,7 +15,7 @@ from datetime import datetime
 from io import StringIO
 
 import numpy as np
-# from numba import jit, prange
+from numba import njit
 
 
 def validate_file_exists(file_name):
@@ -285,6 +285,43 @@ def to_escaped(string, separator=',', delimiter='"'):
         return s.getvalue()
     else:
         return string
+
+@njit
+def bytearray_to_escaped(srcbytearray, destbytearray,
+                         src_start=np.uint64(0), src_end=None, dest_start=np.uint64(0),
+                         separator=b',', delimiter=b'"'):
+    if src_end is None:
+        src_end = np.uint64(len(srcbytearray))
+
+    comma = False
+    quotes = False
+    for i_c in range(src_start, src_end):
+        c = srcbytearray[i_c]
+        if c == separator:
+            comma = True
+        elif c == delimiter:
+            quotes = True
+
+    d_index = 0
+    if comma or quotes:
+        destbytearray[d_index] = delimiter
+        d_index += 1
+        for i_c in range(src_start, src_end):
+            c = srcbytearray[i_c]
+            if c == delimiter:
+                destbytearray[d_index] = c
+                d_index += 1
+            destbytearray[d_index] = c
+            d_index += 1
+        destbytearray[d_index] = delimiter
+        d_index += 1
+        return d_index
+    else:
+        s_len = np.uint64(src_end - src_start)
+        destbytearray[dest_start:dest_start + s_len] = srcbytearray[src_start:src_end]
+        d_index += s_len
+        return d_index
+
 
 def from_escaped(string):
     s = StringIO(string)

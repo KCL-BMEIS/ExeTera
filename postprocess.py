@@ -52,11 +52,13 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     sort_assessments = sort_enabled(flags) and True
     sort_tests = sort_enabled(flags) and True
 
+    make_assessment_patient_id_index = process_enabled(flags) and True
     year_from_age = process_enabled(flags) and True
     clean_weight_height_bmi = process_enabled(flags) and True
     clean_temperatures = process_enabled(flags) and True
     check_symptoms = process_enabled(flags) and True
-    create_daily = process_enabled(flags) and True
+    create_daily = process_enabled(flags) and False
+    make_patient_level_assessment_metrics = process_enabled(flags) and True
 
     # post process patients
     # TODO: need an transaction table
@@ -79,6 +81,16 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         sort_keys = ('patient_id', 'created_at')
         persistence.sort_on(
             assessments_src, assessments_dest, sort_keys, timestamp=timestamp)
+
+        # print("creating 'patient_index' foreign key index for 'patient_id'")
+        # t0 = time.time()
+        # patient_ids = persistence.get_reader_from_field(patients_dest['id'])
+        # assessment_patient_ids =\
+        #     persistence.get_reader_from_field(assessments_dest['patient_id'])
+        # assessment_patient_id_index =\
+        #     assessment_patient_ids.getwriter(assessments_dest, 'patient_index', timestamp)
+        # persistence.get_index(patient_ids, assessment_patient_ids, assessment_patient_id_index)
+        # print(f"completed in {time.time() - t0}s")
 
         print("checking sort order")
         t0 = time.time()
@@ -108,9 +120,11 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
             tests_src, tests_dest, sort_keys, timestamp=timestamp)
 
 
-
     # Processing
     # ##########
+
+    sorted_patients_src = patients_dest if sort_patients else patients_src
+    sorted_assessments_src = assessments_dest if sort_assessments else assessments_src
 
     # Patient processing
     # ==================
@@ -163,10 +177,18 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
 
     # Assessment processing
     # =====================
-    sorted_assessments_src = assessments_dest if sort_assessments else assessments_src
 
-
-    # if full_assessment_valid:
+    if make_assessment_patient_id_index:
+        print("creating 'patient_index' foreign key index for 'patient_id'")
+        t0 = time.time()
+        patient_ids = persistence.get_reader_from_field(sorted_patients_src['id'])
+        assessment_patient_ids =\
+            persistence.get_reader_from_field(sorted_assessments_src['patient_id'])
+        assessment_patient_id_index =\
+            persistence.NewNumericWriter(assessments_dest, chunksize, 'patient_id_index',
+                                         timestamp, 'int64')
+        persistence.get_index(patient_ids, assessment_patient_ids, assessment_patient_id_index)
+        print(f"completed in {time.time() - t0}s")
 
 
     if clean_temperatures:
@@ -210,29 +232,99 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
             persistence.get_reader_from_field(sorted_assessments_src['created_at_day'])
         raw_created_at_days = created_at_days[:]
 
-        print("Calculating spans")
+        if 'patient_id_index' in assessments_src.keys():
+            patient_id_index = assessments_src['patient_id_index']
+        else:
+            patient_id_index = assessments_dest['patient_id_index']
+        patient_id_indices =\
+            persistence.get_reader_from_field(patient_id_index)
+        raw_patient_id_indices = patient_id_indices[:]
+
+
+        print("Calculating patient id index spans")
         t0 = time.time()
-        spans = persistence.get_spans(fields=(raw_patient_ids, raw_created_at_days))
-        print(f"Calculated {len(spans)-1} spans in {time.time() - t0}s")
+        patient_id_index_spans =\
+            persistence.get_spans(fields=(raw_patient_id_indices, raw_created_at_days))
+        print(f"Calculated {len(patient_id_index_spans)-1} spans in {time.time() - t0}s")
+
 
         print("Applying spans to 'health_status'")
         t0 = time.time()
-        health_status = persistence.get_reader_from_field(sorted_assessments_src['health_status'])
-        raw_health_status = health_status[:]
-        daily_health_status = np.zeros(len(spans)-1, dtype=raw_health_status.dtype)
-        persistence.apply_spans_max(spans, raw_health_status, daily_health_status)
-        print(f"apply_spans completed in {time.time()-t0}s")
-        # t0 = time.time()
-        # distinct_pids = persistence.distinct(raw_patient_ids)
-        # print(f"{len(distinct_pids)} patients identified from assessments in {time.time() - t0}s")
+        default_behavour_overrides = {
+            'id': persistence.apply_spans_last,
+            'patient_id': persistence.apply_spans_first,
+            'patient_index': persistence.apply_spans_first,
+            'created_at': persistence.apply_spans_last,
+            'created_at_day': persistence.apply_spans_first,
+            'updated_at': persistence.apply_spans_last,
+            'updated_at_day': persistence.apply_spans_first,
+            'version': persistence.apply_spans_max,
+            'country_code': persistence.apply_spans_first,
+            'date_test_occurred': None,
+            'date_test_occurred_guess': None,
+            'date_test_occurred_day': None,
+            'date_test_occurred_set': None,
+        }
+        for k in sorted_assessments_src.keys():
+            t1 = time.time()
+            reader = persistence.get_reader_from_field(sorted_assessments_src[k])
+            if k in default_behavour_overrides:
+                apply_span_fn = default_behavour_overrides[k]
+                if apply_span_fn is not None:
+                    apply_span_fn(patient_id_index_spans, reader,
+                                  reader.getwriter(daily_assessments_dest, k, timestamp))
+                    print(f"  Field {k} aggregated in {time.time() - t1}s")
+                else:
+                    print(f"  Skipping field {k}")
+            else:
+                if isinstance(reader, persistence.NewCategoricalReader):
+                    persistence.apply_spans_max(patient_id_index_spans, reader,
+                                                reader.getwriter(daily_assessments_dest,
+                                                                 k, timestamp))
+                    print(f"  Field {k} aggregated in {time.time() - t1}s")
+                elif isinstance(reader, persistence.NewIndexedStringReader):
+                    persistence.apply_spans_concat(patient_id_index_spans, reader,
+                                                   reader.getwriter(daily_assessments_dest,
+                                                                    k, timestamp))
+                    print(f"  Field {k} aggregated in {time.time() - t1}s")
+                elif isinstance(reader, persistence.NewNumericReader):
+                    persistence.apply_spans_max(patient_id_index_spans, reader,
+                                                reader.getwriter(daily_assessments_dest,
+                                                        k, timestamp))
+                    print(f"  Field {k} aggregated in {time.time() - t1}s")
+                else:
+                    print(f"  No function for {k}")
 
-        # print("checking distinct assessments days per patient")
-        # # TODO - basic implementation
-        # # TODO - look at generating indices for process id boundaries
-        # t0 = time.time()
-        # distinct_days = persistence.distinct(
-        #     persistence.get_reader_from_field(sorted_assessments_src['created_at_day'])[:])
-        # print(f"{len(distinct_days)} dates generated in {time.time() - t0}")
+        print(f"apply_spans completed in {time.time() - t0}s")
+
+
+    # TODO - patient measure: assessments per patient
+
+    if make_patient_level_assessment_metrics:
+        if 'patient_id_index' in assessments_dest:
+            src = assessments_dest['patient_id_index']
+        else:
+            src = assessments_src['patient_id_index']
+        assessment_patient_id_index = persistence.NewNumericReader(src)
+        spans = persistence.get_spans(field=assessment_patient_id_index)
+
+        assessment_counts = np.zeros(len(spans)-1, dtype=np.uint32)
+        persistence.apply_spans_count(spans, assessment_counts)
+        patient_ids_for_counts = assessment_patient_id_index[:][spans[:-1]]
+
+        #TODO: needs a persistence function to perform mapping of counts to another space
+
+        assessment_count_per_patient =\
+            persistence.NewNumericWriter(patients_dest, chunksize, 'assessment_count',
+                                         timestamp, 'uint32')
+        ids = persistence.get_reader_from_field(patients_src['id'])
+        patient_space_counts = assessment_count_per_patient.chunk_factory(len(ids))
+        patient_space_counts[patient_ids_for_counts] = assessment_counts
+        assessment_count_per_patient.write(patient_space_counts)
+
+
+
+    # TODO - patient measure: daily assessments per patient
 
 
 if __name__ == '__main__':

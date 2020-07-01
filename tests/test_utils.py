@@ -11,7 +11,10 @@
 
 import unittest
 
-from utils import find_longest_sequence_of, to_escaped
+import numpy as np
+
+from utils import find_longest_sequence_of, to_escaped, bytearray_to_escaped
+
 
 class TestUtils(unittest.TestCase):
 
@@ -47,3 +50,34 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(to_escaped('a"b'), '"a""b"')
         self.assertEqual(to_escaped('"a","b"'), '"""a"",""b"""')
         self.assertEqual(to_escaped(',",'), '","","')
+
+    def test_bytearray_to_escaped(self):
+        src = np.frombuffer(b'abcd', dtype='S1')
+        dest = np.zeros(10, dtype='S1')
+        self.assertTrue(
+            np.array_equal(dest[:bytearray_to_escaped(src, dest)],
+                           np.frombuffer(b'abcd', dtype='S1')))
+        src = np.frombuffer(b'ab,cd', dtype='S1')
+        dest = np.zeros(10, dtype='S1')
+        self.assertTrue(
+            np.array_equal(dest[:bytearray_to_escaped(src, dest)],
+                           np.frombuffer(b'"ab,cd"', dtype='S1')))
+        src = np.frombuffer(b'ab"cd', dtype='S1')
+        dest = np.zeros(10, dtype='S1')
+        self.assertTrue(
+            np.array_equal(dest[:bytearray_to_escaped(src, dest)],
+                           np.frombuffer(b'"ab""cd"', dtype='S1')))
+        src = np.frombuffer(b'"ab","cd"', dtype='S1')
+        dest = np.zeros(20, dtype='S1')
+        self.assertTrue(
+            np.array_equal(dest[:bytearray_to_escaped(src, dest)],
+                           np.frombuffer(b'"""ab"",""cd"""', dtype='S1')))
+
+        src1 = np.frombuffer(b'ab"cd', dtype='S1')
+        src2 = np.frombuffer(b'"ab","cd"', dtype='S1')
+        dest = np.zeros(30, dtype='S1')
+        len1 = bytearray_to_escaped(src1, dest)
+        len2 = bytearray_to_escaped(src2, dest[len1:], dest_start=len1)
+        self.assertTrue(
+            np.array_equal(dest[:len1 + len2],
+                           np.frombuffer(b'"ab""cd""""ab"",""cd"""', dtype='S1')))

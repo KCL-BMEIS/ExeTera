@@ -21,6 +21,8 @@ import h5py
 import numpy as np
 from numba import jit, njit
 
+import utils
+
 DEFAULT_CHUNKSIZE = 1 << 18
 
 # TODO: rename this persistence file to hdf5persistence
@@ -312,17 +314,77 @@ def distinct(field=None, fields=None, filter=None):
     results = [uniques[f'{i}'] for i in range(len(fields))]
     return results
 
+# @njit
+# def _not_equals(a, c):
+#     a_len = len(a)
+#     a0 = a[:-1]
+#     a1 = a[1:]
+#     c0 = c[1:-1]
+#     for i_r in range(a_len):
+#         c0[i_r] = a0[i_r] == a1[i_r]
+
 @njit
+def _not_equals(a, b, c):
+    a_len = len(a)
+    for i_r in range(a_len):
+        c[i_r] = a[i_r] != b[i_r]
+
 def _get_spans_for_field(field0):
-    count = 0
-    spans = np.zeros(len(field0)+1, dtype=np.uint32)
-    spans[0] = 0
-    for i in np.arange(1, len(field0)):
-        if field0[i] != field0[i-1]:
-            count += 1
-            spans[count] = i
-    spans[count+1] = len(field0)
-    return spans[:count+2]
+    # count = 0
+    # spans = np.empty(len(field0)+1, dtype=np.uint32)
+    # spans[0] = 0
+    # field_count = len(field0)
+    # for i in range(1, field_count):
+    #     if field0[i] != field0[i-1]:
+    #         count += 1
+    #         spans[count] = i
+    # spans[count+1] = len(field0)
+    # return spans[:count+2]
+
+
+    results = np.zeros(len(field0) + 1, dtype=np.bool)
+    # _not_equals(field0, results)
+    t0 = time.time()
+    a = field0[:-1]
+    print(f"    {time.time() - t0}")
+    t0 = time.time()
+    b = field0[1:]
+    print(f"    {time.time() - t0}")
+    t0 = time.time()
+    _not_equals(field0[:-1], field0[1:], results[1:])
+    print(f"    {time.time() - t0}")
+    results[0] = True
+    results[-1] = True
+    return np.nonzero(results)[0]
+    # return results
+
+# def find_runs(x):
+#     """Find runs of consecutive items in an array."""
+#
+#     # ensure array
+#     x = np.asanyarray(x)
+#     if x.ndim != 1:
+#         raise ValueError('only 1D array supported')
+#     n = x.shape[0]
+#
+#     # handle empty array
+#     if n == 0:
+#         return np.array([]), np.array([]), np.array([])
+#
+#     else:
+#         # find run starts
+#         loc_run_start = np.empty(n, dtype=bool)
+#         loc_run_start[0] = True
+#         np.not_equal(x[:-1], x[1:], out=loc_run_start[1:])
+#         run_starts = np.nonzero(loc_run_start)[0]
+#
+#         # find run values
+#         run_values = x[loc_run_start]
+#
+#         # find run lengths
+#         run_lengths = np.diff(np.append(run_starts, n))
+#
+#         return run_values, run_starts, run_lengths
 
 @njit
 def _get_spans_for_2_fields(field0, field1):
@@ -344,6 +406,7 @@ def get_spans(field=None, fields=None):
         return ValueError("Only one of 'field' and 'fields' may be set")
 
     if field is not None:
+        #return _get_spans_for_field(field)
         return _get_spans_for_field(field)
     elif len(fields) == 1:
         return _get_spans_for_field(fields[0])
@@ -352,27 +415,237 @@ def get_spans(field=None, fields=None):
     else:
         raise NotImplementedError("This operation does not support more than two fields at present")
 
+@njit
+def _apply_spans_count(spans, dest_array):
+    for i in range(len(spans)-1):
+        dest_array[i] = np.uint64(spans[i+1] - spans[i])
+        # if spans[i+1] - spans[i] < 0:
+        #     print(spans[i+1] - spans[i], spans[i+1], spans[i], i)
+    print(dest_array.max())
+
+
+def apply_spans_count(spans, writer):
+    if isinstance(writer, NewWriter):
+        dest_values = writer.chunk_factory(len(spans) - 1)
+        _apply_spans_count(spans, dest_values)
+        writer.write(dest_values)
+    elif isinstance(writer, np.ndarray):
+        _apply_spans_count(spans, writer)
+    else:
+        raise ValueError(f"'writer' must be one of 'NewWriter' or 'ndarray' but is {type(writer)}")
+
 
 @njit
-def apply_spans_max(spans, src_field, dest_field):
+def _apply_spans_first(spans, src_array, dest_array):
+    dest_array[:] = src_array[spans[:-1]]
+
+
+def apply_spans_first(spans, reader, writer):
+    dest_values = writer.chunk_factory(len(spans) - 1)
+    _apply_spans_first(spans, reader[:], dest_values)
+    writer.write(dest_values)
+
+
+@njit
+def _apply_spans_last(spans, src_array, dest_array):
+    spans = spans[1:]-1
+    dest_array[:] = src_array[spans]
+
+
+def apply_spans_last(spans, reader, writer):
+    dest_values = writer.chunk_factory(len(spans) - 1)
+    _apply_spans_last(spans, reader[:], dest_values)
+    writer.write(dest_values)
+
+@njit
+def _apply_spans_max(spans, src_array, dest_array):
 
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
         if next - cur == 1:
-            dest_field[i] = src_field[cur]
+            dest_array[i] = src_array[cur]
         else:
-            dest_field[i] = src_field[cur:next].max()
+            dest_array[i] = src_array[cur:next].max()
 
-@jit
-def apply_spans_concat(spans, src_field, dest_field):
+
+def apply_spans_max(spans, reader, writer):
+    dest_values = writer.chunk_factory(len(spans) - 1)
+    _apply_spans_max(spans, reader[:], dest_values)
+    writer.write(dest_values)
+
+
+def _apply_spans_concat(spans, src_field):
+    dest_values = [None] * (len(spans)-1)
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
         if next - cur == 1:
-            dest_field[i] = src_field[cur]
+            dest_values[i] = src_field[cur]
         else:
-            raise NotImplementedError
+            src = [s for s in src_field[cur:next] if len(s) > 0]
+            if len(src) > 0:
+                dest_values[i] = ','.join(utils.to_escaped(src))
+            else:
+                dest_values[i] = ''
+            # if len(dest_values[i]) > 0:
+            #     print(dest_values[i])
+    return dest_values
+
+# 0, 2, 3, 4, 6, 8
+# 0, 2, 6, 10, 12, 16, 18, 22, 24
+# aa bbbb cccc dd eeee ff gggghh
+
+# 0, 6, 10, 12, 18, 24
+# aabbbb cccc dd eeeeff gggghh
+
+@njit
+def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
+                        max_index_i, max_value_i, s_start):#, separator, delimiter):
+    separator = np.frombuffer(b',', dtype=np.uint8)[0]
+    delimiter = np.frombuffer(b'"', dtype=np.uint8)[0]
+    if s_start == 0:
+        index_i = np.uint32(1)
+        index_v = np.uint64(0)
+        dest_index[0] = spans[0]
+    else:
+        index_i = np.uint32(0)
+        index_v = np.uint64(0)
+
+    s_end = len(spans)-1
+    for s in range(s_start, s_end):
+        cur = spans[s]
+        next = spans[s+1]
+        cur_src_i = src_index[cur]
+        next_src_i = src_index[next]
+
+        dest_index[index_i] = next_src_i
+        index_i += 1
+
+        if next_src_i - cur_src_i > 1:
+            if next - cur == 1:
+                # only one entry to be copied, so commas not required
+                next_index_v = next_src_i - cur_src_i + np.uint64(index_v)
+                dest_values[index_v:next_index_v] = src_values[cur_src_i:next_src_i]
+                index_v = next_index_v
+            else:
+                # check to see how many non-zero-length entries there are; >1 means we must
+                # separate them by commas
+                non_empties = 0
+                for e in range(cur, next):
+                   if src_index[e] < src_index[e+1]:
+                       non_empties += 1
+                if non_empties == 1:
+                    # only one non-empty entry to be copied, so commas not required
+                    next_index_v = next_src_i - cur_src_i + np.uint64(index_v)
+                    dest_values[index_v:next_index_v] = src_values[cur_src_i:next_src_i]
+                    index_v = next_index_v
+                else:
+                    # the outer conditional already determines that we have a non-empty entry
+                    # so there must be multiple non-empty entries and commas are required
+                    for e in range(cur, next):
+                        # separator = b','
+                        # delimiter = b'"'
+                        # delta = utils.bytearray_to_escaped(src_values,
+                        #                                    dest_values,
+                        #                                    src_start=src_index[e],
+                        #                                    src_end=src_index[e+1],
+                        #                                    dest_start=index_v)
+                        # index_v += np.uint64(d_index)
+                        src_start = src_index[e]
+                        src_end = src_index[e+1]
+                        comma = False
+                        quotes = False
+                        for i_c in range(src_start, src_end):
+                            # c = src_values[i_c]
+                            # if c == separator[0]:
+                            if src_values[i_c] == separator:
+                                comma = True
+                            # elif c == delimiter[0]:
+                            elif src_values[i_c] == delimiter:
+                                quotes = True
+
+                        d_index = np.uint64(0)
+                        if comma or quotes:
+                            dest_values[d_index] = delimiter
+                            d_index += 1
+                            for i_c in range(src_start, src_end):
+                                # c = src_values[i_c]
+                                # if c == delimiter[0]:
+                                if src_values[i_c] == delimiter:
+                                    # dest_values[d_index] = c
+                                    dest_values[d_index] = src_values[i_c]
+                                    d_index += 1
+                                # dest_values[d_index] = c
+                                dest_values[d_index] = src_values[i_c]
+                                d_index += 1
+                            dest_values[d_index] = delimiter
+                            d_index += 1
+                        else:
+                            s_len = np.uint64(src_end - src_start)
+                            dest_values[index_v:index_v + s_len] = src_values[src_start:src_end]
+                            d_index += s_len
+                        index_v += np.uint64(d_index)
+
+        # if either the index or values are past the threshold, write them
+        if index_i >= max_index_i or index_v >= max_value_i:
+            break
+            # return s+1, index_i, index_v
+    return s+1, index_i, index_v
+
+
+def apply_spans_concat(spans, reader, writer):
+    separator = np.frombuffer(b',', '|S1')
+    delimiter = np.frombuffer(b'"', '|S1')
+    src_index = reader.field['index'][:]
+    src_values = reader.field['values'][:]
+    # write chunks to the writer
+    # . read from a given span
+    #   . calculate extra characters required
+    dest_index = np.zeros(reader.chunksize, src_index.dtype)
+    dest_values = np.zeros(reader.chunksize * 16, src_values.dtype)
+
+    max_index_i = reader.chunksize
+    max_value_i = reader.chunksize * 8
+    s = 0
+    while s < len(spans)-1:
+        s, index_i, index_v = _apply_spans_concat(spans, src_index, src_values,
+                                                  dest_index, dest_values,
+                                                  max_index_i, max_value_i, s)
+                                                  # separator[0], delimiter[0])
+
+        if index_i > 0 or index_v > 0:
+            writer.write_raw(dest_index[:index_i], dest_values[:index_v])
+    writer.flush()
+    # index_i = 1
+    # index_v = 0
+    # max_index_i = reader.chunksize
+    # max_value_i = reader.chunksize * 8
+    # dest_index[0] = spans[0]
+    # for s in range(len(spans)-1):
+    #     cur = spans[s]
+    #     next = spans[s+1]
+    #     cur_src_i = src_index[cur]
+    #     next_src_i = src_index[next]
+    #
+    #     dest_index[index_i] = next_src_i
+    #     index_i += 1
+    #
+    #     next_index_v = next_src_i - cur_src_i + np.uint64(index_v)
+    #     dest_values[index_v:next_index_v] = src_values[cur_src_i:next_src_i]
+    #     index_v = next_index_v
+    #     # if either the index or values are past the threshold, write them
+    #     if index_i >= max_index_i or index_v >= max_value_i:
+    #         writer.write_raw(dest_index[:index_i], dest_values[:index_v])
+    #         index_i = 0
+    #         index_v = 0
+    #
+    # if index_i > 0 or index_v > 0:
+    #     writer.write_raw(dest_index[:index_i], dest_values[:index_v])
+    #
+    # writer.flush()
+
+
 
 
 def timestamp_to_date(values):
@@ -469,6 +742,41 @@ def process(inputs, outputs, predicate):
         predicate(**kwargs)
 
         # TODO: write back to the writer
+
+
+def get_index(target, foreign_key, destination):
+    print('  building patient_id index')
+    t0 = time.time()
+    target_lookup = dict()
+    for i, v in enumerate(target[:]):
+        target_lookup[v] = i
+    print(f'  target lookup built in {time.time() - t0}s')
+
+    print('perform initial index')
+    t0 = time.time()
+    foreign_key_elems = foreign_key[:]
+    # foreign_key_index = np.asarray([target_lookup.get(i, -1) for i in foreign_key_elems],
+    #                                    dtype=np.int64)
+    foreign_key_index = np.zeros(len(foreign_key_elems), dtype=np.int64)
+
+    current_invalid = -1
+    for i_k, k in enumerate(foreign_key_elems):
+        index = target_lookup.get(k, current_invalid)
+        if index < 0:
+            current_invalid -= 1
+            target_lookup[k] = index
+        foreign_key_index[i_k] = index
+    print(f'initial index performed in {time.time() - t0}s')
+
+    print(f'fixing up negative index order')
+    t0 = time.time()
+    # negative values are in the opposite of the key order, so reverse them
+    foreign_key_index = np.where(foreign_key_index < 0,
+                                 current_invalid - foreign_key_index,
+                                 foreign_key_index)
+    print(f'negative index order fix performed in {time.time() - t0}s')
+    destination.write(foreign_key_index)
+
 
 
 def get_trash_group(group):
@@ -684,7 +992,7 @@ class NewIndexedStringWriter(NewWriter):
         self.timestamp = timestamp
         self.chunksize = chunksize
 
-        self.values = np.zeros(chunksize, dtype=np.byte)
+        self.values = np.zeros(chunksize, dtype=np.uint8)
         self.indices = np.zeros(chunksize, dtype=np.uint64)
         self.ever_written = False
         self.accumulated = 0
@@ -740,6 +1048,10 @@ class NewIndexedStringWriter(NewWriter):
         self.flush()
 
     def write_part_raw(self, index, values):
+        if index.dtype != np.uint64:
+            raise ValueError(f"'index' must be an ndarray of '{np.uint64}'")
+        if values.dtype != np.uint8:
+            raise ValueError(f"'values' must be an ndarray of '{np.uint8}'")
         DataWriter._write(self.field, 'index', index, len(index))
         DataWriter._write(self.field, 'values', values, len(values))
 

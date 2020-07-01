@@ -510,6 +510,70 @@ class TestPersistence(unittest.TestCase):
             print(v)
 
 
+class TestPersistenceConcat(unittest.TestCase):
+
+    def test_apply_spans_concat_fast(self):
+        dt = datetime.now(timezone.utc)
+        ts = str(dt)
+        bio = BytesIO()
+
+        src_spans = np.asarray([0, 2, 3, 4, 6, 8], dtype=np.uint64)
+        src_indices = np.asarray([0, 2, 6, 10, 12, 16, 18, 22, 24], dtype=np.uint64)
+        src_values = np.frombuffer(b'aabbbbccccddeeeeffgggghh', dtype='S1')
+
+        with h5py.File(bio, 'w') as hf:
+            foo = persistence.NewIndexedStringWriter(hf, 10, 'foo', ts)
+            foo.write_raw(src_indices, src_values)
+            foo_r = persistence.get_reader_from_field(hf['foo'])
+            persistence.apply_spans_concat(src_spans, foo_r, foo_r.getwriter(hf, 'concatfoo', ts))
+
+            expected = ['aabbbb', 'cccc', 'dd', 'eeeeff', 'gggghh']
+            actual = persistence.get_reader_from_field(hf['concatfoo'])[:]
+            self.assertListEqual(expected, actual)
+
+
+    def test_apply_spans_concat_fast_value_flush_length_is_0(self):
+        dt = datetime.now(timezone.utc)
+        ts = str(dt)
+        bio = BytesIO()
+
+        src_spans = np.asarray([0, 2, 3, 4, 6, 8], dtype=np.uint64)
+        src_indices = np.asarray([0, 12, 20, 32, 40, 44, 54, 57, 64], dtype=np.uint64)
+        src_values = np.frombuffer(
+            b'aaaaaaaaaaaabbbbbbbbccccccccccccddddddddeeeeffffffffffggggghhhhh', dtype='S1')
+        with h5py.File(bio, 'w') as hf:
+            foo = persistence.NewIndexedStringWriter(hf, 8, 'foo', ts)
+            foo.write_raw(src_indices, src_values)
+            foo_r = persistence.get_reader_from_field(hf['foo'])
+            persistence.apply_spans_concat(src_spans, foo_r, foo_r.getwriter(hf, 'concatfoo', ts))
+
+            expected = ['aaaaaaaaaaaabbbbbbbb', 'cccccccccccc', 'dddddddd',
+                        'eeeeffffffffff', 'ggggghhhhh']
+            actual = persistence.get_reader_from_field(hf['concatfoo'])[:]
+            self.assertListEqual(expected, actual)
+
+
+    def test_apply_spans_concat_fast_value_multiple_iterations(self):
+        dt = datetime.now(timezone.utc)
+        ts = str(dt)
+        bio = BytesIO()
+
+        src_spans = np.asarray([0, 2, 3, 4, 6, 8, 9], dtype=np.uint64)
+        src_indices = np.asarray([0, 12, 20, 32, 40, 44, 54, 57, 64, 72], dtype=np.uint64)
+        src_values = np.frombuffer(
+            b'aaaaaaaaaaaabbbbbbbbccccccccccccddddddddeeeeffffffffffggggghhhhhiiiiiiii', dtype='S1')
+        with h5py.File(bio, 'w') as hf:
+            foo = persistence.NewIndexedStringWriter(hf, 8, 'foo', ts)
+            foo.write_raw(src_indices, src_values)
+            foo_r = persistence.get_reader_from_field(hf['foo'])
+            persistence.apply_spans_concat(src_spans, foo_r, foo_r.getwriter(hf, 'concatfoo', ts))
+
+            expected = ['aaaaaaaaaaaabbbbbbbb', 'cccccccccccc', 'dddddddd',
+                        'eeeeffffffffff', 'ggggghhhhh','iiiiiiii']
+            actual = persistence.get_reader_from_field(hf['concatfoo'])[:]
+            self.assertListEqual(expected, actual)
+
+
 class TestPersistanceMiscellaneous(unittest.TestCase):
 
     def test_distinct_multi_field(self):
@@ -526,6 +590,15 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         print(persistence.get_spans(field=a))
         a = np.asarray([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
         print(persistence.get_spans(field=a))
+        a = np.asarray([0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2])
+        print(persistence.get_spans(field=a))
+
+    def test_apply_spans_count(self):
+        spans = np.asarray([0, 1, 3, 4, 7, 8, 12, 14])
+        results = np.zeros(len(spans)-1, dtype=np.int64)
+        persistence._apply_spans_count(spans, results)
+        print(results)
+
 
     def test_apply_spans_max(self):
         spans = np.asarray([0, 1, 3, 4, 7, 8, 12])
@@ -682,7 +755,6 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         # print(np.asarray(va)[accindex])
         # print(np.asarray(vb)[accindex])
         # print(np.asarray(vx)[accindex])
-
 
 
 class TestSorting(unittest.TestCase):
