@@ -9,12 +9,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import dataset
-import pipeline
+from core import dataset, utils
 
 # fn1 = '/home/ben/covid/patients_export_geocodes_20200406050002.csv'
 # fn2 = '/home/ben/covid/patients_export_geocodes_20200413050002.csv'
-import utils
 
 fn1 = '/home/ben/covid/patients_export_geocodes_20200413050002.csv'
 fn2 = '/home/ben/covid/patients_export_geocodes_20200416050002.csv'

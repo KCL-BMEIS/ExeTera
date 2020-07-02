@@ -7,7 +7,8 @@ from io import BytesIO
 import numpy as np
 import h5py
 
-import persistence
+from core import persistence
+
 
 class TestPersistence(unittest.TestCase):
 

@@ -14,11 +14,8 @@ import argparse
 import os
 import datetime
 
-import data_schemas
-import dataset
-import parsing_schemas
-import pipeline
-import utils
+from covidspecific import data_schemas, parsing_schemas, pipeline
+from core import dataset, utils
 
 equivalence_map = {
     'na': ('', 'na'),

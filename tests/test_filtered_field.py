@@ -11,7 +11,8 @@
 
 import unittest
 
-import filtered_field
+from core import filtered_field
+
 
 class TestFilteredIndex(unittest.TestCase):
 

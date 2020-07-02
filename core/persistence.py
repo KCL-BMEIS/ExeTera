@@ -11,17 +11,13 @@
 
 import os
 import uuid
-import types
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import time
-from io import BytesIO
 
 import h5py
 import numpy as np
 from numba import jit, njit
-
-import utils
 
 DEFAULT_CHUNKSIZE = 1 << 18
 INVALID_INDEX = 1 << 62

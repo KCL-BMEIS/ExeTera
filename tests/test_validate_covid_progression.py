@@ -13,7 +13,6 @@ import unittest
 
 import numpy as np
 
-import parsing_schemas
 import processing.covid_test
 
 

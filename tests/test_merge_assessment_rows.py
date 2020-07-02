@@ -13,7 +13,7 @@ import unittest
 
 
 from processing.assessment_merge import MergeAssessmentRows
-from utils import concatenate_maybe_strs
+from core.utils import concatenate_maybe_strs
 
 
 class MockDataset:

@@ -13,7 +13,7 @@ import unittest
 
 import numpy as np
 
-from utils import find_longest_sequence_of, to_escaped, bytearray_to_escaped
+from core.utils import find_longest_sequence_of, to_escaped, bytearray_to_escaped
 
 
 class TestUtils(unittest.TestCase):

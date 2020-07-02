@@ -11,8 +11,8 @@
 
 import csv
 
-import dataset
-import utils
+from core import dataset, utils
+
 
 # read patients in batches of n
 # read assessments for those pages and output them to n

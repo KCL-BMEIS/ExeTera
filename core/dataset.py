@@ -13,7 +13,7 @@ import csv
 import time
 import numpy as np
 
-import numpy_buffer
+from processing import numpy_buffer
 
 
 class Dataset:

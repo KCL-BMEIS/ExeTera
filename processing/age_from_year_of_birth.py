@@ -9,11 +9,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
-import numpy as np
-
-from utils import check_input_lengths
-import persistence as persist
+from core.utils import check_input_lengths
+from core import persistence as persist
 
 
 class CalculateAgeFromYearOfBirth:

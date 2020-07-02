@@ -1,6 +1,6 @@
 from collections.__init__ import defaultdict
 
-import utils
+from core import utils
 
 
 class TestIndices:
@@ -14,6 +14,7 @@ class TestIndices:
         return f"{self.indices}"
 
 
+# TODO: move to a separate python package that is application specific to zoe pipeline
 class OldFormatTestSummary:
     def __init__(self):
         self.indices = list()
@@ -26,6 +27,7 @@ class OldFormatTestSummary:
         self.seen_positive = self.seen_positive or result == 'yes'
 
 
+# TODO: move to a separate python package that is application specific to zoe pipeline
 def group_new_test_indices_by_patient(ds):
     tids = ds.field_by_name('id')
     pids = ds.field_by_name('patient_id')
@@ -41,6 +43,7 @@ def group_new_test_indices_by_patient(ds):
     return patients
 
 
+# TODO: move to a separate python package that is application specific to zoe pipeline
 def get_patients_with_old_format_tests(a_ds):
     apids = a_ds.field_by_name('patient_id')
     ahcts = a_ds.field_by_name('had_covid_test')
@@ -61,6 +64,7 @@ def get_patients_with_old_format_tests(a_ds):
     return apatients
 
 
+# TODO: move to a separate python package that is application specific to zoe pipeline
 def filter_duplicate_new_tests(ds, patients, threshold_for_diagnostic_print=1000000):
     tids = ds.field_by_name('id')
     pids = ds.field_by_name('patient_id')

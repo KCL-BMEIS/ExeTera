@@ -1,19 +1,13 @@
-from datetime import datetime, timezone
+from datetime import datetime
 import time
-import math
 
 import numpy as np
-import h5py
-from numba import jit, njit
 
-import utils
 from processing.age_from_year_of_birth import calculate_age_from_year_of_birth_fast
 from processing.weight_height_bmi import weight_height_bmi_fast_1
 from processing.inconsistent_symptoms import check_inconsistent_symptoms_1
 from processing.temperature import validate_temperature_1
-import data_schemas
-import parsing_schemas
-import persistence as per
+from core import persistence as per
 
 
 # TODO: hard filter
@@ -343,32 +337,32 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     # TODO - patient measure: daily assessments per patient
 
 
-if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--source', help='the dataset to load')
-    parser.add_argument('-d', '--destination', help='the dataset to write results to')
-    parser.add_argument('--sort', default=False, action='store_true')
-    parser.add_argument('--process', default=False, action='store_true')
-    parser.add_argument('--all', default=False, action='store_true')
-    args = parser.parse_args()
-
-    data_schema = data_schemas.DataSchema(1)
-    parsing_schema = parsing_schemas.ParsingSchema(1)
-    timestamp = str(datetime.now(timezone.utc))
-
-    if args.sort + args.process + args.all > 1:
-        raise ValueError("At most one of '--sort', '--daily', and '--all' may be set")
-    elif args.sort + args.process + args.all == 0:
-        flags = 'all'
-    else:
-        if args.sort is True:
-            flags = 'sort'
-        elif args.process is True:
-            flags = 'process'
-        elif args.all is True:
-            flags = 'all'
-
-    with h5py.File(args.source, 'r') as ds:
-        with h5py.File(args.destination, 'w') as ts:
-            postprocess(ds, ts, data_schema, parsing_schema, timestamp, flags=flags)
+# if __name__ == '__main__':
+#     import argparse
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument('-s', '--source', help='the dataset to load')
+#     parser.add_argument('-d', '--destination', help='the dataset to write results to')
+#     parser.add_argument('--sort', default=False, action='store_true')
+#     parser.add_argument('--process', default=False, action='store_true')
+#     parser.add_argument('--all', default=False, action='store_true')
+#     args = parser.parse_args()
+#
+#     data_schema = data_schemas.DataSchema(1)
+#     parsing_schema = parsing_schemas.ParsingSchema(1)
+#     timestamp = str(datetime.now(timezone.utc))
+#
+#     if args.sort + args.process + args.all > 1:
+#         raise ValueError("At most one of '--sort', '--daily', and '--all' may be set")
+#     elif args.sort + args.process + args.all == 0:
+#         flags = 'all'
+#     else:
+#         if args.sort is True:
+#             flags = 'sort'
+#         elif args.process is True:
+#             flags = 'process'
+#         elif args.all is True:
+#             flags = 'all'
+#
+#     with h5py.File(args.source, 'r') as ds:
+#         with h5py.File(args.destination, 'w') as ts:
+#             postprocess(ds, ts, data_schema, parsing_schema, timestamp, flags=flags)

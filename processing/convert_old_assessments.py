@@ -1,9 +1,8 @@
 
 from collections import defaultdict
 
-import dataset
-import utils
-import analytics
+from core import dataset
+from processing import analytics
 
 
 class FilterNewAssessmentsV1:

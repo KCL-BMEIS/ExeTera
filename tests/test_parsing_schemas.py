@@ -11,8 +11,6 @@
 
 import unittest
 
-
-import parsing_schemas
 import processing.covid_test
 
 

@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+
+from datetime import datetime, timezone
+import os
+
+from covidspecific import data_schemas, importer
+
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--version', action='version', version='v0.2.0')
+parser.add_argument('-te', '--territories', default=None,
+                    help='the territory/territories to filter the dataset on (runs on all territories if not set)')
+parser.add_argument('-p', '--patient_data',
+                    help='the location and name of the patient data csv file')
+parser.add_argument('-a', '--assessment_data',
+                    help='the location and name of the assessment data csv file')
+parser.add_argument('-t', '--test_data',
+                    help='the location and name of the assessment data csv file')
+parser.add_argument('-c', '--consent_data', default=None,
+                    help='the location and name of the consent data csv file')
+parser.add_argument('-o', '--output_hdf5',
+                    help='the location and name of the output hdf5 file')
+parser.add_argument('-d', '--data_schema', default=1, type=int,
+                    help='the schema number to use for parsing and cleaning data')
+parser.add_argument('-ts', '--timestamp', default=str(datetime.now(timezone.utc)),
+                    help='override for the import datetime (')
+args = parser.parse_args()
+
+errors = False
+if not os.path.isfile(args.patient_data):
+    print('-p/--patient_data argument must be an existing file')
+    errors = True
+if not os.path.isfile(args.assessment_data):
+    print('-a/--assessment_data argument must be an existing file')
+    errors = True
+if not os.path.isfile(args.test_data):
+    print('-t/--test_data argument must be an existing file')
+    errors = True
+
+if errors:
+    exit(-1)
+
+data_schema_version = 1
+data_schema = data_schemas.DataSchema(data_schema_version)
+data_schema = data_schemas.DataSchema(1)
+importer.import_to_hdf5(args.timestamp, args.output_hdf5, data_schema,
+                        args.patient_data, args.assessment_data, args.test_data,
+                        args.territories)
+
+

@@ -11,7 +11,7 @@
 
 import numpy as np
 
-import persistence
+from core import persistence
 
 
 class FieldDesc:

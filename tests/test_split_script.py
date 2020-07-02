@@ -11,11 +11,9 @@
 
 import os
 from collections import defaultdict
-import csv
 
-import dataset
+from core import dataset
 
-import split
 
 def jury_rigged_split_sanity_check():
     patient_filename = '/home/ben/covid/patients_export_geocodes_20200510030002.csv'
@@ -71,11 +69,11 @@ def jury_rigged_split_sanity_check():
 
         with open(patient_filename[:-4] + f"_{d:04d}" + ".csv") as spds:
             sp_ds = dataset.Dataset(spds, keys=patient_keys,
-                                                show_progress_every=500000)
+                                    show_progress_every=500000)
         print(f'sp_ds{d}', sp_ds.row_count())
         with open(assessment_filename[:-4] + f"_{d:04d}" + ".csv") as sads:
             sa_ds = dataset.Dataset(sads, keys=assessment_keys,
-                                                show_progress_every=500000)
+                                    show_progress_every=500000)
         print(f'sa_ds{d}', sa_ds.row_count())
 
         sp_ids = sp_ds.field_by_name('id')

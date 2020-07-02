@@ -9,8 +9,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from utils import find_longest_sequence_of
-
 class CalculateMergedFieldCount:
     def __init__(self, updated_ats):
         self.updated_ats = updated_ats

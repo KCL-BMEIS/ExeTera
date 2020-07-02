@@ -11,8 +11,8 @@
 
 import numpy as np
 
-from utils import check_input_lengths
-import persistence
+from core.utils import check_input_lengths
+from core import persistence
 
 
 class CheckInconsistentSymptoms:

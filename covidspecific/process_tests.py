@@ -1,10 +1,9 @@
 import datetime
 import numpy as np
 
-import dataset
-import utils
+from core import dataset, utils
 
-from analytics import group_new_test_indices_by_patient, get_patients_with_old_format_tests, \
+from processing.analytics import group_new_test_indices_by_patient, get_patients_with_old_format_tests, \
     filter_duplicate_new_tests
 from processing.convert_old_assessments import ConvertOldAssessmentsV1
 

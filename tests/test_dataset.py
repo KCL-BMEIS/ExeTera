@@ -12,8 +12,7 @@
 import unittest
 import io
 
-import dataset
-import utils
+from core import dataset, utils
 
 small_dataset = ('id,patient_id,foo,bar\n'
                  '0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,11111111111111111111111111111111,,a\n'

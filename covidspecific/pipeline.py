@@ -17,19 +17,16 @@ from collections import defaultdict
 
 import numpy as np
 
-import dataset
-import data_schemas
-import filtered_field
-import parsing_schemas
-import regression
+from core import dataset, filtered_field, regression
+from covidspecific import data_schemas, parsing_schemas
 from processing.age_from_year_of_birth import CalculateAgeFromYearOfBirth
 from processing.assessment_merge import CalculateMergedFieldCount, MergeAssessmentRows
 from processing.inconsistent_symptoms import CheckInconsistentSymptoms
 from processing.inconsistent_testing import CheckTestingConsistency
 
-from utils import count_flag_empty, count_flag_set, build_histogram, map_between_categories, \
-    to_categorical, print_diagnostic_row, valid_range_fac_inc, iterate_over_patient_assessments, \
-    iterate_over_patient_assessments2, datetime_to_seconds, concatenate_maybe_strs
+from core.utils import count_flag_empty, count_flag_set, build_histogram, map_between_categories, \
+    to_categorical, print_diagnostic_row, valid_range_fac_inc, datetime_to_seconds, concatenate_maybe_strs
+from covidspecific.utils import iterate_over_patient_assessments, iterate_over_patient_assessments2
 
 
 def copy_field(field):
@@ -146,7 +143,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     with open(patient_filename) as f:
         geoc_ds = dataset.Dataset(f, data_schema.patient_categorical_maps,
                                   early_filter=early_filter,
-                                  show_progress_every=1000000,)
+                                  show_progress_every=1000000, )
     print("sorting patients")
     geoc_ds.sort(('id',))
     geoc_ds.show()
