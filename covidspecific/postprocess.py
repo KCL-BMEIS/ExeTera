@@ -40,6 +40,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
 
     sort_enabled = lambda x: x in ('sort', 'all')
     process_enabled = lambda x: x in ('process', 'all')
+
     sort_patients = sort_enabled(flags) and True
     sort_assessments = sort_enabled(flags) and True
     sort_tests = sort_enabled(flags) and True
@@ -51,6 +52,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     check_symptoms = process_enabled(flags) and True
     create_daily = process_enabled(flags) and True
     make_patient_level_assessment_metrics = process_enabled(flags) and True
+    make_patient_level_daily_assessment_metrics = process_enabled(flags) and create_daily and True
 
     # post process patients
     # TODO: need an transaction table
@@ -169,13 +171,13 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     # =====================
 
     if make_assessment_patient_id_fkey:
-        print("creating 'patient_index' foreign key index for 'patient_id'")
+        print("creating 'assessment_patient_id_fkey' foreign key index for 'patient_id'")
         t0 = time.time()
         patient_ids = per.get_reader(sorted_patients_src['id'])
         assessment_patient_ids =\
             per.get_reader(sorted_assessments_src['patient_id'])
         assessment_patient_id_fkey =\
-            per.NumericWriter(assessments_dest, chunksize, 'patient_id_index_fkey',
+            per.NumericWriter(assessments_dest, chunksize, 'assessment_patient_id_fkey',
                                       timestamp, 'int64')
         per.get_index(patient_ids, assessment_patient_ids, assessment_patient_id_fkey)
         print(f"completed in {time.time() - t0}s")
@@ -222,10 +224,10 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
             per.get_reader(sorted_assessments_src['created_at_day'])
         raw_created_at_days = created_at_days[:]
 
-        if 'patient_id_index_fkey' in assessments_src.keys():
-            patient_id_index = assessments_src['patient_id_index_fkey']
+        if 'assessment_patient_id_fkey' in assessments_src.keys():
+            patient_id_index = assessments_src['assessment_patient_id_fkey']
         else:
-            patient_id_index = assessments_dest['patient_id_index_fkey']
+            patient_id_index = assessments_dest['assessment_patient_id_fkey']
         patient_id_indices =\
             per.get_reader(patient_id_index)
         raw_patient_id_indices = patient_id_indices[:]
@@ -288,10 +290,10 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     # TODO - patient measure: assessments per patient
 
     if make_patient_level_assessment_metrics:
-        if 'patient_id_index_fkey' in assessments_dest:
-            src = assessments_dest['patient_id_index_fkey']
+        if 'assessment_patient_id_fkey' in assessments_dest:
+            src = assessments_dest['assessment_patient_id_fkey']
         else:
-            src = assessments_src['patient_id_index_fkey']
+            src = assessments_src['assessment_patient_id_fkey']
         assessment_patient_id_fkey = per.get_reader(src)
         # generate spans from the assessment-space patient_id foreign key
         spans = per.get_spans(field=assessment_patient_id_fkey)
@@ -328,13 +330,31 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         per.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
         print(f"calculated last assessment days per patient in {time.time() - t0}")
 
-
-        # second_result = per.get_reader(patients_dest['assessment_count_2'])
-        # third_result = per.get_reader(patients_dest['assessment_count_3'])
-        # print(np.array_equal(second_result[:], third_result[:]))
-
-
     # TODO - patient measure: daily assessments per patient
+
+    if make_patient_level_daily_assessment_metrics:
+        print("creating 'daily_assessment_patient_id_fkey' foreign key index for 'patient_id'")
+        t0 = time.time()
+        patient_ids = per.get_reader(sorted_patients_src['id'])
+        daily_assessment_patient_ids =\
+            per.get_reader(daily_assessments_dest['patient_id'])
+        daily_assessment_patient_id_fkey =\
+            per.NumericWriter(daily_assessments_dest, chunksize, 'daily_assessment_patient_id_fkey',
+                                      timestamp, 'int64')
+        per.get_index(patient_ids, daily_assessment_patient_ids, daily_assessment_patient_id_fkey)
+        print(f"completed in {time.time() - t0}s")
+
+        spans = per.get_spans(
+            field=per.get_reader(daily_assessments_dest['daily_assessment_patient_id_fkey']))
+
+        print('calculate daily assessment counts per patient')
+        t0 = time.time()
+        writer = per.NumericWriter(patients_dest, chunksize, 'daily_assessment_count', timestamp, 'uint32')
+        aggregated_counts = per.aggregate_count(fkey_index_spans=spans)
+        daily_assessment_patient_id_fkey =\
+            per.get_reader(daily_assessments_dest['daily_assessment_patient_id_fkey'])
+        per.join(ids, daily_assessment_patient_id_fkey, aggregated_counts, writer, spans)
+        print(f"calculated daily assessment counts per patient in {time.time() - t0}")
 
 
 # if __name__ == '__main__':

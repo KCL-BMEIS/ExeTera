@@ -1377,6 +1377,9 @@ def _aggregate_impl(predicate,
 
 
 def join(destination_pkey, fkey_indices, values_to_join, writer=None, fkey_index_spans=None):
+    if fkey_indices is not None:
+        if not isinstance(fkey_indices, (Reader, np.ndarray)):
+            raise ValueError(f"'fkey_indices' must be a type of Reader or an ndarray")
     if values_to_join is not None:
         if not isinstance(values_to_join, (Reader, np.ndarray)):
             raise ValueError(f"'values_to_join' must be a type of Reader but is {type(values_to_join)}")
