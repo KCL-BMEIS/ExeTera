@@ -697,6 +697,22 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
             print(hf.keys())
 
 
+    def test_copy_group(self):
+        bio1 = BytesIO()
+        with h5py.File(bio1, 'w') as hf1:
+            a = hf1.create_group('a')
+            b = a.create_group('b')
+            c = b.create_dataset('c', data=np.random.randint(low=0, high=10, size=100))
+            d = b.create_dataset('d', data=np.random.rand(100))
+
+            bio2 = BytesIO()
+            with h5py.File(bio2, 'w') as hf2:
+                da = hf2.create_group('a')
+                for k in a.keys():
+                    da.copy(a[k], da)
+                print(da.keys())
+                print(da['b'].keys())
+
     def test_predicate(self):
         values = np.random.randint(low=0, high=1000, size=95, dtype=np.uint32)
 

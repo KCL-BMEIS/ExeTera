@@ -9,6 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from threading import Thread
 import os
 import uuid
 from contextlib import contextmanager
@@ -59,7 +60,21 @@ chunk_sizes = {
 class DataWriter:
 
     @staticmethod
-    def _write(group, name, field, count, dtype=None):
+    def _create_group(parent_group, name, attrs):
+        group = parent_group.create_group(name)
+        for k, v in attrs:
+            group.attrs[k] = v
+            group.attrs['completed'] = False
+
+    @staticmethod
+    def create_group(parent_group, name, attrs):
+        t = Thread(target=DataWriter._create_group,
+                   args=(parent_group, name, attrs))
+        t.start()
+        t.join()
+
+    @staticmethod
+    def write(group, name, field, count, dtype=None):
         if name not in group.keys():
             DataWriter._write_first(group, name, field, count, dtype)
         else:
@@ -83,6 +98,13 @@ class DataWriter:
                 group.create_dataset(name, (count,), maxshape=(None,), data=field[:count])
 
     @staticmethod
+    def write_first(group, name, field, count, dtype=None):
+        t = Thread(target=DataWriter._write_first,
+                   args=(group, name, field, count, dtype))
+        t.start()
+        t.join()
+
+    @staticmethod
     def _write_additional(group, name, field, count):
         gv = group[name]
         gv.resize((gv.size + count,))
@@ -91,6 +113,22 @@ class DataWriter:
         else:
             gv[-count:] = field[:count]
 
+    @staticmethod
+    def write_additional(group, name, field, count):
+        t = Thread(target=DataWriter._write_additional,
+                   args=(group, name, field, count))
+        t.start()
+        t.join()
+
+    @staticmethod
+    def _flush(group):
+        group.attrs['completed'] = True
+
+    @staticmethod
+    def flush(group):
+        t = Thread(target=DataWriter._flush, args=(group,))
+        t.start()
+        t.join()
 
 # def str_to_float(value):
 #     try:
@@ -863,7 +901,7 @@ write_modes = {'write', 'overwrite'}
 
 
 class Writer:
-    def __init__(self, group, name, write_mode):
+    def __init__(self, group, name, write_mode, attributes):
         self.trash_field = None
         if write_mode not in write_modes:
             raise ValueError(f"'write_mode' must be one of {write_modes}")
@@ -880,18 +918,24 @@ class Writer:
                          "if you want to overwrite the existing contents")
                 raise KeyError(error)
         else:
-            field = group.create_group(name)
+            DataWriter.create_group(group, name, attributes)
+            field = group[name]
         self.field = field
+        self.name = name
 
     def flush(self):
+        DataWriter.flush(self.field)
         if self.trash_field is not None:
             del self.trash_field
 
 
 class IndexedStringWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, write_mode='write'):
-        Writer.__init__(self, group, name, write_mode)
-        self.fieldtype = f'indexedstring'
+        fieldtype = f'indexedstring'
+        super().__init__(group, name, write_mode,
+                         (('fieldtype', fieldtype), ('timestamp', timestamp),
+                          ('chunksize', chunksize)))
+        self.fieldtype = fieldtype
         self.timestamp = timestamp
         self.chunksize = chunksize
 
@@ -921,27 +965,27 @@ class IndexedStringWriter(Writer):
                 self.values[self.value_index] = v
                 self.value_index += 1
                 if self.value_index == self.chunksize:
-                    DataWriter._write(self.field, 'values', self.values, self.value_index)
+                    DataWriter.write(self.field, 'values', self.values, self.value_index)
                     self.value_index = 0
                 self.accumulated += 1
             self.indices[self.index_index] = self.accumulated
             self.index_index += 1
             if self.index_index == self.chunksize:
-                DataWriter._write(self.field, 'index', self.indices, self.index_index)
+                DataWriter.write(self.field, 'index', self.indices, self.index_index)
                 self.index_index = 0
 
     def flush(self):
         if self.value_index != 0:
-            DataWriter._write(self.field, 'values', self.values, self.value_index)
+            DataWriter.write(self.field, 'values', self.values, self.value_index)
             self.value_index = 0
         if self.index_index != 0:
-            DataWriter._write(self.field, 'index', self.indices, self.index_index)
+            DataWriter.write(self.field, 'index', self.indices, self.index_index)
             self.index_index = 0
-        self.field.attrs['fieldtype'] = self.fieldtype
-        self.field.attrs['timestamp'] = self.timestamp
-        self.field.attrs['chunksize'] = self.chunksize
-        self.field.attrs['completed'] = True
-        Writer.flush(self)
+        # self.field.attrs['fieldtype'] = self.fieldtype
+        # self.field.attrs['timestamp'] = self.timestamp
+        # self.field.attrs['chunksize'] = self.chunksize
+        # self.field.attrs['completed'] = True
+        super().flush()
 
     def write(self, values):
         self.write_part(values)
@@ -952,8 +996,8 @@ class IndexedStringWriter(Writer):
             raise ValueError(f"'index' must be an ndarray of '{np.int64}'")
         if values.dtype != np.uint8:
             raise ValueError(f"'values' must be an ndarray of '{np.uint8}'")
-        DataWriter._write(self.field, 'index', index, len(index))
-        DataWriter._write(self.field, 'values', values, len(values))
+        DataWriter.write(self.field, 'index', index, len(index))
+        DataWriter.write(self.field, 'values', values, len(values))
 
     def write_raw(self, index, values):
         self.write_part_raw(index, values)
@@ -988,29 +1032,33 @@ class CategoricalImporter:
 
 class CategoricalWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, categories, write_mode='write'):
-        Writer.__init__(self, group, name, write_mode)
-        self.fieldtype = f'categorical'
+        fieldtype = f'categorical'
+        super().__init__(group, name, write_mode,
+                         (('fieldtype', fieldtype), ('timestamp', timestamp),
+                          ('chunksize', chunksize)))
+        self.fieldtype = fieldtype
         self.timestamp = timestamp
         self.chunksize = chunksize
         self.keys = categories
+
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype='uint8')
 
     def write_part(self, values):
-        DataWriter._write(self.field, 'values', values, len(values))
+        DataWriter.write(self.field, 'values', values, len(values))
 
     def flush(self):
         key_indices = [None] * len(self.keys)
         for k, v in self.keys.items():
             key_indices[v] = k
-        DataWriter._write(self.field, 'keys', key_indices, len(self.keys),
+        DataWriter.write(self.field, 'keys', key_indices, len(self.keys),
                           dtype=h5py.string_dtype())
-        self.field.attrs['fieldtype'] = self.fieldtype
-        self.field.attrs['timestamp'] = self.timestamp
-        self.field.attrs['chunksize'] = self.chunksize
-        self.field.attrs['completed'] = True
-        Writer.flush(self)
+        # self.field.attrs['fieldtype'] = self.fieldtype
+        # self.field.attrs['timestamp'] = self.timestamp
+        # self.field.attrs['chunksize'] = self.chunksize
+        # self.field.attrs['completed'] = True
+        super().flush()
 
     def write(self, values):
         self.write_part(values)
@@ -1056,8 +1104,11 @@ class NumericImporter:
 
 class NumericWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, nformat, write_mode='write'):
-        Writer.__init__(self, group, name, write_mode)
-        self.fieldtype = f'numeric,{nformat}'
+        fieldtype = f'numeric,{nformat}'
+        super().__init__(group, name, write_mode,
+                         (('fieldtype', fieldtype), ('timestamp', timestamp),
+                          ('chunksize', chunksize), ('nformat', nformat)))
+        self.fieldtype = fieldtype
         self.nformat = nformat
         self.timestamp = timestamp
         self.chunksize = chunksize
@@ -1067,15 +1118,15 @@ class NumericWriter(Writer):
         return np.zeros(length, dtype=nformat)
 
     def write_part(self, values):
-        DataWriter._write(self.field, 'values', values, len(values))
+        DataWriter.write(self.field, 'values', values, len(values))
 
     def flush(self):
-        self.field.attrs['fieldtype'] = self.fieldtype
-        self.field.attrs['timestamp'] = self.timestamp
-        self.field.attrs['chunksize'] = self.chunksize
-        self.field.attrs['nformat'] = self.nformat
-        self.field.attrs['completed'] = True
-        Writer.flush(self)
+        # self.field.attrs['fieldtype'] = self.fieldtype
+        # self.field.attrs['timestamp'] = self.timestamp
+        # self.field.attrs['chunksize'] = self.chunksize
+        # self.field.attrs['nformat'] = self.nformat
+        # self.field.attrs['completed'] = True
+        super().flush()
 
     def write(self, values):
         self.write_part(values)
@@ -1084,24 +1135,28 @@ class NumericWriter(Writer):
 
 class FixedStringWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, strlen, write_mode='write'):
-        Writer.__init__(self, group, name, write_mode)
-        self.strlen = strlen
-        self.fieldtype = f'fixedstring,{strlen}'
+        fieldtype = f'fixedstring,{strlen}'
+        super().__init__(group, name, write_mode,
+                         (('fieldtype', fieldtype), ('timestamp', timestamp),
+                          ('chunksize', chunksize), ('strlen', strlen)))
+        self.fieldtype = fieldtype
         self.timestamp = timestamp
         self.chunksize = chunksize
+        self.strlen = strlen
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype=f'S{self.strlen}')
 
     def write_part(self, values):
-        DataWriter._write(self.field, 'values', values, len(values))
+        DataWriter.write(self.field, 'values', values, len(values))
 
     def flush(self):
-        self.field.attrs['fieldtype'] = self.fieldtype
-        self.field.attrs['timestamp'] = self.timestamp
-        self.field.attrs['chunksize'] = self.chunksize
-        self.field.attrs['completed'] = True
-        Writer.flush(self)
+        # self.field.attrs['fieldtype'] = self.fieldtype
+        # self.field.attrs['timestamp'] = self.timestamp
+        # self.field.attrs['chunksize'] = self.chunksize
+        # self.field.attrs['strlen'] = self.strlen
+        # self.field.attrs['completed'] = True
+        super().flush()
 
     def write(self, values):
         self.write_part(values)
@@ -1154,11 +1209,13 @@ class DateTimeImporter:
 # TODO writers can write out more than one field; offset could be done this way
 class DateTimeWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, write_mode='write'):
-        Writer.__init__(self, group, name, write_mode)
-        self.fieldtype = f'datetime'
+        fieldtype = f'datetime'
+        super().__init__(group, name, write_mode,
+                        (('fieldtype', fieldtype), ('timestamp', timestamp),
+                         ('chunksize', chunksize)))
+        self.fieldtype = fieldtype
         self.timestamp = timestamp
         self.chunksize = chunksize
-        self.name = name
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype=f'S32')
@@ -1177,14 +1234,14 @@ class DateTimeWriter(Writer):
                 else:
                     raise ValueError(f"Date field '{self.field}' has unexpected format '{value}'")
                 timestamps[i] = ts.timestamp()
-        DataWriter._write(self.field, 'values', timestamps, len(timestamps))
+        DataWriter.write(self.field, 'values', timestamps, len(timestamps))
 
     def flush(self):
-        self.field.attrs['fieldtype'] = self.fieldtype
-        self.field.attrs['timestamp'] = self.timestamp
-        self.field.attrs['chunksize'] = self.chunksize
-        self.field.attrs['completed'] = True
-        Writer.flush(self)
+        # self.field.attrs['fieldtype'] = self.fieldtype
+        # self.field.attrs['timestamp'] = self.timestamp
+        # self.field.attrs['chunksize'] = self.chunksize
+        # self.field.attrs['completed'] = True
+        super().flush()
 
     def write(self, values):
         self.write_part(values)
@@ -1193,11 +1250,13 @@ class DateTimeWriter(Writer):
 
 class DateWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, write_mode='write'):
-        Writer.__init__(self, group, name, write_mode)
-        self.fieldtype = f'date'
+        fieldtype = 'date'
+        super().__init__(group, name, write_mode,
+                         (('fieldtype', fieldtype), ('timestamp', timestamp),
+                          ('chunksize', chunksize)))
+        self.fieldtype = fieldtype
         self.timestamp = timestamp
         self.chunksize = chunksize
-        self.name = name
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype=f'S10')
@@ -1212,14 +1271,14 @@ class DateWriter(Writer):
             else:
                 ts = datetime.strptime(value.decode(), '%Y-%m-%d')
                 timestamps[i] = ts.timestamp()
-        DataWriter._write(self.field, 'values', timestamps, len(timestamps))
+        DataWriter.write(self.field, 'values', timestamps, len(timestamps))
 
     def flush(self):
         self.field.attrs['fieldtype'] = self.fieldtype
         self.field.attrs['timestamp'] = self.timestamp
         self.field.attrs['chunksize'] = self.chunksize
         self.field.attrs['completed'] = True
-        Writer.flush(self)
+        super().flush()
 
     def write(self, values):
         self.write_part(values)
@@ -1228,17 +1287,19 @@ class DateWriter(Writer):
 
 class TimestampWriter(Writer):
     def __init__(self, group, chunksize, name, timestamp, write_mode='write'):
-        Writer.__init__(self, group, name, write_mode)
-        self.fieldtype = f'timestamp'
+        fieldtype = 'timestamp'
+        super().__init__(group, name, write_mode,
+                        (('fieldtype', fieldtype), ('timestamp', timestamp),
+                         ('chunksize', chunksize)))
+        self.fieldtype = fieldtype
         self.timestamp = timestamp
         self.chunksize = chunksize
-        self.name = name
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype=f'float64')
 
     def write_part(self, values):
-        DataWriter._write(self.field, 'values', values, len(values))
+        DataWriter.write(self.field, 'values', values, len(values))
 
     def flush(self):
         self.field.attrs['fieldtype'] = self.fieldtype
