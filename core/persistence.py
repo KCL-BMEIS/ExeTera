@@ -654,10 +654,15 @@ def process(inputs, outputs, predicate):
         for k, v in inputs.items():
             kwargs[k] = v[c[0]:c[1]]
         for k, v in output_arrays.items():
-            kwargs[k] = v
+            kwargs[k] = v[:c[1]-c[0]]
         predicate(**kwargs)
 
         # TODO: write back to the writer
+        for k in output_arrays.keys():
+            output_writers[k].write_part(kwargs[k])
+    for k, v in output_writers.items():
+        output_writers[k].flush()
+
 
 
 def get_index(target, foreign_key, destination):

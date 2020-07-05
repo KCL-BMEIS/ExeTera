@@ -718,6 +718,10 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
 
             persistence.process({'foo': foo}, {'footwo': footwo}, functor)
 
+            footwo = persistence.NumericReader(hf['twofoo'])
+            for i, j in zip(foo[:], footwo[:]):
+                self.assertTrue(j == i*2)
+
 
     def test_raw_performance(self):
         import time
