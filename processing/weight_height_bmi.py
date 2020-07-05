@@ -138,6 +138,7 @@ def weight_height_bmi_1(min_weight, max_weight, min_height, max_height, min_bmi,
     bmis_filter.flush()
 
 def weight_height_bmi_fast_1(
+    datastore,
     min_weight, max_weight, min_height, max_height, min_bmi, max_bmi,
     genders, gender_filter, ages, age_filter,
     weights, weight_filter, heights, height_filter, bmis, bmi_filter,
@@ -145,12 +146,12 @@ def weight_height_bmi_fast_1(
     heights_clean, heights_filter, heights_modified_flag,
     bmis_clean, bmis_filter, bmis_modified_flag):
 
-    raw_weightsv = persistence.NumericReader(weights)[:]
-    raw_weightsf = persistence.NumericReader(weight_filter)[:]
-    raw_heightsv = persistence.NumericReader(heights)[:]
-    raw_heightsf = persistence.NumericReader(height_filter)[:]
-    raw_bmisv = persistence.NumericReader(bmis)[:]
-    raw_bmisf = persistence.NumericReader(bmi_filter)[:]
+    raw_weightsv = datastore.get_reader(weights)[:]
+    raw_weightsf = datastore.get_reader(weight_filter)[:]
+    raw_heightsv = datastore.get_reader(heights)[:]
+    raw_heightsf = datastore.get_reader(height_filter)[:]
+    raw_bmisv = datastore.get_reader(bmis)[:]
+    raw_bmisf = datastore.get_reader(bmi_filter)[:]
 
     length = len(raw_weightsv)
     def test_input(series, name):

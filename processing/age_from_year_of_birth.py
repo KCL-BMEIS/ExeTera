@@ -55,12 +55,12 @@ def calculate_age_from_year_of_birth(destination,
             age.append(None)
 
 
-def calculate_age_from_year_of_birth_fast(min_age, max_age,
+def calculate_age_from_year_of_birth_fast(datastore, min_age, max_age,
                                           year_of_birth, year_of_birth_filter,
                                           age, age_filter, age_range_filter, year,
                                           chunksize=None, timestamp=None):
-    yob_v = persist.NumericReader(year_of_birth)
-    yob_f = persist.NumericReader(year_of_birth_filter)
+    yob_v = datastore.get_reader(year_of_birth)
+    yob_f = datastore.get_reader(year_of_birth_filter)
     raw_ages = year - yob_v[:]
     raw_age_filter = yob_f[:]
     raw_age_range_filter = raw_age_filter & (min_age <= raw_ages) & (raw_ages <= max_age)

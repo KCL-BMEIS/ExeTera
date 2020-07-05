@@ -7,7 +7,8 @@ from processing.age_from_year_of_birth import calculate_age_from_year_of_birth_f
 from processing.weight_height_bmi import weight_height_bmi_fast_1
 from processing.inconsistent_symptoms import check_inconsistent_symptoms_1
 from processing.temperature import validate_temperature_1
-from core import persistence as per
+from core import persistence
+from core.persistence import DataStore
 
 
 # TODO: hard filter
@@ -29,14 +30,14 @@ def log(*a, **kwa):
 def postprocess(dataset, destination, data_schema, process_schema, timestamp=None, flags='all'):
 
     chunksize = 1 << 20
-
+    datastore = DataStore()
     patients_src = dataset['patients']
-    patients_dest = per.get_or_create_group(destination, 'patients')
+    patients_dest = datastore.get_or_create_group(destination, 'patients')
     assessments_src = dataset['assessments']
-    assessments_dest = per.get_or_create_group(destination, 'assessments')
-    daily_assessments_dest = per.get_or_create_group(destination, 'daily_assessments')
+    assessments_dest = datastore.get_or_create_group(destination, 'assessments')
+    daily_assessments_dest = datastore.get_or_create_group(destination, 'daily_assessments')
     tests_src = dataset['tests']
-    tests_dest = per.get_or_create_group(destination, 'tests')
+    tests_dest = datastore.get_or_create_group(destination, 'tests')
 
     sort_enabled = lambda x: x in ('sort', 'all')
     process_enabled = lambda x: x in ('process', 'all')
@@ -68,28 +69,18 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
 
     if sort_patients:
         sort_keys = ('id',)
-        per.sort_on(
+        datastore.sort_on(
             patients_src, patients_dest, sort_keys, timestamp=timestamp, write_mode=write_mode)
 
     if sort_assessments:
         sort_keys = ('patient_id', 'created_at')
-        per.sort_on(
+        datastore.sort_on(
             assessments_src, assessments_dest, sort_keys, timestamp=timestamp)
-
-        # print("creating 'patient_index' foreign key index for 'patient_id'")
-        # t0 = time.time()
-        # patient_ids = per.get_reader_from_field(patients_dest['id'])
-        # assessment_patient_ids =\
-        #     per.get_reader_from_field(assessments_dest['patient_id'])
-        # assessment_patient_id_fkey =\
-        #     assessment_patient_ids.getwriter(assessments_dest, 'patient_index', timestamp)
-        # per.get_index(patient_ids, assessment_patient_ids, assessment_patient_id_fkey)
-        # print(f"completed in {time.time() - t0}s")
 
         print("checking sort order")
         t0 = time.time()
-        raw_patient_ids = per.FixedStringReader(assessments_dest['patient_id'])[:]
-        raw_created_ats = per.TimestampReader(assessments_dest['created_at'])[:]
+        raw_patient_ids = datastore.get_reader(assessments_dest['patient_id'])[:]
+        raw_created_ats = datastore.get_reader(assessments_dest['created_at'])[:]
         last_pid = raw_patient_ids[0]
         last_cat = raw_created_ats[0]
         duplicates = 0
@@ -108,7 +99,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
 
     if sort_tests:
         sort_keys = ('patient_id', 'created_at')
-        per.sort_on(
+        datastore.sort_on(
             tests_src, tests_dest, sort_keys, timestamp=timestamp)
 
 
@@ -124,14 +115,14 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     if year_from_age:
         log("year of birth -> age; 18 to 90 filter")
         t0 = time.time()
-        age = per.NumericWriter(patients_dest, chunksize, 'age', timestamp, 'uint32',
-                                        write_mode)
-        age_filter = per.NumericWriter(patients_dest, chunksize, 'age_filter',
-                                               timestamp, 'bool', write_mode)
-        age_16_to_90 = per.NumericWriter(patients_dest, chunksize, '16_to_90_years',
-                                                 timestamp, 'bool', write_mode)
+        age = datastore.get_numeric_writer(patients_dest, 'age', timestamp, 'uint32',
+                                           write_mode)
+        age_filter = datastore.get_numeric_writer(patients_dest, 'age_filter', timestamp,
+                                                  'bool', write_mode)
+        age_16_to_90 = datastore.get_numeric_writer(patients_dest, '16_to_90_years',
+                                                    timestamp, 'bool', write_mode)
         calculate_age_from_year_of_birth_fast(
-            16, 90,
+            datastore, 16, 90,
             patients_src['year_of_birth'], patients_src['year_of_birth_valid'],
             age, age_filter, age_16_to_90,
             2020)
@@ -144,20 +135,20 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         log("height / weight / bmi; standard range filters")
         t0 = time.time()
 
-        weights_clean = per.NumericWriter(patients_dest, chunksize, 'weight_kg_clean',
+        weights_clean = datastore.get_numeric_writer(patients_dest, 'weight_kg_clean',
+                                                     timestamp, 'float32', write_mode)
+        weights_filter = datastore.get_numeric_writer(patients_dest, '40_to_200_kg',
+                                                      timestamp, 'bool', write_mode)
+        heights_clean = datastore.get_numeric_writer(patients_dest, 'height_cm_clean',
+                                                     timestamp, 'float32', write_mode)
+        heights_filter = datastore.get_numeric_writer(patients_dest, '110_to_220_cm',
+                                                      timestamp, 'bool', write_mode)
+        bmis_clean = datastore.get_numeric_writer(patients_dest, 'bmi_clean',
                                                   timestamp, 'float32', write_mode)
-        weights_filter = per.NumericWriter(patients_dest, chunksize, '40_to_200_kg',
+        bmis_filter = datastore.get_numeric_writer(patients_dest, '15_to_55_bmi',
                                                    timestamp, 'bool', write_mode)
-        heights_clean = per.NumericWriter(patients_dest, chunksize, 'height_cm_clean',
-                                                  timestamp, 'float32', write_mode)
-        heights_filter = per.NumericWriter(patients_dest, chunksize, '110_to_220_cm',
-                                                   timestamp, 'bool', write_mode)
-        bmis_clean = per.NumericWriter(patients_dest, chunksize, 'bmi_clean',
-                                               timestamp, 'float32', write_mode)
-        bmis_filter = per.NumericWriter(patients_dest, chunksize, '15_to_55_bmi',
-                                                timestamp, 'bool', write_mode)
 
-        weight_height_bmi_fast_1(40, 200, 110, 220, 15, 55,
+        weight_height_bmi_fast_1(datastore, 40, 200, 110, 220, 15, 55,
                                  None, None, None, None,
                                  patients_src['weight_kg'], patients_src['weight_kg_valid'],
                                  patients_src['height_cm'], patients_src['height_cm_valid'],
@@ -173,22 +164,22 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     if make_assessment_patient_id_fkey:
         print("creating 'assessment_patient_id_fkey' foreign key index for 'patient_id'")
         t0 = time.time()
-        patient_ids = per.get_reader(sorted_patients_src['id'])
+        patient_ids = datastore.get_reader(sorted_patients_src['id'])
         assessment_patient_ids =\
-            per.get_reader(sorted_assessments_src['patient_id'])
+            datastore.get_reader(sorted_assessments_src['patient_id'])
         assessment_patient_id_fkey =\
-            per.NumericWriter(assessments_dest, chunksize, 'assessment_patient_id_fkey',
-                                      timestamp, 'int64')
-        per.get_index(patient_ids, assessment_patient_ids, assessment_patient_id_fkey)
+            datastore.get_numeric_writer(assessments_dest, 'assessment_patient_id_fkey',
+                                         timestamp, 'int64')
+        datastore.get_index(patient_ids, assessment_patient_ids, assessment_patient_id_fkey)
         print(f"completed in {time.time() - t0}s")
 
 
     if clean_temperatures:
         print("clean temperatures")
         t0 = time.time()
-        temps = per.NumericReader(sorted_assessments_src['temperature'])
-        temp_units = per.FixedStringReader(sorted_assessments_src['temperature_unit'])
-        temps_valid = per.NumericReader(sorted_assessments_src['temperature_valid'])
+        temps = datastore.get_reader(sorted_assessments_src['temperature'])
+        temp_units = datastore.get_reader(sorted_assessments_src['temperature_unit'])
+        temps_valid = datastore.get_reader(sorted_assessments_src['temperature_valid'])
         dest_temps = temps.getwriter(assessments_dest, 'temperature_c_clean', timestamp,
                                      write_mode)
         dest_temps_valid =\
@@ -205,7 +196,8 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     if check_symptoms:
         print('check inconsistent health_status')
         t0 = time.time()
-        check_inconsistent_symptoms_1(sorted_assessments_src, assessments_dest, timestamp)
+        check_inconsistent_symptoms_1(datastore,
+                                      sorted_assessments_src, assessments_dest, timestamp)
         print(time.time() - t0)
 
 
@@ -218,40 +210,38 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
 
     if create_daily:
         print("generate daily assessments")
-        patient_ids = per.get_reader(sorted_assessments_src['patient_id'])
+        patient_ids = datastore.get_reader(sorted_assessments_src['patient_id'])
         raw_patient_ids = patient_ids[:]
-        created_at_days =\
-            per.get_reader(sorted_assessments_src['created_at_day'])
+        created_at_days = datastore.get_reader(sorted_assessments_src['created_at_day'])
         raw_created_at_days = created_at_days[:]
 
         if 'assessment_patient_id_fkey' in assessments_src.keys():
             patient_id_index = assessments_src['assessment_patient_id_fkey']
         else:
             patient_id_index = assessments_dest['assessment_patient_id_fkey']
-        patient_id_indices =\
-            per.get_reader(patient_id_index)
+        patient_id_indices = datastore.get_reader(patient_id_index)
         raw_patient_id_indices = patient_id_indices[:]
 
 
         print("Calculating patient id index spans")
         t0 = time.time()
-        patient_id_index_spans =\
-            per.get_spans(fields=(raw_patient_id_indices, raw_created_at_days))
+        patient_id_index_spans = datastore.get_spans(fields=(raw_patient_id_indices,
+                                                     raw_created_at_days))
         print(f"Calculated {len(patient_id_index_spans)-1} spans in {time.time() - t0}s")
 
 
         print("Applying spans to 'health_status'")
         t0 = time.time()
         default_behavour_overrides = {
-            'id': per.apply_spans_last,
-            'patient_id': per.apply_spans_first,
-            'patient_index': per.apply_spans_first,
-            'created_at': per.apply_spans_last,
-            'created_at_day': per.apply_spans_first,
-            'updated_at': per.apply_spans_last,
-            'updated_at_day': per.apply_spans_first,
-            'version': per.apply_spans_max,
-            'country_code': per.apply_spans_first,
+            'id': datastore.apply_spans_last,
+            'patient_id': datastore.apply_spans_first,
+            'patient_index': datastore.apply_spans_first,
+            'created_at': datastore.apply_spans_last,
+            'created_at_day': datastore.apply_spans_first,
+            'updated_at': datastore.apply_spans_last,
+            'updated_at_day': datastore.apply_spans_first,
+            'version': datastore.apply_spans_max,
+            'country_code': datastore.apply_spans_first,
             'date_test_occurred': None,
             'date_test_occurred_guess': None,
             'date_test_occurred_day': None,
@@ -259,7 +249,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         }
         for k in sorted_assessments_src.keys():
             t1 = time.time()
-            reader = per.get_reader(sorted_assessments_src[k])
+            reader = datastore.get_reader(sorted_assessments_src[k])
             if k in default_behavour_overrides:
                 apply_span_fn = default_behavour_overrides[k]
                 if apply_span_fn is not None:
@@ -269,17 +259,20 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
                 else:
                     print(f"  Skipping field {k}")
             else:
-                if isinstance(reader, per.CategoricalReader):
-                    per.apply_spans_max(patient_id_index_spans, reader,
-                                        reader.getwriter(daily_assessments_dest, k, timestamp))
+                if isinstance(reader, persistence.CategoricalReader):
+                    datastore.apply_spans_max(
+                        patient_id_index_spans, reader,
+                        reader.getwriter(daily_assessments_dest, k, timestamp))
                     print(f"  Field {k} aggregated in {time.time() - t1}s")
-                elif isinstance(reader, per.IndexedStringReader):
-                    per.apply_spans_concat(patient_id_index_spans, reader,
-                                           reader.getwriter(daily_assessments_dest, k, timestamp))
+                elif isinstance(reader, persistence.IndexedStringReader):
+                    datastore.apply_spans_concat(
+                        patient_id_index_spans, reader,
+                        reader.getwriter(daily_assessments_dest, k, timestamp))
                     print(f"  Field {k} aggregated in {time.time() - t1}s")
-                elif isinstance(reader, per.NumericReader):
-                    per.apply_spans_max(patient_id_index_spans, reader,
-                                        reader.getwriter(daily_assessments_dest, k, timestamp))
+                elif isinstance(reader, persistence.NumericReader):
+                    datastore.apply_spans_max(
+                        patient_id_index_spans, reader,
+                        reader.getwriter(daily_assessments_dest, k, timestamp))
                     print(f"  Field {k} aggregated in {time.time() - t1}s")
                 else:
                     print(f"  No function for {k}")
@@ -294,40 +287,43 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
             src = assessments_dest['assessment_patient_id_fkey']
         else:
             src = assessments_src['assessment_patient_id_fkey']
-        assessment_patient_id_fkey = per.get_reader(src)
+        assessment_patient_id_fkey = datastore.get_reader(src)
         # generate spans from the assessment-space patient_id foreign key
-        spans = per.get_spans(field=assessment_patient_id_fkey)
+        spans = datastore.get_spans(field=assessment_patient_id_fkey)
 
-        ids = per.get_reader(patients_src['id'])
-
-        #TODO: needs a persistence function to perform mapping of values to another space
+        ids = datastore.get_reader(patients_src['id'])
 
         # print('predicate_and_join')
-        # acpp2 = per.NumericWriter(patients_dest, chunksize, 'assessment_count_2', timestamp, 'uint32')
-        # per.predicate_and_join(per.apply_spans_count, ids, assessment_patient_id_fkey, None, acpp2, spans)
+        # acpp2 = datastore.get_numeric_writer(patients_dest, 'assessment_count_2',
+        #                                      timestamp, 'uint32')
+        # datastore.predicate_and_join(datastore.apply_spans_count, ids,
+        #                              assessment_patient_id_fkey, None, acpp2, spans)
 
         print('calculate assessment counts per patient')
         t0 = time.time()
-        writer = per.NumericWriter(patients_dest, chunksize, 'assessment_count', timestamp, 'uint32')
-        aggregated_counts = per.aggregate_count(fkey_index_spans=spans)
-        per.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
+        writer = datastore.get_numeric_writer(patients_dest, 'assessment_count',
+                                              timestamp, 'uint32')
+        aggregated_counts = datastore.aggregate_count(fkey_index_spans=spans)
+        datastore.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
         print(f"calculated assessment counts per patient in {time.time() - t0}")
 
         print('calculate first assessment days per patient')
         t0 = time.time()
-        reader = per.get_reader(sorted_assessments_src['created_at_day'])
-        writer = per.FixedStringWriter(patients_dest, chunksize, 'first_assessment_day', timestamp, 10)
-        aggregated_counts = per.aggregate_first(fkey_index_spans=spans, reader=reader)
-        per.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
+        reader = datastore.get_reader(sorted_assessments_src['created_at_day'])
+        writer = datastore.get_fixed_string_writer(patients_dest, 'first_assessment_day',
+                                                   timestamp, 10)
+        aggregated_counts = datastore.aggregate_first(fkey_index_spans=spans, reader=reader)
+        datastore.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
         print(f"calculated first assessment days per patient in {time.time() - t0}")
 
         print('calculate last assessment days per patient')
         t0 = time.time()
-        pids = per.get_reader(sorted_assessments_src['patient_id'])
-        reader = per.get_reader(sorted_assessments_src['created_at_day'])
-        writer = per.FixedStringWriter(patients_dest, chunksize, 'last_assessment_day', timestamp, 10)
-        aggregated_counts = per.aggregate_last(fkey_index_spans=spans, reader=reader)
-        per.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
+        pids = datastore.get_reader(sorted_assessments_src['patient_id'])
+        reader = datastore.get_reader(sorted_assessments_src['created_at_day'])
+        writer = datastore.get_fixed_string_writer(patients_dest, 'last_assessment_day',
+                                                   timestamp, 10)
+        aggregated_counts = datastore.aggregate_last(fkey_index_spans=spans, reader=reader)
+        datastore.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
         print(f"calculated last assessment days per patient in {time.time() - t0}")
 
     # TODO - patient measure: daily assessments per patient
@@ -335,25 +331,28 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     if make_patient_level_daily_assessment_metrics:
         print("creating 'daily_assessment_patient_id_fkey' foreign key index for 'patient_id'")
         t0 = time.time()
-        patient_ids = per.get_reader(sorted_patients_src['id'])
+        patient_ids = datastore.get_reader(sorted_patients_src['id'])
         daily_assessment_patient_ids =\
-            per.get_reader(daily_assessments_dest['patient_id'])
+            datastore.get_reader(daily_assessments_dest['patient_id'])
         daily_assessment_patient_id_fkey =\
-            per.NumericWriter(daily_assessments_dest, chunksize, 'daily_assessment_patient_id_fkey',
-                                      timestamp, 'int64')
-        per.get_index(patient_ids, daily_assessment_patient_ids, daily_assessment_patient_id_fkey)
+            datastore.get_numeric_writer(daily_assessments_dest,
+                                         'daily_assessment_patient_id_fkey',
+                                         timestamp, 'int64')
+        datastore.get_index(patient_ids, daily_assessment_patient_ids,
+                            daily_assessment_patient_id_fkey)
         print(f"completed in {time.time() - t0}s")
 
-        spans = per.get_spans(
-            field=per.get_reader(daily_assessments_dest['daily_assessment_patient_id_fkey']))
+        spans = datastore.get_spans(
+            field=datastore.get_reader(daily_assessments_dest['daily_assessment_patient_id_fkey']))
 
         print('calculate daily assessment counts per patient')
         t0 = time.time()
-        writer = per.NumericWriter(patients_dest, chunksize, 'daily_assessment_count', timestamp, 'uint32')
-        aggregated_counts = per.aggregate_count(fkey_index_spans=spans)
+        writer = datastore.get_numeric_writer(patients_dest, 'daily_assessment_count',
+                                              timestamp, 'uint32')
+        aggregated_counts = datastore.aggregate_count(fkey_index_spans=spans)
         daily_assessment_patient_id_fkey =\
-            per.get_reader(daily_assessments_dest['daily_assessment_patient_id_fkey'])
-        per.join(ids, daily_assessment_patient_id_fkey, aggregated_counts, writer, spans)
+            datastore.get_reader(daily_assessments_dest['daily_assessment_patient_id_fkey'])
+        datastore.join(ids, daily_assessment_patient_id_fkey, aggregated_counts, writer, spans)
         print(f"calculated daily assessment counts per patient in {time.time() - t0}")
 
 

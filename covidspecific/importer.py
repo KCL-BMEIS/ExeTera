@@ -11,7 +11,7 @@
 
 import h5py
 
-from core import dataset
+from core import dataset, persistence
 
 # TODO:
 from core.importer import DatasetImporter
@@ -53,6 +53,7 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
     if territories is not None:
         early_filter = ('country_code', lambda x: x in tuple(territories.split(',')))
 
+    datastore = persistence.DataStore()
     with h5py.File(dest_file_name, 'w') as hf:
         writer_factory = data_schema.field_writers
 
@@ -108,7 +109,7 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
             p_show_progress_every = show_every
             p_stop_after = None
             p_keys = None
-            DatasetImporter(p_file_name, hf, 'patients',
+            DatasetImporter(datastore, p_file_name, hf, 'patients',
                             writer_factory, patient_writers, patient_maps, timestamp,
                             keys=p_keys, field_descriptors=patient_maps,
                             show_progress_every=p_show_progress_every, stop_after=p_stop_after,
@@ -120,7 +121,7 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
             a_show_progress_every = show_every
             a_stop_after = None
             a_keys = None
-            DatasetImporter(a_file_name, hf, 'assessments',
+            DatasetImporter(datastore, a_file_name, hf, 'assessments',
                             writer_factory, assessment_writers, assessment_maps, timestamp,
                             keys=a_keys, field_descriptors=assessment_maps,
                             show_progress_every=a_show_progress_every, stop_after=a_stop_after,
@@ -132,7 +133,7 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
             t_show_progress_every = show_every
             t_stop_after = None
             t_keys = None
-            DatasetImporter(t_file_name, hf, 'tests',
+            DatasetImporter(datastore, t_file_name, hf, 'tests',
                             writer_factory, test_writers, test_maps, timestamp,
                             keys=t_keys, field_descriptors=test_maps,
                             show_progress_every=t_show_progress_every, stop_after=t_stop_after,

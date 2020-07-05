@@ -3,7 +3,7 @@ import time
 
 
 class DatasetImporter:
-    def __init__(self, source, hf, space,
+    def __init__(self, datastore, source, hf, space,
                  writer_factory, writers, field_entries, timestamp,
                  keys=None, field_descriptors=None,
                  stop_after=None, show_progress_every=None, filter_fn=None,
@@ -56,13 +56,13 @@ class DatasetImporter:
                 field_name = fields_to_use[i_n]
                 if writers[field_name] != 'categoricaltype':
                     writer = writer_factory[writers[field_name]](
-                        group, chunk_size, field_name, timestamp)
+                        datastore, group, field_name, timestamp)
                     categorical_map_list.append(None)
                 else:
                     str_to_vals = field_entries[field_name].strings_to_values
                     writer =\
                         writer_factory[writers[field_name]](
-                            group, chunk_size, field_name, timestamp, str_to_vals)
+                            datastore, group, field_name, timestamp, str_to_vals)
                     categorical_map_list.append(str_to_vals)
                 new_fields[field_name] = writer
                 new_field_list.append(writer)
