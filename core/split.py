@@ -138,29 +138,29 @@ def split_data(patient_data, assessment_data, bucket_size=500000, territories=No
 
     print('done!')
 
-if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--version', action='version', version='v0.1.9')
-    parser.add_argument('-te', '--territories', default=None,
-                        help='the territories to filter the dataset on (runs on all territories if not set)')
-    parser.add_argument('-p', '--patient_data',
-                        help='the location and name of the patient data csv file')
-    parser.add_argument('-a', '--assessment_data',
-                        help='the location and name of the assessment data csv file')
-    parser.add_argument('-b', '--bucket_size', type=int, default=500000,
-                        help='the number of patients to include in a bucket')
-
-    args = parser.parse_args()
-    if args.bucket_size < 10000:
-        print('--bucket_size cannot be less than 10000')
-        exit(-1)
-
-    utils.validate_file_exists(args.patient_data)
-    utils.validate_file_exists(args.assessment_data)
-
-    try:
-        split_data(args.patient_data, args.assessment_data, args.bucket_size, args.territories)
-    except Exception as e:
-        print(e)
-        exit(-1)
+# if __name__ == '__main__':
+#     import argparse
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument('--version', action='version', version='v0.1.9')
+#     parser.add_argument('-te', '--territories', default=None,
+#                         help='the territories to filter the dataset on (runs on all territories if not set)')
+#     parser.add_argument('-p', '--patient_data',
+#                         help='the location and name of the patient data csv file')
+#     parser.add_argument('-a', '--assessment_data',
+#                         help='the location and name of the assessment data csv file')
+#     parser.add_argument('-b', '--bucket_size', type=int, default=500000,
+#                         help='the number of patients to include in a bucket')
+#
+#     args = parser.parse_args()
+#     if args.bucket_size < 10000:
+#         print('--bucket_size cannot be less than 10000')
+#         exit(-1)
+#
+#     utils.validate_file_exists(args.patient_data)
+#     utils.validate_file_exists(args.assessment_data)
+#
+#     try:
+#         split_data(args.patient_data, args.assessment_data, args.bucket_size, args.territories)
+#     except Exception as e:
+#         print(e)
+#         exit(-1)
