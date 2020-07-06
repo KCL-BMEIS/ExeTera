@@ -2,7 +2,7 @@ The KCL covid19 joinzoe data preparation pipeline.
 
 # Cleaning scripts
 
-Current version: v0.2.1
+Current version: v0.2.2
 
 ---
 # Usage
@@ -124,7 +124,11 @@ python split.py --version
 ---
 ## Changes
 
-### v0.2.0 -> v0.2.1
+### v0.2.1 -> v0.2.2
+* Fix: Split functionality had not been moved to bin/csvsplit as documented
+* Fix: Missing license headers added
+
+### v0.2.0 -> v0.2.1 - tag
 * Refactor: Created the `DataStore` class and moved `processor` api methods onto it as member
   functions
 * Refactor: Simplified the creation of Writers. This can now be done through `get_writer` on
