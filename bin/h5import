@@ -8,7 +8,7 @@ from covidspecific import data_schemas, importer
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--version', action='version', version='v0.2.0')
+parser.add_argument('--version', action='version', version='v0.2.1')
 parser.add_argument('-te', '--territories', default=None,
                     help='the territory/territories to filter the dataset on (runs on all territories if not set)')
 parser.add_argument('-p', '--patient_data',
@@ -24,7 +24,7 @@ parser.add_argument('-o', '--output_hdf5',
 parser.add_argument('-d', '--data_schema', default=1, type=int,
                     help='the schema number to use for parsing and cleaning data')
 parser.add_argument('-ts', '--timestamp', default=str(datetime.now(timezone.utc)),
-                    help='override for the import datetime (')
+                    help='override for the import datetime (the current time is selected otherwise')
 args = parser.parse_args()
 
 errors = False

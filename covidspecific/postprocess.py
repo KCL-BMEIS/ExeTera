@@ -180,13 +180,13 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         temps = datastore.get_reader(sorted_assessments_src['temperature'])
         temp_units = datastore.get_reader(sorted_assessments_src['temperature_unit'])
         temps_valid = datastore.get_reader(sorted_assessments_src['temperature_valid'])
-        dest_temps = temps.getwriter(assessments_dest, 'temperature_c_clean', timestamp,
-                                     write_mode)
+        dest_temps = temps.get_writer(assessments_dest, 'temperature_c_clean', timestamp,
+                                      write_mode)
         dest_temps_valid =\
-            temps_valid.getwriter(assessments_dest, 'temperature_35_to_42_inclusive', timestamp,
-                                  write_mode)
+            temps_valid.get_writer(assessments_dest, 'temperature_35_to_42_inclusive', timestamp,
+                                   write_mode)
         dest_temps_modified =\
-            temps_valid.getwriter(assessments_dest, 'temperature_modified', timestamp, write_mode)
+            temps_valid.get_writer(assessments_dest, 'temperature_modified', timestamp, write_mode)
         validate_temperature_1(35.0, 42.0,
                                temps, temp_units, temps_valid,
                                dest_temps, dest_temps_valid, dest_temps_modified)
@@ -234,12 +234,12 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         t0 = time.time()
         default_behavour_overrides = {
             'id': datastore.apply_spans_last,
-            'patient_id': datastore.apply_spans_first,
-            'patient_index': datastore.apply_spans_first,
+            'patient_id': datastore.apply_spans_last,
+            'patient_index': datastore.apply_spans_last,
             'created_at': datastore.apply_spans_last,
-            'created_at_day': datastore.apply_spans_first,
+            'created_at_day': datastore.apply_spans_last,
             'updated_at': datastore.apply_spans_last,
-            'updated_at_day': datastore.apply_spans_first,
+            'updated_at_day': datastore.apply_spans_last,
             'version': datastore.apply_spans_max,
             'country_code': datastore.apply_spans_first,
             'date_test_occurred': None,
@@ -254,7 +254,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
                 apply_span_fn = default_behavour_overrides[k]
                 if apply_span_fn is not None:
                     apply_span_fn(patient_id_index_spans, reader,
-                                  reader.getwriter(daily_assessments_dest, k, timestamp))
+                                  reader.get_writer(daily_assessments_dest, k, timestamp))
                     print(f"  Field {k} aggregated in {time.time() - t1}s")
                 else:
                     print(f"  Skipping field {k}")
@@ -262,17 +262,17 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
                 if isinstance(reader, persistence.CategoricalReader):
                     datastore.apply_spans_max(
                         patient_id_index_spans, reader,
-                        reader.getwriter(daily_assessments_dest, k, timestamp))
+                        reader.get_writer(daily_assessments_dest, k, timestamp))
                     print(f"  Field {k} aggregated in {time.time() - t1}s")
                 elif isinstance(reader, persistence.IndexedStringReader):
                     datastore.apply_spans_concat(
                         patient_id_index_spans, reader,
-                        reader.getwriter(daily_assessments_dest, k, timestamp))
+                        reader.get_writer(daily_assessments_dest, k, timestamp))
                     print(f"  Field {k} aggregated in {time.time() - t1}s")
                 elif isinstance(reader, persistence.NumericReader):
                     datastore.apply_spans_max(
                         patient_id_index_spans, reader,
-                        reader.getwriter(daily_assessments_dest, k, timestamp))
+                        reader.get_writer(daily_assessments_dest, k, timestamp))
                     print(f"  Field {k} aggregated in {time.time() - t1}s")
                 else:
                     print(f"  No function for {k}")

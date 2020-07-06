@@ -152,7 +152,7 @@ class TestPersistence(unittest.TestCase):
             persistence.IndexedStringWriter(datastore, hf, 'foo', ts).write(values)
 
             reader = datastore.get_reader(hf['foo'])
-            writer = reader.getwriter(hf, 'foo2', ts)
+            writer = reader.get_writer(hf, 'foo2', ts)
             writer.write(reader[:])
             reader2 = datastore.get_reader(hf['foo2'])
             self.assertListEqual(reader[:], reader2[:])
@@ -228,7 +228,7 @@ class TestPersistence(unittest.TestCase):
             persistence.FixedStringWriter(datastore, hf, 'foo', ts, 6).write(bvalues)
 
             reader = datastore.get_reader(hf['foo'])
-            writer = reader.getwriter(hf, 'foo2', ts)
+            writer = reader.get_writer(hf, 'foo2', ts)
             writer.write(reader[:])
             reader2 = datastore.get_reader(hf['foo2'])
             self.assertTrue(np.array_equal(reader[:], reader2[:]))
@@ -337,7 +337,7 @@ class TestPersistence(unittest.TestCase):
             persistence.NumericWriter(datastore, hf, 'foo_filter', ts, 'bool').write(out_filter)
 
             reader = datastore.get_reader(hf['foo'])
-            writer = reader.getwriter(hf, 'foo2', ts)
+            writer = reader.get_writer(hf, 'foo2', ts)
             writer.write(reader[:])
             reader2 = datastore.get_reader(hf['foo2'])
             self.assertTrue(np.array_equal(reader[:], reader2[:]))
@@ -459,7 +459,7 @@ class TestPersistence(unittest.TestCase):
             persistence.CategoricalImporter(datastore, hf, 'foo', ts, value_map).write(values)
 
             reader = datastore.get_reader(hf['foo'])
-            writer = reader.getwriter(hf, 'foo2', ts)
+            writer = reader.get_writer(hf, 'foo2', ts)
             writer.write(reader[:])
             reader2 = datastore.get_reader(hf['foo2'])
             self.assertTrue(np.array_equal(reader[:], reader2[:]))
@@ -531,7 +531,7 @@ class TestPersistence(unittest.TestCase):
             persistence.DateTimeWriter(datastore, hf, 'foo', ts).write(svalues)
 
             reader = datastore.get_reader(hf['foo'])
-            writer = reader.getwriter(hf, 'foo2', ts)
+            writer = reader.get_writer(hf, 'foo2', ts)
             writer.write(reader[:])
             reader2 = datastore.get_reader(hf['foo2'])
             self.assertTrue(np.array_equal(reader[:], reader2[:]))
@@ -562,7 +562,7 @@ class TestPersistenceConcat(unittest.TestCase):
             foo = persistence.IndexedStringWriter(datastore, hf, 'foo', ts)
             foo.write_raw(src_indices, src_values)
             foo_r = datastore.get_reader(hf['foo'])
-            datastore.apply_spans_concat(src_spans, foo_r, foo_r.getwriter(hf, 'concatfoo', ts))
+            datastore.apply_spans_concat(src_spans, foo_r, foo_r.get_writer(hf, 'concatfoo', ts))
 
             expected = ['aabbbb', 'cccc', 'dd', 'eeeeff', 'gggghh']
             actual = datastore.get_reader(hf['concatfoo'])[:]
@@ -584,7 +584,7 @@ class TestPersistenceConcat(unittest.TestCase):
             foo = persistence.IndexedStringWriter(datastore, hf, 'foo', ts)
             foo.write_raw(src_indices, src_values)
             foo_r = datastore.get_reader(hf['foo'])
-            datastore.apply_spans_concat(src_spans, foo_r, foo_r.getwriter(hf, 'concatfoo', ts))
+            datastore.apply_spans_concat(src_spans, foo_r, foo_r.get_writer(hf, 'concatfoo', ts))
 
             expected = ['aaaaaaaaaaaabbbbbbbb', 'cccccccccccc', 'dddddddd',
                         'eeeeffffffffff', 'ggggghhhhh']
@@ -607,7 +607,7 @@ class TestPersistenceConcat(unittest.TestCase):
             foo = persistence.IndexedStringWriter(datastore, hf, 'foo', ts)
             foo.write_raw(src_indices, src_values)
             foo_r = datastore.get_reader(hf['foo'])
-            datastore.apply_spans_concat(src_spans, foo_r, foo_r.getwriter(hf, 'concatfoo', ts))
+            datastore.apply_spans_concat(src_spans, foo_r, foo_r.get_writer(hf, 'concatfoo', ts))
 
             expected = ['aaaaaaaaaaaabbbbbbbb', 'cccccccccccc', 'dddddddd',
                         'eeeeffffffffff', 'ggggghhhhh','iiiiiiii']
@@ -680,7 +680,7 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
             persistence.NumericWriter(datastore, hf, 'foo', ts, 'int32').write(values)
 
             reader = persistence.NumericReader(datastore, hf['foo'])
-            writer = reader.getwriter(hf, 'foo', ts, 'overwrite')
+            writer = reader.get_writer(hf, 'foo', ts, 'overwrite')
             writer.write(values * 2)
             reader = persistence.NumericReader(datastore, hf['foo'])
             print(reader[:])
@@ -865,7 +865,7 @@ class TestSorting(unittest.TestCase):
                 persistence.IndexedStringWriter(datastore, hf, 'vals', ts).write(sv)
 
                 vals = persistence.IndexedStringReader(datastore, hf['vals'])
-                wvals = vals.getwriter(hf, 'sorted_vals', ts)
+                wvals = vals.get_writer(hf, 'sorted_vals', ts)
                 vals.sort(np.asarray(si, dtype=np.uint32), wvals)
                 actual = persistence.IndexedStringReader(datastore, hf['sorted_vals'])[:]
                 expected = [sv[i] for i in si]

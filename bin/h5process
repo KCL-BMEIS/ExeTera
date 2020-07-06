@@ -9,8 +9,8 @@ from covidspecific import data_schemas, parsing_schemas, postprocess
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--source', help='the dataset to load')
-    parser.add_argument('-d', '--destination', help='the dataset to write results to')
+    parser.add_argument('-i', '--input', help='the dataset to load')
+    parser.add_argument('-o', '--output', help='the dataset to write results to')
     parser.add_argument('--sort', default=False, action='store_true')
     parser.add_argument('--process', default=False, action='store_true')
     parser.add_argument('--all', default=False, action='store_true')
@@ -32,7 +32,7 @@ if __name__ == '__main__':
         elif args.all is True:
             flags = 'all'
 
-    with h5py.File(args.source, 'r') as ds:
-        with h5py.File(args.destination, 'w') as ts:
+    with h5py.File(args.input, 'r') as ds:
+        with h5py.File(args.output, 'w') as ts:
             postprocess.postprocess(ds, ts, data_schema, parsing_schema, timestamp,
                                     flags=flags)

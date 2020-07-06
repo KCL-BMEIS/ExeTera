@@ -495,7 +495,7 @@ class IndexedStringReader(Reader):
     def __len__(self):
         return len(self.field['index']) - 1
 
-    def getwriter(self, dest_group, dest_name, timestamp, write_mode='write'):
+    def get_writer(self, dest_group, dest_name, timestamp, write_mode='write'):
         return IndexedStringWriter(self.datastore, dest_group, dest_name,
                                    timestamp, write_mode)
 
@@ -529,7 +529,7 @@ class NumericReader(Reader):
     def __len__(self):
         return len(self.field['values'])
 
-    def getwriter(self, dest_group, dest_name, timestamp, write_mode='write'):
+    def get_writer(self, dest_group, dest_name, timestamp, write_mode='write'):
         return NumericWriter(self.datastore, dest_group, dest_name, timestamp,
                              self.field.attrs['fieldtype'].split(',')[1], write_mode)
 
@@ -557,7 +557,7 @@ class CategoricalReader(Reader):
     def __len__(self):
         return len(self.field['values'])
 
-    def getwriter(self, dest_group, dest_name, timestamp, write_mode='write'):
+    def get_writer(self, dest_group, dest_name, timestamp, write_mode='write'):
         return CategoricalWriter(self.datastore, dest_group, dest_name, timestamp,
                                  {v: k for k, v in enumerate(self.field['keys'])}, write_mode)
 
@@ -584,7 +584,7 @@ class FixedStringReader(Reader):
     def __len__(self):
         return len(self.field['values'])
 
-    def getwriter(self, dest_group, dest_name, timestamp, write_mode='write'):
+    def get_writer(self, dest_group, dest_name, timestamp, write_mode='write'):
         return FixedStringWriter(self.datastore, dest_group, dest_name, timestamp,
                                  self.field.attrs['fieldtype'].split(',')[1], write_mode)
 
@@ -611,7 +611,7 @@ class TimestampReader(Reader):
     def __len__(self):
         return len(self.field['values'])
 
-    def getwriter(self, dest_group, dest_name, timestamp, write_mode='write'):
+    def get_writer(self, dest_group, dest_name, timestamp, write_mode='write'):
         return TimestampWriter(self.datastore, dest_group, dest_name, timestamp,
                                write_mode)
 
@@ -1139,7 +1139,7 @@ class DataStore:
         for k in src_group.keys():
             t1 = time.time()
             r = self.get_reader(src_group[k])
-            w = r.getwriter(dest_group, k, timestamp, write_mode=write_mode)
+            w = r.get_writer(dest_group, k, timestamp, write_mode=write_mode)
             self.apply_sort(sorted_index, r, w)
             del r
             del w

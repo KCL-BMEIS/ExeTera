@@ -2,17 +2,69 @@ The KCL covid19 joinzoe data preparation pipeline.
 
 # Cleaning scripts
 
-Current version: v0.1.9
+Current version: v0.2.1
 
 ---
-## `pipeline.py`
+# Usage
+The Zoe covid data preparation pipeline has two modes.
+
+The first, and recommended, is to import CSV data into a HDF5 file, perform standard post import
+processing on it, and then use the API to carry out further analysis.
+
+The second is a legacy version of the pipeline that runs a cleaning script directly on the csv file
+and outputs a modified csv file. This is provided for existing cleaning infrastructure but will not
+be updated to match the hdf5 functionality.
+ 
+## HDF5
+The HDF5 analytics tools allow you to import data from CSV sources into HDF5, a columnar data
+format more suited to performing analytics. This is done in two stages:
+1. Import the data using `h5import`
+2. Process the data using `h5process` to create a set of useful additional data from the base data
+
+### Why two stages?
+Importing from CSV is a lengthy process that you may only want to do once. Splitting the work
+between importing and processing means that the import can be done only once, and the imported file
+used as a source for processing even if the processing functionality significantly changes.
+
+### `h5import`
+```
+h5import -te <territories> -p <patient_csv> -a <assessment_csv> -t <test_csv> -o <output_hdf5> -d <data_schema> -ts <timestamp>
+```
+
+#### Arguments
+ * `-te/--territories`: If set, this only imports the listed territories. If left unset, all
+   territories are imported
+ * `-p/--patient_data`: The path and name of the patient data file
+ * `-a/--assessment_data`: The path and name of the assessment data csv file to be imported
+ * `-t/--test_data`: The path and name of the test data csv file to be imported
+ * `-o/--output_hdf5`: The path and name to where the resulting hdf5 dataset should be written
+ * `-d/--data_schema`: The optional data schema to be used during import (default of 1)
+ * `-ts/--timestamp`: An override for the timestamp to be written
+   (defaults to `datetime.now(timezone.utc)`)
+
+Expect this script to take about an hour or so to execute.
+
+### `h5process`
+```angular2html
+h5process -s <source_hdf5> -o <output_hdf5>
+```
+#### Arguments
+ * `-i/--input`: The path and name of the import hdf5 file
+ * `-o/--output`: The path and name of the processed hdf5 file
+
+## How do I work on the resulting dataset?
+See the wiki for detailed examples of how to interact with the hdf5 datastore.
+
+---
+## Legacy csv
+## `csvclean`
 
 ### Running the pipeline
 ```
-python pipeline.py -t <territory> -p <input patient csv> -a <input assessor csv> -po <output patient csv -ao <output assessor csv>
+csvclean -t <territory> -p <input patient csv> -a <input assessor csv> -po <output patient csv -ao <output assessor csv>
 ```
 
-#### options
+#### Arguments
  * `-t` / `--territory`: the territory to filter the dataset on (runs on all territories if not set)
  * `-p` / `--patient_data`: the location and name of the patient data csv file
  * `-a` / `--assessment_data`: the location and name of the assessment data csv file
@@ -41,12 +93,11 @@ Use the function `pipeline()` from `pipeline.py`.
 
 Proper documentation and packaging to follow
 
----
-## `split.py`
+## `csvsplit`
 
 ### Running the split script
 ```
-python split.py -t <territory> -p <input patient csv> -a <input assessor csv> -b <bucket size>
+csvsplit -t <territory> -p <input patient csv> -a <input assessor csv> -b <bucket size>
 ```
 
 The output of the split script is a series of patient and assessment files with the following structure:
@@ -72,6 +123,19 @@ python split.py --version
 
 ---
 ## Changes
+
+### v0.2.0 -> v0.2.1
+* Refactor: Created the `DataStore` class and moved `processor` api methods onto it as member
+  functions
+* Refactor: Simplified the creation of Writers. This can now be done through `get_writer` on
+  a `DataStore` instance
+* Fix: Writes to a hdf5 store can no longer be interrupted by interrupts, resulting in more
+  stable hdf5 files
+* Fix: Fixed critical bug in process method that resulted in exceptions when running on fields
+  with a length that isn't an exact multiple of the chunksize
+
+### v0.1.9 -> v0.2.0
+* Added hdf5 import and process functionality
 
 ### v0.1.8 -> v0.1.9
 * Feature: provision of the `split.py` script to split the dataset up into subsets of patients
