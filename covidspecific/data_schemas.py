@@ -95,6 +95,7 @@ class DataSchema:
         'alcohol_change': 'categoricaltype',
         'already_had_covid': 'categoricaltype',
         'always_used_shortage': 'categoricaltype',
+        'blood_group': 'categoricaltype',
         'bmi': 'float32type',
         'cancer_clinical_trial_site': 'indexedstringtype',
         'cancer_type': 'indexedstringtype',
@@ -168,6 +169,7 @@ class DataSchema:
         'is_in_us_american_cancer_society_cancer_prevention_study_3': 'categoricaltype',
         'is_in_us_aspree_xt': 'categoricaltype',
         'is_in_us_bwhs': 'categoricaltype',
+        'is_in_us_c19_human_genetics': 'categoricaltype',
         'is_in_us_california_teachers': 'categoricaltype',
         'is_in_us_chasing_covid': 'categoricaltype',
         'is_in_us_colocare': 'categoricaltype',
@@ -362,8 +364,13 @@ class DataSchema:
         'date_taken_between_end': 'datetype',
         'date_taken_between_start': 'datetype',
         'date_taken_specific': 'datetype',
+        'deleted': 'categoricaltype',
+        'invited_to_test': 'categoricaltype',
+        'location': 'categoricaltype',
+        'location_other': 'indexedstringtype',
         'mechanism': 'indexedstringtype',
-        'result': 'categoricaltype'
+        'result': 'categoricaltype',
+        'trained_worker': 'categoricaltype',
     }
 
     na_value_from = ''
@@ -382,6 +389,7 @@ class DataSchema:
         ('alcohol_change', leaky_boolean_delta + ['no_alcohol'], None, np.uint8, 1, None),
         ('already_had_covid', leaky_boolean_to, None, np.uint8, 1, None),
         ('always_used_shortage', ['', 'all_needed', 'reused'], None, np.uint8, 1, None),
+        ('blood_group', ['', 'a', 'b', 'ab', 'o', 'unsure', 'pfnts'], None, np.uint8, 1, None),
         ('classic_symptoms', leaky_boolean_to, None, np.uint8, 1, None),
         ('contact_health_worker', leaky_boolean_to, None, np.uint8, 1, None),
         ('does_chemotherapy', leaky_boolean_to, None, np.uint8, 1, None),
@@ -442,6 +450,7 @@ class DataSchema:
         ('is_in_us_american_cancer_society_cancer_prevention_study_3', leaky_boolean_to, None, np.uint8, 1, None),
         ('is_in_us_aspree_xt', leaky_boolean_to, None, np.uint8, 1, None),
         ('is_in_us_bwhs', leaky_boolean_to, None, np.uint8, 1, None),
+        ('is_in_us_c19_human_genetics', leaky_boolean_to, None, np.uint8, 1, None),
         ('is_in_us_california_teachers', leaky_boolean_to, None, np.uint8, 1, None),
         ('is_in_us_chasing_covid', leaky_boolean_to, None, np.uint8, 1, None),
         ('is_in_us_colocare', leaky_boolean_to, None, np.uint8, 1, None),
@@ -576,7 +585,11 @@ class DataSchema:
         ('worn_face_mask', [na_value_to, 'not_applicable', 'never', 'sometimes', 'most_of_the_time', 'always'], None, np.uint8, 1, None),
     ]
     test_categorical_fields = [
-        ('result', ['waiting', 'failed', 'negative', 'positive'], None, np.uint8, 1, None),
+        ('deleted', ['', 'False', 'True'], None, np.uint8, 1, None),
+        ('invited_to_test', ['', 'False', 'True'], None, np.uint8, 1, None),
+        ('location', ['', 'home', 'drive_through_rtc', 'hospital', 'gp', 'chemist', 'work', 'local_health_dept', 'drop_in_test_centre', 'other'], None, np.uint8, 1, None),
+        ('result', ['', 'waiting', 'failed', 'negative', 'positive'], None, np.uint8, 1, None),
+        ('trained_worker', ['', 'trained', 'untrained', 'unsure'], None, np.uint8, 1, None),
     ]
 
     assessment_field_entries = dict()

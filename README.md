@@ -2,7 +2,7 @@ The KCL covid19 joinzoe data preparation pipeline.
 
 # Cleaning scripts
 
-Current version: v0.2.2
+Current version: v0.2.3
 
 ---
 # Usage
@@ -123,6 +123,9 @@ python split.py --version
 
 ---
 ## Changes
+
+### v0.2.2 -> v0.2.3
+* Data schema updated for 1.5.1
 
 ### v0.2.1 -> v0.2.2
 * Fix: Split functionality had not been moved to bin/csvsplit as documented
