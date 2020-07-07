@@ -15,11 +15,13 @@ from core import persistence
 
 
 class FieldDesc:
-    def __init__(self, field, strings_to_values, values_to_strings, to_datatype):
+    def __init__(self, field, strings_to_values, values_to_strings, to_datatype,
+                 out_of_range_label):
         self.field = field
         self.to_datatype = to_datatype
         self.strings_to_values = strings_to_values
         self.values_to_strings = values_to_strings
+        self.out_of_range_label = out_of_range_label
 
     def __str__(self):
         output = 'FieldDesc(field={}, strings_to_values={}, values_to_strings={})'
@@ -74,6 +76,9 @@ class DataSchema:
         'unittype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, ts, 1),
         'categoricaltype':
             lambda g, cs, n, ts, stv: persistence.CategoricalWriter(g, cs, n, ts, stv),
+        'leakycategoricaltype':
+            lambda g, cs, n, ts, stv, oor: persistence.LeakyCategoricalImporter(g, cs, n, ts,
+                                                                                stv, oor),
         'float32type': lambda g, cs, n, ts: persistence.NumericImporter(
             g, cs, n, ts, 'float32', persistence.try_str_to_float),
         'uint16type': lambda g, cs, n, ts: persistence.NumericImporter(
@@ -336,7 +341,7 @@ class DataSchema:
         'temperature_unit': 'unittype',
         'tested_covid_positive': 'categoricaltype',
         'treated_patients_with_covid': 'categoricaltype',
-        'treatment': 'indexedstringtype',
+        'treatment': 'leakycategoricaltype',
         'typical_hayfever': 'categoricaltype',
         'unusual_muscle_pains': 'categoricaltype',
         'worn_face_mask': 'categoricaltype'
@@ -580,6 +585,7 @@ class DataSchema:
         ('tested_covid_positive', [na_value_to, 'waiting', 'no', 'yes'], None, np.uint8, 1, None),
         ('tested_covid_positive_clean', [na_value_to, 'waiting', 'no', 'yes'], None, np.uint8, 1, None),
         ('treated_patients_with_covid', [na_value_to, 'no', 'yes_suspected', 'yes_documented_suspected', 'yes_documented'], None, np.uint8, 1, None),
+        ('treatment', [na_value_to, 'none', 'oxygen', 'nonInvasiveVentilation', 'invasiveVentilation'], None, np.uint8, 1, None, "freetext"),
         ('typical_hayfever', leaky_boolean_to, None, np.uint8, 1, None),
         ('unusual_muscle_pains', leaky_boolean_to, None, np.uint8, 1, None),
         ('worn_face_mask', [na_value_to, 'not_applicable', 'never', 'sometimes', 'most_of_the_time', 'always'], None, np.uint8, 1, None),
@@ -594,8 +600,9 @@ class DataSchema:
 
     assessment_field_entries = dict()
     for cf in assessment_categorical_fields:
-        entry = FieldEntry(FieldDesc(cf[0], _build_map(cf[1]) if cf[2] is None else cf[2], cf[1], cf[3]),
-                           cf[4], cf[5])
+        desc = FieldDesc(cf[0], _build_map(cf[1]) if cf[2] is None else cf[2], cf[1], cf[3],
+                         cf[6] if len(cf) == 7 else None)
+        entry = FieldEntry(desc, cf[4], cf[5])
         entry_list = \
             list() if assessment_field_entries.get(cf[0]) is None else assessment_field_entries[cf[0]]
         entry_list.append(entry)
@@ -603,8 +610,9 @@ class DataSchema:
 
     patient_field_entries = dict()
     for cf in patient_categorical_fields:
-        entry = FieldEntry(FieldDesc(cf[0], _build_map(cf[1]) if cf[2] is None else cf[2], cf[1], cf[3]),
-                           cf[4], cf[5])
+        desc = FieldDesc(cf[0], _build_map(cf[1]) if cf[2] is None else cf[2], cf[1], cf[3],
+                         cf[6] if len(cf) == 7 else None)
+        entry = FieldEntry(desc, cf[4], cf[5])
         entry_list = \
             list() if patient_field_entries.get(cf[0]) is None else patient_field_entries[cf[0]]
         entry_list.append(entry)
@@ -613,8 +621,9 @@ class DataSchema:
 
     test_field_entries = dict()
     for cf in test_categorical_fields:
-        entry = FieldEntry(FieldDesc(cf[0], _build_map(cf[1]) if cf[2] is None else cf[2], cf[1], cf[3]),
-                           cf[4], cf[5])
+        desc = FieldDesc(cf[0], _build_map(cf[1]) if cf[2] is None else cf[2], cf[1], cf[3],
+                         cf[6] if len(cf) == 7 else None)
+        entry = FieldEntry(desc, cf[4], cf[5])
         entry_list = \
             list() if test_field_entries.get(cf[0]) is None else test_field_entries[cf[0]]
         entry_list.append(entry)

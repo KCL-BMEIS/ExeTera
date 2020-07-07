@@ -423,6 +423,29 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'r') as hf:
             print(hf['foo'].keys())
             print(hf['foo']['values'])
+            print(hf['foo']['key_values'])
+            print(hf['foo']['key_names'])
+
+
+    # def test_categorical_string_writer_with_string_data(self):
+    #     datastore = persistence.DataStore(10)
+    #     ts = str(datetime.now(timezone.utc))
+    #     bio = BytesIO()
+    #     with h5py.File(bio, 'w') as hf:
+    #         values = ['', 'True', 'False', 'False', '', '', 'True', 'False', 'True', '']
+    #         # ds = hf.create_dataset('foo', (10,), dtype=h5py.string_dtype(encoding='utf-8'))
+    #         # ds[:] = values
+    #         # print(ds)
+    #         foo = persistence.CategoricalWriter(datastore, hf, 'foo', ts,
+    #                                               {'': 0, 'False': 1, 'True': 2})
+    #         foo.write(values)
+    #         print('fieldtype:', hf['foo'].attrs['fieldtype'])
+    #         print('timestamp:', hf['foo'].attrs['timestamp'])
+    #         print('completed:', hf['foo'].attrs['completed'])
+    #
+    #     with h5py.File(bio, 'r') as hf:
+    #         print(hf['foo'].keys())
+    #         print(hf['foo']['values'])
 
 
     def test_categorical_string_reader(self):
@@ -440,6 +463,7 @@ class TestPersistence(unittest.TestCase):
 
         with h5py.File(bio, 'r') as hf:
             foo_int = persistence.CategoricalReader(datastore, hf['foo'])
+            print(foo_int.keys)
             for i in range(len(foo_int)):
                 self.assertEqual(value_map[values[i]], foo_int[i])
             for expected, actual in zip([value_map[v] for v in values], foo_int):

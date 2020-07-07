@@ -548,7 +548,10 @@ class CategoricalReader(Reader):
             error = "'fieldtype of '{} should be 'categorical' but is {}"
             raise ValueError(error.format(field, fieldtype))
         self.chunksize = field.attrs['chunksize']
-        self.keys = self.field['keys'][()]
+        kv = self.field['key_values'][:]
+        kn = self.field['key_names'][:]
+        self.keys = dict(zip(kv, kn))
+        # self.keys = self.field['keys'][()]
         self.datastore = datastore
 
     def __getitem__(self, item):
@@ -558,8 +561,9 @@ class CategoricalReader(Reader):
         return len(self.field['values'])
 
     def get_writer(self, dest_group, dest_name, timestamp, write_mode='write'):
-        return CategoricalWriter(self.datastore, dest_group, dest_name, timestamp,
-                                 {v: k for k, v in enumerate(self.field['keys'])}, write_mode)
+        keys = {v: k for k, v in zip(self.field['key_values'][:], self.field['key_names'][:])}
+        return CategoricalWriter(self.datastore, dest_group, dest_name, timestamp, keys,
+                                 write_mode)
 
     def dtype(self):
         return self.field['values'].dtype
@@ -728,6 +732,47 @@ class IndexedStringWriter(Writer):
 
 # TODO: should produce a warning for unmappable strings and a corresponding filter, rather
 # than raising an exception; or at least have a mode where this is possible
+class LeakyCategoricalImporter:
+    def __init__(self, datastore, group, name, timestamp, categories, out_of_range,
+                 write_mode='write'):
+        self.writer = CategoricalWriter(datastore, group, name,
+                                        timestamp, categories, write_mode)
+        self.other_values = IndexedStringWriter(datastore, group, f"{name}_{out_of_range}",
+                                                timestamp, write_mode)
+        self.field_size = max([len(k) for k in categories.keys()])
+
+    def chunk_factory(self, length):
+        return np.zeros(length, dtype=f'U{self.field_size}')
+
+    def write_part(self, values):
+        results = np.zeros(len(values), dtype='int8')
+        strresults = list([""] * len(values))
+        keys = self.writer.keys
+        anomalous_count = 0
+        for i in range(len(values)):
+            value = keys.get(values[i], -1)
+            if value != -1:
+                results[i] = value
+            else:
+                anomalous_count += 1
+                results[i] = -1
+                strresults[i] = values[i]
+        self.writer.write_part(results)
+        self.other_values.write_part(strresults)
+
+    def flush(self):
+        # add a 'freetext' value to keys
+        self.writer.keys['freetext'] = -1
+        self.writer.flush()
+        self.other_values.flush()
+
+    def write(self, values):
+        self.write_part(values)
+        self.flush()
+
+
+# TODO: should produce a warning for unmappable strings and a corresponding filter, rather
+# than raising an exception; or at least have a mode where this is possible
 class CategoricalImporter:
     def __init__(self, datastore, group, name, timestamp, categories,
                  write_mode='write'):
@@ -739,7 +784,7 @@ class CategoricalImporter:
         return np.zeros(length, dtype=f'U{self.field_size}')
 
     def write_part(self, values):
-        results = np.zeros(len(values), dtype='uint8')
+        results = np.zeros(len(values), dtype='int8')
         keys = self.writer.keys
         for i in range(len(values)):
             results[i] = keys[values[i]]
@@ -767,17 +812,22 @@ class CategoricalWriter(Writer):
 
 
     def chunk_factory(self, length):
-        return np.zeros(length, dtype='uint8')
+        return np.zeros(length, dtype='int8')
 
     def write_part(self, values):
         DataWriter.write(self.field, 'values', values, len(values))
 
     def flush(self):
-        key_indices = [None] * len(self.keys)
-        for k, v in self.keys.items():
-            key_indices[v] = k
-        DataWriter.write(self.field, 'keys', key_indices, len(self.keys),
-                          dtype=h5py.string_dtype())
+        key_strs = list()
+        key_values = np.zeros(len(self.keys), dtype='int8')
+        items = self.keys.items()
+        for i, kv in enumerate(items):
+            k, v = kv
+            key_strs.append(k)
+            key_values[i] = v
+        DataWriter.write(self.field, 'key_values', key_values, len(key_values))
+        DataWriter.write(self.field, 'key_names', key_strs, len(key_strs),
+                         dtype=h5py.string_dtype())
         # self.field.attrs['fieldtype'] = self.fieldtype
         # self.field.attrs['timestamp'] = self.timestamp
         # self.field.attrs['chunksize'] = self.chunksize

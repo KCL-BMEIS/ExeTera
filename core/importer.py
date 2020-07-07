@@ -63,18 +63,27 @@ class DatasetImporter:
             new_field_list = list()
             field_chunk_list = list()
             categorical_map_list = list()
+            # TODO: categorical writers should use the datatype specified in the schema
             for i_n in range(len(fields_to_use)):
                 field_name = fields_to_use[i_n]
-                if writers[field_name] != 'categoricaltype':
-                    writer = writer_factory[writers[field_name]](
-                        datastore, group, field_name, timestamp)
-                    categorical_map_list.append(None)
-                else:
+                if writers[field_name] == 'categoricaltype':
                     str_to_vals = field_entries[field_name].strings_to_values
                     writer =\
                         writer_factory[writers[field_name]](
                             datastore, group, field_name, timestamp, str_to_vals)
                     categorical_map_list.append(str_to_vals)
+                elif writers[field_name] == 'leakycategoricaltype':
+                    str_to_vals = field_entries[field_name].strings_to_values
+                    out_of_range = field_entries[field_name].out_of_range_label
+                    writer =\
+                        writer_factory[writers[field_name]](
+                            datastore, group, field_name, timestamp, str_to_vals, out_of_range)
+                    # categorical_map_list.append(str_to_vals)
+                    categorical_map_list.append(None)
+                else:
+                    writer = writer_factory[writers[field_name]](
+                        datastore, group, field_name, timestamp)
+                    categorical_map_list.append(None)
                 new_fields[field_name] = writer
                 new_field_list.append(writer)
                 field_chunk_list.append(writer.chunk_factory(chunk_size))
