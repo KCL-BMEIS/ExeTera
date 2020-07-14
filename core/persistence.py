@@ -35,26 +35,47 @@ INVALID_INDEX = 1 << 62
 # * assessments
 # * tests
 
-# groups
-# * datetime
-#   * year
-#   * month
-#   * day
-#   * hour
-#   * minute
-#   * second
-#   * microsecond
-
-# field
-# * key
-#   * applied sort
-#   * applied filter
-# * category_names
-# * values
+# TODO:
+"""
+ * mapping and joining
+   * by function
+     * get_mapping (fwd / bwd)
+     * first_in_second -> filter
+     * second_in_first -> filter
+     * join(left, right, inner, outer)
+     * aggregate_and_join(left, right, inner, outer, left_fn, right_fn
+   * use of pandas
+   * use of dicts
+"""
 
 chunk_sizes = {
     'patient': (DEFAULT_CHUNKSIZE,), 'assessment': (DEFAULT_CHUNKSIZE,), 'test': (DEFAULT_CHUNKSIZE,)
 }
+
+
+def _check_is_appropriate_writer_if_set(param_name, reader, writer):
+    msg = "{} must be of type {} or None but is {}"
+    if writer is not None:
+        if isinstance(reader, IndexedStringReader):
+            if not isinstance(writer, IndexedStringWriter):
+                raise ValueError(msg.format(param_name, IndexedStringReader, writer))
+        elif isinstance(reader, FixedStringReader):
+            if not isinstance(writer, FixedStringWriter):
+                raise ValueError(msg.format(param_name, FixedStringReader, writer))
+        elif isinstance(reader, NumericReader):
+            if not isinstance(writer, NumericWriter):
+                raise ValueError(msg.format(param_name, NumericReader, writer))
+        elif isinstance(reader, CategoricalReader):
+            if not isinstance(writer, CategoricalWriter):
+                raise ValueError(msg.format(param_name, CategoricalReader, writer))
+        elif isinstance(reader, TimestampReader):
+            if not isinstance(writer, TimestampWriter):
+                raise ValueError(msg.format(param_name, TimestampReader, writer))
+
+
+def _check_is_reader_or_ndarray(name, field):
+    if not isinstance(field, (Reader, np.ndarray)):
+        raise ValueError(f"'name' must be either a Reader or an ndarray but is {type(field)}")
 
 
 class DataWriter:
@@ -63,8 +84,12 @@ class DataWriter:
     def _create_group(parent_group, name, attrs):
         group = parent_group.create_group(name)
         for k, v in attrs:
-            group.attrs[k] = v
-            group.attrs['completed'] = False
+            try:
+                group.attrs[k] = v
+            except Exception as e:
+                print(f"Exception {e} caught while assigning attribute {k} value {v}")
+                raise
+        group.attrs['completed'] = False
 
     @staticmethod
     def create_group(parent_group, name, attrs):
@@ -165,6 +190,39 @@ def try_str_to_float(value, invalid=0):
         return True, v
     except ValueError:
         return False, invalid
+
+
+def _apply_filter_to_array(values, filter):
+    return values[filter]
+
+
+@njit
+def _apply_filter_to_index_values(index_filter, indices, values):
+    # pass 1 - determine the destination lengths
+    cur_ = indices[:-1]
+    next_ = indices[1:]
+    count = 0
+    total = 0
+    for i in range(len(index_filter)):
+        if index_filter[i] == True:
+            count += 1
+            total += next_[i] - cur_[i]
+    dest_indices = np.zeros(count+1, indices.dtype)
+    dest_values = np.zeros(total, values.dtype)
+    dest_indices[0] = 0
+    count = 1
+    total = 0
+    for i in range(len(index_filter)):
+        if index_filter[i] == True:
+            n = next_[i]
+            c = cur_[i]
+            delta = n - c
+            dest_values[total:total + delta] = values[c:n]
+            total += delta
+            dest_indices[count] = total
+            count += 1
+    return dest_indices, dest_values
+
 
 
 def _apply_sort_to_array(index, values):
@@ -455,6 +513,73 @@ def filtered_iterator(values, filter, default=np.nan):
         else:
             yield values[i]
 
+@njit
+def _map_valid_indices(src, map, default):
+
+    filter = map < INVALID_INDEX
+    #dest = np.where(filter, src[map], default)
+    dest = np.zeros(len(map), dtype=src.dtype)
+    for i_r in range(len(map)):
+        if filter[i_r]:
+            dest[i_r] = src[map[i_r]]
+        else:
+            dest[i_r] = default
+    return dest
+
+
+def _values_from_reader_or_ndarray(name, field):
+    if isinstance(field, Reader):
+        raw_field = field[:]
+    elif isinstance(field, np.ndarray):
+        raw_field = field
+    else:
+        raise ValueError(f"'{name}' must be a Reader or an ndarray but is {type(field)}")
+    return raw_field
+
+
+def filter_duplicate_fields(field):
+
+    filter_ = np.ones(len(field), dtype=np.bool)
+    _filter_duplicate_fields(field, filter_)
+    return filter
+
+@njit
+def _filter_duplicate_fields(field, filter):
+    seen_ids = dict()
+    for i in range(len(field)):
+        f = field[i]
+        if f in seen_ids:
+            filter[i] = False
+        else:
+            seen_ids[f] = 1
+            filter[i] = True
+    return filter
+
+def filter_non_orphaned_foreign_keys(primary_key, foreign_key):
+    _check_is_reader_or_ndarray('primary_key', primary_key)
+    _check_is_reader_or_ndarray('foreign_key', foreign_key)
+    if isinstance(primary_key, Reader):
+        pk = primary_key[:]
+    else:
+        pk = primary_key
+    if isinstance(foreign_key, Reader):
+        fk = foreign_key[:]
+    else:
+        fk = foreign_key
+
+    result = np.zeros(len(fk), dtype=np.bool)
+    return _filter_non_orphaned_foreign_keys(pk, fk, result)
+
+@njit
+def _filter_non_orphaned_foreign_keys(primary_key, foreign_key, results):
+    pkids = dict()
+    for pk in primary_key:
+        pkids[pk] = 0
+
+    for i_f in range(len(foreign_key)):
+        results[i_f] = foreign_key[i_f] in pkids
+    return results
+
 
 # Newest
 # ======
@@ -638,15 +763,14 @@ class Writer:
                 dest_name = trash.name + f"/{name.split('/')[-1]}"
                 group.move(field.name, dest_name)
                 self.trash_field = trash[name]
-                field = group.create_group(name)
+                DataWriter.create_group(group, name, attributes)
             else:
                 error = (f"Field '{name}' already exists. Set 'write_mode' to 'overwrite' "
                          "if you want to overwrite the existing contents")
                 raise KeyError(error)
         else:
             DataWriter.create_group(group, name, attributes)
-            field = group[name]
-        self.field = field
+        self.field = group[name]
         self.name = name
 
     def flush(self):
@@ -1215,25 +1339,58 @@ class DataStore:
 
 
     # TODO: index should be able to be either a reader or an ndarray
-    def apply_sort(self, index, reader, writer):
+    def apply_sort(self, index, reader, writer=None):
+        _check_is_appropriate_writer_if_set('writer', reader, writer)
+
         if isinstance(reader, IndexedStringReader):
             src_indices = reader.field['index'][:]
             src_values = reader.field.get('values', np.zeros(0, dtype='S1'))[:]
             indices, values = _apply_sort_to_index_values(index, src_indices, src_values)
-            writer.write_raw(indices, values)
+            if writer:
+                writer.write_raw(indices, values)
+            return indices, values
         elif isinstance(reader, Reader):
             result = _apply_sort_to_array(index, reader[:])
-            writer.write(result)
+            if writer:
+                writer.write(result)
+            return result
         elif isinstance(reader, np.ndarray):
             result = _apply_sort_to_array(index, reader)
-            writer.write(result)
+            if writer:
+                writer.write(result)
+            return result
         else:
             raise ValueError(f"'reader' must be a Reader or an ndarray, but is {type.reader}")
 
 
     # TODO: write filter with new readers / writers rather than deleting this
-    def filter(self, dataset, field, name, predicate, timestamp=datetime.now(timezone.utc)):
-        raise NotImplementedError()
+    def apply_filter(self, filter_to_apply, reader, writer=None):
+        if isinstance(reader, IndexedStringReader):
+            _check_is_appropriate_writer_if_set('writer', reader, writer)
+
+            src_indices = reader.field['index'][:]
+            src_values = reader.field.get('values', np.zeros(0, dtype='S1'))[:]
+            if len(src_indices) != len(filter_to_apply) + 1:
+                raise ValueError(f"'indices' (length {len(indices)}) must be one longer than "
+                                 f"'index_filter' (length {len(index_filter)})")
+
+            indices, values = _apply_filter_to_index_values(filter_to_apply,
+                                                            src_indices, src_values)
+            if writer:
+                writer.write_raw(indices, values)
+            return indices, values
+        elif isinstance(reader, Reader):
+            result = reader[:][filter_to_apply]
+            if writer:
+                writer.write(result)
+            return result
+        elif isinstance(reader, np.ndarray):
+            result = reader[filter_to_apply]
+            if writer:
+                writer.write(result)
+            return result
+        else:
+            raise ValueError(f"'reader' must be a Reader or an ndarray, but is {type.reader}")
 
 
     # TODO: write distinct with new readers / writers rather than deleting this
@@ -1596,8 +1753,10 @@ class DataStore:
         for k, v in output_writers.items():
             output_writers[k].flush()
 
+    def get_index_2(self, left_key, right_key, destination, mode='left'):
+        pass
 
-    def get_index(self, target, foreign_key, destination):
+    def get_index(self, target, foreign_key, destination=None):
         print('  building patient_id index')
         t0 = time.time()
         target_lookup = dict()
@@ -1621,7 +1780,10 @@ class DataStore:
             foreign_key_index[i_k] = index
         print(f'  initial index performed in {time.time() - t0}s')
 
-        destination.write(foreign_key_index)
+        if destination:
+            destination.write(foreign_key_index)
+        else:
+            return foreign_key_index
 
 
     def get_trash_group(self, group):

@@ -9,6 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
 from collections import defaultdict
 import csv
 from datetime import datetime
@@ -333,3 +334,16 @@ def sort_mixed_list(values, check_fn, sort_fn):
         values.append(checked_item)
 
     return values
+
+
+class Timer:
+    def __init__(self, start_msg, new_line=False, end_msg='completed in'):
+        print(start_msg, end=': ' if new_line is False else '\n')
+        self.end_msg = end_msg
+
+    def __enter__(self):
+        self.t0 = time.time()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        print(self.end_msg + f' {time.time() - self.t0} seconds')

@@ -24,6 +24,8 @@ class DatasetImporter:
 
         time0 = time.time()
 
+        seen_ids = set()
+
         # keys = ('id', 'created_at', 'updated_at')
         if space not in hf.keys():
             hf.create_group(space)
@@ -43,6 +45,7 @@ class DatasetImporter:
                         raise ValueError(f"key '{k}' isn't in the available keys ({keys})")
                 fields_to_use = keys
                 index_map = [available_keys.index(k) for k in keys]
+
 
             transforms_by_index = list()
             for i_n, n in enumerate(available_keys):

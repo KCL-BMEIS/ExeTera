@@ -270,7 +270,7 @@ class DataSchema:
         'takes_corticosteroids': 'categoricaltype',
         'takes_immunosuppressants': 'categoricaltype',
         'unwell_month_before': 'categoricaltype',
-        'vs_asked_at': 'datetimetype',
+        'vs_asked_at': 'optionaldatetimetype',
         'vs_garlic': 'categoricaltype',
         'vs_multivitamins': 'categoricaltype',
         'vs_none': 'categoricaltype',

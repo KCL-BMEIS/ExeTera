@@ -823,6 +823,75 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         print(np.sum(c))
 
 
+class TestPersistenceOperations(unittest.TestCase):
+
+    def test_filter_non_orphaned_foreign_keys(self):
+        pks = np.asarray([1, 2, 4, 5, 7, 8])
+        fks = np.asarray([1, 1, 1, 3, 3, 4, 4, 5, 6, 6, 8, 8])
+        results = persistence.filter_non_orphaned_foreign_keys(pks, fks)
+        print(results)
+
+
+    def test_filter(self):
+
+        def filter_framework(name, raw_indices, raw_values, the_filter, expected):
+            dest_indices, dest_values =\
+                persistence._apply_filter_to_index_values(the_filter, raw_indices, raw_values)
+            print(dest_indices)
+            print(dest_values)
+            w = persistence.IndexedStringWriter(datastore, hf, name, ts)
+            w.write_raw(dest_indices, dest_values)
+            r = datastore.get_reader(hf[name])
+            print(r[:])
+
+            self.assertListEqual(r[:], expected)
+
+        datastore = persistence.DataStore(10)
+        values = ['True', 'False', '', '', 'False', '', 'True',
+                  'Stupendous', '', "I really don't know", 'True',
+                  'Ambiguous', '', '', '', 'Things', 'Zombie driver',
+                  'Perspicacious', 'False', 'Fa,lse', '', '', 'True',
+                  '', 'True', 'Troubador', '', 'Calisthenics', 'The',
+                  '', 'Quick', 'Brown', '', '', 'Fox', 'Jumped', '',
+                  'Over', 'The', '', 'Lazy', 'Dog']
+        bio = BytesIO()
+        ts = str(datetime.now(timezone.utc))
+        with h5py.File(bio, 'w') as hf:
+            persistence.IndexedStringWriter(datastore, hf, 'foo', ts).write(values)
+
+            raw_indices = hf['foo']['index'][:]
+            raw_values = hf['foo']['values'][:]
+
+            even_filter = np.zeros(len(values), np.bool)
+            for i in range(len(even_filter)):
+                even_filter[i] = i % 2 == 0
+            expected = values[::2]
+            filter_framework('even_filter', raw_indices, raw_values,
+                             even_filter, expected)
+
+            middle_filter = np.ones(len(values), np.bool)
+            middle_filter[0] = False
+            middle_filter[-1] = False
+            expected = values[1:-1]
+            filter_framework('middle_filter', raw_indices, raw_values,
+                             middle_filter, expected)
+
+            ends_filter = np.logical_not(middle_filter)
+            expected = [values[0]] + [values[-1]]
+            filter_framework('end_filter', raw_indices, raw_values,
+                             ends_filter, expected)
+
+            all_true_filter = np.ones(len(values), np.bool)
+            expected = values
+            filter_framework('all_true_filter', raw_indices, raw_values,
+                             all_true_filter, expected)
+
+            all_false_filter = np.zeros(len(values), np.bool)
+            expected = []
+            filter_framework('all_false_filter', raw_indices, raw_values,
+                             all_false_filter, expected)
+
+
     def test_sort(self):
 
         datastore = persistence.DataStore(10)
@@ -868,6 +937,74 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         # print(np.asarray(vb)[accindex])
         # print(np.asarray(vx)[accindex])
 
+
+class TestJoining(unittest.TestCase):
+
+    def test_join_pk_to_fk(self):
+        ds = persistence.DataStore(10)
+        ts = str(datetime.now(timezone.utc))
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            a = hf.create_group('assessments')
+            p = hf.create_group('patients')
+            ds.get_fixed_string_writer(a, 'id', ts, 2).write(
+                [e.encode() for e in [
+                    'aa', 'ab', 'ac', 'ba', 'bb', 'bc', 'ca', 'cd', 'ea']]
+            )
+            ds.get_fixed_string_writer(a, 'pid', ts, 1).write(
+                [e.encode() for e in [
+                    'a', 'a', 'a', 'b', 'b', 'b', 'c', 'c', 'e']]
+            )
+            ds.get_numeric_writer(a, 'ill', ts, 'int32').write(
+                [1, 2, 3, 4, 5, 6, 7, 8, 9]
+            )
+            ds.get_fixed_string_writer(p, 'id', ts, 1).write(
+                [e.encode() for e in ['a', 'c', 'd', 'e']]
+            )
+            ds.get_numeric_writer(p, 'age', ts, 1).write(
+                [18, 90, 45, 60]
+            )
+            ds.get_index(
+                ds.get_reader(a['pid']),
+                ds.get_reader(p['id']),
+                ds.get_numeric_writer(p, 'pid_to_apid', ts, 'int64'),
+            )
+            print(ds.get_reader(p['pid_to_apid'])[:])
+            ds.get_index(
+                ds.get_reader(p['id']),
+                ds.get_reader(a['pid']),
+                ds.get_numeric_writer(a, 'apid_to_pid', ts, 'int64'),
+            )
+            print('fkey:', ds.get_reader(a['apid_to_pid'])[:])
+
+            # print(ds.get_reader(p['age'])[:][ds.get_reader(a['apid_to_pid'])[:]])
+
+            result = persistence._map_valid_indices(ds.get_reader(p['age'])[:],
+                                                    ds.get_reader(a['apid_to_pid'])[:],
+                                                    -100)
+            print(result)
+            # TODO: appears to be a bug in h5py
+            # print(ds.get_reader(p['age'])[ds.get_reader(a['apid_to_pid'])[:]])
+
+            # aages = ds.get_reader(dest_asmts['age'])[:]
+            # apids = ds.get_reader(src_asmts['patient_id'])[:]
+            # pages = ds.get_reader(src_ptnts['age'])[:]
+            # pids = ds.get_reader(src_ptnts['id'])[:]
+            # t0 = time.time()
+            # from collections import defaultdict
+            # dpages = defaultdict(int)
+            # for i_r in range(len(pids)):
+            #     dpages[pids[i_r]] = pages[i_r]
+            #
+            # not_in = 0
+            # for i_r in range(len(apids)):
+            #     if apids[i_r] in dpages:
+            #         if aages[i_r] != dpages[apids[i_r]]:
+            #             print("bad_mapping:", i_r, apids[i_r], aages[i_r], dpages[apids[i_r]])
+            #     else:
+            #         not_in += 1
+            # print("not_in:", not_in)
+            # print(f"mapping checked in {time.time() - t0}s")
 
 class TestSorting(unittest.TestCase):
 
