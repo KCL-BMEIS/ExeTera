@@ -647,6 +647,7 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         b = np.asarray(['a', 'a', 'b', 'a', 'b', 'a', 'd', 'c', 'a', 'b'])
         print(datastore.distinct(fields=(a, b)))
 
+
     def test_get_spans_single_field(self):
         datastore = persistence.DataStore(10)
         a = np.asarray([1, 2, 2, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 1])
@@ -660,11 +661,13 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         a = np.asarray([0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2])
         print(datastore.get_spans(field=a))
 
+
     def test_apply_spans_count(self):
         spans = np.asarray([0, 1, 3, 4, 7, 8, 12, 14])
         results = np.zeros(len(spans)-1, dtype=np.int64)
         persistence._apply_spans_count(spans, results)
         print(results)
+
 
     def test_apply_spans_first(self):
         spans = np.asarray([0, 1, 3, 4, 7, 8, 12, 14])
@@ -672,6 +675,7 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         results = np.zeros(len(spans)-1, dtype=np.int64)
         persistence._apply_spans_first(spans, values, results)
         print(results)
+
 
     def test_apply_spans_last(self):
         spans = np.asarray([0, 1, 3, 4, 7, 8, 12, 14])
@@ -686,12 +690,22 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         persistence._apply_spans_last(spans, values, results)
         print(results)
 
+
     def test_apply_spans_max(self):
         spans = np.asarray([0, 1, 3, 4, 7, 8, 12])
         values = np.asarray([1, 2, 3, 4, 5, 6, 12, 11, 10, 9, 8, 7])
         results = np.zeros(len(spans)-1, dtype=values.dtype)
         persistence._apply_spans_max(spans, values, results)
-        print(results)
+        self.assertTrue(np.array_equal(results, [1, 3, 4, 12, 11, 10]))
+
+
+    def test_apply_spans_index_of_max(self):
+        spans = np.asarray([0, 1, 3, 4, 7, 8, 12])
+        values = np.asarray([1, 2, 3, 4, 5, 6, 12, 11, 10, 9, 8, 7])
+        results = np.zeros(len(spans)-1, dtype=values.dtype)
+        persistence._apply_spans_index_of_max(spans, values, results)
+        self.assertTrue(np.array_equal(results, [0, 2, 3, 6, 7, 8]))
+
 
     def test_write_to_existing(self):
         datastore = persistence.DataStore(10)
@@ -783,6 +797,7 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
                 print(da.keys())
                 print(da['b'].keys())
 
+
     def test_predicate(self):
         datastore = persistence.DataStore(10)
         values = np.random.randint(low=0, high=1000, size=95, dtype=np.uint32)
@@ -828,7 +843,7 @@ class TestPersistenceOperations(unittest.TestCase):
     def test_filter_non_orphaned_foreign_keys(self):
         pks = np.asarray([1, 2, 4, 5, 7, 8])
         fks = np.asarray([1, 1, 1, 3, 3, 4, 4, 5, 6, 6, 8, 8])
-        results = persistence.filter_non_orphaned_foreign_keys(pks, fks)
+        results = persistence.foreign_key_is_in_primary_key(pks, fks)
         print(results)
 
 
@@ -890,6 +905,67 @@ class TestPersistenceOperations(unittest.TestCase):
             expected = []
             filter_framework('all_false_filter', raw_indices, raw_values,
                              all_false_filter, expected)
+
+    def test_apply_indices(self):
+
+        def index_framework(name, raw_indices, raw_values, the_indices, expected):
+            dest_indices, dest_values = \
+                persistence._apply_indices_to_index_values(the_indices, raw_indices, raw_values)
+            print(dest_indices)
+            print(dest_values)
+            w = persistence.IndexedStringWriter(datastore, hf, name, ts)
+            w.write_raw(dest_indices, dest_values)
+            r = datastore.get_reader(hf[name])
+            print(r[:])
+
+            self.assertListEqual(r[:], expected)
+
+        datastore = persistence.DataStore(10)
+        values = ['True', 'False', '', '', 'False', '', 'True',
+                  'Stupendous', '', "I really don't know", 'True',
+                  'Ambiguous', '', '', '', 'Things', 'Zombie driver',
+                  'Perspicacious', 'False', 'Fa,lse', '', '', 'True',
+                  '', 'True', 'Troubador', '', 'Calisthenics', 'The',
+                  '', 'Quick', 'Brown', '', '', 'Fox', 'Jumped', '',
+                  'Over', 'The', '', 'Lazy', 'Dog']
+        bio = BytesIO()
+        ts = str(datetime.now(timezone.utc))
+        with h5py.File(bio, 'w') as hf:
+            persistence.IndexedStringWriter(datastore, hf, 'foo', ts).write(values)
+
+            raw_indices = hf['foo']['index'][:]
+            raw_values = hf['foo']['values'][:]
+
+            even_indices = np.arange(0, len(values), 2)
+            expected = values[::2]
+            index_framework('even_filter', raw_indices, raw_values,
+                            even_indices, expected)
+
+            # middle_filter = np.ones(len(values), np.bool)
+            # middle_filter[0] = False
+            # middle_filter[-1] = False
+            middle_indices = np.arange(1, len(values)-1)
+            expected = values[1:-1]
+            index_framework('middle_filter', raw_indices, raw_values,
+                            middle_indices, expected)
+
+            # ends_filter = np.logical_not(middle_indices)
+            ends_indices = np.asarray([0, len(values)-1])
+            expected = [values[0]] + [values[-1]]
+            index_framework('end_filter', raw_indices, raw_values,
+                            ends_indices, expected)
+
+            # all_true_filter = np.ones(len(values), np.bool)
+            all_indices = np.arange(len(values))
+            expected = values
+            index_framework('all_true_filter', raw_indices, raw_values,
+                            all_indices, expected)
+
+            # all_false_filter = np.zeros(len(values), np.bool)
+            no_indices = np.asarray([], dtype=np.int64)
+            expected = []
+            index_framework('all_false_filter', raw_indices, raw_values,
+                            no_indices, expected)
 
 
     def test_sort(self):

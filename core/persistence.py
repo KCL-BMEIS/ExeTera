@@ -18,7 +18,9 @@ import time
 
 import h5py
 import numpy as np
+import numba
 from numba import jit, njit
+import pandas as pd
 
 DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62
@@ -76,6 +78,12 @@ def _check_is_appropriate_writer_if_set(param_name, reader, writer):
 def _check_is_reader_or_ndarray(name, field):
     if not isinstance(field, (Reader, np.ndarray)):
         raise ValueError(f"'name' must be either a Reader or an ndarray but is {type(field)}")
+
+
+def _check_is_reader_or_ndarray_if_set(name, field):
+    if not isinstance(field, (Reader, np.ndarray)):
+        raise ValueError("if set, 'name' must be either a Reader or an ndarray "
+                         f"but is {type(field)}")
 
 
 class DataWriter:
@@ -224,6 +232,31 @@ def _apply_filter_to_index_values(index_filter, indices, values):
     return dest_indices, dest_values
 
 
+#@njit
+def _apply_indices_to_index_values(indices_to_apply, indices, values):
+    # pass 1 - determine the destination lengths
+    cur_ = indices[:-1]
+    next_ = indices[1:]
+    count = 0
+    total = 0
+    for i in indices_to_apply:
+        count += 1
+        total += next_[i] - cur_[i]
+    dest_indices = np.zeros(count+1, indices.dtype)
+    dest_values = np.zeros(total, values.dtype)
+    dest_indices[0] = 0
+    count = 1
+    total = 0
+    for i in indices_to_apply:
+        n = next_[i]
+        c = cur_[i]
+        delta = n - c
+        dest_values[total:total + delta] = values[c:n]
+        total += delta
+        dest_indices[count] = total
+        count += 1
+    return dest_indices, dest_values
+
 
 def _apply_sort_to_array(index, values):
     return values[index]
@@ -320,11 +353,6 @@ def _not_equals(a, b, c):
 
 
 def _get_spans(field, fields):
-    if field is None and fields is None:
-        raise ValueError("One of 'field' and 'fields' must be set")
-    if field is not None and fields is not None:
-        raise ValueError("Only one of 'field' and 'fields' may be set")
-
     if field is not None:
         # return _get_spans_for_field(field)
         return _get_spans_for_field(field)
@@ -359,9 +387,35 @@ def _get_spans_for_2_fields(field0, field1):
 
 
 @njit
+def _apply_spans_index_of_max(spans, src_array, dest_array):
+    for i in range(len(spans)-1):
+        cur = spans[i]
+        next = spans[i+1]
+
+        if next - cur == 1:
+            dest_array[i] = cur
+        else:
+            dest_array[i] = cur + src_array[cur:next].argmax()
+
+
+@njit
+def _apply_spans_index_of_min(spans, src_array, dest_array, filter_array):
+    for i in range(len(spans)-1):
+        cur = spans[i]
+        next = spans[i+1]
+        if next - cur == 0:
+            filter_array[i] = False
+        elif next - cur == 1:
+            dest_array[i] = cur
+        else:
+            dest_array[i] = cur = src_array[cur:next].argmin()
+
+
+@njit
 def _apply_spans_count(spans, dest_array):
     for i in range(len(spans)-1):
         dest_array[i] = np.int64(spans[i+1] - spans[i])
+
 
 @njit
 def _apply_spans_first(spans, src_array, dest_array):
@@ -541,9 +595,8 @@ def filter_duplicate_fields(field):
 
     filter_ = np.ones(len(field), dtype=np.bool)
     _filter_duplicate_fields(field, filter_)
-    return filter
+    return filter_
 
-@njit
 def _filter_duplicate_fields(field, filter):
     seen_ids = dict()
     for i in range(len(field)):
@@ -555,7 +608,8 @@ def _filter_duplicate_fields(field, filter):
             filter[i] = True
     return filter
 
-def filter_non_orphaned_foreign_keys(primary_key, foreign_key):
+
+def foreign_key_is_in_primary_key(primary_key, foreign_key):
     _check_is_reader_or_ndarray('primary_key', primary_key)
     _check_is_reader_or_ndarray('foreign_key', foreign_key)
     if isinstance(primary_key, Reader):
@@ -570,14 +624,16 @@ def filter_non_orphaned_foreign_keys(primary_key, foreign_key):
     result = np.zeros(len(fk), dtype=np.bool)
     return _filter_non_orphaned_foreign_keys(pk, fk, result)
 
-@njit
+
 def _filter_non_orphaned_foreign_keys(primary_key, foreign_key, results):
     pkids = dict()
-    for pk in primary_key:
-        pkids[pk] = 0
+    trueval = np.bool(True)
+    falseval = np.bool(False)
+    for p in primary_key:
+        pkids[p] = trueval
 
-    for i_f in range(len(foreign_key)):
-        results[i_f] = foreign_key[i_f] in pkids
+    for i, f in enumerate(foreign_key):
+        results[i] = pkids.get(f, falseval)
     return results
 
 
@@ -1018,6 +1074,10 @@ class NumericWriter(Writer):
         return np.zeros(length, dtype=nformat)
 
     def write_part(self, values):
+        if not np.issubdtype(values.dtype, self.nformat):
+            values = values.astype(self.nformat)
+            print("tweaked dtype in write_part")
+
         DataWriter.write(self.field, 'values', values, len(values))
 
     def flush(self):
@@ -1393,6 +1453,32 @@ class DataStore:
             raise ValueError(f"'reader' must be a Reader or an ndarray, but is {type.reader}")
 
 
+    def apply_indices(self, indices_to_apply, reader, writer=None):
+        if isinstance(reader, IndexedStringReader):
+            _check_is_appropriate_writer_if_set('writer', reader, writer)
+
+            src_indices = reader.field['index'][:]
+            src_values = reader.field.get('values', np.zeros(0, dtype='S1'))[:]
+
+            indices, values = _apply_indices_to_index_values(indices_to_apply,
+                                                             src_indices, src_values)
+            if writer:
+                writer.write_raw(indices, values)
+            return indices, values
+        elif isinstance(reader, Reader):
+            result = reader[:][indices_to_apply]
+            if writer:
+                writer.write(result)
+            return result
+        elif isinstance(reader, np.ndarray):
+            result = reader[indices_to_apply]
+            if writer:
+                writer.write(result)
+            return result
+        else:
+            raise ValueError(f"'reader' must be a Reader or an ndarray, but is {type.reader}")
+
+
     # TODO: write distinct with new readers / writers rather than deleting this
     def distinct(self, field=None, fields=None, filter=None):
         if field is None and fields is None:
@@ -1414,7 +1500,46 @@ class DataStore:
 
 
     def get_spans(self, field=None, fields=None):
-        return _get_spans(field, fields)
+        if field is None and fields is None:
+            raise ValueError("One of 'field' and 'fields' must be set")
+        if field is not None and fields is not None:
+            raise ValueError("Only one of 'field' and 'fields' may be set")
+        raw_field = None
+        raw_fields = None
+        if field is not None:
+            _check_is_reader_or_ndarray('field', field)
+            raw_field = field[:] if isinstance(field, Reader) else field
+        else:
+            raw_fields = []
+            for f in fields:
+                _check_is_reader_or_ndarray('elements of tuple/list fields', f)
+                raw_fields.append(f[:] if isinstance(f, Reader) else f)
+        return _get_spans(raw_field, raw_fields)
+
+
+    def apply_spans_index_of_max(self, spans, reader, writer=None):
+        _check_is_reader_or_ndarray('reader', reader)
+        _check_is_reader_or_ndarray_if_set('writer', reader)
+
+        if isinstance(reader, Reader):
+            raw_reader = reader[:]
+        else:
+            raw_reader = reader
+
+        if writer is not None:
+            if isinstance(writer, Writer):
+                raw_writer = writer[:]
+            else:
+                raw_writer = writer
+        else:
+            raw_writer = np.zeros(len(spans)-1, dtype=np.int64)
+        filter = np.zeros(len(spans)-1, dtype=np.bool)
+        _apply_spans_index_of_max(spans, raw_reader, raw_writer)
+        if isinstance(writer, Writer):
+            writer.write(raw_writer)
+        else:
+            return raw_writer
+
 
 
     # TODO - for all apply_spans methods, spans should be able to be an ndarray
@@ -1706,7 +1831,9 @@ class DataStore:
         return group.create_group(name)
 
 
-    def chunks(self, length, chunksize):
+    def chunks(self, length, chunksize=None):
+        if chunksize is None:
+            chunksize = self.chunksize
         cur = 0
         while cur < length:
             next = min(length, cur + chunksize)
@@ -1753,8 +1880,6 @@ class DataStore:
         for k, v in output_writers.items():
             output_writers[k].flush()
 
-    def get_index_2(self, left_key, right_key, destination, mode='left'):
-        pass
 
     def get_index(self, target, foreign_key, destination=None):
         print('  building patient_id index')
