@@ -1059,7 +1059,7 @@ class TestJoining(unittest.TestCase):
                                                     ds.get_reader(a['apid_to_pid'])[:],
                                                     -100)
             print(result)
-            # TODO: appears to be a bug in h5py
+            # TODO: appears to be a bug in h5py that doesn't allow complex numpy indexing
             # print(ds.get_reader(p['age'])[ds.get_reader(a['apid_to_pid'])[:]])
 
             # aages = ds.get_reader(dest_asmts['age'])[:]

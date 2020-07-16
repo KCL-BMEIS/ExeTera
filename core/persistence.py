@@ -1076,8 +1076,6 @@ class NumericWriter(Writer):
     def write_part(self, values):
         if not np.issubdtype(values.dtype, self.nformat):
             values = values.astype(self.nformat)
-            print("tweaked dtype in write_part")
-
         DataWriter.write(self.field, 'values', values, len(values))
 
     def flush(self):
@@ -1517,6 +1515,30 @@ class DataStore:
         return _get_spans(raw_field, raw_fields)
 
 
+    # TODO: needs a predicate to break ties: first, last?
+    def apply_spans_index_of_min(self, spans, reader, writer=None):
+        _check_is_reader_or_ndarray('reader', reader)
+        _check_is_reader_or_ndarray_if_set('writer', reader)
+
+        if isinstance(reader, Reader):
+            raw_reader = reader[:]
+        else:
+            raw_reader = reader
+
+        if writer is not None:
+            if isinstance(writer, Writer):
+                raw_writer = writer[:]
+            else:
+                raw_writer = writer
+        else:
+            raw_writer = np.zeros(len(spans)-1, dtype=np.int64)
+        _apply_spans_index_of_min(spans, raw_reader, raw_writer)
+        if isinstance(writer, Writer):
+            writer.write(raw_writer)
+        else:
+            return raw_writer
+
+
     def apply_spans_index_of_max(self, spans, reader, writer=None):
         _check_is_reader_or_ndarray('reader', reader)
         _check_is_reader_or_ndarray_if_set('writer', reader)
@@ -1533,13 +1555,11 @@ class DataStore:
                 raw_writer = writer
         else:
             raw_writer = np.zeros(len(spans)-1, dtype=np.int64)
-        filter = np.zeros(len(spans)-1, dtype=np.bool)
         _apply_spans_index_of_max(spans, raw_reader, raw_writer)
         if isinstance(writer, Writer):
             writer.write(raw_writer)
         else:
             return raw_writer
-
 
 
     # TODO - for all apply_spans methods, spans should be able to be an ndarray
@@ -1735,7 +1755,10 @@ class DataStore:
         # finally, map the results from the source space to the destination space
         destination_space_values[safe_unique_fkey_indices] = safe_values_to_join
 
-        writer.write(destination_space_values)
+        if writer is not None:
+            writer.write(destination_space_values)
+        else:
+            return destination_space_values
 
 
     def predicate_and_join(self,

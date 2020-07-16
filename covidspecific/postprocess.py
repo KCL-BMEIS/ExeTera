@@ -358,9 +358,13 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         ds.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
         print(f"calculated last assessment days per patient in {time.time() - t0}")
 
-        print('calculate assessment test counts per patient')
+        print('calculate maximum assessment test result per patient')
         t0 = time.time()
         reader = ds.get_reader(sorted_assessments_src['tested_covid_positive'])
+        writer = reader.get_writer(patients_dest, 'max_assessment_test_result', timestamp)
+        max_result_value = ds.aggregate_max(fkey_index_spans=spans, reader=reader)
+        ds.join(ids, assessment_patient_id_fkey, max_result_value, writer, spans)
+        print(f"calculated maximum asssessment test result in {time.time() - t0}")
 
     # TODO - patient measure: daily assessments per patient
 
