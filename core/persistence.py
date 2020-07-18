@@ -658,20 +658,24 @@ class IndexedStringReader(Reader):
         self.datastore = datastore
 
     def __getitem__(self, item):
-        if isinstance(item, slice):
-            start = item.start if item.start is not None else 0
-            stop = item.stop if item.stop is not None else len(self.field['index']) - 1
-            step = item.step
-            #TODO: validate slice
-            index = self.field['index'][start:stop+1]
-            bytestr = self.field['values'][index[0]:index[-1]]
-            results = [None] * (len(index)-1)
-            startindex = start
-            for ir in range(len(results)):
-                results[ir] =\
-                    bytestr[index[ir]-np.int64(startindex):
-                            index[ir+1]-np.int64(startindex)].tobytes().decode()
-            return results
+        try:
+            if isinstance(item, slice):
+                start = item.start if item.start is not None else 0
+                stop = item.stop if item.stop is not None else len(self.field['index']) - 1
+                step = item.step
+                #TODO: validate slice
+                index = self.field['index'][start:stop+1]
+                bytestr = self.field['values'][index[0]:index[-1]]
+                results = [None] * (len(index)-1)
+                startindex = start
+                for ir in range(len(results)):
+                    results[ir] =\
+                        bytestr[index[ir]-np.int64(startindex):
+                                index[ir+1]-np.int64(startindex)].tobytes().decode()
+                return results
+        except Exception as e:
+            print("{}: unexpected exception {}".format(self.field.name, e))
+            raise
 
     def __len__(self):
         return len(self.field['index']) - 1

@@ -36,7 +36,7 @@ def logit_prediction(df, dict_coef, index):
     return temp_logit
 
 
-def imputation_pos_all(df_umerge, distr, threshold=None):
+def imputation_pos_all(df_umerge, distr, samplecount, threshold=None):
     # df_umerge = pd.merge(df_assess, df_patred, left_on='patient_id', right_on='id', how='left')
     # df_umerge = df_umerge.drop_duplicates(['patient_id', 'interval_days']) #not needed due to daily assessments
     list_temp = []
@@ -44,10 +44,10 @@ def imputation_pos_all(df_umerge, distr, threshold=None):
     df_umerge = {k: v[:] for k, v in df_umerge.items()}
 
     results = logit_prediction(df_umerge, distr, 0)
-    for i in range(1, 100):
+    for i in range(1, samplecount):
         print(f"  imputation iteration {i}")
         results += logit_prediction(df_umerge, distr, i)
-    average_decision = results / np.float64(100)
+    average_decision = results / np.float64(samplecount)
     # average_decision = np.mean(np.asarray(list_temp).astype(float), 0)
     # this could be a threshold of
     # print(average_decision.shape, len(average_decision > threshold), df_umerge.shape, df_assess.shape)
@@ -71,10 +71,11 @@ def nature_medicine_model_1(persistent_cough, skipped_meals, loss_of_smell, fati
         'gender': gender_in_assessment_space
     }
 
+    samplecount = 100
     distr = {}
     for k in dict_coef.keys():
-        distr[k] = dict_coef[k] + dict_sd[k] * np.random.randn(100)
+        distr[k] = dict_coef[k] + dict_sd[k] * np.random.randn(samplecount)
     # patients (age , gender)
 
-    results = imputation_pos_all(dataset, distr, threshold)
+    results = imputation_pos_all(dataset, distr, samplecount, threshold)
     return results
