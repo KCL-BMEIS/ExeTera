@@ -13,7 +13,7 @@ import unittest
 
 import numpy as np
 
-import processing.covid_test
+import hystore.processing.covid_test as covid_test
 
 
 class TestCovidProgression1(unittest.TestCase):
@@ -28,7 +28,7 @@ class TestCovidProgression1(unittest.TestCase):
         filter_flags = np.zeros_like(hcts_start, dtype=np.uint32)
         flags_expected = np.asarray(flags_expected, dtype=np.uint32)
         validator =\
-            processing.covid_test.ValidateCovidTestResultsFacVersion1(
+            covid_test.ValidateCovidTestResultsFacVersion1(
                 hcts_start, tcps_start, filter_flags, None, hct_results, tcp_results, 0x1)
 
         validator('abcd',filter_flags, 0, len(hcts_start)-1)

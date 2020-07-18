@@ -12,8 +12,6 @@
 import h5py
 
 from hystore.core import dataset, persistence
-
-# TODO:
 from hystore.core.importer import DatasetImporter
 
 """

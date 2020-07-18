@@ -16,10 +16,10 @@ from collections import defaultdict
 import numpy as np
 import numba
 
-from processing.age_from_year_of_birth import calculate_age_from_year_of_birth_fast
-from processing.weight_height_bmi import weight_height_bmi_fast_1
-from processing.inconsistent_symptoms import check_inconsistent_symptoms_1
-from processing.temperature import validate_temperature_1
+from hystore.processing.age_from_year_of_birth import calculate_age_from_year_of_birth_fast
+from hystore.processing.weight_height_bmi import weight_height_bmi_fast_1
+from hystore.processing.inconsistent_symptoms import check_inconsistent_symptoms_1
+from hystore.processing.temperature import validate_temperature_1
 from hystore.core import persistence
 from hystore.core.persistence import DataStore
 

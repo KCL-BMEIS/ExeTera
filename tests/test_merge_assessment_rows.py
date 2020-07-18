@@ -12,7 +12,7 @@
 import unittest
 
 
-from processing.assessment_merge import MergeAssessmentRows
+from hystore.processing.assessment_merge import MergeAssessmentRows
 from hystore.core.utils import concatenate_maybe_strs
 
 

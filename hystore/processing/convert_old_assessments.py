@@ -2,7 +2,7 @@
 from collections import defaultdict
 
 from hystore.core import dataset
-from processing import analytics
+from hystore.processing import analytics
 
 
 class FilterNewAssessmentsV1:

@@ -13,7 +13,7 @@ import csv
 import time
 import numpy as np
 
-from processing import numpy_buffer
+from hystore.processing import numpy_buffer
 
 
 class Dataset:

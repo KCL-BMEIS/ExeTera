@@ -14,7 +14,7 @@ import unittest
 import numpy as np
 
 from hystore.core.utils import valid_range_fac_inc
-from processing.age_from_year_of_birth import CalculateAgeFromYearOfBirth
+from hystore.processing.age_from_year_of_birth import CalculateAgeFromYearOfBirth
 
 
 class TestAgeFromYearOfBirth(unittest.TestCase):

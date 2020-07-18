@@ -14,9 +14,9 @@ import numpy as np
 
 from hystore.core import dataset, utils
 
-from processing.analytics import group_new_test_indices_by_patient, get_patients_with_old_format_tests, \
+from hystore.processing.analytics import group_new_test_indices_by_patient, get_patients_with_old_format_tests, \
     filter_duplicate_new_tests
-from processing.convert_old_assessments import ConvertOldAssessmentsV1
+from hystore.processing.convert_old_assessments import ConvertOldAssessmentsV1
 
 strformat = '%Y-%m-%d'
 t_file_name = '/home/ben/covid/covid_test_export_20200601030001.csv'

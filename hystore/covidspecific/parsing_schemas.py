@@ -9,9 +9,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from processing.covid_test import ValidateCovidTestResultsFacVersion1, ValidateCovidTestResultsFacVersion2
-from processing.temperature import ValidateTemperature1
-from processing.weight_height_bmi import ValidateHeight1, ValidateHeight2
+from hystore.processing.covid_test import ValidateCovidTestResultsFacVersion1, ValidateCovidTestResultsFacVersion2
+from hystore.processing.temperature import ValidateTemperature1
+from hystore.processing.weight_height_bmi import ValidateHeight1, ValidateHeight2
 
 
 class ParsingSchemaVersionError(Exception):

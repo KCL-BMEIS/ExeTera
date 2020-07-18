@@ -19,10 +19,10 @@ import numpy as np
 
 from hystore.core import dataset, filtered_field, regression
 from hystore.covidspecific import data_schemas, parsing_schemas
-from processing.age_from_year_of_birth import CalculateAgeFromYearOfBirth
-from processing.assessment_merge import CalculateMergedFieldCount, MergeAssessmentRows
-from processing.inconsistent_symptoms import CheckInconsistentSymptoms
-from processing.inconsistent_testing import CheckTestingConsistency
+from hystore.processing.age_from_year_of_birth import CalculateAgeFromYearOfBirth
+from hystore.processing.assessment_merge import CalculateMergedFieldCount, MergeAssessmentRows
+from hystore.processing.inconsistent_symptoms import CheckInconsistentSymptoms
+from hystore.processing.inconsistent_testing import CheckTestingConsistency
 
 from hystore.core.utils import count_flag_empty, count_flag_set, build_histogram, map_between_categories, \
     to_categorical, print_diagnostic_row, valid_range_fac_inc, datetime_to_seconds, concatenate_maybe_strs

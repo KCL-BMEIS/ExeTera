@@ -11,7 +11,7 @@
 
 import unittest
 
-import processing.covid_test
+from  hystore.processing.covid_test import ValidateCovidTestResultsFacVersion2
 
 
 class MockDataset:
@@ -34,7 +34,7 @@ class TestParsingSchemas(unittest.TestCase):
 
         filter_status = [0] * len(dataset.index_)
         results = [0] * len(dataset.index_)
-        fn = processing.covid_test.ValidateCovidTestResultsFacVersion2(dataset, filter_status, None, results, 0x1)
+        fn = ValidateCovidTestResultsFacVersion2(dataset, filter_status, None, results, 0x1)
         fn(dataset.fields_, filter_status, 0, len(dataset.fields_) - 1)
 
     def test_validate_covid_test_results_version_2_na_waiting_no_waiting(self):
@@ -48,5 +48,5 @@ class TestParsingSchemas(unittest.TestCase):
 
         filter_status = [0] * len(dataset.index_)
         results = [0] * len(dataset.index_)
-        fn = processing.covid_test.ValidateCovidTestResultsFacVersion2(dataset, filter_status, None, results, 0x1)
+        fn = ValidateCovidTestResultsFacVersion2(dataset, filter_status, None, results, 0x1)
         fn(dataset.fields_, filter_status, 0, len(dataset.fields_) - 1)
