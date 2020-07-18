@@ -14,7 +14,7 @@
 from datetime import datetime, timezone
 import os
 
-from covidspecific import data_schemas, importer
+from hytable.covidspecific import data_schemas, importer
 
 import argparse
 

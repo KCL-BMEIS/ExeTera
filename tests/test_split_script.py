@@ -12,7 +12,7 @@
 import os
 from collections import defaultdict
 
-from core import dataset
+from hytable.core import dataset
 
 
 def jury_rigged_split_sanity_check():

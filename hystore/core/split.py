@@ -11,7 +11,7 @@
 
 import csv
 
-from core import dataset, utils
+from hytable.core import dataset, utils
 
 
 # read patients in batches of n

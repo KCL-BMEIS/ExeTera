@@ -9,8 +9,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from core.utils import check_input_lengths
-from core import persistence as persist
+from hytable.core.utils import check_input_lengths
+from hytable.core import persistence as persist
 
 
 class CalculateAgeFromYearOfBirth:

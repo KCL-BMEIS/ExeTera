@@ -11,7 +11,7 @@
 
 import numpy as np
 
-from core import persistence, utils
+from hytable.core import persistence, utils
 
 
 class ValidateHeight1:

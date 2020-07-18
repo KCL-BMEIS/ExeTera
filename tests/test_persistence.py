@@ -7,7 +7,7 @@ from io import BytesIO
 import numpy as np
 import h5py
 
-from core import persistence
+from hytable.core import persistence
 
 
 class TestPersistence(unittest.TestCase):

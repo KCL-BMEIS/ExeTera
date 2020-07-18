@@ -1,7 +1,7 @@
 
 from collections import defaultdict
 
-from core import dataset
+from hytable.core import dataset
 from processing import analytics
 
 

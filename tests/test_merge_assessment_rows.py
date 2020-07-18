@@ -13,7 +13,7 @@ import unittest
 
 
 from processing.assessment_merge import MergeAssessmentRows
-from core.utils import concatenate_maybe_strs
+from hytable.core.utils import concatenate_maybe_strs
 
 
 class MockDataset:

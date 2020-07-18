@@ -11,7 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from core.split import split_data
+from hytable.core.split import split_data
 import core.utils as utils
 
 if __name__ == '__main__':

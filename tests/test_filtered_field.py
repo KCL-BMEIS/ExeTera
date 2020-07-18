@@ -11,7 +11,7 @@
 
 import unittest
 
-from core import filtered_field
+from hytable.core import filtered_field
 
 
 class TestFilteredIndex(unittest.TestCase):
