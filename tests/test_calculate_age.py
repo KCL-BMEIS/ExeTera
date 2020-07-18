@@ -13,7 +13,7 @@ import unittest
 
 import numpy as np
 
-from hytable.core.utils import valid_range_fac_inc
+from hystore.core.utils import valid_range_fac_inc
 from processing.age_from_year_of_birth import CalculateAgeFromYearOfBirth
 
 

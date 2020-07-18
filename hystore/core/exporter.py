@@ -4,7 +4,7 @@ import csv
 import pandas
 
 
-from hytable.core import utils, persistence
+from hystore.core import utils, persistence
 
 def transform_from_reader_type(reader):
     if isinstance(reader, persistence.FixedStringReader):

@@ -1,6 +1,6 @@
 import sys
 
-from hytable.core import dataset
+from hystore.core import dataset
 
 def enumerate_versions(filenames):
 

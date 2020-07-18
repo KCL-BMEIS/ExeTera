@@ -8,8 +8,8 @@ import numpy as np
 import h5py
 import pandas as pd
 
-from hytable.core import exporter, persistence, utils
-from hytable.core.persistence import DataStore
+from hystore.core import exporter, persistence, utils
+from hystore.core.persistence import DataStore
 from processing.nat_medicine_model import nature_medicine_model_1
 """
 I then cleaned and recoded the assessments based on my scripts for HRT/menopause and added them to the patient file

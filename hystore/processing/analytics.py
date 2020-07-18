@@ -1,6 +1,6 @@
 from collections.__init__ import defaultdict
 
-from hytable.core import utils
+from hystore.core import utils
 
 
 class TestIndices:

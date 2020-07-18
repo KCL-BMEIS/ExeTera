@@ -2,7 +2,7 @@ import sys
 
 import h5py
 
-from hytable.core import persistence as per
+from hystore.core import persistence as per
 
 def h5dataset_summary(dataset):
     print(dataset.keys())

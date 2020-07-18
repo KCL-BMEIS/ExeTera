@@ -12,7 +12,7 @@
 import datetime
 import numpy as np
 
-from hytable.core import dataset, utils
+from hystore.core import dataset, utils
 
 from processing.analytics import group_new_test_indices_by_patient, get_patients_with_old_format_tests, \
     filter_duplicate_new_tests

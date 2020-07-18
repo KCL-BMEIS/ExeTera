@@ -1,7 +1,7 @@
 import sys
 
-from hytable.core import dataset
-from hytable.covidspecific import data_schemas
+from hystore.core import dataset
+from hystore.covidspecific import data_schemas
 
 def check_missing_fields(entries, categorical_maps, filename):
     print(filename)

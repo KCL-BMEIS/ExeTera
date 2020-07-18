@@ -17,16 +17,16 @@ from collections import defaultdict
 
 import numpy as np
 
-from hytable.core import dataset, filtered_field, regression
-from hytable.covidspecific import data_schemas, parsing_schemas
+from hystore.core import dataset, filtered_field, regression
+from hystore.covidspecific import data_schemas, parsing_schemas
 from processing.age_from_year_of_birth import CalculateAgeFromYearOfBirth
 from processing.assessment_merge import CalculateMergedFieldCount, MergeAssessmentRows
 from processing.inconsistent_symptoms import CheckInconsistentSymptoms
 from processing.inconsistent_testing import CheckTestingConsistency
 
-from hytable.core.utils import count_flag_empty, count_flag_set, build_histogram, map_between_categories, \
+from hystore.core.utils import count_flag_empty, count_flag_set, build_histogram, map_between_categories, \
     to_categorical, print_diagnostic_row, valid_range_fac_inc, datetime_to_seconds, concatenate_maybe_strs
-from hytable.covidspecific.utils import iterate_over_patient_assessments, iterate_over_patient_assessments2
+from hystore.covidspecific.utils import iterate_over_patient_assessments, iterate_over_patient_assessments2
 
 
 def copy_field(field):

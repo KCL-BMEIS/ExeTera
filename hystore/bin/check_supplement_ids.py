@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from hytable.core import dataset
+from hystore.core import dataset
 
 ds1 = None
 with open('/home/ben/covid/patients_export_geocodes_20200702030001.csv') as f1:

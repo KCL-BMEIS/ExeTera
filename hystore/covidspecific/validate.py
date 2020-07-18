@@ -14,8 +14,8 @@ import argparse
 import os
 import datetime
 
-from hytable.covidspecific import data_schemas, parsing_schemas, pipeline
-from hytable.core import dataset, utils
+from hystore.covidspecific import data_schemas, parsing_schemas, pipeline
+from hystore.core import dataset, utils
 
 equivalence_map = {
     'na': ('', 'na'),

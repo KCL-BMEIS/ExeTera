@@ -11,7 +11,7 @@
 
 import numpy as np
 
-from hytable.core import persistence
+from hystore.core import persistence
 
 
 class FieldDesc:

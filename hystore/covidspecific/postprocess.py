@@ -20,8 +20,8 @@ from processing.age_from_year_of_birth import calculate_age_from_year_of_birth_f
 from processing.weight_height_bmi import weight_height_bmi_fast_1
 from processing.inconsistent_symptoms import check_inconsistent_symptoms_1
 from processing.temperature import validate_temperature_1
-from hytable.core import persistence
-from hytable.core.persistence import DataStore
+from hystore.core import persistence
+from hystore.core.persistence import DataStore
 
 
 # TODO: hard filter

@@ -14,7 +14,7 @@
 from datetime import datetime
 import time
 
-from hytable.covidspecific import data_schemas, parsing_schemas, pipeline
+from hystore.covidspecific import data_schemas, parsing_schemas, pipeline
 
 # TODO: add flag to output values as categorical variables
 if __name__ == '__main__':

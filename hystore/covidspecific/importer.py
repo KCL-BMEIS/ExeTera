@@ -11,10 +11,10 @@
 
 import h5py
 
-from hytable.core import dataset, persistence
+from hystore.core import dataset, persistence
 
 # TODO:
-from hytable.core.importer import DatasetImporter
+from hystore.core.importer import DatasetImporter
 
 """
  * field source

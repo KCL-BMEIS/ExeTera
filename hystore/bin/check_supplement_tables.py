@@ -1,4 +1,4 @@
-from hytable.core import dataset
+from hystore.core import dataset
 
 pfilename = '/home/ben/covid/supplements_patients.csv'
 afilename = '/home/ben/covid/supplements_assessments.csv'

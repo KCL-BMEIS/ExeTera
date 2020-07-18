@@ -6,8 +6,8 @@ from datetime import datetime
 
 import numpy as np
 
-from hytable.core import dataset
-from hytable.core import utils
+from hystore.core import dataset
+from hystore.core import utils
 
 
 """

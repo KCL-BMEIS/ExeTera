@@ -2,8 +2,8 @@ import csv
 
 import numpy as np
 
-from hytable.core import dataset
-from hytable.covidspecific import data_schemas
+from hystore.core import dataset
+from hystore.covidspecific import data_schemas
 from processing.weight_height_bmi import ValidateHeight2
 
 filename = '/home/ben/covid/patients_export_geocodes_20200701030002.csv'

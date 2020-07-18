@@ -11,8 +11,8 @@
 
 import numpy as np
 
-from hytable.core.utils import check_input_lengths
-from hytable.core import persistence
+from hystore.core.utils import check_input_lengths
+from hystore.core import persistence
 
 
 class CheckInconsistentSymptoms:

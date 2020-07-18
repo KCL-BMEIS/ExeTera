@@ -6,7 +6,7 @@ from collections import defaultdict
 import numpy as np
 from numba import jit, njit
 
-from hytable.core import dataset
+from hystore.core import dataset
 
 
 @njit
