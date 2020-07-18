@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='hystore',
-    version='0.2.4dev1',
+    version='0.2.4.dev1',
     description='High-volume key-value store and analytics, based on hdf5',
     url='https://github.com/kcl-bmeis/zoe-data-store',
     author='Ben Murray',
