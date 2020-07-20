@@ -421,35 +421,3 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         aggregated_results = ds.aggregate_max(fkey_index_spans=spans, reader=test_results)
         ds.join(ids, test_patient_id_fkey, aggregated_results, writer, spans)
         print(f"calculated max_test_result per patient in {time.time() - t0}")
-
-
-
-# if __name__ == '__main__':
-#     import argparse
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument('-s', '--source', help='the dataset to load')
-#     parser.add_argument('-d', '--destination', help='the dataset to write results to')
-#     parser.add_argument('--sort', default=False, action='store_true')
-#     parser.add_argument('--process', default=False, action='store_true')
-#     parser.add_argument('--all', default=False, action='store_true')
-#     args = parser.parse_args()
-#
-#     data_schema = data_schemas.DataSchema(1)
-#     parsing_schema = parsing_schemas.ParsingSchema(1)
-#     timestamp = str(datetime.now(timezone.utc))
-#
-#     if args.sort + args.process + args.all > 1:
-#         raise ValueError("At most one of '--sort', '--daily', and '--all' may be set")
-#     elif args.sort + args.process + args.all == 0:
-#         flags = 'all'
-#     else:
-#         if args.sort is True:
-#             flags = 'sort'
-#         elif args.process is True:
-#             flags = 'process'
-#         elif args.all is True:
-#             flags = 'all'
-#
-#     with h5py.File(args.source, 'r') as ds:
-#         with h5py.File(args.destination, 'w') as ts:
-#             postprocess(ds, ts, data_schema, parsing_schema, timestamp, flags=flags)

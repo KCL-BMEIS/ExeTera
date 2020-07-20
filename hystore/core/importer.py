@@ -16,7 +16,7 @@ import time
 class DatasetImporter:
     def __init__(self, datastore, source, hf, space,
                  writer_factory, writers, field_entries, timestamp,
-                 keys=None, field_descriptors=None,
+                 keys=None, # field_descriptors=None,
                  stop_after=None, show_progress_every=None, filter_fn=None,
                  early_filter=None):
         self.names_ = list()
@@ -49,8 +49,8 @@ class DatasetImporter:
 
             transforms_by_index = list()
             for i_n, n in enumerate(available_keys):
-                if field_descriptors and n in field_descriptors:
-                    transforms_by_index.append(field_descriptors[n])
+                if field_entries and n in field_entries:
+                    transforms_by_index.append(field_entries[n])
                 else:
                     transforms_by_index.append(None)
 

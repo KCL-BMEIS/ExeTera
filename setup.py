@@ -8,5 +8,11 @@ setup(
     author='Ben Murray',
     author_email='benjamin.murray@kcl.ac.uk',
     license='http://www.apache.org/licenses/LICENSE-2.0',
-    packages=['hystore']
+    packages=['hystore'],
+    install_requires=[
+        'numpy',
+        'numba',
+        'pandas',
+        'h5py'
+    ]
 )

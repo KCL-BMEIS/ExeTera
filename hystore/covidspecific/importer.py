@@ -109,9 +109,8 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
             p_keys = None
             DatasetImporter(datastore, p_file_name, hf, 'patients',
                             writer_factory, patient_writers, patient_maps, timestamp,
-                            keys=p_keys, field_descriptors=patient_maps,
-                            show_progress_every=p_show_progress_every, stop_after=p_stop_after,
-                            early_filter=early_filter)
+                            keys=p_keys, show_progress_every=p_show_progress_every,
+                            stop_after=p_stop_after, early_filter=early_filter)
             print("patients done")
 
 
@@ -121,9 +120,8 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
             a_keys = None
             DatasetImporter(datastore, a_file_name, hf, 'assessments',
                             writer_factory, assessment_writers, assessment_maps, timestamp,
-                            keys=a_keys, field_descriptors=assessment_maps,
-                            show_progress_every=a_show_progress_every, stop_after=a_stop_after,
-                            early_filter=early_filter)
+                            keys=a_keys, show_progress_every=a_show_progress_every,
+                            stop_after=a_stop_after, early_filter=early_filter)
             print("assessments_done")
 
 
@@ -133,9 +131,8 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
             t_keys = None
             DatasetImporter(datastore, t_file_name, hf, 'tests',
                             writer_factory, test_writers, test_maps, timestamp,
-                            keys=t_keys, field_descriptors=test_maps,
-                            show_progress_every=t_show_progress_every, stop_after=t_stop_after,
-                            early_filter=early_filter)
+                            keys=t_keys, show_progress_every=t_show_progress_every,
+                            stop_after=t_stop_after, early_filter=early_filter)
             print("test_done")
 
 

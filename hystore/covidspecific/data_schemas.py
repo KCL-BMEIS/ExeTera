@@ -60,7 +60,7 @@ class DataSchema:
     data_schemas = [1]
 
 
-    field_writers = {
+    _field_writers = {
         'idtype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, ts, 32),
         'datetimetype':
             lambda g, cs, n, ts: persistence.DateTimeImporter(g, cs, n, ts, False),
@@ -88,7 +88,7 @@ class DataSchema:
         'geocodetype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, ts, 9)
     }
 
-    patient_field_types = {
+    _patient_field_types = {
         'id': 'idtype',
         'created_at': 'datetimetype',
         'updated_at': 'datetimetype',
@@ -289,7 +289,7 @@ class DataSchema:
         'zipcode': 'indexedstringtype'
     }
 
-    assessment_field_types = {
+    _assessment_field_types = {
         'id': 'idtype',
         'patient_id': 'idtype',
         'created_at': 'datetimetype',
@@ -347,11 +347,7 @@ class DataSchema:
         'worn_face_mask': 'categoricaltype'
     }
 
-    generated_health_fields = (
-        'has_temperature'
-    )
-
-    health_check_fields = (
+    _health_check_fields = (
         'fever', 'persistent_cough', 'fatigue', 'shortness_of_breath', 'diarrhoea',
         'delirium', 'skipped_meals', 'abdominal_pain', 'chest_pain', 'hoarse_voice',
         'loss_of_smell', 'headache', 'chills_or_shivers', 'eye_soreness', 'nausea',
@@ -359,7 +355,7 @@ class DataSchema:
         'unusual_muscle_pains'
     )
 
-    test_field_types = {
+    _test_field_types = {
         'id': 'idtype',
         'patient_id': 'idtype',
         'created_at': 'datetimetype',
@@ -373,7 +369,7 @@ class DataSchema:
         'invited_to_test': 'categoricaltype',
         'location': 'categoricaltype',
         'location_other': 'indexedstringtype',
-        'mechanism': 'indexedstringtype',
+        'mechanism': 'leakycategoricaltype',
         'result': 'categoricaltype',
         'trained_worker': 'categoricaltype',
     }
@@ -389,7 +385,7 @@ class DataSchema:
     # 2: string_to_values or None if it should be calculated from values_to_string
     # 3: inclusive version from
     # 4: exclusive version to
-    patient_categorical_fields = [
+    _patient_categorical_fields = [
         ('activity_change', leaky_boolean_delta, None, np.uint8, 1, None),
         ('alcohol_change', leaky_boolean_delta + ['no_alcohol'], None, np.uint8, 1, None),
         ('already_had_covid', leaky_boolean_to, None, np.uint8, 1, None),
@@ -543,7 +539,7 @@ class DataSchema:
         ('vs_zinc', leaky_boolean_to, None, np.uint8, 1, None),
         ('weight_change', leaky_boolean_delta, None, np.uint8, 1, None),
     ]
-    assessment_categorical_fields = [
+    _assessment_categorical_fields = [
         ('abdominal_pain', leaky_boolean_to, None, np.uint8, 1, None),
         ('always_used_shortage', [na_value_to, 'all_needed', 'reused'], None, np.uint8, 1, None),
         ('blisters_on_feet', leaky_boolean_to, None, np.uint8, 1, None),
@@ -590,44 +586,46 @@ class DataSchema:
         ('unusual_muscle_pains', leaky_boolean_to, None, np.uint8, 1, None),
         ('worn_face_mask', [na_value_to, 'not_applicable', 'never', 'sometimes', 'most_of_the_time', 'always'], None, np.uint8, 1, None),
     ]
-    test_categorical_fields = [
+    _test_categorical_fields = [
         ('deleted', ['', 'False', 'True'], None, np.uint8, 1, None),
         ('invited_to_test', ['', 'False', 'True'], None, np.uint8, 1, None),
         ('location', ['', 'home', 'drive_through_rtc', 'hospital', 'gp', 'chemist', 'work', 'local_health_dept', 'drop_in_test_centre', 'other'], None, np.uint8, 1, None),
+        ('mechanism', ['', 'nose_swab', 'throat_swab', 'nose_throat_swab', 'spit_tube', 'blood_sample'
+                       'blood_sample_finger_prick', 'blood_sample_needle_draw'], None, np.uint8, 1, None),
         ('result', ['', 'waiting', 'failed', 'negative', 'positive'], None, np.uint8, 1, None),
         ('trained_worker', ['', 'trained', 'untrained', 'unsure'], None, np.uint8, 1, None),
     ]
 
-    assessment_field_entries = dict()
-    for cf in assessment_categorical_fields:
+    _assessment_field_entries = dict()
+    for cf in _assessment_categorical_fields:
         desc = FieldDesc(cf[0], _build_map(cf[1]) if cf[2] is None else cf[2], cf[1], cf[3],
                          cf[6] if len(cf) == 7 else None)
         entry = FieldEntry(desc, cf[4], cf[5])
         entry_list = \
-            list() if assessment_field_entries.get(cf[0]) is None else assessment_field_entries[cf[0]]
+            list() if _assessment_field_entries.get(cf[0]) is None else _assessment_field_entries[cf[0]]
         entry_list.append(entry)
-        assessment_field_entries[cf[0]] = entry_list
+        _assessment_field_entries[cf[0]] = entry_list
 
-    patient_field_entries = dict()
-    for cf in patient_categorical_fields:
+    _patient_field_entries = dict()
+    for cf in _patient_categorical_fields:
         desc = FieldDesc(cf[0], _build_map(cf[1]) if cf[2] is None else cf[2], cf[1], cf[3],
                          cf[6] if len(cf) == 7 else None)
         entry = FieldEntry(desc, cf[4], cf[5])
         entry_list = \
-            list() if patient_field_entries.get(cf[0]) is None else patient_field_entries[cf[0]]
+            list() if _patient_field_entries.get(cf[0]) is None else _patient_field_entries[cf[0]]
         entry_list.append(entry)
-        patient_field_entries[cf[0]] = entry_list
+        _patient_field_entries[cf[0]] = entry_list
 
 
-    test_field_entries = dict()
-    for cf in test_categorical_fields:
+    _test_field_entries = dict()
+    for cf in _test_categorical_fields:
         desc = FieldDesc(cf[0], _build_map(cf[1]) if cf[2] is None else cf[2], cf[1], cf[3],
                          cf[6] if len(cf) == 7 else None)
         entry = FieldEntry(desc, cf[4], cf[5])
         entry_list = \
-            list() if test_field_entries.get(cf[0]) is None else test_field_entries[cf[0]]
+            list() if _test_field_entries.get(cf[0]) is None else _test_field_entries[cf[0]]
         entry_list.append(entry)
-        test_field_entries[cf[0]] = entry_list
+        _test_field_entries[cf[0]] = entry_list
 
 
     def __init__(self, version):
@@ -635,6 +633,9 @@ class DataSchema:
         self.patient_categorical_maps = self._get_patient_categorical_maps(version)
         self.assessment_categorical_maps = self._get_assessment_categorical_maps(version)
         self.test_categorical_maps = self._get_test_categorical_maps(version)
+        self.patient_field_types = DataSchema._patient_field_types
+        self.assessment_field_types = DataSchema._assessment_field_types
+        self.test_field_types = DataSchema._test_field_types
 
 
     def _validate_schema_number(self, schema):
@@ -643,15 +644,15 @@ class DataSchema:
 
 
     def _get_patient_categorical_maps(self, version):
-        return self._get_categorical_maps(DataSchema.patient_field_entries, version)
+        return self._get_categorical_maps(DataSchema._patient_field_entries, version)
 
 
     def _get_assessment_categorical_maps(self, version):
-        return self._get_categorical_maps(DataSchema.assessment_field_entries, version)
+        return self._get_categorical_maps(DataSchema._assessment_field_entries, version)
 
 
     def _get_test_categorical_maps(self, version):
-        return self._get_categorical_maps(DataSchema.test_field_entries, version)
+        return self._get_categorical_maps(DataSchema._test_field_entries, version)
 
 
     def _get_categorical_maps(self, field_entries, version):
