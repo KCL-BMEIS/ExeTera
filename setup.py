@@ -8,7 +8,7 @@ setup(
     author='Ben Murray',
     author_email='benjamin.murray@kcl.ac.uk',
     license='http://www.apache.org/licenses/LICENSE-2.0',
-    packages=['hystore'],
+    packages=['hystore', 'hystore.contrib', 'hystore.core', 'hystore.covidspecific', 'hystore.processing'],
     install_requires=[
         'numpy',
         'numba',
