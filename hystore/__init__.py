@@ -1,3 +1,6 @@
 from __future__ import absolute_import
 
-from . import contrib, core, covidspecific, processing
+import hystore.contrib
+import hystore.core
+import hystore.covidspecific
+import hystore.processing
