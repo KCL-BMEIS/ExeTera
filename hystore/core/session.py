@@ -12,6 +12,8 @@ from hystore.core import persistence as per
 """
  * joins: get mapping and map multiple fields using mapping
    * can use pandas for initial functionality and then improve
+   * mark fields has having sorted order if they are sorted
+     * would have to check field
    * for sorted, can use fast
    * aggregation
      * aggregate and join / join and aggregate
@@ -20,7 +22,19 @@ from hystore.core import persistence as per
  * groups are registered and given names
  * indices can be built from merging pk and fks and mapping to values
  * everything can accept tuples instead of groups and operate on all of them
- * FilteredReader / FilteredWriter for applying filters without copying data
+ * advanced sorting / filtering
+   * FilteredReader / FilteredWriter for applying filters without copying data
+   * SortedReader / SortedWriter for applying sorts without copying data
+ * reader/writers
+   * should be able to read/write through the same object
+     rw = s.get(name)
+     rw.w[:] = data
+     data = rw.r[:]
+   * soft sorting / filtering
+     rw = s.get(name)
+     rw.add_transform(filter)
+     rw.add_transform(sort)
+     rw.w[:] = data
 """
 
 class Session:
