@@ -55,24 +55,68 @@ chunk_sizes = {
 }
 
 
-def _check_is_appropriate_writer_if_set(param_name, reader, writer):
+def _writer_from_writer_or_group(writer_getter, param_name, writer):
+    if isinstance(writer, h5py.Group):
+        return writer_getter.get_existing_writer(writer)
+    elif isinstance(writer, Writer):
+        return writer
+    else:
+        msg = "'{}' must be one of (h5py.Group, Writer) but is {}"
+        raise ValueError(msg.format(param_name, type(writer)))
+
+
+def _check_is_appropriate_writer_if_set(reader_getter, param_name, reader, writer):
+    # TODO: this method needs reworking; readers should know whether writers are compatible with
+    # them
     msg = "{} must be of type {} or None but is {}"
-    if writer is not None:
-        if isinstance(reader, IndexedStringReader):
-            if not isinstance(writer, IndexedStringWriter):
-                raise ValueError(msg.format(param_name, IndexedStringReader, writer))
-        elif isinstance(reader, FixedStringReader):
-            if not isinstance(writer, FixedStringWriter):
-                raise ValueError(msg.format(param_name, FixedStringReader, writer))
-        elif isinstance(reader, NumericReader):
-            if not isinstance(writer, NumericWriter):
-                raise ValueError(msg.format(param_name, NumericReader, writer))
-        elif isinstance(reader, CategoricalReader):
-            if not isinstance(writer, CategoricalWriter):
-                raise ValueError(msg.format(param_name, CategoricalReader, writer))
-        elif isinstance(reader, TimestampReader):
-            if not isinstance(writer, TimestampWriter):
-                raise ValueError(msg.format(param_name, TimestampReader, writer))
+    # if writer is not None:
+    #     if isinstance(reader, np.ndarray):
+    #         raise ValueError("'if 'reader' is a numpy.ndarray, 'writer' must be None")
+
+    if isinstance(reader, h5py.Group):
+        reader = reader_getter.get_reader(reader)
+
+
+    if isinstance(reader, IndexedStringReader):
+        if not isinstance(writer, IndexedStringWriter):
+            raise ValueError(msg.format(param_name, IndexedStringReader, writer))
+    elif isinstance(reader, FixedStringReader):
+        if not isinstance(writer, FixedStringWriter):
+            raise ValueError(msg.format(param_name, FixedStringReader, writer))
+    elif isinstance(reader, NumericReader):
+        if not isinstance(writer, NumericWriter):
+            raise ValueError(msg.format(param_name, NumericReader, writer))
+    elif isinstance(reader, CategoricalReader):
+        if not isinstance(writer, CategoricalWriter):
+            raise ValueError(msg.format(param_name, CategoricalReader, writer))
+    elif isinstance(reader, TimestampReader):
+        if not isinstance(writer, TimestampWriter):
+            raise ValueError(msg.format(param_name, TimestampReader, writer))
+
+
+def _check_all_readers_valid_and_same_type(readers):
+    if not isinstance(readers, (tuple, list)):
+        raise ValueError("'readers' collection must be a tuple or list")
+
+    if isinstance(readers[0], h5py.Group):
+        expected_type = h5py.Group
+    elif isinstance(readers[0], Reader):
+        expected_type = Reader
+    elif isinstance(readers[0], np.ndarray):
+        expected_type = np.ndarray
+    else:
+        raise ValueError("'readers' collection must of the following types: "
+                         "(h5py.Group, Reader, numpy.ndarray)")
+    for r in readers[1:]:
+        if not isinstance(r, expected_type):
+            raise ValueError("'readers': all elements must be the same underlying type "
+                             "(h5py.Group, Reader, numpy.ndarray")
+
+
+def _check_is_reader_substitute(name, field):
+    if not isinstance(field, (h5py.Group, Reader, np.ndarray)):
+        msg = "'{}' must be one of (h5py.Group, Reader, numpy.ndarray) but is '{}'"
+        raise ValueError(msg.format(type(field)))
 
 
 def _check_is_reader_or_ndarray(name, field):
@@ -84,6 +128,41 @@ def _check_is_reader_or_ndarray_if_set(name, field):
     if not isinstance(field, (Reader, np.ndarray)):
         raise ValueError("if set, 'name' must be either a Reader or an ndarray "
                          f"but is {type(field)}")
+
+
+def _check_equal_length(name1, field1, name2, field2):
+    if len(field1) != len(field2):
+        msg = "'{}' must be the same length as '{}' (lengths {} and {} respectively)"
+        raise ValueError(msg.format(name1, name2, len(field1), len(field2)))
+
+
+def _reader_from_group_if_required(reader_source, name, reader):
+    if isinstance(reader, h5py.Group):
+        return reader_source.get_reader(reader)
+    return reader
+
+
+def _raw_array_from_parameter(datastore, name, field):
+    if isinstance(field, h5py.Group):
+        return datastore.get_reader(field)[:]
+    elif isinstance(field, Reader):
+        return field[:]
+    elif isinstance(field, np.ndarray):
+        return field
+    else:
+        error_str = "'{}' must be one of (Group, Reader or ndarray, but is {}"
+        raise ValueError(error_str.format(name, type(field)))
+
+@numba.njit
+def _safe_map(data_field, map_field, map_filter):
+    result = np.zeros_like(map_field, dtype=data_field.dtype)
+    empty_val = result[0]
+    for i in range(len(map_field)):
+        if map_filter[i]:
+            result[i] = data_field[map_field[i]]
+        else:
+            result[i] = empty_val
+    return result
 
 
 class DataWriter:
@@ -591,6 +670,7 @@ def _values_from_reader_or_ndarray(name, field):
     return raw_field
 
 
+# TODO: handle usage of reader
 def filter_duplicate_fields(field):
 
     filter_ = np.ones(len(field), dtype=np.bool)
@@ -680,7 +760,7 @@ class IndexedStringReader(Reader):
     def __len__(self):
         return len(self.field['index']) - 1
 
-    def get_writer(self, dest_group, dest_name, timestamp, write_mode='write'):
+    def get_writer(self, dest_group, dest_name, timestamp=None, write_mode='write'):
         return IndexedStringWriter(self.datastore, dest_group, dest_name,
                                    timestamp, write_mode)
 
@@ -714,9 +794,10 @@ class NumericReader(Reader):
     def __len__(self):
         return len(self.field['values'])
 
-    def get_writer(self, dest_group, dest_name, timestamp, write_mode='write'):
-        return NumericWriter(self.datastore, dest_group, dest_name, timestamp,
-                             self.field.attrs['fieldtype'].split(',')[1], write_mode)
+    def get_writer(self, dest_group, dest_name, timestamp=None, write_mode='write'):
+        return NumericWriter(self.datastore, dest_group, dest_name,
+                             self.field.attrs['fieldtype'].split(',')[1],
+                             timestamp, write_mode)
 
     def dtype(self):
         return self.field['values'].dtype
@@ -745,10 +826,10 @@ class CategoricalReader(Reader):
     def __len__(self):
         return len(self.field['values'])
 
-    def get_writer(self, dest_group, dest_name, timestamp, write_mode='write'):
+    def get_writer(self, dest_group, dest_name, timestamp=None, write_mode='write'):
         keys = {v: k for k, v in zip(self.field['key_values'][:], self.field['key_names'][:])}
-        return CategoricalWriter(self.datastore, dest_group, dest_name, timestamp, keys,
-                                 write_mode)
+        return CategoricalWriter(self.datastore, dest_group, dest_name, keys,
+                                 timestamp, write_mode)
 
     def dtype(self):
         return self.field['values'].dtype
@@ -773,9 +854,10 @@ class FixedStringReader(Reader):
     def __len__(self):
         return len(self.field['values'])
 
-    def get_writer(self, dest_group, dest_name, timestamp, write_mode='write'):
-        return FixedStringWriter(self.datastore, dest_group, dest_name, timestamp,
-                                 self.field.attrs['fieldtype'].split(',')[1], write_mode)
+    def get_writer(self, dest_group, dest_name, timestamp=None, write_mode='write'):
+        return FixedStringWriter(self.datastore, dest_group, dest_name,
+                                 self.field.attrs['fieldtype'].split(',')[1],
+                                 timestamp, write_mode)
 
     def dtype(self):
         return self.field['values'].dtype
@@ -800,7 +882,7 @@ class TimestampReader(Reader):
     def __len__(self):
         return len(self.field['values'])
 
-    def get_writer(self, dest_group, dest_name, timestamp, write_mode='write'):
+    def get_writer(self, dest_group, dest_name, timestamp=None, write_mode='write'):
         return TimestampWriter(self.datastore, dest_group, dest_name, timestamp,
                                write_mode)
 
@@ -840,7 +922,10 @@ class Writer:
 
 
 class IndexedStringWriter(Writer):
-    def __init__(self, datastore, group, name, timestamp, write_mode='write'):
+    def __init__(self, datastore, group, name,
+                 timestamp=None, write_mode='write'):
+        if timestamp is None:
+            timestamp = datastore.timestamp
         fieldtype = f'indexedstring'
         super().__init__(datastore, group, name, write_mode,
                          (('fieldtype', fieldtype), ('timestamp', timestamp),
@@ -917,10 +1002,12 @@ class IndexedStringWriter(Writer):
 # TODO: should produce a warning for unmappable strings and a corresponding filter, rather
 # than raising an exception; or at least have a mode where this is possible
 class LeakyCategoricalImporter:
-    def __init__(self, datastore, group, name, timestamp, categories, out_of_range,
-                 write_mode='write'):
+    def __init__(self, datastore, group, name, categories, out_of_range,
+                 timestamp=None, write_mode='write'):
+        if timestamp is None:
+            timestamp = datastore.timestamp
         self.writer = CategoricalWriter(datastore, group, name,
-                                        timestamp, categories, write_mode)
+                                        categories, timestamp, write_mode)
         self.other_values = IndexedStringWriter(datastore, group, f"{name}_{out_of_range}",
                                                 timestamp, write_mode)
         self.field_size = max([len(k) for k in categories.keys()])
@@ -958,10 +1045,12 @@ class LeakyCategoricalImporter:
 # TODO: should produce a warning for unmappable strings and a corresponding filter, rather
 # than raising an exception; or at least have a mode where this is possible
 class CategoricalImporter:
-    def __init__(self, datastore, group, name, timestamp, categories,
-                 write_mode='write'):
+    def __init__(self, datastore, group, name, categories,
+                 timestamp=None, write_mode='write'):
+        if timestamp is None:
+            timestamp = datastore.timestamp
         self.writer = CategoricalWriter(datastore, group, name,
-                                        timestamp, categories, write_mode)
+                                        categories, timestamp, write_mode)
         self.field_size = max([len(k) for k in categories.keys()])
 
     def chunk_factory(self, length):
@@ -983,8 +1072,10 @@ class CategoricalImporter:
 
 
 class CategoricalWriter(Writer):
-    def __init__(self, datastore, group, name, timestamp, categories,
-                 write_mode='write'):
+    def __init__(self, datastore, group, name, categories,
+                 timestamp=None, write_mode='write'):
+        if timestamp is None:
+            timestamp = datastore.timestamp
         fieldtype = f'categorical'
         super().__init__(datastore, group, name, write_mode,
                          (('fieldtype', fieldtype), ('timestamp', timestamp),
@@ -1024,12 +1115,14 @@ class CategoricalWriter(Writer):
 
 
 class NumericImporter:
-    def __init__(self, datastore, group, name, timestamp, nformat,
-                 parser, write_mode='write'):
+    def __init__(self, datastore, group, name, nformat, parser,
+                 timestamp=None, write_mode='write'):
+        if timestamp is None:
+            timestamp = datastore.timestamp
         self.data_writer = NumericWriter(datastore, group, name,
-                                         timestamp, nformat, write_mode)
+                                         nformat, timestamp, write_mode)
         self.flag_writer = NumericWriter(datastore, group, f"{name}_valid",
-                                         timestamp, 'bool', write_mode)
+                                         'bool', timestamp, write_mode)
         self.parser = parser
 
     def chunk_factory(self, length):
@@ -1062,8 +1155,10 @@ class NumericImporter:
 
 
 class NumericWriter(Writer):
-    def __init__(self, datastore, group, name, timestamp, nformat,
-                 write_mode='write'):
+    def __init__(self, datastore, group, name, nformat,
+                 timestamp=None, write_mode='write'):
+        if timestamp is None:
+            timestamp = datastore.timestamp
         fieldtype = f'numeric,{nformat}'
         super().__init__(datastore, group, name, write_mode,
                          (('fieldtype', fieldtype), ('timestamp', timestamp),
@@ -1096,8 +1191,10 @@ class NumericWriter(Writer):
 
 
 class FixedStringWriter(Writer):
-    def __init__(self, datastore, group, name, timestamp, strlen,
-                 write_mode='write'):
+    def __init__(self, datastore, group, name, strlen,
+                 timestamp=None, write_mode='write'):
+        if timestamp is None:
+            timestamp = datastore.timestamp
         fieldtype = f'fixedstring,{strlen}'
         super().__init__(datastore, group, name, write_mode,
                          (('fieldtype', fieldtype), ('timestamp', timestamp),
@@ -1127,16 +1224,18 @@ class FixedStringWriter(Writer):
 
 
 class DateTimeImporter:
-    def __init__(self, datastore, group, name, timestamp, optional=True,
-                 write_mode='write'):
+    def __init__(self, datastore, group, name,
+                 optional=True, timestamp=None, write_mode='write'):
+        if timestamp is None:
+            timestamp = datastore.timestamp
         self.datetime = DateTimeWriter(datastore, group, name,
                                        timestamp, write_mode)
         self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
-                                         timestamp, '10', write_mode)
+                                         '10', timestamp, write_mode)
         self.datetimeset = None
         if optional:
             self.datetimeset = NumericWriter(datastore, group, f"{name}_set",
-                                             timestamp, 'bool', write_mode)
+                                             'bool', timestamp, write_mode)
 
     def chunk_factory(self, length):
         return self.datetime.chunk_factory(length)
@@ -1173,7 +1272,10 @@ class DateTimeImporter:
 
 # TODO writers can write out more than one field; offset could be done this way
 class DateTimeWriter(Writer):
-    def __init__(self, datastore, group, name, timestamp, write_mode='write'):
+    def __init__(self, datastore, group, name,
+                 timestamp=None, write_mode='write'):
+        if timestamp is None:
+            timestamp = datastore.timestamp
         fieldtype = f'datetime'
         super().__init__(datastore, group, name, write_mode,
                          (('fieldtype', fieldtype), ('timestamp', timestamp),
@@ -1214,7 +1316,10 @@ class DateTimeWriter(Writer):
 
 
 class DateWriter(Writer):
-    def __init__(self, datastore, group, name, timestamp, write_mode='write'):
+    def __init__(self, datastore, group, name,
+                 timestamp=None, write_mode='write'):
+        if timestamp is None:
+            timestamp = datastore.timestamp
         fieldtype = 'date'
         super().__init__(datastore, group, name, write_mode,
                          (('fieldtype', fieldtype), ('timestamp', timestamp),
@@ -1251,7 +1356,10 @@ class DateWriter(Writer):
 
 
 class TimestampWriter(Writer):
-    def __init__(self, datastore, group, name, timestamp, write_mode='write'):
+    def __init__(self, datastore, group, name,
+                 timestamp=None, write_mode='write'):
+        if timestamp is None:
+            timestamp = datastore.timestamp
         fieldtype = 'timestamp'
         super().__init__(datastore, group, name, write_mode,
                          (('fieldtype', fieldtype), ('timestamp', timestamp),
@@ -1279,15 +1387,17 @@ class TimestampWriter(Writer):
 
 
 class OptionalDateImporter:
-    def __init__(self, datastore, group, name, timestamp,
-                 optional=True, write_mode='write'):
+    def __init__(self, datastore, group, name,
+                 optional=True, timestamp=None, write_mode='write'):
+        if timestamp is None:
+            timestamp = datastore.timestamp
         self.date = DateWriter(datastore, group, name, timestamp, write_mode)
         self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
-                                         timestamp, '10', write_mode)
+                                         '10', timestamp, write_mode)
         self.dateset = None
         if optional:
             self.dateset =\
-                NumericWriter(datastore, group, f"{name}_set", timestamp, 'bool', write_mode)
+                NumericWriter(datastore, group, f"{name}_set", 'bool', timestamp, write_mode)
 
     def chunk_factory(self, length):
         return self.date.chunk_factory(length)
@@ -1357,18 +1467,31 @@ def _aggregate_impl(predicate, fkey_indices=None, fkey_index_spans=None,
 
 class DataStore:
 
-    def __init__(self, chunksize=DEFAULT_CHUNKSIZE):
+    def __init__(self, chunksize=DEFAULT_CHUNKSIZE,
+                 timestamp=str(datetime.now(timezone.utc))):
+        if not isinstance(timestamp, str):
+            error_str = "'timestamp' must be a string but is of type {}"
+            raise ValueError(error_str.format(type(timestamp)))
         self.chunksize = chunksize
+        self.timestamp = timestamp
+
+
+    def set_timestamp(self, timestamp=str(datetime.now(timezone.utc))):
+        if not isinstance(timestamp, str):
+            error_str = "'timestamp' must be a string but is of type {}"
+            raise ValueError(error_str.format(type(timestamp)))
+        self.timestamp = timestamp
 
 
     # TODO: fields is being ignored at present
     def sort_on(self, src_group, dest_group, keys, fields=None,
-                timestamp=datetime.now(timezone.utc), write_mode='write'):
+                timestamp=None, write_mode='write'):
+        if timestamp is None:
+            timestamp = self.timestamp
         # sort_keys = ('patient_id', 'created_at')
         readers = tuple(self.get_reader(src_group[f]) for f in keys)
         t1 = time.time()
-        sorted_index = self.dataset_sort(
-            np.arange(len(readers[0]), dtype=np.uint32), readers)
+        sorted_index = self.dataset_sort(readers, np.arange(len(readers[0]), dtype=np.uint32))
         print(f'sorted {keys} index in {time.time() - t1}s')
 
         t0 = time.time()
@@ -1383,8 +1506,10 @@ class DataStore:
         print(f"fields reordered in {time.time() - t0}s")
 
 
-    def dataset_sort(self, index, readers):
+    def dataset_sort(self, readers, index=None):
         r_readers = reversed(readers)
+        if index is None:
+            index = np.arange(len(r_readers[0]))
 
         acc_index = index[:]
         first = True
@@ -1402,11 +1527,11 @@ class DataStore:
 
     # TODO: index should be able to be either a reader or an ndarray
     def apply_sort(self, index, reader, writer=None):
-        _check_is_appropriate_writer_if_set('writer', reader, writer)
+        _check_is_appropriate_writer_if_set(self, 'writer', reader, writer)
 
         if isinstance(reader, IndexedStringReader):
             src_indices = reader.field['index'][:]
-            src_values = reader.field.get('values', np.zeros(0, dtype='S1'))[:]
+            src_values = reader.field.get('values', np.zeros(0, dtype=np.uint8))[:]
             indices, values = _apply_sort_to_index_values(index, src_indices, src_values)
             if writer:
                 writer.write_raw(indices, values)
@@ -1428,10 +1553,10 @@ class DataStore:
     # TODO: write filter with new readers / writers rather than deleting this
     def apply_filter(self, filter_to_apply, reader, writer=None):
         if isinstance(reader, IndexedStringReader):
-            _check_is_appropriate_writer_if_set('writer', reader, writer)
+            _check_is_appropriate_writer_if_set(self, 'writer', reader, writer)
 
             src_indices = reader.field['index'][:]
-            src_values = reader.field.get('values', np.zeros(0, dtype='S1'))[:]
+            src_values = reader.field.get('values', np.zeros(0, dtype=np.uint8))[:]
             if len(src_indices) != len(filter_to_apply) + 1:
                 raise ValueError(f"'indices' (length {len(indices)}) must be one longer than "
                                  f"'index_filter' (length {len(index_filter)})")
@@ -1543,6 +1668,30 @@ class DataStore:
             return raw_writer
 
 
+    # TODO: needs a predicate to break ties: first, last?
+    def apply_spans_index_of_min(self, spans, reader, writer=None):
+        _check_is_reader_or_ndarray('reader', reader)
+        _check_is_reader_or_ndarray_if_set('writer', reader)
+
+        if isinstance(reader, Reader):
+            raw_reader = reader[:]
+        else:
+            raw_reader = reader
+
+        if writer is not None:
+            if isinstance(writer, Writer):
+                raw_writer = writer[:]
+            else:
+                raw_writer = writer
+        else:
+            raw_writer = np.zeros(len(spans)-1, dtype=np.int64)
+        _apply_spans_index_of_min(spans, raw_reader, raw_writer)
+        if isinstance(writer, Writer):
+            writer.write(raw_writer)
+        else:
+            return raw_writer
+
+
     def apply_spans_index_of_max(self, spans, reader, writer=None):
         _check_is_reader_or_ndarray('reader', reader)
         _check_is_reader_or_ndarray_if_set('writer', reader)
@@ -1567,15 +1716,21 @@ class DataStore:
 
 
     # TODO - for all apply_spans methods, spans should be able to be an ndarray
-    def apply_spans_count(self, spans, _, writer):
-        if isinstance(writer, Writer):
-            dest_values = writer.chunk_factory(len(spans) - 1)
+    def apply_spans_count(self, spans, _, writer=None):
+        if writer is None:
+            _values_from_reader_or_ndarray('spans', spans)
+            dest_values = np.zeros(len(spans)-1, dtype=np.int64)
             _apply_spans_count(spans, dest_values)
-            writer.write(dest_values)
-        elif isinstance(writer, np.ndarray):
-            _apply_spans_count(spans, writer)
+            return dest_values
         else:
-            raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
+            if isinstance(writer, Writer):
+                dest_values = writer.chunk_factory(len(spans) - 1)
+                _apply_spans_count(spans, dest_values)
+                writer.write(dest_values)
+            elif isinstance(writer, np.ndarray):
+                _apply_spans_count(spans, writer)
+            else:
+                raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
 
     def apply_spans_first(self, spans, reader, writer):
         if isinstance(reader, Reader):
@@ -1827,29 +1982,55 @@ class DataStore:
         return fieldtype_map[fieldtype](self, field)
 
 
-    def get_indexed_string_writer(self, group, name, timestamp, writemode='write'):
+    def get_existing_writer(self, field, timestamp=None):
+        if 'fieldtype' not in field.attrs.keys():
+            raise ValueError(f"'{field_name}' is not a well-formed field")
+
+        fieldtype_map = {
+            'indexedstring': IndexedStringReader,
+            'fixedstring': FixedStringReader,
+            'categorical': CategoricalReader,
+            'boolean': NumericReader,
+            'numeric': NumericReader,
+            'datetime': TimestampReader,
+            'date': TimestampReader,
+            'timestamp': TimestampReader
+        }
+
+        fieldtype = field.attrs['fieldtype'].split(',')[0]
+        reader = fieldtype_map[fieldtype](self, field)
+        group = field.parent
+        name = field.name.split('/')[-1]
+        return reader.get_writer(group, name, timestamp=timestamp, write_mode='overwrite')
+
+
+    def get_indexed_string_writer(self, group, name,
+                                  timestamp=None, writemode='write'):
         return IndexedStringWriter(self, group, name, timestamp, writemode)
 
 
-    def get_fixed_string_writer(self, group, name, timestamp, width, writemode='write'):
-        return FixedStringWriter(self, group, name, timestamp, width, writemode)
+    def get_fixed_string_writer(self, group, name, width,
+                                timestamp=None, writemode='write'):
+        return FixedStringWriter(self, group, name, width, timestamp, writemode)
 
 
-    def get_categorical_writer(self, group, name, timestamp, categories, writemode='write'):
-        return CategoricalWriter(self, group, name, timestamp, categories, writemode)
+    def get_categorical_writer(self, group, name, categories,
+                               timestamp=None, writemode='write'):
+        return CategoricalWriter(self, group, name, categories, timestamp, writemode)
 
 
-    def get_numeric_writer(self, group, name, timestamp, dtype, writemode='write'):
-        return NumericWriter(self, group, name, timestamp, dtype, writemode)
+    def get_numeric_writer(self, group, name, dtype, timestamp=None, writemode='write'):
+        return NumericWriter(self, group, name, dtype, timestamp, writemode)
 
 
-    def get_timestamp_writer(self, group, name, timestamp, writemode='write'):
+    def get_timestamp_writer(self, group, name, timestamp=None, writemode='write'):
         return TimestampWriter(self, group, name, timestamp, writemode)
 
 
-    def get_compatible_writer(self, field, dest_group, dest_name, writemode='write'):
+    def get_compatible_writer(self, field, dest_group, dest_name,
+                              timestamp=None, writemode='write'):
         reader = self.get_reader(field)
-        return reader.get_writer(dest_group, dest_name, writemode)
+        return reader.get_writer(dest_group, dest_name, timestamp, writemode)
 
 
     def get_or_create_group(self, group, name):

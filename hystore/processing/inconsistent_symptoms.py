@@ -29,7 +29,10 @@ class CheckInconsistentSymptoms:
                 flags[i_r] |= self.f_not_healthy_but_no_symptoms
 
 
-def check_inconsistent_symptoms_1(datastore, src_assessments, dest_assessments, timestamp):
+def check_inconsistent_symptoms_1(datastore, src_assessments, dest_assessments, timestamp=None):
+    if timestamp is None:
+        timestamp = datastore.timestamp
+
     generated_health_fields = ()
     # generated_health_fields = ('has_temperature',)
 
@@ -63,10 +66,10 @@ def check_inconsistent_symptoms_1(datastore, src_assessments, dest_assessments, 
 
     inconsistent_healthy =\
         datastore.get_numeric_writer(dest_assessments,
-                                     'inconsistent_healthy', timestamp, 'bool')
+                                     'inconsistent_healthy', 'bool', timestamp)
     inconsistent_not_healthy = \
         datastore.get_numeric_writer(dest_assessments,
-                                     'inconsistent_not_healthy', timestamp, 'bool')
+                                     'inconsistent_not_healthy', 'bool', timestamp)
 
     inconsistent_healthy.write((health_status_array == 1) & (combined_results is False))
     inconsistent_not_healthy.write((health_status_array == 2) & (combined_results is True))

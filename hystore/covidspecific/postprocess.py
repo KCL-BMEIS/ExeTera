@@ -44,7 +44,7 @@ def log(*a, **kwa):
 def postprocess(dataset, destination, data_schema, process_schema, timestamp=None, flags='all'):
 
     chunksize = 1 << 20
-    ds = DataStore()
+    ds = DataStore(timestamp=timestamp)
     patients_src = dataset['patients']
     patients_dest = ds.get_or_create_group(destination, 'patients')
     assessments_src = dataset['assessments']
@@ -91,7 +91,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         for k in patients_src.keys():
             t0 = time.time()
             r = ds.get_reader(patients_src[k])
-            w = r.get_writer(patients_dest, k, timestamp)
+            w = r.get_writer(patients_dest, k)
             ds.apply_filter(duplicate_filter, r, w)
             print(f"'{k}' filtered in {time.time() - t0}s")
 
@@ -99,37 +99,16 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
               np.count_nonzero(duplicate_filter == False))
         sort_keys = ('id',)
         ds.sort_on(
-            patients_dest, patients_dest, sort_keys, timestamp=timestamp, write_mode='overwrite')
+            patients_dest, patients_dest, sort_keys, write_mode='overwrite')
 
     if sort_assessments:
         sort_keys = ('patient_id', 'created_at')
         ds.sort_on(
-            assessments_src, assessments_dest, sort_keys, timestamp=timestamp)
-
-        # print("checking sort order")
-        # t0 = time.time()
-        # raw_patient_ids = ds.get_reader(assessments_dest['patient_id'])[:]
-        # raw_created_ats = ds.get_reader(assessments_dest['created_at'])[:]
-        # last_pid = raw_patient_ids[0]
-        # last_cat = raw_created_ats[0]
-        # duplicates = 0
-        # for i_r in range(1, len(raw_patient_ids)):
-        #     pid = raw_patient_ids[i_r]
-        #     cat = raw_created_ats[i_r]
-        #     if (last_pid, last_cat) == (pid, cat):
-        #         duplicates += 1
-        #     if (last_pid, last_cat) > (pid, cat):
-        #         print(i_r,
-        #               last_pid, datetime.fromtimestamp(last_cat),
-        #               pid, datetime.fromtimestamp(cat))
-        #     last_pid = pid
-        #     last_cat = cat
-        # print(f"sort order checked({duplicates} duplicate row keys found) in {time.time() - t0}")
+            assessments_src, assessments_dest, sort_keys)
 
     if sort_tests:
         sort_keys = ('patient_id', 'created_at')
-        ds.sort_on(
-            tests_src, tests_dest, sort_keys, timestamp=timestamp)
+        ds.sort_on(tests_src, tests_dest, sort_keys)
 
 
     # Processing
@@ -146,12 +125,12 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     if year_from_age:
         log("year of birth -> age; 18 to 90 filter")
         t0 = time.time()
-        age = ds.get_numeric_writer(patients_dest, 'age', timestamp, 'uint32',
+        age = ds.get_numeric_writer(patients_dest, 'age', 'uint32',
                                     write_mode)
-        age_filter = ds.get_numeric_writer(patients_dest, 'age_filter', timestamp,
+        age_filter = ds.get_numeric_writer(patients_dest, 'age_filter',
                                            'bool', write_mode)
         age_16_to_90 = ds.get_numeric_writer(patients_dest, '16_to_90_years',
-                                             timestamp, 'bool', write_mode)
+                                             'bool', write_mode)
         print('year_of_birth:', patients_dest['year_of_birth'])
         for k in patients_dest['year_of_birth'].attrs.keys():
             print(k, patients_dest['year_of_birth'].attrs[k])
@@ -170,17 +149,17 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         t0 = time.time()
 
         weights_clean = ds.get_numeric_writer(patients_dest, 'weight_kg_clean',
-                                              timestamp, 'float32', write_mode)
+                                              'float32', write_mode)
         weights_filter = ds.get_numeric_writer(patients_dest, '40_to_200_kg',
-                                               timestamp, 'bool', write_mode)
+                                               'bool', write_mode)
         heights_clean = ds.get_numeric_writer(patients_dest, 'height_cm_clean',
-                                              timestamp, 'float32', write_mode)
+                                              'float32', write_mode)
         heights_filter = ds.get_numeric_writer(patients_dest, '110_to_220_cm',
-                                               timestamp, 'bool', write_mode)
+                                               'bool', write_mode)
         bmis_clean = ds.get_numeric_writer(patients_dest, 'bmi_clean',
-                                           timestamp, 'float32', write_mode)
+                                           'float32', write_mode)
         bmis_filter = ds.get_numeric_writer(patients_dest, '15_to_55_bmi',
-                                            timestamp, 'bool', write_mode)
+                                            'bool', write_mode)
 
         weight_height_bmi_fast_1(ds, 40, 200, 110, 220, 15, 55,
                                  None, None, None, None,
@@ -202,8 +181,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         assessment_patient_ids =\
             ds.get_reader(sorted_assessments_src['patient_id'])
         assessment_patient_id_fkey =\
-            ds.get_numeric_writer(assessments_dest, 'assessment_patient_id_fkey',
-                                  timestamp, 'int64')
+            ds.get_numeric_writer(assessments_dest, 'assessment_patient_id_fkey', 'int64')
         ds.get_index(patient_ids, assessment_patient_ids, assessment_patient_id_fkey)
         print(f"completed in {time.time() - t0}s")
 
@@ -214,13 +192,11 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         temps = ds.get_reader(sorted_assessments_src['temperature'])
         temp_units = ds.get_reader(sorted_assessments_src['temperature_unit'])
         temps_valid = ds.get_reader(sorted_assessments_src['temperature_valid'])
-        dest_temps = temps.get_writer(assessments_dest, 'temperature_c_clean', timestamp,
-                                      write_mode)
+        dest_temps = temps.get_writer(assessments_dest, 'temperature_c_clean', write_mode)
         dest_temps_valid =\
-            temps_valid.get_writer(assessments_dest, 'temperature_35_to_42_inclusive', timestamp,
-                                   write_mode)
+            temps_valid.get_writer(assessments_dest, 'temperature_35_to_42_inclusive', write_mode)
         dest_temps_modified =\
-            temps_valid.get_writer(assessments_dest, 'temperature_modified', timestamp, write_mode)
+            temps_valid.get_writer(assessments_dest, 'temperature_modified', write_mode)
         validate_temperature_1(35.0, 42.0,
                                temps, temp_units, temps_valid,
                                dest_temps, dest_temps_valid, dest_temps_modified)
@@ -230,8 +206,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     if check_symptoms:
         print('check inconsistent health_status')
         t0 = time.time()
-        check_inconsistent_symptoms_1(ds,
-                                      sorted_assessments_src, assessments_dest, timestamp)
+        check_inconsistent_symptoms_1(ds, sorted_assessments_src, assessments_dest)
         print(time.time() - t0)
 
 
@@ -287,7 +262,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
                 apply_span_fn = default_behavour_overrides[k]
                 if apply_span_fn is not None:
                     apply_span_fn(patient_id_index_spans, reader,
-                                  reader.get_writer(daily_assessments_dest, k, timestamp))
+                                  reader.get_writer(daily_assessments_dest, k))
                     print(f"  Field {k} aggregated in {time.time() - t1}s")
                 else:
                     print(f"  Skipping field {k}")
@@ -295,17 +270,17 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
                 if isinstance(reader, persistence.CategoricalReader):
                     ds.apply_spans_max(
                         patient_id_index_spans, reader,
-                        reader.get_writer(daily_assessments_dest, k, timestamp))
+                        reader.get_writer(daily_assessments_dest, k))
                     print(f"  Field {k} aggregated in {time.time() - t1}s")
                 elif isinstance(reader, persistence.IndexedStringReader):
                     ds.apply_spans_concat(
                         patient_id_index_spans, reader,
-                        reader.get_writer(daily_assessments_dest, k, timestamp))
+                        reader.get_writer(daily_assessments_dest, k))
                     print(f"  Field {k} aggregated in {time.time() - t1}s")
                 elif isinstance(reader, persistence.NumericReader):
                     ds.apply_spans_max(
                         patient_id_index_spans, reader,
-                        reader.get_writer(daily_assessments_dest, k, timestamp))
+                        reader.get_writer(daily_assessments_dest, k))
                     print(f"  Field {k} aggregated in {time.time() - t1}s")
                 else:
                     print(f"  No function for {k}")
@@ -327,15 +302,13 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         ids = ds.get_reader(patients_dest['id'])
 
         # print('predicate_and_join')
-        # acpp2 = ds.get_numeric_writer(patients_dest, 'assessment_count_2',
-        #                                      timestamp, 'uint32')
+        # acpp2 = ds.get_numeric_writer(patients_dest, 'assessment_count_2', 'uint32')
         # ds.predicate_and_join(ds.apply_spans_count, ids,
         #                              assessment_patient_id_fkey, None, acpp2, spans)
 
         print('calculate assessment counts per patient')
         t0 = time.time()
-        writer = ds.get_numeric_writer(patients_dest, 'assessment_count',
-                                              timestamp, 'uint32')
+        writer = ds.get_numeric_writer(patients_dest, 'assessment_count', 'uint32')
         aggregated_counts = ds.aggregate_count(fkey_index_spans=spans)
         ds.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
         print(f"calculated assessment counts per patient in {time.time() - t0}")
@@ -343,8 +316,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         print('calculate first assessment days per patient')
         t0 = time.time()
         reader = ds.get_reader(sorted_assessments_src['created_at_day'])
-        writer = ds.get_fixed_string_writer(patients_dest, 'first_assessment_day',
-                                                   timestamp, 10)
+        writer = ds.get_fixed_string_writer(patients_dest, 'first_assessment_day', 10)
         aggregated_counts = ds.aggregate_first(fkey_index_spans=spans, reader=reader)
         ds.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
         print(f"calculated first assessment days per patient in {time.time() - t0}")
@@ -352,8 +324,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         print('calculate last assessment days per patient')
         t0 = time.time()
         reader = ds.get_reader(sorted_assessments_src['created_at_day'])
-        writer = ds.get_fixed_string_writer(patients_dest, 'last_assessment_day',
-                                                   timestamp, 10)
+        writer = ds.get_fixed_string_writer(patients_dest, 'last_assessment_day', 10)
         aggregated_counts = ds.aggregate_last(fkey_index_spans=spans, reader=reader)
         ds.join(ids, assessment_patient_id_fkey, aggregated_counts, writer, spans)
         print(f"calculated last assessment days per patient in {time.time() - t0}")
@@ -361,7 +332,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         print('calculate maximum assessment test result per patient')
         t0 = time.time()
         reader = ds.get_reader(sorted_assessments_src['tested_covid_positive'])
-        writer = reader.get_writer(patients_dest, 'max_assessment_test_result', timestamp)
+        writer = reader.get_writer(patients_dest, 'max_assessment_test_result')
         max_result_value = ds.aggregate_max(fkey_index_spans=spans, reader=reader)
         ds.join(ids, assessment_patient_id_fkey, max_result_value, writer, spans)
         print(f"calculated maximum asssessment test result in {time.time() - t0}")
@@ -376,7 +347,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
             ds.get_reader(daily_assessments_dest['patient_id'])
         daily_assessment_patient_id_fkey =\
             ds.get_numeric_writer(daily_assessments_dest, 'daily_assessment_patient_id_fkey',
-                                  timestamp, 'int64')
+                                  'int64')
         ds.get_index(patient_ids, daily_assessment_patient_ids,
                      daily_assessment_patient_id_fkey)
         print(f"completed in {time.time() - t0}s")
@@ -386,8 +357,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
 
         print('calculate daily assessment counts per patient')
         t0 = time.time()
-        writer = ds.get_numeric_writer(patients_dest, 'daily_assessment_count',
-                                              timestamp, 'uint32')
+        writer = ds.get_numeric_writer(patients_dest, 'daily_assessment_count', 'uint32')
         aggregated_counts = ds.aggregate_count(fkey_index_spans=spans)
         daily_assessment_patient_id_fkey =\
             ds.get_reader(daily_assessments_dest['daily_assessment_patient_id_fkey'])
@@ -401,7 +371,8 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         t0 = time.time()
         patient_ids = ds.get_reader(sorted_patients_src['id'])
         test_patient_ids = ds.get_reader(tests_dest['patient_id'])
-        test_patient_id_fkey = ds.get_numeric_writer(tests_dest, 'test_patient_id_fkey', timestamp, 'int64')
+        test_patient_id_fkey = ds.get_numeric_writer(tests_dest, 'test_patient_id_fkey',
+                                                     'int64')
         ds.get_index(patient_ids, test_patient_ids, test_patient_id_fkey)
         test_patient_id_fkey = ds.get_reader(tests_dest['test_patient_id_fkey'])
         spans = ds.get_spans(field=test_patient_id_fkey)
@@ -409,7 +380,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
 
         print('calculate test_counts per patient')
         t0 = time.time()
-        writer = ds.get_numeric_writer(patients_dest, 'test_count', timestamp, 'uint32')
+        writer = ds.get_numeric_writer(patients_dest, 'test_count', 'uint32')
         aggregated_counts = ds.aggregate_count(fkey_index_spans=spans)
         ds.join(ids, test_patient_id_fkey, aggregated_counts, writer, spans)
         print(f"calculated test counts per patient in {time.time() - t0}")
@@ -417,7 +388,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         print('calculate test_result per patient')
         t0 = time.time()
         test_results = ds.get_reader(tests_dest['result'])
-        writer = test_results.get_writer(patients_dest, 'max_test_result', timestamp)
+        writer = test_results.get_writer(patients_dest, 'max_test_result')
         aggregated_results = ds.aggregate_max(fkey_index_spans=spans, reader=test_results)
         ds.join(ids, test_patient_id_fkey, aggregated_results, writer, spans)
         print(f"calculated max_test_result per patient in {time.time() - t0}")

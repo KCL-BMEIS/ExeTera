@@ -60,32 +60,32 @@ class DataSchema:
     data_schemas = [1]
 
 
-    _field_writers = {
-        'idtype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, ts, 32),
+    field_writers = {
+        'idtype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, 32, ts),
         'datetimetype':
-            lambda g, cs, n, ts: persistence.DateTimeImporter(g, cs, n, ts, False),
+            lambda g, cs, n, ts: persistence.DateTimeImporter(g, cs, n, False, ts),
         'optionaldatetimetype':
-            lambda g, cs, n, ts: persistence.DateTimeImporter(g, cs, n, ts, True),
+            lambda g, cs, n, ts: persistence.DateTimeImporter(g, cs, n, True, ts),
         'datetype':
-            lambda g, cs, n, ts: persistence.OptionalDateImporter(g, cs, n, ts, False),
+            lambda g, cs, n, ts: persistence.OptionalDateImporter(g, cs, n, False, ts),
         'optionaldatetype':
-            lambda g, cs, n, ts: persistence.OptionalDateImporter(g, cs, n, ts, True),
-        'versiontype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, ts, 10),
+            lambda g, cs, n, ts: persistence.OptionalDateImporter(g, cs, n, True, ts),
+        'versiontype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, 10, ts),
         'indexedstringtype': lambda g, cs, n, ts: persistence.IndexedStringWriter(g, cs, n, ts),
-        'countrycodetype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, ts, 2),
-        'unittype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, ts, 1),
+        'countrycodetype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, 2, ts),
+        'unittype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, 1, ts),
         'categoricaltype':
-            lambda g, cs, n, ts, stv: persistence.CategoricalWriter(g, cs, n, ts, stv),
+            lambda g, cs, n, stv, ts: persistence.CategoricalWriter(g, cs, n, stv, ts),
         'leakycategoricaltype':
-            lambda g, cs, n, ts, stv, oor: persistence.LeakyCategoricalImporter(g, cs, n, ts,
-                                                                                stv, oor),
+            lambda g, cs, n, stv, oor, ts: persistence.LeakyCategoricalImporter(g, cs, n, stv,
+                                                                                oor, ts),
         'float32type': lambda g, cs, n, ts: persistence.NumericImporter(
-            g, cs, n, ts, 'float32', persistence.try_str_to_float),
+            g, cs, n, 'float32', persistence.try_str_to_float, ts),
         'uint16type': lambda g, cs, n, ts: persistence.NumericImporter(
-            g, cs, n, ts, 'uint16', persistence.try_str_to_int),
+            g, cs, n, 'uint16', persistence.try_str_to_int, ts),
         'yeartype': lambda g, cs, n, ts: persistence.NumericImporter(
-            g, cs, n, ts, 'uint32', persistence.try_str_to_float_to_int),
-        'geocodetype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, ts, 9)
+            g, cs, n, 'uint32', persistence.try_str_to_float_to_int, ts),
+        'geocodetype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, 9, ts)
     }
 
     _patient_field_types = {

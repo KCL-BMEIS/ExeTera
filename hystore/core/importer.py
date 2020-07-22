@@ -73,14 +73,14 @@ class DatasetImporter:
                     str_to_vals = field_entries[field_name].strings_to_values
                     writer =\
                         writer_factory[writers[field_name]](
-                            datastore, group, field_name, timestamp, str_to_vals)
+                            datastore, group, field_name, str_to_vals, timestamp)
                     categorical_map_list.append(str_to_vals)
                 elif writers[field_name] == 'leakycategoricaltype':
                     str_to_vals = field_entries[field_name].strings_to_values
                     out_of_range = field_entries[field_name].out_of_range_label
                     writer =\
                         writer_factory[writers[field_name]](
-                            datastore, group, field_name, timestamp, str_to_vals, out_of_range)
+                            datastore, group, field_name, str_to_vals, out_of_range, timestamp)
                     # categorical_map_list.append(str_to_vals)
                     categorical_map_list.append(None)
                 else:

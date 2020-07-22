@@ -105,7 +105,7 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
 
         if import_patients:
             p_show_progress_every = show_every
-            p_stop_after = 100000
+            p_stop_after = 1500000
             p_keys = None
             DatasetImporter(datastore, p_file_name, hf, 'patients',
                             writer_factory, patient_writers, patient_maps, timestamp,
@@ -116,7 +116,7 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
 
         if import_assessments:
             a_show_progress_every = show_every
-            a_stop_after = 1200000
+            a_stop_after = 10000000
             a_keys = None
             DatasetImporter(datastore, a_file_name, hf, 'assessments',
                             writer_factory, assessment_writers, assessment_maps, timestamp,
