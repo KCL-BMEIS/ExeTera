@@ -15,11 +15,12 @@ from datetime import datetime, timezone
 import os
 
 from hystore.covidspecific import data_schemas, importer
+from version import __version__
 
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--version', action='version', version='v0.2.1')
+parser.add_argument('--version', action='version', version=__version__)
 parser.add_argument('-te', '--territories', default=None,
                     help='the territory/territories to filter the dataset on (runs on all territories if not set)')
 parser.add_argument('-p', '--patient_data',
@@ -51,6 +52,11 @@ if not os.path.isfile(args.test_data):
 
 if errors:
     exit(-1)
+
+if 'dev' in __version__:
+    msg = ("Warning: this is a development version of hystore ({}). "
+           "Please use one of the release versions for actual work")
+    print(msg.format(__version__))
 
 data_schema_version = 1
 data_schema = data_schemas.DataSchema(data_schema_version)

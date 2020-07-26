@@ -109,7 +109,6 @@ class TestSessionSort(unittest.TestCase):
             self.assertListEqual([b'e', b'd', b'a', b'c', b'b'], s.get_reader(hf['x'])[:].tolist())
 
 
-
 class TestSessionFilter(unittest.TestCase):
 
     def test_apply_filter(self):
@@ -120,3 +119,107 @@ class TestSessionFilter(unittest.TestCase):
 
         result = s.apply_filter(filt, vx)
         self.assertListEqual([1, 2, 5, 7], result.tolist())
+
+
+class TestSessionFields(unittest.TestCase):
+
+    def test_write_then_read_numeric(self):
+        from hystore.core.session import Session
+        from hystore.core import fields
+        from hystore.core.utils import Timer
+
+        s = Session()
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            np.random.seed(12345678)
+            values = np.random.randint(low=0, high=1000000, size=100000000)
+            fields.numeric_field_constructor(s, hf, 'a', 'int32')
+            a = fields.NumericField(s, hf['a'], write_enabled=True)
+            a.data.write(values)
+
+            with Timer("array"):
+                total = np.sum(a.data[:])
+            print(total)
+
+            with Timer("* 2"):
+                a.data[:] = a.data[:] * 2
+                total = np.sum(a.data[:])
+            print(total)
+
+
+    def test_write_then_read_categorical(self):
+        from hystore.core.session import Session
+        from hystore.core import fields
+        from hystore.core.utils import Timer
+
+        s = Session()
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            np.random.seed(12345678)
+            values = np.random.randint(low=0, high=3, size=100000000)
+            print(values.min(), values.max())
+            fields.categorical_field_constructor(s, hf, 'a', 'int8',
+                                                 {'foo': 0, 'bar': 1, 'boo': 2})
+            a = fields.CategoricalField(s, hf['a'], write_enabled=True)
+            a.data.write(values)
+
+            with Timer("array"):
+                total = np.sum(a.data[:])
+            print(total)
+
+            d = a.data[:]
+            a.data[:] = np.where(d == 2, 1, d)
+
+
+    def test_write_then_read_fixed_string(self):
+        from hystore.core.session import Session
+        from hystore.core import fields
+        from hystore.core.utils import Timer
+
+        s = Session()
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            np.random.seed(12345678)
+            values = np.random.randint(low=0, high=4, size=1000000)
+            svalues = [b''.join([b'x'] * v) for v in values]
+            fields.fixed_string_field_constructor(s, hf, 'a', 8)
+            a = fields.FixedStringField(s, hf['a'], write_enabled=True)
+            a.data.write(svalues)
+
+            with Timer("array"):
+                total = np.unique(a.data[:])
+            print(total)
+
+            with Timer("* 2"):
+                a.data[:] = np.core.defchararray.add(a.data[:], b'y')
+            print(a.data[:10])
+
+
+    def test_write_then_read_indexed_string(self):
+        from hystore.core.session import Session
+        from hystore.core import fields
+        from hystore.core.utils import Timer
+
+        s = Session()
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            np.random.seed(12345678)
+            values = np.random.randint(low=0, high=4, size=200000)
+            svalues = [''.join(['x'] * v) for v in values]
+            fields.indexed_string_field_constructor(s, hf, 'a', 8)
+            a = fields.IndexedStringField(s, hf['a'], write_enabled=True)
+            a.data.write(svalues)
+
+            with Timer("array"):
+                total = np.unique(a.data[:])
+            print(total)
+
+            with Timer("* 2"):
+                strs = a.data[:]
+                strs = [s+'y' for s in strs]
+                a.data.clear()
+                a.data.write(strs)
+            print(strs[:10])
+            print(a.indices[:10])
+            print(a.values[:10])
+            print(a.data[:10])

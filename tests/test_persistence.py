@@ -1200,6 +1200,17 @@ class TestJittingSort(unittest.TestCase):
         s_index = sorted(index, key=predicate)
         print(f"sorted in {time.time() - t0}s")
 
+
+class TestDataWriter(unittest.TestCase):
+
+    def test_data_writer(self):
+        from hystore.core.persistence import DataWriter
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            DataWriter.write(hf, 'x', [], 0, dtype='int32')
+            print(hf['x'])
+
+
 class TestLongPersistence(unittest.TestCase):
 
     def test_large_dataset_chunk_settings(self):

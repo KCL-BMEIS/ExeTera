@@ -590,8 +590,8 @@ class DataSchema:
         ('deleted', ['', 'False', 'True'], None, np.uint8, 1, None),
         ('invited_to_test', ['', 'False', 'True'], None, np.uint8, 1, None),
         ('location', ['', 'home', 'drive_through_rtc', 'hospital', 'gp', 'chemist', 'work', 'local_health_dept', 'drop_in_test_centre', 'other'], None, np.uint8, 1, None),
-        ('mechanism', ['', 'nose_swab', 'throat_swab', 'nose_throat_swab', 'spit_tube', 'blood_sample'
-                       'blood_sample_finger_prick', 'blood_sample_needle_draw'], None, np.uint8, 1, None),
+        ('mechanism', ['', 'nose_swab', 'throat_swab', 'nose_throat_swab', 'spit_tube', 'blood_sample',
+                       'blood_sample_finger_prick', 'blood_sample_needle_draw'], None, np.uint8, 1, None, "freetext"),
         ('result', ['', 'waiting', 'failed', 'negative', 'positive'], None, np.uint8, 1, None),
         ('trained_worker', ['', 'trained', 'untrained', 'unsure'], None, np.uint8, 1, None),
     ]

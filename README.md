@@ -2,7 +2,7 @@ The KCL covid19 joinzoe data preparation pipeline.
 
 # Cleaning scripts
 
-Current version: v0.2.3
+Current version: v0.2.5
 
 ---
 # Usage
@@ -123,6 +123,11 @@ python split.py --version
 
 ---
 ## Changes
+
+### v0.2.3 -> v0.2.5
+* Please note: there was no version v0.2.4; due to a numbering error when updating the version number
+* Simplifications to the API
+
 
 ### v0.2.2 -> v0.2.3
 * Data schema updated for 1.5.1

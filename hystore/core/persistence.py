@@ -168,6 +168,17 @@ def _safe_map(data_field, map_field, map_filter):
 class DataWriter:
 
     @staticmethod
+    def clear_dataset(parent_group, name):
+        t = Thread(target=DataWriter._clear_dataset,
+                   args=(parent_group, name))
+        t.start()
+        t.join()
+
+    @staticmethod
+    def _clear_dataset(field, name):
+        del field[name]
+
+    @staticmethod
     def _create_group(parent_group, name, attrs):
         group = parent_group.create_group(name)
         for k, v in attrs:
@@ -1083,6 +1094,7 @@ class CategoricalWriter(Writer):
         self.fieldtype = fieldtype
         self.timestamp = timestamp
         self.datastore = datastore
+        # string:number
         self.keys = categories
 
 
@@ -1173,7 +1185,7 @@ class NumericWriter(Writer):
         return np.zeros(length, dtype=nformat)
 
     def write_part(self, values):
-        if not np.issubdtype(values.dtype, self.nformat):
+        if not np.issubdtype(values.dtype, np.dtype(self.nformat)):
             values = values.astype(self.nformat)
         DataWriter.write(self.field, 'values', values, len(values))
 
