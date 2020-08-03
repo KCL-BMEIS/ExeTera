@@ -215,6 +215,25 @@ class TestPersistence(unittest.TestCase):
             for i in range(len(r_bytes)):
                 self.assertEqual(bvalues[i], r_bytes[i])
 
+    def test_fixed_string_reader_scalar_comparison(self):
+        datastore = persistence.DataStore(10)
+        ts = str(datetime.now(timezone.utc))
+        bio = BytesIO()
+        values = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
+                  '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
+        bvalues = [v.encode() for v in values]
+        with h5py.File(bio, 'w') as hf:
+            foo = persistence.FixedStringWriter(datastore, hf, 'foo', 6, ts)
+            foo.write(bvalues)
+
+        with h5py.File(bio, 'r') as hf:
+            r_bytes = persistence.FixedStringReader(datastore, hf['foo'])[:]
+            r_filtered = r_bytes == b'1.0.0'
+            print(r_filtered)
+            for i in range(len(r_bytes)):
+                self.assertEqual(bvalues[i], r_bytes[i])
+
+
 
     def test_fixed_string_writer_from_reader(self):
 
@@ -850,6 +869,24 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         print(time.time() - t0)
         print(np.sum(c))
 
+
+    def test_index_spans(self):
+        spans = np.asarray([0,2,2,4,5,8,8,10], dtype='int32')
+        results = np.zeros(10, dtype='int32')
+        persistence._index_spans(spans, results)
+        print(results)
+
+
+    def test_get_shared_index(self):
+        datastore = persistence.DataStore(10)
+        a = np.asarray(['a', 'a', 'c', 'c', 'd', 'f', 'f', 'g', 'i'])
+        b = np.asarray(['a', 'b', 'b', 'c', 'f', 'g', 'h', 'h'])
+        c = np.asarray(['b', 'c', 'e', 'e', 'e', 'f', 'f', 'i', 'j'])
+
+        x, y, z = datastore.get_shared_index((a, b, c))
+        print(x)
+        print(y)
+        print(z)
 
 class TestPersistenceOperations(unittest.TestCase):
 

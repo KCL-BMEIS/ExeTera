@@ -12,6 +12,7 @@
 import numpy as np
 
 from hystore.core import persistence
+from hystore.core import fields
 
 
 class FieldDesc:
@@ -88,6 +89,37 @@ class DataSchema:
         'geocodetype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, 9, ts)
     }
 
+
+    new_field_writers = {
+        'idtype': lambda s, g, n, l, ts=None, cs=None:
+            fields.FixedStringImporter(s, g, n, 32, ts, cs),
+        'datetimetype': lambda s, g, n, ts=None, cs=None:
+            fields.DateTimeImporter(s, g, n, False, True, ts, cs),
+        'optionaldatetimetype': lambda s, g, n, ts=None, cs=None:
+            fields.DateTimeImporter(s, g, n, True, True, ts),
+        'datetype':
+            lambda g, cs, n, ts: fields.OptionalDateImporter(g, cs, n, False, ts),
+        'optionaldatetype':
+            lambda g, cs, n, ts: fields.OptionalDateImporter(g, cs, n, True, ts),
+        'versiontype': lambda g, cs, n, ts: fields.FixedStringWriter(g, cs, n, 10, ts),
+        'indexedstringtype': lambda g, cs, n, ts: fields.IndexedStringWriter(g, cs, n, ts),
+        'countrycodetype': lambda g, cs, n, ts: fields.FixedStringWriter(g, cs, n, 2, ts),
+        'unittype': lambda g, cs, n, ts: fields.FixedStringWriter(g, cs, n, 1, ts),
+        'categoricaltype':
+            lambda g, cs, n, stv, ts: fields.CategoricalWriter(g, cs, n, stv, ts),
+        'leakycategoricaltype':
+            lambda g, cs, n, stv, oor, ts: fields.LeakyCategoricalImporter(g, cs, n, stv,
+                                                                                oor, ts),
+        'float32type': lambda g, cs, n, ts: fields.NumericImporter(
+            g, cs, n, 'float32', fields.try_str_to_float, ts),
+        'uint16type': lambda g, cs, n, ts: fields.NumericImporter(
+            g, cs, n, 'uint16', fields.try_str_to_int, ts),
+        'yeartype': lambda g, cs, n, ts: fields.NumericImporter(
+            g, cs, n, 'uint32', fields.try_str_to_float_to_int, ts),
+        'geocodetype': lambda g, cs, n, ts: fields.FixedStringWriter(g, cs, n, 9, ts)
+    }
+
+
     _patient_field_types = {
         'id': 'idtype',
         'created_at': 'datetimetype',
@@ -109,6 +141,7 @@ class DataSchema:
         'clinical_study_institutions': 'indexedstringtype',
         'clinical_study_names': 'indexedstringtype',
         'clinical_study_nct_ids': 'indexedstringtype',
+        'contact_additional_studies': 'categoricaltype',
         'contact_health_worker': 'categoricaltype',
         'diabetes_diagnosis_year': 'uint16type',
         'diabetes_oral_biguanide': 'categoricaltype',
@@ -392,6 +425,7 @@ class DataSchema:
         ('always_used_shortage', ['', 'all_needed', 'reused'], None, np.uint8, 1, None),
         ('blood_group', ['', 'a', 'b', 'ab', 'o', 'unsure', 'pfnts'], None, np.uint8, 1, None),
         ('classic_symptoms', leaky_boolean_to, None, np.uint8, 1, None),
+        ('contact_additional_studies', leaky_boolean_to, None, np.uint8, 1, None),
         ('contact_health_worker', leaky_boolean_to, None, np.uint8, 1, None),
         ('does_chemotherapy', leaky_boolean_to, None, np.uint8, 1, None),
         ('diabetes_oral_biguanide', leaky_boolean_to, None, np.uint8, 1, None),

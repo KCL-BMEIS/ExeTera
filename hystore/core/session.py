@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from hystore.core import persistence as per
+from hystore.core import fields as fld
 
 
 # TODO:
@@ -25,16 +26,23 @@ from hystore.core import persistence as per
  * advanced sorting / filtering
    * FilteredReader / FilteredWriter for applying filters without copying data
    * SortedReader / SortedWriter for applying sorts without copying data
+   * Filters corresponding to the presence or absence of elements of a maybe field
+     * should be marked indicating that they are related to that field. This allows
+       a user to query all the filters generated for different fields, whether the
+       values are valid or whether they are a standard filtering for different
+       categories (age sub-ranges, for example)
  * reader/writers
-   * should be able to read/write through the same object
+   * should be able to read/write through the same object (they can now but not like this)
      rw = s.get(name)
-     rw.w[:] = data
-     data = rw.r[:]
+     rw.writeable.data[:] = data
+     data = rw.data[:]
    * soft sorting / filtering
      rw = s.get(name)
      rw.add_transform(filter)
      rw.add_transform(sort)
-     rw.w[:] = data
+     rw.writeable[:] = data # can this be done?
+     rw.clean()
+     rw.write(data)
 """
 
 class Session:
@@ -514,6 +522,23 @@ class Session:
 
         writer.write(destination_space_values)
 
+    def get(self, field):
+        if 'fieldtype' not in field.attrs.keys():
+            raise ValueError(f"'{field_name}' is not a well-formed field")
+
+        fieldtype_map = {
+            'indexedstring': fld.IndexedStringField,
+            'fixedstring': fld.FixedStringField,
+            'categorical': fld.CategoricalField,
+            'boolean': fld.NumericField,
+            'numeric': fld.NumericField,
+            'datetime': fld.TimestampField,
+            'date': fld.TimestampField,
+            'timestamp': fld.TimestampField
+        }
+
+        fieldtype = field.attrs['fieldtype'].split(',')[0]
+        return fieldtype_map[fieldtype](self, field)
 
     def get_reader(self, field):
         if 'fieldtype' not in field.attrs.keys():

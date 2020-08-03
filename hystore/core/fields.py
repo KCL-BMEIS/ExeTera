@@ -1,29 +1,10 @@
+from datetime import datetime, timezone
+
 import numpy as np
 import numba
 import h5py
 
 from hystore.core.persistence import DataWriter
-
-"""
-Design thoughts & snippets for fields:
-
-Is there a difference between writing and importing?
-. importing: scalably write data of an unknown length by successive appends
-. writing: write the results of a transform on data of a known length
-# reader/writer properties
-f = ds.get('x')
-v = f.r[:]
-f.w[:] = v * 2
-
-f = ds.get('x')
-v = f[:]
-f[:] = v * 2
-# or
-f.write(v * 2)
-
-f = ds.get('x')
-
-"""
 
 
 # def test_field_iterator(data):
@@ -41,22 +22,6 @@ f = ds.get('x')
 #     for i in iter_:
 #         total += i
 #     return total
-#
-# class TestField:
-#
-#     def __init__(self, data):
-#         self.data = data
-#
-#     def __getitem__(self, item):
-#         print("__getitem__({})".format(item))
-#         return self.data[item]
-#
-#     def __setitem__(self, key, value):
-#         print("__setitem__({}, {}".format(key, value))
-#         self.data[key] = value
-#
-#     def __iter__(self):
-#         return test_field_iterator(self.data)
 
 
 class Field:
@@ -74,7 +39,7 @@ class Field:
         else:
             if name is not None:
                 if name in group.keys():
-                    self._field = group['name']
+                    self._field = group[name]
                     self._fieldtype = self._field.attrs['fieldtype']
                     self._write_enabled = write_enabled
                 else:
@@ -109,7 +74,7 @@ class ReadOnlyFieldArray:
         return self._dataset.dtype
 
     def __getitem__(self, item):
-        self._dataset[item]
+        return self._dataset[item]
 
     def __setitem__(self, key, value):
         raise PermissionError("This field was created read-only; call <field>.writeable() "
@@ -156,10 +121,11 @@ class WriteableFieldArray:
         DataWriter._clear_dataset(self._field, self._name)
 
     def write_part(self, part):
-        DataWriter.write_part(self._field, self._name, part, len(part), dtype=self._dataset.dtype)
+        DataWriter.write(self._field, self._name, part, len(part), dtype=self._dataset.dtype)
 
     def write(self, part):
         DataWriter.write(self._field, self._name, part, len(part), dtype=self._dataset.dtype)
+        self.complete()
 
     def complete(self):
         DataWriter.flush(self._field[self._name])
@@ -180,7 +146,7 @@ class ReadOnlyIndexedFieldArray:
         try:
             if isinstance(item, slice):
                 start = item.start if item.start is not None else 0
-                stop = item.stop if item.stop is not None else len(self._field_index) - 1
+                stop = item.stop if item.stop is not None else len(self._index_dataset) - 1
                 step = item.step
                 #TODO: validate slice
                 index = self._index_dataset[start:stop+1]
@@ -193,7 +159,7 @@ class ReadOnlyIndexedFieldArray:
                                 index[ir+1]-np.int64(startindex)].tobytes().decode()
                 return results
         except Exception as e:
-            print("{}: unexpected exception {}".format(self.field.name, e))
+            print("{}: unexpected exception {}".format(self._field.name, e))
             raise
 
     def __setitem__(self, key, value):
@@ -348,14 +314,15 @@ def categorical_field_constructor(session, group, name, nformat, key,
     DataWriter.write(field, 'key_names', key_names, len(key_names), h5py.special_dtype(vlen=str))
 
 
+def timestamp_field_constructor(session, group, name, timestamp=None, chunksize=None):
+    field = base_field_contructor(session, group, name, timestamp, chunksize)
+    field.attrs['fieldtype'] = 'timestamp'
+    DataWriter.write(field, 'values', [], 0, 'float64')
+
+
 class IndexedStringField(Field):
-    def __init__(self, session, group,
-                 name=None, timestamp=None, write_enabled='write'):
-        additional = None
-        if name is not None and name not in group:
-            # new field
-            additional = {'fieldtype': 'indexedstring'}
-        super().__init__(session, group, name=name, additional_attributes=additional,
+    def __init__(self, session, group, name=None, timestamp=None, write_enabled=False):
+        super().__init__(session, group, name=name,
                          timestamp=timestamp, write_enabled=write_enabled)
         self._data_wrapper = None
         self._index_wrapper = None
@@ -386,19 +353,11 @@ class IndexedStringField(Field):
             self._value_wrapper = wrapper(self._field, 'values')
         return self._value_wrapper
 
-    # def dtype(self):
-    #     return self
-
 
 class FixedStringField(Field):
-    def __init__(self, session, group,
-                 name=None, length=None, timestamp=None, write_enabled='write'):
-        additional = {}
-        if length is not None:
-            additional['fieldtype'] = 'fixedstring,{}'.format(length)
-        super().__init__(session, group, name=name, additional_attributes=additional,
+    def __init__(self, session, group, name=None, timestamp=None, write_enabled=False):
+        super().__init__(session, group, name=name,
                          timestamp=timestamp, write_enabled=write_enabled)
-        self._length = length
 
     def writeable(self):
         return FixedStringField(self._session, self._field, write_enabled=True)
@@ -412,20 +371,11 @@ class FixedStringField(Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
-    # @property
-    # def dtype(self):
-    #     return "S{}".format(self._length)
-
 
 class NumericField(Field):
-    def __init__(self, session, group,
-                 name=None, nformat=None, timestamp=None, write_enabled=False):
-        additional = {}
-        if nformat is not None:
-            additional['fieldtype'] = 'fieldtype,{}'.format(nformat)
-        super().__init__(session, group, name=name, additional_attributes=additional,
+    def __init__(self, session, group, name=None, timestamp=None, write_enabled=False):
+        super().__init__(session, group, name=name,
                          timestamp=timestamp, write_enabled=write_enabled)
-        self._nformat = nformat
 
     def writeable(self):
         return NumericField(self._session, self._field, write_enabled=True)
@@ -439,28 +389,12 @@ class NumericField(Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
-    # @property
-    # def dtype(self):
-    #     return self._nformat
-
 
 class CategoricalField(Field):
     def __init__(self, session, group,
-                 name=None, key=None, nformat=None, timestamp=None, write_enabled=False):
-        additional = {}
-        key_fields = None
-        if nformat is not None:
-            additional['fieldtype'] = 'fieldtype,{}'.format(nformat)
-
-        if key is not None:
-            key_fields = dict()
-            key_fields['key_values'] = ([v for k, v in key.items()], 'int8')
-            key_fields['key_names'] = ([k for k, v in key.items()], h5py.special_dtype(vlen=str))
-
-        super().__init__(session, group, name=name, additional_attributes=additional,
-                         auxilliary_fields=key_fields, timestamp=timestamp,
-                         write_enabled=write_enabled)
-        self._nformat = nformat
+                 name=None, timestamp=None, write_enabled=False):
+        super().__init__(session, group, name=name,
+                         timestamp=timestamp, write_enabled=write_enabled)
 
     def writeable(self):
         return CategoricalField(self._session, self._field, write_enabled=True)
@@ -474,9 +408,6 @@ class CategoricalField(Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
-    # @property
-    # def dtype(self):
-    #     return self._nformat
 
     # Note: key is presented as value: str, even though the dictionary must be presented
     # as str: value
@@ -488,572 +419,237 @@ class CategoricalField(Field):
         return keys
 
 
+class TimestampField(Field):
+    def __init__(self, session, group, name=None, timestamp=None, write_enabled=False):
+        super().__init__(session, group, name=name,
+                         timestamp=timestamp, write_enabled=write_enabled)
+
+    def writeable(self):
+        return TimestampField(self._session, self._field, write_enabled=True)
+
+    @property
+    def data(self):
+        if self._value_wrapper is None:
+            if self._write_enabled:
+                self._value_wrapper = WriteableFieldArray(self._field, 'values')
+            else:
+                self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
+        return self._value_wrapper
 
 
+class IndexedStringImporter:
+    def __init__(self, session, group, name, timestamp=None, chunksize=None):
+        indexed_string_field_constructor(session, group, name, timestamp, chunksize)
+        self._field = IndexedStringField(session, group, name, write_enabled=True)
 
-# class TimestampReader(Reader):
-#     def __init__(self, datastore, field):
-#         Reader.__init__(self, field)
-#         if 'fieldtype' not in field.attrs.keys():
-#             error = "{} must have 'fieldtype' in its attrs property"
-#             raise ValueError(error.format(field))
-#         fieldtype = field.attrs['fieldtype'].split(',')
-#         if fieldtype[0] not in ('datetime', 'date', 'timestamp'):
-#             error = "'fieldtype of '{} should be 'datetime' or 'date' but is {}"
-#             raise ValueError(error.format(field, fieldtype))
-#         self.chunksize = field.attrs['chunksize']
-#         self.datastore = datastore
-#
-#     def __getitem__(self, item):
-#         return self.field['values'][item]
-#
-#     def __len__(self):
-#         return len(self.field['values'])
-#
-#     def get_writer(self, dest_group, dest_name, timestamp=None, write_mode='write'):
-#         return TimestampWriter(self.datastore, dest_group, dest_name, timestamp,
-#                                write_mode)
-#
-#     def dtype(self):
-#         return self.field['values'].dtype
-#
-#
-# write_modes = {'write', 'overwrite'}
-#
-#
-# class Writer:
-#     def __init__(self, datastore, group, name, write_mode, attributes):
-#         self.trash_field = None
-#         if write_mode not in write_modes:
-#             raise ValueError(f"'write_mode' must be one of {write_modes}")
-#         if name in group:
-#             if write_mode == 'overwrite':
-#                 field = group[name]
-#                 trash = datastore.get_trash_group(field)
-#                 dest_name = trash.name + f"/{name.split('/')[-1]}"
-#                 group.move(field.name, dest_name)
-#                 self.trash_field = trash[name]
-#                 DataWriter.create_group(group, name, attributes)
-#             else:
-#                 error = (f"Field '{name}' already exists. Set 'write_mode' to 'overwrite' "
-#                          "if you want to overwrite the existing contents")
-#                 raise KeyError(error)
-#         else:
-#             DataWriter.create_group(group, name, attributes)
-#         self.field = group[name]
-#         self.name = name
-#
-#     def flush(self):
-#         DataWriter.flush(self.field)
-#         if self.trash_field is not None:
-#             del self.trash_field
-#
-#
-# class IndexedStringWriter(Writer):
-#     def __init__(self, datastore, group, name,
-#                  timestamp=None, write_mode='write'):
-#         if timestamp is None:
-#             timestamp = datastore.timestamp
-#         fieldtype = f'indexedstring'
-#         super().__init__(datastore, group, name, write_mode,
-#                          (('fieldtype', fieldtype), ('timestamp', timestamp),
-#                           ('chunksize', datastore.chunksize)))
-#         self.fieldtype = fieldtype
-#         self.timestamp = timestamp
-#         self.datastore = datastore
-#
-#         self.values = np.zeros(self.datastore.chunksize, dtype=np.uint8)
-#         self.indices = np.zeros(self.datastore.chunksize, dtype=np.int64)
-#         self.ever_written = False
-#         self.accumulated = 0
-#         self.value_index = 0
-#         self.index_index = 0
-#
-#     def chunk_factory(self, length):
-#         return [None] * length
-#
-#     def write_part(self, values):
-#         """Writes a list of strings in indexed string form to a field
-#         Args:
-#             values: a list of utf8 strings
-#         """
-#         if not self.ever_written:
-#             self.indices[0] = self.accumulated
-#             self.index_index = 1
-#             self.ever_written = True
-#
-#         for s in values:
-#             evalue = s.encode()
-#             for v in evalue:
-#                 self.values[self.value_index] = v
-#                 self.value_index += 1
-#                 if self.value_index == self.datastore.chunksize:
-#                     DataWriter.write(self.field, 'values', self.values, self.value_index)
-#                     self.value_index = 0
-#                 self.accumulated += 1
-#             self.indices[self.index_index] = self.accumulated
-#             self.index_index += 1
-#             if self.index_index == self.datastore.chunksize:
-#                 DataWriter.write(self.field, 'index', self.indices, self.index_index)
-#                 self.index_index = 0
-#
-#     def flush(self):
-#         if self.value_index != 0:
-#             DataWriter.write(self.field, 'values', self.values, self.value_index)
-#             self.value_index = 0
-#         if self.index_index != 0:
-#             DataWriter.write(self.field, 'index', self.indices, self.index_index)
-#             self.index_index = 0
-#         # self.field.attrs['fieldtype'] = self.fieldtype
-#         # self.field.attrs['timestamp'] = self.timestamp
-#         # self.field.attrs['chunksize'] = self.chunksize
-#         # self.field.attrs['completed'] = True
-#         super().flush()
-#
-#     def write(self, values):
-#         self.write_part(values)
-#         self.flush()
-#
-#     def write_part_raw(self, index, values):
-#         if index.dtype != np.int64:
-#             raise ValueError(f"'index' must be an ndarray of '{np.int64}'")
-#         if values.dtype != np.uint8:
-#             raise ValueError(f"'values' must be an ndarray of '{np.uint8}'")
-#         DataWriter.write(self.field, 'index', index, len(index))
-#         DataWriter.write(self.field, 'values', values, len(values))
-#
-#     def write_raw(self, index, values):
-#         self.write_part_raw(index, values)
-#         self.flush()
-#
-#
-# # TODO: should produce a warning for unmappable strings and a corresponding filter, rather
-# # than raising an exception; or at least have a mode where this is possible
-# class LeakyCategoricalImporter:
-#     def __init__(self, datastore, group, name, categories, out_of_range,
-#                  timestamp=None, write_mode='write'):
-#         if timestamp is None:
-#             timestamp = datastore.timestamp
-#         self.writer = CategoricalWriter(datastore, group, name,
-#                                         categories, timestamp, write_mode)
-#         self.other_values = IndexedStringWriter(datastore, group, f"{name}_{out_of_range}",
-#                                                 timestamp, write_mode)
-#         self.field_size = max([len(k) for k in categories.keys()])
-#
-#     def chunk_factory(self, length):
-#         return np.zeros(length, dtype=f'U{self.field_size}')
-#
-#     def write_part(self, values):
-#         results = np.zeros(len(values), dtype='int8')
-#         strresults = list([""] * len(values))
-#         keys = self.writer.keys
-#         anomalous_count = 0
-#         for i in range(len(values)):
-#             value = keys.get(values[i], -1)
-#             if value != -1:
-#                 results[i] = value
-#             else:
-#                 anomalous_count += 1
-#                 results[i] = -1
-#                 strresults[i] = values[i]
-#         self.writer.write_part(results)
-#         self.other_values.write_part(strresults)
-#
-#     def flush(self):
-#         # add a 'freetext' value to keys
-#         self.writer.keys['freetext'] = -1
-#         self.writer.flush()
-#         self.other_values.flush()
-#
-#     def write(self, values):
-#         self.write_part(values)
-#         self.flush()
-#
-#
-# # TODO: should produce a warning for unmappable strings and a corresponding filter, rather
-# # than raising an exception; or at least have a mode where this is possible
-# class CategoricalImporter:
-#     def __init__(self, datastore, group, name, categories,
-#                  timestamp=None, write_mode='write'):
-#         if timestamp is None:
-#             timestamp = datastore.timestamp
-#         self.writer = CategoricalWriter(datastore, group, name,
-#                                         categories, timestamp, write_mode)
-#         self.field_size = max([len(k) for k in categories.keys()])
-#
-#     def chunk_factory(self, length):
-#         return np.zeros(length, dtype=f'U{self.field_size}')
-#
-#     def write_part(self, values):
-#         results = np.zeros(len(values), dtype='int8')
-#         keys = self.writer.keys
-#         for i in range(len(values)):
-#             results[i] = keys[values[i]]
-#         self.writer.write_part(results)
-#
-#     def flush(self):
-#         self.writer.flush()
-#
-#     def write(self, values):
-#         self.write_part(values)
-#         self.flush()
-#
-#
-# class CategoricalWriter(Writer):
-#     def __init__(self, datastore, group, name, categories,
-#                  timestamp=None, write_mode='write'):
-#         if timestamp is None:
-#             timestamp = datastore.timestamp
-#         fieldtype = f'categorical'
-#         super().__init__(datastore, group, name, write_mode,
-#                          (('fieldtype', fieldtype), ('timestamp', timestamp),
-#                           ('chunksize', datastore.chunksize)))
-#         self.fieldtype = fieldtype
-#         self.timestamp = timestamp
-#         self.datastore = datastore
-#         self.keys = categories
-#
-#
-#     def chunk_factory(self, length):
-#         return np.zeros(length, dtype='int8')
-#
-#     def write_part(self, values):
-#         DataWriter.write(self.field, 'values', values, len(values))
-#
-#     def flush(self):
-#         key_strs = list()
-#         key_values = np.zeros(len(self.keys), dtype='int8')
-#         items = self.keys.items()
-#         for i, kv in enumerate(items):
-#             k, v = kv
-#             key_strs.append(k)
-#             key_values[i] = v
-#         DataWriter.write(self.field, 'key_values', key_values, len(key_values))
-#         DataWriter.write(self.field, 'key_names', key_strs, len(key_strs),
-#                          dtype=h5py.string_dtype())
-#         # self.field.attrs['fieldtype'] = self.fieldtype
-#         # self.field.attrs['timestamp'] = self.timestamp
-#         # self.field.attrs['chunksize'] = self.chunksize
-#         # self.field.attrs['completed'] = True
-#         super().flush()
-#
-#     def write(self, values):
-#         self.write_part(values)
-#         self.flush()
-#
-#
-# class NumericImporter:
-#     def __init__(self, datastore, group, name, nformat, parser,
-#                  timestamp=None, write_mode='write'):
-#         if timestamp is None:
-#             timestamp = datastore.timestamp
-#         self.data_writer = NumericWriter(datastore, group, name,
-#                                          nformat, timestamp, write_mode)
-#         self.flag_writer = NumericWriter(datastore, group, f"{name}_valid",
-#                                          'bool', timestamp, write_mode)
-#         self.parser = parser
-#
-#     def chunk_factory(self, length):
-#         return [None] * length
-#
-#     def write_part(self, values):
-#         """
-#         Given a list of strings, parse the strings and write the parsed values. Values that
-#         cannot be parsed are written out as zero for the values, and zero for the flags to
-#         indicate that that entry is not valid.
-#         Args:
-#             values: a list of strings to be parsed
-#         """
-#         elements = np.zeros(len(values), dtype=self.data_writer.nformat)
-#         validity = np.zeros(len(values), dtype='bool')
-#         for i in range(len(values)):
-#             valid, value = self.parser(values[i])
-#             elements[i] = value
-#             validity[i] = valid
-#         self.data_writer.write_part(elements)
-#         self.flag_writer.write_part(validity)
-#
-#     def flush(self):
-#         self.data_writer.flush()
-#         self.flag_writer.flush()
-#
-#     def write(self, values):
-#         self.write_part(values)
-#         self.flush()
-#
-#
-# class NumericWriter(Writer):
-#     def __init__(self, datastore, group, name, nformat,
-#                  timestamp=None, write_mode='write'):
-#         if timestamp is None:
-#             timestamp = datastore.timestamp
-#         fieldtype = f'numeric,{nformat}'
-#         super().__init__(datastore, group, name, write_mode,
-#                          (('fieldtype', fieldtype), ('timestamp', timestamp),
-#                           ('chunksize', datastore.chunksize), ('nformat', nformat)))
-#         self.fieldtype = fieldtype
-#         self.nformat = nformat
-#         self.timestamp = timestamp
-#         self.datastore = datastore
-#
-#     def chunk_factory(self, length):
-#         nformat = self.fieldtype.split(',')[1]
-#         return np.zeros(length, dtype=nformat)
-#
-#     def write_part(self, values):
-#         if not np.issubdtype(values.dtype, self.nformat):
-#             values = values.astype(self.nformat)
-#         DataWriter.write(self.field, 'values', values, len(values))
-#
-#     def flush(self):
-#         # self.field.attrs['fieldtype'] = self.fieldtype
-#         # self.field.attrs['timestamp'] = self.timestamp
-#         # self.field.attrs['chunksize'] = self.chunksize
-#         # self.field.attrs['nformat'] = self.nformat
-#         # self.field.attrs['completed'] = True
-#         super().flush()
-#
-#     def write(self, values):
-#         self.write_part(values)
-#         self.flush()
-#
-#
-# class FixedStringWriter(Writer):
-#     def __init__(self, datastore, group, name, strlen,
-#                  timestamp=None, write_mode='write'):
-#         if timestamp is None:
-#             timestamp = datastore.timestamp
-#         fieldtype = f'fixedstring,{strlen}'
-#         super().__init__(datastore, group, name, write_mode,
-#                          (('fieldtype', fieldtype), ('timestamp', timestamp),
-#                           ('chunksize', datastore.chunksize), ('strlen', strlen)))
-#         self.fieldtype = fieldtype
-#         self.timestamp = timestamp
-#         self.datastore = datastore
-#         self.strlen = strlen
-#
-#     def chunk_factory(self, length):
-#         return np.zeros(length, dtype=f'S{self.strlen}')
-#
-#     def write_part(self, values):
-#         DataWriter.write(self.field, 'values', values, len(values))
-#
-#     def flush(self):
-#         # self.field.attrs['fieldtype'] = self.fieldtype
-#         # self.field.attrs['timestamp'] = self.timestamp
-#         # self.field.attrs['chunksize'] = self.chunksize
-#         # self.field.attrs['strlen'] = self.strlen
-#         # self.field.attrs['completed'] = True
-#         super().flush()
-#
-#     def write(self, values):
-#         self.write_part(values)
-#         self.flush()
-#
-#
-# class DateTimeImporter:
-#     def __init__(self, datastore, group, name,
-#                  optional=True, timestamp=None, write_mode='write'):
-#         if timestamp is None:
-#             timestamp = datastore.timestamp
-#         self.datetime = DateTimeWriter(datastore, group, name,
-#                                        timestamp, write_mode)
-#         self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
-#                                          '10', timestamp, write_mode)
-#         self.datetimeset = None
-#         if optional:
-#             self.datetimeset = NumericWriter(datastore, group, f"{name}_set",
-#                                              'bool', timestamp, write_mode)
-#
-#     def chunk_factory(self, length):
-#         return self.datetime.chunk_factory(length)
-#
-#     def write_part(self, values):
-#         # TODO: use a timestamp writer instead of a datetime writer and do the conversion here
-#
-#         days = self.datestr.chunk_factory(len(values))
-#         flags = None
-#         if self.datetimeset is not None:
-#             flags = self.datetimeset.chunk_factory(len(values))
-#             for i in range(len(values)):
-#                 flags[i] = values[i] != b''
-#                 days[i] = values[i][:10]
-#         else:
-#             for i in range(len(values)):
-#                 days[i] = values[i][:10]
-#
-#         self.datetime.write_part(values)
-#         self.datestr.write_part(days)
-#         if self.datetimeset is not None:
-#             self.datetimeset.write_part(flags)
-#
-#     def flush(self):
-#         self.datetime.flush()
-#         self.datestr.flush()
-#         if self.datetimeset is not None:
-#             self.datetimeset.flush()
-#
-#     def write(self, values):
-#         self.write_part(values)
-#         self.flush()
-#
-#
-# # TODO writers can write out more than one field; offset could be done this way
-# class DateTimeWriter(Writer):
-#     def __init__(self, datastore, group, name,
-#                  timestamp=None, write_mode='write'):
-#         if timestamp is None:
-#             timestamp = datastore.timestamp
-#         fieldtype = f'datetime'
-#         super().__init__(datastore, group, name, write_mode,
-#                          (('fieldtype', fieldtype), ('timestamp', timestamp),
-#                           ('chunksize', datastore.chunksize)))
-#         self.fieldtype = fieldtype
-#         self.timestamp = timestamp
-#         self.datastore = datastore
-#
-#     def chunk_factory(self, length):
-#         return np.zeros(length, dtype=f'S32')
-#
-#     def write_part(self, values):
-#         timestamps = np.zeros(len(values), dtype=np.float64)
-#         for i in range(len(values)):
-#             value = values[i]
-#             if value == b'':
-#                 timestamps[i] = 0
-#             else:
-#                 if len(value) == 32:
-#                     ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S.%f%z')
-#                 elif len(value) == 25:
-#                     ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S%z')
-#                 else:
-#                     raise ValueError(f"Date field '{self.field}' has unexpected format '{value}'")
-#                 timestamps[i] = ts.timestamp()
-#         DataWriter.write(self.field, 'values', timestamps, len(timestamps))
-#
-#     def flush(self):
-#         # self.field.attrs['fieldtype'] = self.fieldtype
-#         # self.field.attrs['timestamp'] = self.timestamp
-#         # self.field.attrs['chunksize'] = self.chunksize
-#         # self.field.attrs['completed'] = True
-#         super().flush()
-#
-#     def write(self, values):
-#         self.write_part(values)
-#         self.flush()
-#
-#
-# class DateWriter(Writer):
-#     def __init__(self, datastore, group, name,
-#                  timestamp=None, write_mode='write'):
-#         if timestamp is None:
-#             timestamp = datastore.timestamp
-#         fieldtype = 'date'
-#         super().__init__(datastore, group, name, write_mode,
-#                          (('fieldtype', fieldtype), ('timestamp', timestamp),
-#                           ('chunksize', datastore.chunksize)))
-#         self.fieldtype = fieldtype
-#         self.timestamp = timestamp
-#         self.datastore = datastore
-#
-#     def chunk_factory(self, length):
-#         return np.zeros(length, dtype=f'S10')
-#
-#     def write_part(self, values):
-#
-#         timestamps = np.zeros(len(values), dtype=np.float64)
-#         for i in range(len(values)):
-#             value = values[i]
-#             if value == b'':
-#                 timestamps[i] = 0
-#             else:
-#                 ts = datetime.strptime(value.decode(), '%Y-%m-%d')
-#                 timestamps[i] = ts.timestamp()
-#         DataWriter.write(self.field, 'values', timestamps, len(timestamps))
-#
-#     def flush(self):
-#         # self.field.attrs['fieldtype'] = self.fieldtype
-#         # self.field.attrs['timestamp'] = self.timestamp
-#         # self.field.attrs['chunksize'] = self.chunksize
-#         # self.field.attrs['completed'] = True
-#         super().flush()
-#
-#     def write(self, values):
-#         self.write_part(values)
-#         self.flush()
-#
-#
-# class TimestampWriter(Writer):
-#     def __init__(self, datastore, group, name,
-#                  timestamp=None, write_mode='write'):
-#         if timestamp is None:
-#             timestamp = datastore.timestamp
-#         fieldtype = 'timestamp'
-#         super().__init__(datastore, group, name, write_mode,
-#                          (('fieldtype', fieldtype), ('timestamp', timestamp),
-#                           ('chunksize', datastore.chunksize)))
-#         self.fieldtype = fieldtype
-#         self.timestamp = timestamp
-#         self.datastore = datastore
-#
-#     def chunk_factory(self, length):
-#         return np.zeros(length, dtype=f'float64')
-#
-#     def write_part(self, values):
-#         DataWriter.write(self.field, 'values', values, len(values))
-#
-#     def flush(self):
-#         # self.field.attrs['fieldtype'] = self.fieldtype
-#         # self.field.attrs['timestamp'] = self.timestamp
-#         # self.field.attrs['chunksize'] = self.chunksize
-#         # self.field.attrs['completed'] = True
-#         Writer.flush(self)
-#
-#     def write(self, values):
-#         self.write_part(values)
-#         self.flush()
-#
-#
-# class OptionalDateImporter:
-#     def __init__(self, datastore, group, name,
-#                  optional=True, timestamp=None, write_mode='write'):
-#         if timestamp is None:
-#             timestamp = datastore.timestamp
-#         self.date = DateWriter(datastore, group, name, timestamp, write_mode)
-#         self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
-#                                          '10', timestamp, write_mode)
-#         self.dateset = None
-#         if optional:
-#             self.dateset =\
-#                 NumericWriter(datastore, group, f"{name}_set", 'bool', timestamp, write_mode)
-#
-#     def chunk_factory(self, length):
-#         return self.date.chunk_factory(length)
-#
-#     def write_part(self, values):
-#         # TODO: use a timestamp writer instead of a datetime writer and do the conversion here
-#         days = self.datestr.chunk_factory(len(values))
-#         flags = None
-#         if self.dateset is not None:
-#             flags = self.dateset.chunk_factory(len(values))
-#             for i in range(len(values)):
-#                 flags[i] = values[i] != b''
-#                 days[i] = values[i][:10]
-#         else:
-#             for i in range(len(values)):
-#                 days[i] = values[i][:10]
-#
-#         self.date.write_part(values)
-#         self.datestr.write_part(days)
-#         if self.dateset is not None:
-#             self.dateset.write_part(flags)
-#
-#     def flush(self):
-#         self.date.flush()
-#         self.datestr.flush()
-#         if self.dateset is not None:
-#             self.dateset.flush()
-#
-#     def write(self, values):
-#         self.write_part(values)
-#         self.flush()
+    def chunk_factory(self, length):
+        return [None] * length
+
+    def write_part(self, values):
+        self._field.data.write_part(values)
+
+    def complete(self):
+        self._field.data.complete()
+
+    def write(self, values):
+        self.write_part(values)
+        self.complete()
+
+
+class FixedStringImporter:
+    def __init__(self, session, group, name, length, timestamp=None, chunksize=None):
+        fixed_string_field_constructor(session, group, name, length, timestamp, chunksize)
+        self._field = FixedStringField(session, group, name, write_enabled=True)
+
+    def chunk_factory(self, length):
+        return np.zeros(length, dtype='S{}'.format(self._field.data.dtype))
+
+    def write_part(self, values):
+        self._field.data.write_part([v.encode() for v in values])
+
+    def complete(self):
+        self._field.data.complete()
+
+    def write(self, values):
+        self.write_part(values)
+        self.complete()
+
+
+class NumericImporter:
+    def __init__(self, session, group, name, dtype, parser, timestamp=None, chunksize=None):
+        numeric_field_constructor(session, group, name, dtype, timestamp, chunksize)
+        numeric_field_constructor(session, group, '{}_valid'.format(name), 'bool',
+                                  timestamp, chunksize)
+
+        chunksize = session.chunksize if chunksize is None else chunksize
+        self._field = NumericField(session, group, name, write_enabled=True)
+        self._filter_field = NumericField(session, group, name, write_enabled=True)
+
+        self._parser = parser
+        self._values = np.zeros(chunksize, dtype=self._field.data.dtype)
+
+        self._filter_values = np.zeros(chunksize, dtype='bool')
+
+    def chunk_factory(self, length):
+        return np.zeros(length, dtype=self._field.data.dtype)
+
+    def write_part(self, values):
+        for i in range(len(values)):
+            valid, value = self._parser(values[i])
+            self._values[i] = value
+            self._filter_values[i] = valid
+        self._field.data.write_part(self._values)
+        self._filter_field.data.write_part(self._filter_values)
+
+    def complete(self):
+        self._field.data.complete()
+        self._filter_field.data.complete()
+
+    def write(self, values):
+        self.write_part(values)
+        self.complete()
+
+
+class CategoricalImporter:
+    def __init__(self, session, group, name, keys, value_type, timestamp=None, chunksize=None):
+        categorical_field_constructor(session, group, name, keys, value_type, timestamp, chunksize)
+        self._field = CategoricalField(session, group, name, write_enabled=True)
+        self._keys = keys
+        self._dtype = value_type
+        self._key_type = 'S{}'.format(max(k.encode() for k in keys))
+        self._results = np.zeros(chunksize, dtype=value_type)
+
+    def chunk_factory(self, length):
+        return np.zeros(length, dtype=self._key_type)
+
+    def write_part(self, values):
+        keys = self._keys
+        results = self._results
+        for i in range(len(values)):
+            results = keys[values[i]]
+        self._field.data.write_part(results)
+
+    def complete(self):
+        self._field.data.complete()
+
+    def write(self, values):
+        self.write_part(values)
+        self.complete()
+
+
+class LeakyCategoricalImporter:
+    def __init__(self, session, group, name, keys, value_type, out_of_range,
+                 timestamp=None, chunksize=None):
+        categorical_field_constructor(session, group, name, keys, value_type,
+                                      timestamp, chunksize)
+        numeric_field_constructor(session, group, '{}_{}'.format(name, out_of_range), 'int8',
+                                  timestamp, chunksize)
+
+        self._field = CategoricalField(session, group, name, write_enabled=True)
+        self._str_field = IndexedStringField(session, group, name, write_enabled=True)
+
+        self._keys = keys
+        self._dtype = value_type
+        self._key_type = 'S{}'.format(max(k.encode() for k in keys))
+
+        self._results = np.zeros(chunksize, dtype=value_type)
+
+    def chunk_factory(self, length):
+        return np.zeros(length, dtype=self._key_type)
+
+    def write_part(self, values):
+        keys = self._keys
+        results = self._results
+        strresults = self._strresult
+        for i in range(len(values)):
+            value = keys.get(values[i], -1)
+            if value == -1:
+                strresults[i] = values[i]
+            else:
+                strresults[i] = ''
+            results[i] = value
+            results = keys[values[i]]
+        self._field.data.write_part(results)
+        self._str_field.data.write_part(strresults)
+
+    def complete(self):
+        self._field.data.complete()
+        self._str_field.data.complete()
+
+    def write(self, values):
+        self.write_part(values)
+        self.complete()
+
+
+class DateTimeImporter:
+    def __init__(self, session, group, name,
+                 optional=False, write_days=False, timestamp=None, chunksize=None):
+        timestamp_field_constructor(session, group, name, timestamp, chunksize)
+        self._field = TimestampField(session, group, name, timestamp, write_enabled=True)
+        self._results = np.zeros(chunksize, dtype='float64')
+
+        if optional is True:
+            filter_name = '{}_set'.format(name)
+            numeric_field_constructor(session, group, filter_name, 'bool',
+                                      timestamp, chunksize)
+            self._filter_field = NumericField(session, group, filter_name, write_enabled=True)
+
+    def chunk_factory(self, length):
+        return np.zeros(length, dtype='float64')
+
+    def write_part(self, values):
+        results = self._results
+
+        for i, v in enumerate(values):
+            if len(v) == 32:
+                ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S.%f%z')
+            elif len(v) == 25:
+                ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S%z')
+            else:
+                msg = "Date field '{}' has unexpected format '{}'"
+                raise ValueError(msg.format(self._field, v))
+            results[i] = ts.timestamp
+
+        self._field.data.write_part(results)
+
+    def complete(self):
+        self._field.data.complete()
+
+    def write(self, values):
+        self.write_part(values)
+        self.complete()
+
+
+class DateImporter:
+    def __init__(self, session, group, name,
+                 optional=False, timestamp=None, chunksize=None):
+        timestamp_field_constructor(session, group, name, timestamp, chunksize)
+        self._field = TimestampField(session, group, name, timestamp, write_enabled=True)
+        self._results = np.zeros(chunksize, dtype='float64')
+
+        if optional is True:
+            filter_name = '{}_set'.format(name)
+            numeric_field_constructor(session, group, filter_name, 'bool',
+                                      timestamp, chunksize)
+            self._filter_field = NumericField(session, group, filter_name, write_enabled=True)
+
+    def chunk_factory(self, length):
+        return np.zeros(length, dtype=f'S10')
+
+    def write_part(self, values):
+        timestamps = np.zeros(len(values), dtype=np.float64)
+        for i in range(len(values)):
+            value = values[i]
+            if value == '':
+                timestamps[i] = np.nan()
+            else:
+                ts = datetime.strptime(value, '%Y-%m-%d')
+                timestamps[i] = ts.timestamp()
+        self._field.data.write_part(timestamps)
+
+    def complete(self):
+        self._field.data.complete()
+
+    def write(self, values):
+        self.write_part(values)
+        self.complete()

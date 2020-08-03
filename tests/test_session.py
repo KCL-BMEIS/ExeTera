@@ -6,6 +6,7 @@ from io import BytesIO
 import h5py
 
 from hystore.core import session
+from hystore.core import fields
 from hystore.core import persistence as per
 
 
@@ -223,3 +224,59 @@ class TestSessionFields(unittest.TestCase):
             print(a.indices[:10])
             print(a.values[:10])
             print(a.data[:10])
+
+
+class TestSessionImporters(unittest.TestCase):
+
+    def test_indexed_string_importer(self):
+
+        s = session.Session()
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            values = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
+                      '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
+            im = fields.IndexedStringImporter(s, hf, 'x')
+            im.write(values)
+            f = s.get(hf['x'])
+            print(f, f.data)
+            print(f.data[:])
+            print(f.indices[:])
+            print(f.values[:])
+
+    def test_fixed_string_importer(self):
+        s = session.Session()
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            values = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
+                      '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
+            im = fields.FixedStringImporter(s, hf, 'x',
+                                            max(len(v.encode()) for v in values))
+            im.write(values)
+            f = s.get(hf['x'])
+            print(f, f.data)
+            print(f.data[:])
+
+    def test_numeric_importer(self):
+        from datetime import datetime
+        s = session.Session()
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
+                      '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
+            im = fields.NumericImporter(s, hf, 'x', 'float32', per.try_str_to_float)
+            im.write(values)
+            f = s.get(hf['x'])
+            print(f, f.data)
+            print(f.data[:])
+
+    def test_date_importer(self):
+        from datetime import datetime
+        s = session.Session()
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            values = ['2020-05-10', '2020-05-12', '2020-05-12', '2020-05-15']
+            im = fields.DateImporter(s, hf, 'x')
+            im.write(values)
+            f = s.get(hf['x'])
+            print(f, f.data)
+            print([datetime.fromtimestamp(d) for d in f.data[:]])

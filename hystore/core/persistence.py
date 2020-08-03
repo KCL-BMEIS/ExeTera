@@ -454,6 +454,15 @@ def _get_spans(field, fields):
         raise NotImplementedError("This operation does not support more than two fields at present")
 
 
+@njit
+def _index_spans(spans, results):
+    sp_sta = spans[:-1]
+    sp_end = spans[1:]
+    for s in range(len(sp_sta)):
+        results[sp_sta[s]:sp_end[s]] = s
+    return results
+
+
 def _get_spans_for_field(field0):
 
     results = np.zeros(len(field0) + 1, dtype=np.bool)
@@ -499,6 +508,16 @@ def _apply_spans_index_of_min(spans, src_array, dest_array, filter_array):
             dest_array[i] = cur
         else:
             dest_array[i] = cur = src_array[cur:next].argmin()
+
+
+@njit
+def _apply_spans_index_of_first(spans, dest_array):
+    dest_array[:] = spans[:-1]
+
+
+@njit
+def _apply_spans_index_of_last(spans, dest_array):
+    dest_array[:] = spans[1:] - 1
 
 
 @njit
@@ -1579,6 +1598,11 @@ class DataStore:
                 writer.write_raw(indices, values)
             return indices, values
         elif isinstance(reader, Reader):
+            if len(filter_to_apply) != len(reader):
+                msg = ("'filter_to_apply' and 'reader' must be the same length "
+                       "but are length {} and {} respectively")
+                raise ValueError(msg.format(len(filter_to_apply), len(reader)))
+
             result = reader[:][filter_to_apply]
             if writer:
                 writer.write(result)
@@ -1656,29 +1680,10 @@ class DataStore:
         return _get_spans(raw_field, raw_fields)
 
 
-    # TODO: needs a predicate to break ties: first, last?
-    def apply_spans_index_of_min(self, spans, reader, writer=None):
-        _check_is_reader_or_ndarray('reader', reader)
-        _check_is_reader_or_ndarray_if_set('writer', reader)
-
-        if isinstance(reader, Reader):
-            raw_reader = reader[:]
-        else:
-            raw_reader = reader
-
-        if writer is not None:
-            if isinstance(writer, Writer):
-                raw_writer = writer[:]
-            else:
-                raw_writer = writer
-        else:
-            raw_writer = np.zeros(len(spans)-1, dtype=np.int64)
-        _apply_spans_index_of_min(spans, raw_reader, raw_writer)
-        if isinstance(writer, Writer):
-            writer.write(raw_writer)
-        else:
-            return raw_writer
-
+    def index_spans(self, spans):
+        raw_spans = _raw_array_from_parameter(self, "spans", spans)
+        results = np.zeros(raw_spans[-1], dtype=np.int64)
+        return _index_spans(raw_spans, results)
 
     # TODO: needs a predicate to break ties: first, last?
     def apply_spans_index_of_min(self, spans, reader, writer=None):
@@ -1721,6 +1726,22 @@ class DataStore:
         else:
             raw_writer = np.zeros(len(spans)-1, dtype=np.int64)
         _apply_spans_index_of_max(spans, raw_reader, raw_writer)
+        if isinstance(writer, Writer):
+            writer.write(raw_writer)
+        else:
+            return raw_writer
+
+    # TODO: needs a predicate to break ties: first, last?
+    def apply_spans_index_of_last(self, spans, writer=None):
+
+        if writer is not None:
+            if isinstance(writer, Writer):
+                raw_writer = writer[:]
+            else:
+                raw_writer = writer
+        else:
+            raw_writer = np.zeros(len(spans) - 1, dtype=np.int64)
+        _apply_spans_index_of_last(spans, raw_writer)
         if isinstance(writer, Writer):
             writer.write(raw_writer)
         else:
@@ -2129,6 +2150,22 @@ class DataStore:
             destination.write(foreign_key_index)
         else:
             return foreign_key_index
+
+
+    def get_shared_index(self, keys):
+        if not isinstance(keys, tuple):
+            raise ValueError("'keys' must be a tuple")
+        concatted = None
+        for k in keys:
+            raw_field = _raw_array_from_parameter(self, 'keys', k)
+            if concatted is None:
+                concatted = pd.unique(raw_field)
+            else:
+                concatted = np.concatenate((concatted, raw_field), axis=0)
+        concatted = pd.unique(concatted)
+        concatted = np.sort(concatted)
+
+        return tuple(np.searchsorted(concatted, k) for k in keys)
 
 
     def get_trash_group(self, group):
