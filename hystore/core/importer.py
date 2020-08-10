@@ -134,9 +134,9 @@ class DatasetImporter:
                 new_field_list[i_df].flush()
 
 
+from hystore.core import session, fields
 
 class NewDatasetImporter:
-    from hystore.core import session, fields
     def __init__(self, datastore, source, hf, space,
                  writer_factory, writers, field_entries, timestamp,
                  keys=None, # field_descriptors=None,
@@ -196,19 +196,18 @@ class NewDatasetImporter:
                     str_to_vals = field_entries[field_name].strings_to_values
                     writer =\
                         writer_factory[writers[field_name]](
-                            datastore, group, field_name, str_to_vals, timestamp)
+                            datastore, group, field_name, 'int8', str_to_vals)
                     categorical_map_list.append(str_to_vals)
                 elif writers[field_name] == 'leakycategoricaltype':
                     str_to_vals = field_entries[field_name].strings_to_values
                     out_of_range = field_entries[field_name].out_of_range_label
                     writer =\
                         writer_factory[writers[field_name]](
-                            datastore, group, field_name, str_to_vals, out_of_range, timestamp)
+                            datastore, group, field_name, 'int8', str_to_vals, out_of_range)
                     # categorical_map_list.append(str_to_vals)
                     categorical_map_list.append(None)
                 else:
-                    writer = writer_factory[writers[field_name]](
-                        datastore, group, field_name, timestamp)
+                    writer = writer_factory[writers[field_name]](datastore, group, field_name)
                     categorical_map_list.append(None)
                 new_fields[field_name] = writer
                 new_field_list.append(writer)
@@ -241,7 +240,11 @@ class NewDatasetImporter:
                                     error.format(f, categorical_map, self.names_[i_f]))
                             f = categorical_map[f]
                         # t = transforms_by_index[i_f]
-                        field_chunk_list[i_df][chunk_index] = f
+                        try:
+                            field_chunk_list[i_df][chunk_index] = f
+                        except Exception as e:
+                            print(i_df, self.names_[i_f], chunk_index, f, e)
+                            raise
                         # new_field_list[i_df].append(f)
                     chunk_index += 1
                     if chunk_index == chunk_size:
@@ -254,4 +257,4 @@ class NewDatasetImporter:
                     new_field_list[i_df].write_part(field_chunk_list[i_df][:chunk_index])
 
             for i_df in range(len(index_map)):
-                new_field_list[i_df].flush()
+                new_field_list[i_df].complete()

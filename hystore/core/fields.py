@@ -4,7 +4,8 @@ import numpy as np
 import numba
 import h5py
 
-from hystore.core.persistence import DataWriter
+from hystore.core.readerwriter import DataWriter
+from hystore.core import utils
 
 
 # def test_field_iterator(data):
@@ -26,38 +27,54 @@ from hystore.core.persistence import DataWriter
 
 class Field:
     def __init__(self, session, group,
-                 name=None, additional_attributes=None, auxilliary_fields=None,
-                 timestamp=None, write_enabled=False):
+                 name=None, # additional_attributes=None, auxilliary_fields=None,
+                 # timestamp=None,
+                 write_enabled=False):
         # if name is None, the group is an existing field
         # if name is set but group[name] doesn't exist, then create the field
         if name is None:
             # the group is an existing field
-            self._session = session
-            self._field = group
-            self._fieldtype = self._field.attrs['fieldtype']
-            self._write_enabled = write_enabled
+            field = group
         else:
-            if name is not None:
-                if name in group.keys():
-                    self._field = group[name]
-                    self._fieldtype = self._field.attrs['fieldtype']
-                    self._write_enabled = write_enabled
-                else:
-                    all_attributes = {
-                        'timestamp': session.timestamp if timestamp is None else timestamp,
-                        'chunksize': session.chunksize,
-                    }
-                    all_attributes.update(additional_attributes)
-                    DataWriter.create_group(group, name, all_attributes.items())
-
-                    if auxilliary_fields is not None:
-                        for k, v in auxilliary_fields.items():
-                            DataWriter.write(group, k, v[0], len(v), dtype=v[1])
-
-                    self._field = group[name]
-                    self._fieldtype = self._field.attrs['fieldtype']
-                    self._write_enabled = True
+            field = group[name]
+        self._session = session
+        self._field = field
+        self._fieldtype = self._field.attrs['fieldtype']
+        self._write_enabled = write_enabled
+    # else:
+        #     if name is not None:
+        #         if name in group.keys():
+        #             self._field = group[name]
+        #             self._fieldtype = self._field.attrs['fieldtype']
+        #             self._write_enabled = write_enabled
+        #         else:
+        #             all_attributes = {
+        #                 'timestamp': session.timestamp if timestamp is None else timestamp,
+        #                 'chunksize': session.chunksize,
+        #             }
+        #             all_attributes.update(additional_attributes)
+        #             DataWriter.create_group(group, name, all_attributes.items())
+        #
+        #             if auxilliary_fields is not None:
+        #                 for k, v in auxilliary_fields.items():
+        #                     DataWriter.write(group, k, v[0], len(v), dtype=v[1])
+        #
+        #             self._field = group[name]
+        #             self._fieldtype = self._field.attrs['fieldtype']
+        #             self._write_enabled = True
         self._value_wrapper = None
+
+    @property
+    def name(self):
+        return self._field.name
+
+    @property
+    def timestamp(self):
+        return self._field.attrs['timestamp']
+
+    @property
+    def chunksize(self):
+        return self._field.attrs['chunksize']
 
 
 class ReadOnlyFieldArray:
@@ -255,6 +272,7 @@ class WriteableIndexedFieldArray:
                                  self._raw_indices, self._index_index)
                 self._index_index = 0
 
+
     def write(self, part):
         self.write_part(part)
         self.complete()
@@ -291,7 +309,7 @@ def indexed_string_field_constructor(session, group, name, timestamp=None, chunk
 def fixed_string_field_constructor(session, group, name, length, timestamp=None, chunksize=None):
     field = base_field_contructor(session, group, name, timestamp, chunksize)
     field.attrs['fieldtype'] = 'fixedstring,{}'.format(length)
-    field.attrs['length'] = length
+    field.attrs['strlen'] = length
     DataWriter.write(field, 'values', [], 0, "S{}".format(length))
 
 
@@ -324,12 +342,18 @@ class IndexedStringField(Field):
     def __init__(self, session, group, name=None, timestamp=None, write_enabled=False):
         super().__init__(session, group, name=name,
                          timestamp=timestamp, write_enabled=write_enabled)
+        self._session = session
         self._data_wrapper = None
         self._index_wrapper = None
         self._value_wrapper = None
 
     def writeable(self):
         return IndexedStringField(self._session, self._field, write_enabled=True)
+
+    def create_like(self, group, name, timestamp=None):
+        ts = self.timestamp if timestamp is None else timestamp
+        indexed_string_field_constructor(self._session, group, name, ts, self.chunksize)
+        return IndexedStringField(self._session, group, name, write_enabled=True)
 
     @property
     def data(self):
@@ -357,10 +381,17 @@ class IndexedStringField(Field):
 class FixedStringField(Field):
     def __init__(self, session, group, name=None, timestamp=None, write_enabled=False):
         super().__init__(session, group, name=name,
-                         timestamp=timestamp, write_enabled=write_enabled)
+                         # timestamp=timestamp,
+                         write_enabled=write_enabled)
 
     def writeable(self):
         return FixedStringField(self._session, self._field, write_enabled=True)
+
+    def create_like(self, group, name, timestamp=None):
+        ts = self.timestamp if timestamp is None else timestamp
+        length = self._field.attrs['strlen']
+        fixed_string_field_constructor(self._session, group, name, length, ts, self.chunksize)
+        return FixedStringField(self._session, group, name, write_enabled=True)
 
     @property
     def data(self):
@@ -375,10 +406,17 @@ class FixedStringField(Field):
 class NumericField(Field):
     def __init__(self, session, group, name=None, timestamp=None, write_enabled=False):
         super().__init__(session, group, name=name,
-                         timestamp=timestamp, write_enabled=write_enabled)
+                         # timestamp=timestamp,
+                         write_enabled=write_enabled)
 
     def writeable(self):
         return NumericField(self._session, self._field, write_enabled=True)
+
+    def create_like(self, group, name, timestamp=None):
+        ts = self.timestamp if timestamp is None else timestamp
+        nformat = self._field.attrs['nformat']
+        numeric_field_constructor(self._session, group, name, nformat, ts, self.chunksize)
+        return NumericField(self._session, group, name, write_enabled=True)
 
     @property
     def data(self):
@@ -394,10 +432,19 @@ class CategoricalField(Field):
     def __init__(self, session, group,
                  name=None, timestamp=None, write_enabled=False):
         super().__init__(session, group, name=name,
-                         timestamp=timestamp, write_enabled=write_enabled)
+                         # timestamp=timestamp,
+                         write_enabled=write_enabled)
 
     def writeable(self):
         return CategoricalField(self._session, self._field, write_enabled=True)
+
+    def create_like(self, group, name, timestamp=None):
+        ts = self.timestamp if timestamp is None else timestamp
+        nformat = self._field.attrs['nformat'] if 'nformat' in self._field.attrs else 'int8'
+        keys = {v: k for k, v in self.keys.items()}
+        categorical_field_constructor(self._session, group, name, nformat, keys,
+                                      ts, self.chunksize)
+        return CategoricalField(self._session, group, name, write_enabled=True)
 
     @property
     def data(self):
@@ -422,10 +469,16 @@ class CategoricalField(Field):
 class TimestampField(Field):
     def __init__(self, session, group, name=None, timestamp=None, write_enabled=False):
         super().__init__(session, group, name=name,
-                         timestamp=timestamp, write_enabled=write_enabled)
+                         # timestamp=timestamp,
+                         write_enabled=write_enabled)
 
     def writeable(self):
         return TimestampField(self._session, self._field, write_enabled=True)
+
+    def create_like(self, group, name, timestamp=None):
+        ts = self.timestamp if timestamp is None else timestamp
+        timestamp_field_constructor(self._session, group, name, ts, self.chunksize)
+        return TimestampField(self._session, group, name, write_enabled=True)
 
     @property
     def data(self):
@@ -446,7 +499,8 @@ class IndexedStringImporter:
         return [None] * length
 
     def write_part(self, values):
-        self._field.data.write_part(values)
+        with utils.Timer("writing {}".format(self._field.name)):
+            self._field.data.write_part(values)
 
     def complete(self):
         self._field.data.complete()
@@ -462,10 +516,12 @@ class FixedStringImporter:
         self._field = FixedStringField(session, group, name, write_enabled=True)
 
     def chunk_factory(self, length):
-        return np.zeros(length, dtype='S{}'.format(self._field.data.dtype))
+        return np.zeros(length, dtype=self._field.data.dtype)
 
     def write_part(self, values):
-        self._field.data.write_part([v.encode() for v in values])
+        with utils.Timer("writing {}".format(self._field.name)):
+            # self._field.data.write_part([v.encode() for v in values])
+            self._field.data.write_part(values)
 
     def complete(self):
         self._field.data.complete()
@@ -491,15 +547,17 @@ class NumericImporter:
         self._filter_values = np.zeros(chunksize, dtype='bool')
 
     def chunk_factory(self, length):
-        return np.zeros(length, dtype=self._field.data.dtype)
+        # return np.zeros(length, dtype=self._field.data.dtype)
+        return [None] * length
 
     def write_part(self, values):
-        for i in range(len(values)):
-            valid, value = self._parser(values[i])
-            self._values[i] = value
-            self._filter_values[i] = valid
-        self._field.data.write_part(self._values)
-        self._filter_field.data.write_part(self._filter_values)
+        with utils.Timer("writing {}".format(self._field.name)):
+            for i in range(len(values)):
+                valid, value = self._parser(values[i])
+                self._values[i] = value
+                self._filter_values[i] = valid
+            self._field.data.write_part(self._values)
+            self._filter_field.data.write_part(self._filter_values)
 
     def complete(self):
         self._field.data.complete()
@@ -511,23 +569,27 @@ class NumericImporter:
 
 
 class CategoricalImporter:
-    def __init__(self, session, group, name, keys, value_type, timestamp=None, chunksize=None):
-        categorical_field_constructor(session, group, name, keys, value_type, timestamp, chunksize)
+    def __init__(self, session, group, name, value_type, keys, timestamp=None, chunksize=None):
+        chunksize = session.chunksize if chunksize is None else chunksize
+        categorical_field_constructor(session, group, name, value_type, keys, timestamp, chunksize)
         self._field = CategoricalField(session, group, name, write_enabled=True)
         self._keys = keys
         self._dtype = value_type
-        self._key_type = 'S{}'.format(max(k.encode() for k in keys))
-        self._results = np.zeros(chunksize, dtype=value_type)
+        self._key_type = 'U{}'.format(max(len(k.encode()) for k in keys))
+        # self._results = np.zeros(chunksize, dtype=value_type)
 
     def chunk_factory(self, length):
-        return np.zeros(length, dtype=self._key_type)
+        # return np.zeros(length, dtype=self._key_type)
+        return np.zeros(length, dtype=self._dtype)
 
     def write_part(self, values):
-        keys = self._keys
-        results = self._results
-        for i in range(len(values)):
-            results = keys[values[i]]
-        self._field.data.write_part(results)
+        with utils.Timer("writing {}".format(self._field.name)):
+            keys = self._keys
+            # results = self._results
+            # for i in range(len(values)):
+            #     results = keys[values[i]]
+            # self._field.data.write_part(results)
+            self._field.data.write_part(values)
 
     def complete(self):
         self._field.data.complete()
@@ -538,39 +600,47 @@ class CategoricalImporter:
 
 
 class LeakyCategoricalImporter:
-    def __init__(self, session, group, name, keys, value_type, out_of_range,
+    def __init__(self, session, group, name, value_type, keys, out_of_range,
                  timestamp=None, chunksize=None):
-        categorical_field_constructor(session, group, name, keys, value_type,
+        chunksize = session.chunksize if chunksize is None else chunksize
+        categorical_field_constructor(session, group, name, value_type, keys,
                                       timestamp, chunksize)
-        numeric_field_constructor(session, group, '{}_{}'.format(name, out_of_range), 'int8',
-                                  timestamp, chunksize)
+        out_of_range_name = '{}_{}'.format(name, out_of_range)
+        indexed_string_field_constructor(session, group, out_of_range_name,
+                                         timestamp, chunksize)
 
         self._field = CategoricalField(session, group, name, write_enabled=True)
-        self._str_field = IndexedStringField(session, group, name, write_enabled=True)
+        self._str_field = IndexedStringField(session, group, out_of_range_name, write_enabled=True)
 
         self._keys = keys
         self._dtype = value_type
-        self._key_type = 'S{}'.format(max(k.encode() for k in keys))
+        self._key_type = 'S{}'.format(max(len(k.encode()) for k in keys))
 
         self._results = np.zeros(chunksize, dtype=value_type)
+        self._strresult = [None] * chunksize
 
     def chunk_factory(self, length):
-        return np.zeros(length, dtype=self._key_type)
+        return [None] * length
 
     def write_part(self, values):
-        keys = self._keys
-        results = self._results
-        strresults = self._strresult
-        for i in range(len(values)):
-            value = keys.get(values[i], -1)
-            if value == -1:
-                strresults[i] = values[i]
+        with utils.Timer("writing {}".format(self._field.name)):
+            keys = self._keys
+            results = self._results
+            strresults = self._strresult
+            for i in range(len(values)):
+                value = keys.get(values[i], -1)
+                if value == -1:
+                    strresults[i] = values[i]
+                else:
+                    strresults[i] = ''
+                results[i] = value
+                # results = keys[values[i]]
+            if len(values) != len(results):
+                self._field.data.write_part(results[:len(values)])
+                self._str_field.data.write_part(strresults[:len(values)])
             else:
-                strresults[i] = ''
-            results[i] = value
-            results = keys[values[i]]
-        self._field.data.write_part(results)
-        self._str_field.data.write_part(strresults)
+                self._field.data.write_part(results)
+                self._str_field.data.write_part(strresults)
 
     def complete(self):
         self._field.data.complete()
@@ -584,9 +654,11 @@ class LeakyCategoricalImporter:
 class DateTimeImporter:
     def __init__(self, session, group, name,
                  optional=False, write_days=False, timestamp=None, chunksize=None):
+        chunksize = session.chunksize if chunksize is None else chunksize
         timestamp_field_constructor(session, group, name, timestamp, chunksize)
         self._field = TimestampField(session, group, name, timestamp, write_enabled=True)
-        self._results = np.zeros(chunksize, dtype='float64')
+        self._results = np.zeros(chunksize , dtype='float64')
+        self._optional = optional
 
         if optional is True:
             filter_name = '{}_set'.format(name)
@@ -595,22 +667,27 @@ class DateTimeImporter:
             self._filter_field = NumericField(session, group, filter_name, write_enabled=True)
 
     def chunk_factory(self, length):
-        return np.zeros(length, dtype='float64')
+        return np.zeros(length, dtype='U32')
 
     def write_part(self, values):
-        results = self._results
+        with utils.Timer("writing {}".format(self._field.name)):
+            results = self._results
 
-        for i, v in enumerate(values):
-            if len(v) == 32:
-                ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S.%f%z')
-            elif len(v) == 25:
-                ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S%z')
-            else:
-                msg = "Date field '{}' has unexpected format '{}'"
-                raise ValueError(msg.format(self._field, v))
-            results[i] = ts.timestamp
+            for i, v in enumerate(values):
+                if len(v) == 32:
+                    ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S.%f%z')
+                    results[i] = ts.timestamp()
+                elif len(v) == 25:
+                    ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S%z')
+                    results[i] = ts.timestamp()
+                else:
+                    if self._optional is True and len(v) == 0:
+                        results[i] = np.nan
+                    else:
+                        msg = "Date field '{}' has unexpected format '{}'"
+                        raise ValueError(msg.format(self._field, v))
 
-        self._field.data.write_part(results)
+            self._field.data.write_part(results)
 
     def complete(self):
         self._field.data.complete()
@@ -634,18 +711,19 @@ class DateImporter:
             self._filter_field = NumericField(session, group, filter_name, write_enabled=True)
 
     def chunk_factory(self, length):
-        return np.zeros(length, dtype=f'S10')
+        return np.zeros(length, dtype='U10')
 
     def write_part(self, values):
-        timestamps = np.zeros(len(values), dtype=np.float64)
-        for i in range(len(values)):
-            value = values[i]
-            if value == '':
-                timestamps[i] = np.nan()
-            else:
-                ts = datetime.strptime(value, '%Y-%m-%d')
-                timestamps[i] = ts.timestamp()
-        self._field.data.write_part(timestamps)
+        with utils.Timer("writing {}".format(self._field.name)):
+            timestamps = np.zeros(len(values), dtype=np.float64)
+            for i in range(len(values)):
+                value = values[i]
+                if value == '':
+                    timestamps[i] = np.nan
+                else:
+                    ts = datetime.strptime(value, '%Y-%m-%d')
+                    timestamps[i] = ts.timestamp()
+            self._field.data.write_part(timestamps)
 
     def complete(self):
         self._field.data.complete()

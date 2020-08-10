@@ -11,7 +11,8 @@
 
 import numpy as np
 
-from hystore.core import persistence
+from hystore.core import persistence as pers
+from hystore.core import readerwriter as rw
 from hystore.core import fields
 
 
@@ -62,61 +63,65 @@ class DataSchema:
 
 
     field_writers = {
-        'idtype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, 32, ts),
+        'idtype': lambda g, cs, n, ts: rw.FixedStringWriter(g, cs, n, 32, ts),
         'datetimetype':
-            lambda g, cs, n, ts: persistence.DateTimeImporter(g, cs, n, False, ts),
+            lambda g, cs, n, ts: rw.DateTimeImporter(g, cs, n, False, ts),
         'optionaldatetimetype':
-            lambda g, cs, n, ts: persistence.DateTimeImporter(g, cs, n, True, ts),
+            lambda g, cs, n, ts: rw.DateTimeImporter(g, cs, n, True, ts),
         'datetype':
-            lambda g, cs, n, ts: persistence.OptionalDateImporter(g, cs, n, False, ts),
+            lambda g, cs, n, ts: rw.OptionalDateImporter(g, cs, n, False, ts),
         'optionaldatetype':
-            lambda g, cs, n, ts: persistence.OptionalDateImporter(g, cs, n, True, ts),
-        'versiontype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, 10, ts),
-        'indexedstringtype': lambda g, cs, n, ts: persistence.IndexedStringWriter(g, cs, n, ts),
-        'countrycodetype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, 2, ts),
-        'unittype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, 1, ts),
+            lambda g, cs, n, ts: rw.OptionalDateImporter(g, cs, n, True, ts),
+        'versiontype': lambda g, cs, n, ts: rw.FixedStringWriter(g, cs, n, 10, ts),
+        'indexedstringtype': lambda g, cs, n, ts: rw.IndexedStringWriter(g, cs, n, ts),
+        'countrycodetype': lambda g, cs, n, ts: rw.FixedStringWriter(g, cs, n, 2, ts),
+        'unittype': lambda g, cs, n, ts: rw.FixedStringWriter(g, cs, n, 1, ts),
         'categoricaltype':
-            lambda g, cs, n, stv, ts: persistence.CategoricalWriter(g, cs, n, stv, ts),
+            lambda g, cs, n, stv, ts: rw.CategoricalWriter(g, cs, n, stv, ts),
         'leakycategoricaltype':
-            lambda g, cs, n, stv, oor, ts: persistence.LeakyCategoricalImporter(g, cs, n, stv,
+            lambda g, cs, n, stv, oor, ts: rw.LeakyCategoricalImporter(g, cs, n, stv,
                                                                                 oor, ts),
-        'float32type': lambda g, cs, n, ts: persistence.NumericImporter(
-            g, cs, n, 'float32', persistence.try_str_to_float, ts),
-        'uint16type': lambda g, cs, n, ts: persistence.NumericImporter(
-            g, cs, n, 'uint16', persistence.try_str_to_int, ts),
-        'yeartype': lambda g, cs, n, ts: persistence.NumericImporter(
-            g, cs, n, 'uint32', persistence.try_str_to_float_to_int, ts),
-        'geocodetype': lambda g, cs, n, ts: persistence.FixedStringWriter(g, cs, n, 9, ts)
+        'float32type': lambda g, cs, n, ts: rw.NumericImporter(
+            g, cs, n, 'float32', pers.try_str_to_float, ts),
+        'uint16type': lambda g, cs, n, ts: rw.NumericImporter(
+            g, cs, n, 'uint16', pers.try_str_to_int, ts),
+        'yeartype': lambda g, cs, n, ts: rw.NumericImporter(
+            g, cs, n, 'uint32', pers.try_str_to_float_to_int, ts),
+        'geocodetype': lambda g, cs, n, ts: rw.FixedStringWriter(g, cs, n, 9, ts)
     }
 
 
     new_field_writers = {
-        'idtype': lambda s, g, n, l, ts=None, cs=None:
+        'idtype': lambda s, g, n, ts=None, cs=None:
             fields.FixedStringImporter(s, g, n, 32, ts, cs),
         'datetimetype': lambda s, g, n, ts=None, cs=None:
             fields.DateTimeImporter(s, g, n, False, True, ts, cs),
         'optionaldatetimetype': lambda s, g, n, ts=None, cs=None:
-            fields.DateTimeImporter(s, g, n, True, True, ts),
-        'datetype':
-            lambda g, cs, n, ts: fields.OptionalDateImporter(g, cs, n, False, ts),
-        'optionaldatetype':
-            lambda g, cs, n, ts: fields.OptionalDateImporter(g, cs, n, True, ts),
-        'versiontype': lambda g, cs, n, ts: fields.FixedStringWriter(g, cs, n, 10, ts),
-        'indexedstringtype': lambda g, cs, n, ts: fields.IndexedStringWriter(g, cs, n, ts),
-        'countrycodetype': lambda g, cs, n, ts: fields.FixedStringWriter(g, cs, n, 2, ts),
-        'unittype': lambda g, cs, n, ts: fields.FixedStringWriter(g, cs, n, 1, ts),
-        'categoricaltype':
-            lambda g, cs, n, stv, ts: fields.CategoricalWriter(g, cs, n, stv, ts),
-        'leakycategoricaltype':
-            lambda g, cs, n, stv, oor, ts: fields.LeakyCategoricalImporter(g, cs, n, stv,
-                                                                                oor, ts),
-        'float32type': lambda g, cs, n, ts: fields.NumericImporter(
-            g, cs, n, 'float32', fields.try_str_to_float, ts),
-        'uint16type': lambda g, cs, n, ts: fields.NumericImporter(
-            g, cs, n, 'uint16', fields.try_str_to_int, ts),
-        'yeartype': lambda g, cs, n, ts: fields.NumericImporter(
-            g, cs, n, 'uint32', fields.try_str_to_float_to_int, ts),
-        'geocodetype': lambda g, cs, n, ts: fields.FixedStringWriter(g, cs, n, 9, ts)
+            fields.DateTimeImporter(s, g, n, True, True, ts, cs),
+        'datetype': lambda s, g, n, ts=None, cs=None:
+            fields.DateImporter(s, g, n, False, ts, cs),
+        'optionaldatetype': lambda s, g, n, ts=None, cs=None:
+            fields.DateImporter(s, g, n, True, ts, cs),
+        'versiontype': lambda s, g, n, ts=None, cs=None:
+            fields.FixedStringImporter(s, g, n, 10, ts, cs),
+        'indexedstringtype': lambda s, g, n, ts=None, cs=None:
+            fields.IndexedStringImporter(s, g, n, ts, cs),
+        'countrycodetype': lambda s, g, n, ts=None, cs=None:
+            fields.FixedStringImporter(s, g, n, 2, ts, cs),
+        'unittype': lambda s, g, n, ts=None, cs=None:
+            fields.FixedStringImporter(s, g, n, 1, ts, cs),
+        'categoricaltype': lambda s, g, n, vt, stv, ts=None, cs=None:
+            fields.CategoricalImporter(s, g, n, vt, stv, ts, cs),
+        'leakycategoricaltype': lambda s, g, n, vt, stv, oor, ts=None, cs=None:
+            fields.LeakyCategoricalImporter(s, g, n, vt, stv, oor, ts, cs),
+        'float32type': lambda s, g, n, ts=None, cs=None:
+            fields.NumericImporter(s, g, n, 'float32', pers.try_str_to_float, ts, cs),
+        'uint16type': lambda s, g, n, ts=None, cs=None:
+            fields.NumericImporter(s, g, n, 'uint16', pers.try_str_to_int, ts, cs),
+        'yeartype': lambda s, g, n, ts=None, cs=None:
+            fields.NumericImporter(s, g, n, 'uint32', pers.try_str_to_float_to_int, ts, cs),
+        'geocodetype': lambda s, g, n, ts=None, cs=None:
+            fields.FixedStringImporter(s, g, n, 9, ts, cs)
     }
 
 
@@ -237,7 +242,7 @@ class DataSchema:
         'is_pregnant': 'categoricaltype',
         'is_smoker': 'categoricaltype',
         'ladcd': 'geocodetype',
-        'last_asked_level_of_isolation': 'datetimetype',
+        'last_asked_level_of_isolation': 'optionaldatetimetype',
         'lifestyle_version': 'versiontype',
         'limited_activity': 'categoricaltype',
         'lsoa11cd': 'geocodetype',

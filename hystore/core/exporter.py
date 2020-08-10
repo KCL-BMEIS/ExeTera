@@ -5,17 +5,18 @@ import pandas
 
 
 from hystore.core import utils, persistence
+import hystore.core.readerwriter as rw
 
 def transform_from_reader_type(reader):
-    if isinstance(reader, persistence.FixedStringReader):
+    if isinstance(reader, rw.FixedStringReader):
         return lambda x: x.decode()
-    if isinstance(reader, persistence.TimestampReader):
+    if isinstance(reader, rw.TimestampReader):
         return lambda x: datetime.fromtimestamp(x)
     return None
 
 
 def schema_from_reader_type(reader):
-    if isinstance(reader, persistence.IndexedStringReader):
+    if isinstance(reader, rw.IndexedStringReader):
         return 'string'
 
 

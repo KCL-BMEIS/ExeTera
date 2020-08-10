@@ -27,6 +27,18 @@ class TestSessionMerge(unittest.TestCase):
         s = session.Session()
         print(s.merge_left(l_id, r_id, left_fields=(l_vals,), right_fields=(r_vals2,)))
 
+    def test_merge_left_2(self):
+        s = session.Session()
+        p_id = np.array([100, 200, 300, 400, 500, 600, 800, 900])
+        p_val = np.array([-1, -2, -3, -4, -5, -6, -8, -9])
+        a_pid = np.array([100, 100, 100, 200, 200, 400, 400, 400, 400, 600,
+                          600, 600, 700, 700, 900, 900, 900])
+        a_val = np.array([10, 11, 12, 23, 22, 43, 40, 41, 41, 60,
+                          63, 62, 71, 71, 92, 92, 92])
+
+        print(s.merge_left(p_id, a_pid, right_fields=(a_val,)))
+        print(s.merge_left(a_pid, p_id, right_fields=(p_val,)))
+
 
     def test_merge_right(self):
         l_id = np.asarray(['a', 'b', 'd', 'f', 'g', 'h'])
@@ -120,6 +132,11 @@ class TestSessionFilter(unittest.TestCase):
 
         result = s.apply_filter(filt, vx)
         self.assertListEqual([1, 2, 5, 7], result.tolist())
+
+
+class TestSessionAggregate(unittest.TestCase):
+
+    pass
 
 
 class TestSessionFields(unittest.TestCase):

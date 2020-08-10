@@ -20,8 +20,10 @@ from hystore.processing.age_from_year_of_birth import calculate_age_from_year_of
 from hystore.processing.weight_height_bmi import weight_height_bmi_fast_1
 from hystore.processing.inconsistent_symptoms import check_inconsistent_symptoms_1
 from hystore.processing.temperature import validate_temperature_1
+from hystore.processing.combined_healthcare_worker import combined_hcw_with_contact
 from hystore.core import persistence
 from hystore.core.persistence import DataStore
+from hystore.core import readerwriter as rw
 
 
 # TODO: hard filter
@@ -63,6 +65,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
     make_assessment_patient_id_fkey = process_enabled(flags) and True
     year_from_age = process_enabled(flags) and True
     clean_weight_height_bmi = process_enabled(flags) and True
+    health_worker_with_contact = process_enabled(flags) and True
     clean_temperatures = process_enabled(flags) and True
     check_symptoms = process_enabled(flags) and True
     create_daily = process_enabled(flags) and True
@@ -171,6 +174,15 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
                                  bmis_clean, bmis_filter, None)
         log(f"completed in {time.time() - t0}")
 
+    if health_worker_with_contact:
+        log("health_worker_with_contact field")
+        #writer = ds.get_categorical_writer(patients_dest, 'health_worker_with_contact', 'int8')
+        combined_hcw_with_contact(ds,
+                                  ds.get_reader(patients_dest['healthcare_professional']),
+                                  ds.get_reader(patients_dest['contact_health_worker']),
+                                  ds.get_reader(patients_dest['is_carer_for_community']),
+                                  patients_dest, 'health_worker_with_contact')
+
     # Assessment processing
     # =====================
 
@@ -267,17 +279,17 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
                 else:
                     print(f"  Skipping field {k}")
             else:
-                if isinstance(reader, persistence.CategoricalReader):
+                if isinstance(reader, rw.CategoricalReader):
                     ds.apply_spans_max(
                         patient_id_index_spans, reader,
                         reader.get_writer(daily_assessments_dest, k))
                     print(f"  Field {k} aggregated in {time.time() - t1}s")
-                elif isinstance(reader, persistence.IndexedStringReader):
+                elif isinstance(reader, rw.IndexedStringReader):
                     ds.apply_spans_concat(
                         patient_id_index_spans, reader,
                         reader.get_writer(daily_assessments_dest, k))
                     print(f"  Field {k} aggregated in {time.time() - t1}s")
-                elif isinstance(reader, persistence.NumericReader):
+                elif isinstance(reader, rw.NumericReader):
                     ds.apply_spans_max(
                         patient_id_index_spans, reader,
                         reader.get_writer(daily_assessments_dest, k))
@@ -335,7 +347,7 @@ def postprocess(dataset, destination, data_schema, process_schema, timestamp=Non
         writer = reader.get_writer(patients_dest, 'max_assessment_test_result')
         max_result_value = ds.aggregate_max(fkey_index_spans=spans, reader=reader)
         ds.join(ids, assessment_patient_id_fkey, max_result_value, writer, spans)
-        print(f"calculated maximum asssessment test result in {time.time() - t0}")
+        print(f"calculated maximum assessment test result in {time.time() - t0}")
 
     # TODO - patient measure: daily assessments per patient
 

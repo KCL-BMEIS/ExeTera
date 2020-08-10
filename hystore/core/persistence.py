@@ -9,7 +9,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from threading import Thread
 import os
 import uuid
 from contextlib import contextmanager
@@ -21,6 +20,9 @@ import numpy as np
 import numba
 from numba import jit, njit
 import pandas as pd
+
+import hystore.core.validation as val
+import hystore.core.readerwriter as rw
 
 DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62
@@ -55,103 +57,6 @@ chunk_sizes = {
 }
 
 
-def _writer_from_writer_or_group(writer_getter, param_name, writer):
-    if isinstance(writer, h5py.Group):
-        return writer_getter.get_existing_writer(writer)
-    elif isinstance(writer, Writer):
-        return writer
-    else:
-        msg = "'{}' must be one of (h5py.Group, Writer) but is {}"
-        raise ValueError(msg.format(param_name, type(writer)))
-
-
-def _check_is_appropriate_writer_if_set(reader_getter, param_name, reader, writer):
-    # TODO: this method needs reworking; readers should know whether writers are compatible with
-    # them
-    msg = "{} must be of type {} or None but is {}"
-    # if writer is not None:
-    #     if isinstance(reader, np.ndarray):
-    #         raise ValueError("'if 'reader' is a numpy.ndarray, 'writer' must be None")
-
-    if isinstance(reader, h5py.Group):
-        reader = reader_getter.get_reader(reader)
-
-
-    if isinstance(reader, IndexedStringReader):
-        if not isinstance(writer, IndexedStringWriter):
-            raise ValueError(msg.format(param_name, IndexedStringReader, writer))
-    elif isinstance(reader, FixedStringReader):
-        if not isinstance(writer, FixedStringWriter):
-            raise ValueError(msg.format(param_name, FixedStringReader, writer))
-    elif isinstance(reader, NumericReader):
-        if not isinstance(writer, NumericWriter):
-            raise ValueError(msg.format(param_name, NumericReader, writer))
-    elif isinstance(reader, CategoricalReader):
-        if not isinstance(writer, CategoricalWriter):
-            raise ValueError(msg.format(param_name, CategoricalReader, writer))
-    elif isinstance(reader, TimestampReader):
-        if not isinstance(writer, TimestampWriter):
-            raise ValueError(msg.format(param_name, TimestampReader, writer))
-
-
-def _check_all_readers_valid_and_same_type(readers):
-    if not isinstance(readers, (tuple, list)):
-        raise ValueError("'readers' collection must be a tuple or list")
-
-    if isinstance(readers[0], h5py.Group):
-        expected_type = h5py.Group
-    elif isinstance(readers[0], Reader):
-        expected_type = Reader
-    elif isinstance(readers[0], np.ndarray):
-        expected_type = np.ndarray
-    else:
-        raise ValueError("'readers' collection must of the following types: "
-                         "(h5py.Group, Reader, numpy.ndarray)")
-    for r in readers[1:]:
-        if not isinstance(r, expected_type):
-            raise ValueError("'readers': all elements must be the same underlying type "
-                             "(h5py.Group, Reader, numpy.ndarray")
-
-
-def _check_is_reader_substitute(name, field):
-    if not isinstance(field, (h5py.Group, Reader, np.ndarray)):
-        msg = "'{}' must be one of (h5py.Group, Reader, numpy.ndarray) but is '{}'"
-        raise ValueError(msg.format(type(field)))
-
-
-def _check_is_reader_or_ndarray(name, field):
-    if not isinstance(field, (Reader, np.ndarray)):
-        raise ValueError(f"'name' must be either a Reader or an ndarray but is {type(field)}")
-
-
-def _check_is_reader_or_ndarray_if_set(name, field):
-    if not isinstance(field, (Reader, np.ndarray)):
-        raise ValueError("if set, 'name' must be either a Reader or an ndarray "
-                         f"but is {type(field)}")
-
-
-def _check_equal_length(name1, field1, name2, field2):
-    if len(field1) != len(field2):
-        msg = "'{}' must be the same length as '{}' (lengths {} and {} respectively)"
-        raise ValueError(msg.format(name1, name2, len(field1), len(field2)))
-
-
-def _reader_from_group_if_required(reader_source, name, reader):
-    if isinstance(reader, h5py.Group):
-        return reader_source.get_reader(reader)
-    return reader
-
-
-def _raw_array_from_parameter(datastore, name, field):
-    if isinstance(field, h5py.Group):
-        return datastore.get_reader(field)[:]
-    elif isinstance(field, Reader):
-        return field[:]
-    elif isinstance(field, np.ndarray):
-        return field
-    else:
-        error_str = "'{}' must be one of (Group, Reader or ndarray, but is {}"
-        raise ValueError(error_str.format(name, type(field)))
 
 @numba.njit
 def _safe_map(data_field, map_field, map_filter):
@@ -164,94 +69,6 @@ def _safe_map(data_field, map_field, map_filter):
             result[i] = empty_val
     return result
 
-
-class DataWriter:
-
-    @staticmethod
-    def clear_dataset(parent_group, name):
-        t = Thread(target=DataWriter._clear_dataset,
-                   args=(parent_group, name))
-        t.start()
-        t.join()
-
-    @staticmethod
-    def _clear_dataset(field, name):
-        del field[name]
-
-    @staticmethod
-    def _create_group(parent_group, name, attrs):
-        group = parent_group.create_group(name)
-        for k, v in attrs:
-            try:
-                group.attrs[k] = v
-            except Exception as e:
-                print(f"Exception {e} caught while assigning attribute {k} value {v}")
-                raise
-        group.attrs['completed'] = False
-
-    @staticmethod
-    def create_group(parent_group, name, attrs):
-        t = Thread(target=DataWriter._create_group,
-                   args=(parent_group, name, attrs))
-        t.start()
-        t.join()
-
-    @staticmethod
-    def write(group, name, field, count, dtype=None):
-        if name not in group.keys():
-            DataWriter._write_first(group, name, field, count, dtype)
-        else:
-            DataWriter._write_additional(group, name, field, count)
-
-    @staticmethod
-    def _write_first(group, name, field, count, dtype=None):
-        if dtype is not None:
-            if count == len(field):
-                ds = group.create_dataset(
-                    name, (count,), maxshape=(None,), dtype=dtype)
-                ds[:] = field
-            else:
-                ds = group.create_dataset(
-                    name, (count,), maxshape=(None,), dtype=dtype)
-                ds[:] = field[:count]
-        else:
-            if count == len(field):
-                group.create_dataset(name, (count,), maxshape=(None,), data=field)
-            else:
-                group.create_dataset(name, (count,), maxshape=(None,), data=field[:count])
-
-    @staticmethod
-    def write_first(group, name, field, count, dtype=None):
-        t = Thread(target=DataWriter._write_first,
-                   args=(group, name, field, count, dtype))
-        t.start()
-        t.join()
-
-    @staticmethod
-    def _write_additional(group, name, field, count):
-        gv = group[name]
-        gv.resize((gv.size + count,))
-        if count == len(field):
-            gv[-count:] = field
-        else:
-            gv[-count:] = field[:count]
-
-    @staticmethod
-    def write_additional(group, name, field, count):
-        t = Thread(target=DataWriter._write_additional,
-                   args=(group, name, field, count))
-        t.start()
-        t.join()
-
-    @staticmethod
-    def _flush(group):
-        group.attrs['completed'] = True
-
-    @staticmethod
-    def flush(group):
-        t = Thread(target=DataWriter._flush, args=(group,))
-        t.start()
-        t.join()
 
 # def str_to_float(value):
 #     try:
@@ -322,7 +139,7 @@ def _apply_filter_to_index_values(index_filter, indices, values):
     return dest_indices, dest_values
 
 
-#@njit
+@njit
 def _apply_indices_to_index_values(indices_to_apply, indices, values):
     # pass 1 - determine the destination lengths
     cur_ = indices[:-1]
@@ -691,7 +508,7 @@ def _map_valid_indices(src, map, default):
 
 
 def _values_from_reader_or_ndarray(name, field):
-    if isinstance(field, Reader):
+    if isinstance(field, rw.Reader):
         raw_field = field[:]
     elif isinstance(field, np.ndarray):
         raw_field = field
@@ -720,13 +537,13 @@ def _filter_duplicate_fields(field, filter):
 
 
 def foreign_key_is_in_primary_key(primary_key, foreign_key):
-    _check_is_reader_or_ndarray('primary_key', primary_key)
-    _check_is_reader_or_ndarray('foreign_key', foreign_key)
-    if isinstance(primary_key, Reader):
+    val._check_is_reader_or_ndarray('primary_key', primary_key)
+    val._check_is_reader_or_ndarray('foreign_key', foreign_key)
+    if isinstance(primary_key, rw.Reader):
         pk = primary_key[:]
     else:
         pk = primary_key
-    if isinstance(foreign_key, Reader):
+    if isinstance(foreign_key, rw.Reader):
         fk = foreign_key[:]
     else:
         fk = foreign_key
@@ -749,717 +566,6 @@ def _filter_non_orphaned_foreign_keys(primary_key, foreign_key, results):
 
 # Newest
 # ======
-class Reader:
-    def __init__(self, field):
-        self.field = field
-
-
-class IndexedStringReader(Reader):
-    def __init__(self, datastore, field):
-        Reader.__init__(self, field)
-        if 'fieldtype' not in field.attrs.keys():
-            error = "{} must have 'fieldtype' in its attrs property"
-            raise ValueError(error.format(field))
-        fieldtype = field.attrs['fieldtype']
-        if fieldtype != 'indexedstring':
-            error = "'fieldtype of '{} should be 'indexedstring' but is {}"
-            raise ValueError(error.format(field, fieldtype))
-        self.chunksize = field.attrs['chunksize']
-        self.datastore = datastore
-
-    def __getitem__(self, item):
-        try:
-            if isinstance(item, slice):
-                start = item.start if item.start is not None else 0
-                stop = item.stop if item.stop is not None else len(self.field['index']) - 1
-                step = item.step
-                #TODO: validate slice
-                index = self.field['index'][start:stop+1]
-                bytestr = self.field['values'][index[0]:index[-1]]
-                results = [None] * (len(index)-1)
-                startindex = start
-                for ir in range(len(results)):
-                    results[ir] =\
-                        bytestr[index[ir]-np.int64(startindex):
-                                index[ir+1]-np.int64(startindex)].tobytes().decode()
-                return results
-        except Exception as e:
-            print("{}: unexpected exception {}".format(self.field.name, e))
-            raise
-
-    def __len__(self):
-        return len(self.field['index']) - 1
-
-    def get_writer(self, dest_group, dest_name, timestamp=None, write_mode='write'):
-        return IndexedStringWriter(self.datastore, dest_group, dest_name,
-                                   timestamp, write_mode)
-
-    def dtype(self):
-        return self.field['index'].dtype, self.field['values'].dtype
-
-    def sort(self, index, writer):
-        field_index = self.field['index'][:]
-        field_values = self.field['values'][:]
-        r_field_index, r_field_values =\
-            self.datastore.apply_sort_to_index_values(index, field_index, field_values)
-        writer.write_raw(r_field_index, r_field_values)
-
-
-class NumericReader(Reader):
-    def __init__(self, datastore, field):
-        Reader.__init__(self, field)
-        if 'fieldtype' not in field.attrs.keys():
-            error = "{} must have 'fieldtype' in its attrs property"
-            raise ValueError(error.format(field))
-        fieldtype = field.attrs['fieldtype'].split(',')
-        if fieldtype[0] != 'numeric':
-            error = "'fieldtype of '{} should be 'numeric' but is {}"
-            raise ValueError(error.format(field, fieldtype))
-        self.chunksize = field.attrs['chunksize']
-        self.datastore = datastore
-
-    def __getitem__(self, item):
-        return self.field['values'][item]
-
-    def __len__(self):
-        return len(self.field['values'])
-
-    def get_writer(self, dest_group, dest_name, timestamp=None, write_mode='write'):
-        return NumericWriter(self.datastore, dest_group, dest_name,
-                             self.field.attrs['fieldtype'].split(',')[1],
-                             timestamp, write_mode)
-
-    def dtype(self):
-        return self.field['values'].dtype
-
-
-class CategoricalReader(Reader):
-    def __init__(self, datastore, field):
-        Reader.__init__(self, field)
-        if 'fieldtype' not in field.attrs.keys():
-            error = "{} must have 'fieldtype' in its attrs property"
-            raise ValueError(error.format(field))
-        fieldtype = field.attrs['fieldtype']
-        if fieldtype != 'categorical':
-            error = "'fieldtype of '{} should be 'categorical' but is {}"
-            raise ValueError(error.format(field, fieldtype))
-        self.chunksize = field.attrs['chunksize']
-        kv = self.field['key_values'][:]
-        kn = self.field['key_names'][:]
-        self.keys = dict(zip(kv, kn))
-        # self.keys = self.field['keys'][()]
-        self.datastore = datastore
-
-    def __getitem__(self, item):
-        return self.field['values'][item]
-
-    def __len__(self):
-        return len(self.field['values'])
-
-    def get_writer(self, dest_group, dest_name, timestamp=None, write_mode='write'):
-        keys = {v: k for k, v in zip(self.field['key_values'][:], self.field['key_names'][:])}
-        return CategoricalWriter(self.datastore, dest_group, dest_name, keys,
-                                 timestamp, write_mode)
-
-    def dtype(self):
-        return self.field['values'].dtype
-
-
-class FixedStringReader(Reader):
-    def __init__(self, datastore, field):
-        Reader.__init__(self, field)
-        if 'fieldtype' not in field.attrs.keys():
-            error = "{} must have 'fieldtype' in its attrs property"
-            raise ValueError(error.format(field))
-        fieldtype = field.attrs['fieldtype'].split(',')
-        if fieldtype[0] != 'fixedstring':
-            error = "'fieldtype of '{} should be 'numeric' but is {}"
-            raise ValueError(error.format(field, fieldtype))
-        self.chunksize = field.attrs['chunksize']
-        self.datastore = datastore
-
-    def __getitem__(self, item):
-        return self.field['values'][item]
-
-    def __len__(self):
-        return len(self.field['values'])
-
-    def get_writer(self, dest_group, dest_name, timestamp=None, write_mode='write'):
-        return FixedStringWriter(self.datastore, dest_group, dest_name,
-                                 self.field.attrs['fieldtype'].split(',')[1],
-                                 timestamp, write_mode)
-
-    def dtype(self):
-        return self.field['values'].dtype
-
-
-class TimestampReader(Reader):
-    def __init__(self, datastore, field):
-        Reader.__init__(self, field)
-        if 'fieldtype' not in field.attrs.keys():
-            error = "{} must have 'fieldtype' in its attrs property"
-            raise ValueError(error.format(field))
-        fieldtype = field.attrs['fieldtype'].split(',')
-        if fieldtype[0] not in ('datetime', 'date', 'timestamp'):
-            error = "'fieldtype of '{} should be 'datetime' or 'date' but is {}"
-            raise ValueError(error.format(field, fieldtype))
-        self.chunksize = field.attrs['chunksize']
-        self.datastore = datastore
-
-    def __getitem__(self, item):
-        return self.field['values'][item]
-
-    def __len__(self):
-        return len(self.field['values'])
-
-    def get_writer(self, dest_group, dest_name, timestamp=None, write_mode='write'):
-        return TimestampWriter(self.datastore, dest_group, dest_name, timestamp,
-                               write_mode)
-
-    def dtype(self):
-        return self.field['values'].dtype
-
-
-write_modes = {'write', 'overwrite'}
-
-
-class Writer:
-    def __init__(self, datastore, group, name, write_mode, attributes):
-        self.trash_field = None
-        if write_mode not in write_modes:
-            raise ValueError(f"'write_mode' must be one of {write_modes}")
-        if name in group:
-            if write_mode == 'overwrite':
-                field = group[name]
-                trash = datastore.get_trash_group(field)
-                dest_name = trash.name + f"/{name.split('/')[-1]}"
-                group.move(field.name, dest_name)
-                self.trash_field = trash[name]
-                DataWriter.create_group(group, name, attributes)
-            else:
-                error = (f"Field '{name}' already exists. Set 'write_mode' to 'overwrite' "
-                         "if you want to overwrite the existing contents")
-                raise KeyError(error)
-        else:
-            DataWriter.create_group(group, name, attributes)
-        self.field = group[name]
-        self.name = name
-
-    def flush(self):
-        DataWriter.flush(self.field)
-        if self.trash_field is not None:
-            del self.trash_field
-
-
-class IndexedStringWriter(Writer):
-    def __init__(self, datastore, group, name,
-                 timestamp=None, write_mode='write'):
-        if timestamp is None:
-            timestamp = datastore.timestamp
-        fieldtype = f'indexedstring'
-        super().__init__(datastore, group, name, write_mode,
-                         (('fieldtype', fieldtype), ('timestamp', timestamp),
-                          ('chunksize', datastore.chunksize)))
-        self.fieldtype = fieldtype
-        self.timestamp = timestamp
-        self.datastore = datastore
-
-        self.values = np.zeros(self.datastore.chunksize, dtype=np.uint8)
-        self.indices = np.zeros(self.datastore.chunksize, dtype=np.int64)
-        self.ever_written = False
-        self.accumulated = 0
-        self.value_index = 0
-        self.index_index = 0
-
-    def chunk_factory(self, length):
-        return [None] * length
-
-    def write_part(self, values):
-        """Writes a list of strings in indexed string form to a field
-        Args:
-            values: a list of utf8 strings
-        """
-        if not self.ever_written:
-            self.indices[0] = self.accumulated
-            self.index_index = 1
-            self.ever_written = True
-
-        for s in values:
-            evalue = s.encode()
-            for v in evalue:
-                self.values[self.value_index] = v
-                self.value_index += 1
-                if self.value_index == self.datastore.chunksize:
-                    DataWriter.write(self.field, 'values', self.values, self.value_index)
-                    self.value_index = 0
-                self.accumulated += 1
-            self.indices[self.index_index] = self.accumulated
-            self.index_index += 1
-            if self.index_index == self.datastore.chunksize:
-                DataWriter.write(self.field, 'index', self.indices, self.index_index)
-                self.index_index = 0
-
-    def flush(self):
-        if self.value_index != 0:
-            DataWriter.write(self.field, 'values', self.values, self.value_index)
-            self.value_index = 0
-        if self.index_index != 0:
-            DataWriter.write(self.field, 'index', self.indices, self.index_index)
-            self.index_index = 0
-        # self.field.attrs['fieldtype'] = self.fieldtype
-        # self.field.attrs['timestamp'] = self.timestamp
-        # self.field.attrs['chunksize'] = self.chunksize
-        # self.field.attrs['completed'] = True
-        super().flush()
-
-    def write(self, values):
-        self.write_part(values)
-        self.flush()
-
-    def write_part_raw(self, index, values):
-        if index.dtype != np.int64:
-            raise ValueError(f"'index' must be an ndarray of '{np.int64}'")
-        if values.dtype != np.uint8:
-            raise ValueError(f"'values' must be an ndarray of '{np.uint8}'")
-        DataWriter.write(self.field, 'index', index, len(index))
-        DataWriter.write(self.field, 'values', values, len(values))
-
-    def write_raw(self, index, values):
-        self.write_part_raw(index, values)
-        self.flush()
-
-
-# TODO: should produce a warning for unmappable strings and a corresponding filter, rather
-# than raising an exception; or at least have a mode where this is possible
-class LeakyCategoricalImporter:
-    def __init__(self, datastore, group, name, categories, out_of_range,
-                 timestamp=None, write_mode='write'):
-        if timestamp is None:
-            timestamp = datastore.timestamp
-        self.writer = CategoricalWriter(datastore, group, name,
-                                        categories, timestamp, write_mode)
-        self.other_values = IndexedStringWriter(datastore, group, f"{name}_{out_of_range}",
-                                                timestamp, write_mode)
-        self.field_size = max([len(k) for k in categories.keys()])
-
-    def chunk_factory(self, length):
-        return np.zeros(length, dtype=f'U{self.field_size}')
-
-    def write_part(self, values):
-        results = np.zeros(len(values), dtype='int8')
-        strresults = list([""] * len(values))
-        keys = self.writer.keys
-        anomalous_count = 0
-        for i in range(len(values)):
-            value = keys.get(values[i], -1)
-            if value != -1:
-                results[i] = value
-            else:
-                anomalous_count += 1
-                results[i] = -1
-                strresults[i] = values[i]
-        self.writer.write_part(results)
-        self.other_values.write_part(strresults)
-
-    def flush(self):
-        # add a 'freetext' value to keys
-        self.writer.keys['freetext'] = -1
-        self.writer.flush()
-        self.other_values.flush()
-
-    def write(self, values):
-        self.write_part(values)
-        self.flush()
-
-
-# TODO: should produce a warning for unmappable strings and a corresponding filter, rather
-# than raising an exception; or at least have a mode where this is possible
-class CategoricalImporter:
-    def __init__(self, datastore, group, name, categories,
-                 timestamp=None, write_mode='write'):
-        if timestamp is None:
-            timestamp = datastore.timestamp
-        self.writer = CategoricalWriter(datastore, group, name,
-                                        categories, timestamp, write_mode)
-        self.field_size = max([len(k) for k in categories.keys()])
-
-    def chunk_factory(self, length):
-        return np.zeros(length, dtype=f'U{self.field_size}')
-
-    def write_part(self, values):
-        results = np.zeros(len(values), dtype='int8')
-        keys = self.writer.keys
-        for i in range(len(values)):
-            results[i] = keys[values[i]]
-        self.writer.write_part(results)
-
-    def flush(self):
-        self.writer.flush()
-
-    def write(self, values):
-        self.write_part(values)
-        self.flush()
-
-
-class CategoricalWriter(Writer):
-    def __init__(self, datastore, group, name, categories,
-                 timestamp=None, write_mode='write'):
-        if timestamp is None:
-            timestamp = datastore.timestamp
-        fieldtype = f'categorical'
-        super().__init__(datastore, group, name, write_mode,
-                         (('fieldtype', fieldtype), ('timestamp', timestamp),
-                          ('chunksize', datastore.chunksize)))
-        self.fieldtype = fieldtype
-        self.timestamp = timestamp
-        self.datastore = datastore
-        # string:number
-        self.keys = categories
-
-
-    def chunk_factory(self, length):
-        return np.zeros(length, dtype='int8')
-
-    def write_part(self, values):
-        DataWriter.write(self.field, 'values', values, len(values))
-
-    def flush(self):
-        key_strs = list()
-        key_values = np.zeros(len(self.keys), dtype='int8')
-        items = self.keys.items()
-        for i, kv in enumerate(items):
-            k, v = kv
-            key_strs.append(k)
-            key_values[i] = v
-        DataWriter.write(self.field, 'key_values', key_values, len(key_values))
-        DataWriter.write(self.field, 'key_names', key_strs, len(key_strs),
-                         dtype=h5py.string_dtype())
-        # self.field.attrs['fieldtype'] = self.fieldtype
-        # self.field.attrs['timestamp'] = self.timestamp
-        # self.field.attrs['chunksize'] = self.chunksize
-        # self.field.attrs['completed'] = True
-        super().flush()
-
-    def write(self, values):
-        self.write_part(values)
-        self.flush()
-
-
-class NumericImporter:
-    def __init__(self, datastore, group, name, nformat, parser,
-                 timestamp=None, write_mode='write'):
-        if timestamp is None:
-            timestamp = datastore.timestamp
-        self.data_writer = NumericWriter(datastore, group, name,
-                                         nformat, timestamp, write_mode)
-        self.flag_writer = NumericWriter(datastore, group, f"{name}_valid",
-                                         'bool', timestamp, write_mode)
-        self.parser = parser
-
-    def chunk_factory(self, length):
-        return [None] * length
-
-    def write_part(self, values):
-        """
-        Given a list of strings, parse the strings and write the parsed values. Values that
-        cannot be parsed are written out as zero for the values, and zero for the flags to
-        indicate that that entry is not valid.
-        Args:
-            values: a list of strings to be parsed
-        """
-        elements = np.zeros(len(values), dtype=self.data_writer.nformat)
-        validity = np.zeros(len(values), dtype='bool')
-        for i in range(len(values)):
-            valid, value = self.parser(values[i])
-            elements[i] = value
-            validity[i] = valid
-        self.data_writer.write_part(elements)
-        self.flag_writer.write_part(validity)
-
-    def flush(self):
-        self.data_writer.flush()
-        self.flag_writer.flush()
-
-    def write(self, values):
-        self.write_part(values)
-        self.flush()
-
-
-class NumericWriter(Writer):
-    def __init__(self, datastore, group, name, nformat,
-                 timestamp=None, write_mode='write'):
-        if timestamp is None:
-            timestamp = datastore.timestamp
-        fieldtype = f'numeric,{nformat}'
-        super().__init__(datastore, group, name, write_mode,
-                         (('fieldtype', fieldtype), ('timestamp', timestamp),
-                          ('chunksize', datastore.chunksize), ('nformat', nformat)))
-        self.fieldtype = fieldtype
-        self.nformat = nformat
-        self.timestamp = timestamp
-        self.datastore = datastore
-
-    def chunk_factory(self, length):
-        nformat = self.fieldtype.split(',')[1]
-        return np.zeros(length, dtype=nformat)
-
-    def write_part(self, values):
-        if not np.issubdtype(values.dtype, np.dtype(self.nformat)):
-            values = values.astype(self.nformat)
-        DataWriter.write(self.field, 'values', values, len(values))
-
-    def flush(self):
-        # self.field.attrs['fieldtype'] = self.fieldtype
-        # self.field.attrs['timestamp'] = self.timestamp
-        # self.field.attrs['chunksize'] = self.chunksize
-        # self.field.attrs['nformat'] = self.nformat
-        # self.field.attrs['completed'] = True
-        super().flush()
-
-    def write(self, values):
-        self.write_part(values)
-        self.flush()
-
-
-class FixedStringWriter(Writer):
-    def __init__(self, datastore, group, name, strlen,
-                 timestamp=None, write_mode='write'):
-        if timestamp is None:
-            timestamp = datastore.timestamp
-        fieldtype = f'fixedstring,{strlen}'
-        super().__init__(datastore, group, name, write_mode,
-                         (('fieldtype', fieldtype), ('timestamp', timestamp),
-                          ('chunksize', datastore.chunksize), ('strlen', strlen)))
-        self.fieldtype = fieldtype
-        self.timestamp = timestamp
-        self.datastore = datastore
-        self.strlen = strlen
-
-    def chunk_factory(self, length):
-        return np.zeros(length, dtype=f'S{self.strlen}')
-
-    def write_part(self, values):
-        DataWriter.write(self.field, 'values', values, len(values))
-
-    def flush(self):
-        # self.field.attrs['fieldtype'] = self.fieldtype
-        # self.field.attrs['timestamp'] = self.timestamp
-        # self.field.attrs['chunksize'] = self.chunksize
-        # self.field.attrs['strlen'] = self.strlen
-        # self.field.attrs['completed'] = True
-        super().flush()
-
-    def write(self, values):
-        self.write_part(values)
-        self.flush()
-
-
-class DateTimeImporter:
-    def __init__(self, datastore, group, name,
-                 optional=True, timestamp=None, write_mode='write'):
-        if timestamp is None:
-            timestamp = datastore.timestamp
-        self.datetime = DateTimeWriter(datastore, group, name,
-                                       timestamp, write_mode)
-        self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
-                                         '10', timestamp, write_mode)
-        self.datetimeset = None
-        if optional:
-            self.datetimeset = NumericWriter(datastore, group, f"{name}_set",
-                                             'bool', timestamp, write_mode)
-
-    def chunk_factory(self, length):
-        return self.datetime.chunk_factory(length)
-
-    def write_part(self, values):
-        # TODO: use a timestamp writer instead of a datetime writer and do the conversion here
-
-        days = self.datestr.chunk_factory(len(values))
-        flags = None
-        if self.datetimeset is not None:
-            flags = self.datetimeset.chunk_factory(len(values))
-            for i in range(len(values)):
-                flags[i] = values[i] != b''
-                days[i] = values[i][:10]
-        else:
-            for i in range(len(values)):
-                days[i] = values[i][:10]
-
-        self.datetime.write_part(values)
-        self.datestr.write_part(days)
-        if self.datetimeset is not None:
-            self.datetimeset.write_part(flags)
-
-    def flush(self):
-        self.datetime.flush()
-        self.datestr.flush()
-        if self.datetimeset is not None:
-            self.datetimeset.flush()
-
-    def write(self, values):
-        self.write_part(values)
-        self.flush()
-
-
-# TODO writers can write out more than one field; offset could be done this way
-class DateTimeWriter(Writer):
-    def __init__(self, datastore, group, name,
-                 timestamp=None, write_mode='write'):
-        if timestamp is None:
-            timestamp = datastore.timestamp
-        fieldtype = f'datetime'
-        super().__init__(datastore, group, name, write_mode,
-                         (('fieldtype', fieldtype), ('timestamp', timestamp),
-                          ('chunksize', datastore.chunksize)))
-        self.fieldtype = fieldtype
-        self.timestamp = timestamp
-        self.datastore = datastore
-
-    def chunk_factory(self, length):
-        return np.zeros(length, dtype=f'S32')
-
-    def write_part(self, values):
-        timestamps = np.zeros(len(values), dtype=np.float64)
-        for i in range(len(values)):
-            value = values[i]
-            if value == b'':
-                timestamps[i] = 0
-            else:
-                if len(value) == 32:
-                    ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S.%f%z')
-                elif len(value) == 25:
-                    ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S%z')
-                else:
-                    raise ValueError(f"Date field '{self.field}' has unexpected format '{value}'")
-                timestamps[i] = ts.timestamp()
-        DataWriter.write(self.field, 'values', timestamps, len(timestamps))
-
-    def flush(self):
-        # self.field.attrs['fieldtype'] = self.fieldtype
-        # self.field.attrs['timestamp'] = self.timestamp
-        # self.field.attrs['chunksize'] = self.chunksize
-        # self.field.attrs['completed'] = True
-        super().flush()
-
-    def write(self, values):
-        self.write_part(values)
-        self.flush()
-
-
-class DateWriter(Writer):
-    def __init__(self, datastore, group, name,
-                 timestamp=None, write_mode='write'):
-        if timestamp is None:
-            timestamp = datastore.timestamp
-        fieldtype = 'date'
-        super().__init__(datastore, group, name, write_mode,
-                         (('fieldtype', fieldtype), ('timestamp', timestamp),
-                          ('chunksize', datastore.chunksize)))
-        self.fieldtype = fieldtype
-        self.timestamp = timestamp
-        self.datastore = datastore
-
-    def chunk_factory(self, length):
-        return np.zeros(length, dtype=f'S10')
-
-    def write_part(self, values):
-
-        timestamps = np.zeros(len(values), dtype=np.float64)
-        for i in range(len(values)):
-            value = values[i]
-            if value == b'':
-                timestamps[i] = 0
-            else:
-                ts = datetime.strptime(value.decode(), '%Y-%m-%d')
-                timestamps[i] = ts.timestamp()
-        DataWriter.write(self.field, 'values', timestamps, len(timestamps))
-
-    def flush(self):
-        # self.field.attrs['fieldtype'] = self.fieldtype
-        # self.field.attrs['timestamp'] = self.timestamp
-        # self.field.attrs['chunksize'] = self.chunksize
-        # self.field.attrs['completed'] = True
-        super().flush()
-
-    def write(self, values):
-        self.write_part(values)
-        self.flush()
-
-
-class TimestampWriter(Writer):
-    def __init__(self, datastore, group, name,
-                 timestamp=None, write_mode='write'):
-        if timestamp is None:
-            timestamp = datastore.timestamp
-        fieldtype = 'timestamp'
-        super().__init__(datastore, group, name, write_mode,
-                         (('fieldtype', fieldtype), ('timestamp', timestamp),
-                          ('chunksize', datastore.chunksize)))
-        self.fieldtype = fieldtype
-        self.timestamp = timestamp
-        self.datastore = datastore
-
-    def chunk_factory(self, length):
-        return np.zeros(length, dtype=f'float64')
-
-    def write_part(self, values):
-        DataWriter.write(self.field, 'values', values, len(values))
-
-    def flush(self):
-        # self.field.attrs['fieldtype'] = self.fieldtype
-        # self.field.attrs['timestamp'] = self.timestamp
-        # self.field.attrs['chunksize'] = self.chunksize
-        # self.field.attrs['completed'] = True
-        Writer.flush(self)
-
-    def write(self, values):
-        self.write_part(values)
-        self.flush()
-
-
-class OptionalDateImporter:
-    def __init__(self, datastore, group, name,
-                 optional=True, timestamp=None, write_mode='write'):
-        if timestamp is None:
-            timestamp = datastore.timestamp
-        self.date = DateWriter(datastore, group, name, timestamp, write_mode)
-        self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
-                                         '10', timestamp, write_mode)
-        self.dateset = None
-        if optional:
-            self.dateset =\
-                NumericWriter(datastore, group, f"{name}_set", 'bool', timestamp, write_mode)
-
-    def chunk_factory(self, length):
-        return self.date.chunk_factory(length)
-
-    def write_part(self, values):
-        # TODO: use a timestamp writer instead of a datetime writer and do the conversion here
-        days = self.datestr.chunk_factory(len(values))
-        flags = None
-        if self.dateset is not None:
-            flags = self.dateset.chunk_factory(len(values))
-            for i in range(len(values)):
-                flags[i] = values[i] != b''
-                days[i] = values[i][:10]
-        else:
-            for i in range(len(values)):
-                days[i] = values[i][:10]
-
-        self.date.write_part(values)
-        self.datestr.write_part(days)
-        if self.dateset is not None:
-            self.dateset.write_part(flags)
-
-    def flush(self):
-        self.date.flush()
-        self.datestr.flush()
-        if self.dateset is not None:
-            self.dateset.flush()
-
-    def write(self, values):
-        self.write_part(values)
-        self.flush()
 
 
 def _aggregate_impl(predicate, fkey_indices=None, fkey_index_spans=None,
@@ -1469,7 +575,7 @@ def _aggregate_impl(predicate, fkey_indices=None, fkey_index_spans=None,
     if fkey_indices is not None and fkey_index_spans is not None:
         raise ValueError("Only one of 'fkey_indices' and 'fkey_index_spans' may be set")
     if writer is not None:
-        if not isinstance(writer, (Writer, np.ndarray)):
+        if not isinstance(writer, (rw.Writer, np.ndarray)):
             raise ValueError("'writer' must be either a Writer or an ndarray instance")
 
     if fkey_index_spans is None:
@@ -1482,7 +588,7 @@ def _aggregate_impl(predicate, fkey_indices=None, fkey_index_spans=None,
         elif writer.dtype != result_dtype:
             raise ValueError(f"'writer' dtype must be {result_dtype} but is {writer.dtype}")
 
-    if isinstance(writer, Writer) or writer is None:
+    if isinstance(writer, rw.Writer) or writer is None:
         results = np.zeros(len(fkey_index_spans) - 1, dtype=result_dtype)
     else:
         results = writer
@@ -1490,7 +596,7 @@ def _aggregate_impl(predicate, fkey_indices=None, fkey_index_spans=None,
     # execute the predicate (note that not every predicate requires a reader)
     predicate(fkey_index_spans, reader, results)
 
-    if isinstance(writer, Writer):
+    if isinstance(writer, rw.Writer):
         writer.write(results)
 
     return writer if writer is not None else results
@@ -1558,16 +664,16 @@ class DataStore:
 
     # TODO: index should be able to be either a reader or an ndarray
     def apply_sort(self, index, reader, writer=None):
-        _check_is_appropriate_writer_if_set(self, 'writer', reader, writer)
+        val._check_is_appropriate_writer_if_set(self, 'writer', reader, writer)
 
-        if isinstance(reader, IndexedStringReader):
+        if isinstance(reader, rw.IndexedStringReader):
             src_indices = reader.field['index'][:]
             src_values = reader.field.get('values', np.zeros(0, dtype=np.uint8))[:]
             indices, values = _apply_sort_to_index_values(index, src_indices, src_values)
             if writer:
                 writer.write_raw(indices, values)
             return indices, values
-        elif isinstance(reader, Reader):
+        elif isinstance(reader, rw.Reader):
             result = _apply_sort_to_array(index, reader[:])
             if writer:
                 writer.write(result)
@@ -1583,8 +689,8 @@ class DataStore:
 
     # TODO: write filter with new readers / writers rather than deleting this
     def apply_filter(self, filter_to_apply, reader, writer=None):
-        if isinstance(reader, IndexedStringReader):
-            _check_is_appropriate_writer_if_set(self, 'writer', reader, writer)
+        if isinstance(reader, rw.IndexedStringReader):
+            val._check_is_appropriate_writer_if_set(self, 'writer', reader, writer)
 
             src_indices = reader.field['index'][:]
             src_values = reader.field.get('values', np.zeros(0, dtype=np.uint8))[:]
@@ -1597,7 +703,7 @@ class DataStore:
             if writer:
                 writer.write_raw(indices, values)
             return indices, values
-        elif isinstance(reader, Reader):
+        elif isinstance(reader, rw.Reader):
             if len(filter_to_apply) != len(reader):
                 msg = ("'filter_to_apply' and 'reader' must be the same length "
                        "but are length {} and {} respectively")
@@ -1613,12 +719,12 @@ class DataStore:
                 writer.write(result)
             return result
         else:
-            raise ValueError(f"'reader' must be a Reader or an ndarray, but is {type.reader}")
+            raise ValueError("'reader' must be a Reader or an ndarray, but is {}".format(type(reader)))
 
 
     def apply_indices(self, indices_to_apply, reader, writer=None):
-        if isinstance(reader, IndexedStringReader):
-            _check_is_appropriate_writer_if_set('writer', reader, writer)
+        if isinstance(reader, rw.IndexedStringReader):
+            val._check_is_appropriate_writer_if_set(self, 'writer', reader, writer)
 
             src_indices = reader.field['index'][:]
             src_values = reader.field.get('values', np.zeros(0, dtype='S1'))[:]
@@ -1628,7 +734,7 @@ class DataStore:
             if writer:
                 writer.write_raw(indices, values)
             return indices, values
-        elif isinstance(reader, Reader):
+        elif isinstance(reader, rw.Reader):
             result = reader[:][indices_to_apply]
             if writer:
                 writer.write(result)
@@ -1639,7 +745,7 @@ class DataStore:
                 writer.write(result)
             return result
         else:
-            raise ValueError(f"'reader' must be a Reader or an ndarray, but is {type.reader}")
+            raise ValueError(f"'reader' must be a Reader or an ndarray, but is {type(reader)}")
 
 
     # TODO: write distinct with new readers / writers rather than deleting this
@@ -1670,79 +776,93 @@ class DataStore:
         raw_field = None
         raw_fields = None
         if field is not None:
-            _check_is_reader_or_ndarray('field', field)
-            raw_field = field[:] if isinstance(field, Reader) else field
+            val._check_is_reader_or_ndarray('field', field)
+            raw_field = field[:] if isinstance(field, rw.Reader) else field
         else:
             raw_fields = []
             for f in fields:
-                _check_is_reader_or_ndarray('elements of tuple/list fields', f)
-                raw_fields.append(f[:] if isinstance(f, Reader) else f)
+                val._check_is_reader_or_ndarray('elements of tuple/list fields', f)
+                raw_fields.append(f[:] if isinstance(f, rw.Reader) else f)
         return _get_spans(raw_field, raw_fields)
 
 
     def index_spans(self, spans):
-        raw_spans = _raw_array_from_parameter(self, "spans", spans)
+        raw_spans = val.raw_array_from_parameter(self, "spans", spans)
         results = np.zeros(raw_spans[-1], dtype=np.int64)
         return _index_spans(raw_spans, results)
 
     # TODO: needs a predicate to break ties: first, last?
     def apply_spans_index_of_min(self, spans, reader, writer=None):
-        _check_is_reader_or_ndarray('reader', reader)
-        _check_is_reader_or_ndarray_if_set('writer', reader)
+        val._check_is_reader_or_ndarray('reader', reader)
+        val._check_is_reader_or_ndarray_if_set('writer', reader)
 
-        if isinstance(reader, Reader):
+        if isinstance(reader, rw.Reader):
             raw_reader = reader[:]
         else:
             raw_reader = reader
 
         if writer is not None:
-            if isinstance(writer, Writer):
+            if isinstance(writer, rw.Writer):
                 raw_writer = writer[:]
             else:
                 raw_writer = writer
         else:
             raw_writer = np.zeros(len(spans)-1, dtype=np.int64)
         _apply_spans_index_of_min(spans, raw_reader, raw_writer)
-        if isinstance(writer, Writer):
+        if isinstance(writer, rw.Writer):
             writer.write(raw_writer)
         else:
             return raw_writer
 
 
     def apply_spans_index_of_max(self, spans, reader, writer=None):
-        _check_is_reader_or_ndarray('reader', reader)
-        _check_is_reader_or_ndarray_if_set('writer', reader)
+        val._check_is_reader_or_ndarray('reader', reader)
+        val._check_is_reader_or_ndarray_if_set('writer', reader)
 
-        if isinstance(reader, Reader):
+        if isinstance(reader, rw.Reader):
             raw_reader = reader[:]
         else:
             raw_reader = reader
 
         if writer is not None:
-            if isinstance(writer, Writer):
+            if isinstance(writer, rw.Writer):
                 raw_writer = writer[:]
             else:
                 raw_writer = writer
         else:
             raw_writer = np.zeros(len(spans)-1, dtype=np.int64)
         _apply_spans_index_of_max(spans, raw_reader, raw_writer)
-        if isinstance(writer, Writer):
+        if isinstance(writer, rw.Writer):
             writer.write(raw_writer)
         else:
             return raw_writer
 
-    # TODO: needs a predicate to break ties: first, last?
+    def apply_spans_index_of_first(self, spans, writer=None):
+
+        if writer is not None:
+            if isinstance(writer, rw.Writer):
+                raw_writer = writer[:]
+            else:
+                raw_writer = writer
+        else:
+            raw_writer = np.zeros(len(spans) - 1, dtype=np.int64)
+        _apply_spans_index_of_first(spans, raw_writer)
+        if isinstance(writer, rw.Writer):
+            writer.write(raw_writer)
+        else:
+            return raw_writer
+
     def apply_spans_index_of_last(self, spans, writer=None):
 
         if writer is not None:
-            if isinstance(writer, Writer):
+            if isinstance(writer, rw.Writer):
                 raw_writer = writer[:]
             else:
                 raw_writer = writer
         else:
             raw_writer = np.zeros(len(spans) - 1, dtype=np.int64)
         _apply_spans_index_of_last(spans, raw_writer)
-        if isinstance(writer, Writer):
+        if isinstance(writer, rw.Writer):
             writer.write(raw_writer)
         else:
             return raw_writer
@@ -1756,7 +876,7 @@ class DataStore:
             _apply_spans_count(spans, dest_values)
             return dest_values
         else:
-            if isinstance(writer, Writer):
+            if isinstance(writer, rw.Writer):
                 dest_values = writer.chunk_factory(len(spans) - 1)
                 _apply_spans_count(spans, dest_values)
                 writer.write(dest_values)
@@ -1766,14 +886,14 @@ class DataStore:
                 raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
 
     def apply_spans_first(self, spans, reader, writer):
-        if isinstance(reader, Reader):
+        if isinstance(reader, rw.Reader):
             read_values = reader[:]
-        elif isinstance(reader.np.ndarray):
+        elif isinstance(reader, np.ndarray):
             read_values = reader
         else:
             raise ValueError(f"'reader' must be one of 'Reader' or 'ndarray' but is {type(reader)}")
 
-        if isinstance(writer, Writer):
+        if isinstance(writer, rw.Writer):
             dest_values = writer.chunk_factory(len(spans) - 1)
             _apply_spans_first(spans, read_values, dest_values)
             writer.write(dest_values)
@@ -1784,14 +904,14 @@ class DataStore:
 
 
     def apply_spans_last(self, spans, reader, writer):
-        if isinstance(reader, Reader):
+        if isinstance(reader, rw.Reader):
             read_values = reader[:]
-        elif isinstance(reader.np.ndarray):
+        elif isinstance(reader, np.ndarray):
             read_values = reader
         else:
             raise ValueError(f"'reader' must be one of 'Reader' or 'ndarray' but is {type(reader)}")
 
-        if isinstance(writer, Writer):
+        if isinstance(writer, rw.Writer):
             dest_values = writer.chunk_factory(len(spans) - 1)
             _apply_spans_last(spans, read_values, dest_values)
             writer.write(dest_values)
@@ -1802,45 +922,45 @@ class DataStore:
 
 
     def apply_spans_min(self, spans, reader, writer):
-        if isinstance(reader, Reader):
+        if isinstance(reader, rw.Reader):
             read_values = reader[:]
-        elif isinstance(reader.np.ndarray):
+        elif isinstance(reader, np.ndarray):
             read_values = reader
         else:
             raise ValueError(f"'reader' must be one of 'Reader' or 'ndarray' but is {type(reader)}")
 
-        if isinstance(writer, Writer):
+        if isinstance(writer, rw.Writer):
             dest_values = writer.chunk_factory(len(spans) - 1)
             _apply_spans_min(spans, read_values, dest_values)
             writer.write(dest_values)
-        elif isinstance(reader, Reader):
+        elif isinstance(reader, rw.Reader):
             _apply_spans_min(spans, read_values, writer)
         else:
             raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
 
 
     def apply_spans_max(self, spans, reader, writer):
-        if isinstance(reader, Reader):
+        if isinstance(reader, rw.Reader):
             read_values = reader[:]
-        elif isinstance(reader.np.ndarray):
+        elif isinstance(reader, np.ndarray):
             read_values = reader
         else:
             raise ValueError(f"'reader' must be one of 'Reader' or 'ndarray' but is {type(reader)}")
 
-        if isinstance(writer, Writer):
+        if isinstance(writer, rw.Writer):
             dest_values = writer.chunk_factory(len(spans) - 1)
             _apply_spans_max(spans, read_values, dest_values)
             writer.write(dest_values)
-        elif isinstance(reader, Reader):
+        elif isinstance(reader, rw.Reader):
             _apply_spans_max(spans, read_values, writer)
         else:
             raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
 
 
     def apply_spans_concat(self, spans, reader, writer):
-        if not isinstance(reader, IndexedStringReader):
+        if not isinstance(reader, rw.IndexedStringReader):
             raise ValueError(f"'reader' must be one of 'IndexedStringReader' but is {type(reader)}")
-        if not isinstance(writer, IndexedStringWriter):
+        if not isinstance(writer, rw.IndexedStringWriter):
             raise ValueError(f"'writer' must be one of 'IndexedStringWriter' but is {type(writer)}")
 
         src_index = reader.field['index'][:]
@@ -1896,9 +1016,9 @@ class DataStore:
                          reader=None, writer=None):
         if reader is None:
             raise ValueError("'reader' must not be None")
-        if not isinstance(reader, (Reader, np.ndarray)):
+        if not isinstance(reader, (rw.Reader, np.ndarray)):
             raise ValueError(f"'reader' must be a Reader or an ndarray but is {type(reader)}")
-        if isinstance(reader, Reader):
+        if isinstance(reader, rw.Reader):
             required_dtype = reader.dtype()
         else:
             required_dtype = reader.dtype
@@ -1910,15 +1030,15 @@ class DataStore:
              destination_pkey, fkey_indices, values_to_join,
              writer=None, fkey_index_spans=None):
         if fkey_indices is not None:
-            if not isinstance(fkey_indices, (Reader, np.ndarray)):
+            if not isinstance(fkey_indices, (rw.Reader, np.ndarray)):
                 raise ValueError(f"'fkey_indices' must be a type of Reader or an ndarray")
         if values_to_join is not None:
-            if not isinstance(values_to_join, (Reader, np.ndarray)):
+            if not isinstance(values_to_join, (rw.Reader, np.ndarray)):
                 raise ValueError(f"'values_to_join' must be a type of Reader but is {type(values_to_join)}")
-            if isinstance(values_to_join, IndexedStringReader):
+            if isinstance(values_to_join, rw.IndexedStringReader):
                 raise ValueError(f"Joins on indexed string fields are not supported")
 
-        if isinstance(values_to_join, Reader):
+        if isinstance(values_to_join, rw.Reader):
             raw_values_to_join = values_to_join[:]
         else:
             raw_values_to_join = values_to_join
@@ -1957,9 +1077,9 @@ class DataStore:
                            predicate, destination_pkey, fkey_indices,
                            reader=None, writer=None, fkey_index_spans=None):
         if reader is not None:
-            if not isinstance(reader, Reader):
+            if not isinstance(reader, rw.Reader):
                 raise ValueError(f"'reader' must be a type of Reader but is {type(reader)}")
-            if isinstance(reader, IndexedStringReader):
+            if isinstance(reader, rw.IndexedStringReader):
                 raise ValueError(f"Joins on indexed string fields are not supported")
 
         # generate spans for the sorted key indices if not provided
@@ -2001,14 +1121,14 @@ class DataStore:
             raise ValueError(f"'{field_name}' is not a well-formed field")
 
         fieldtype_map = {
-            'indexedstring': IndexedStringReader,
-            'fixedstring': FixedStringReader,
-            'categorical': CategoricalReader,
-            'boolean': NumericReader,
-            'numeric': NumericReader,
-            'datetime': TimestampReader,
-            'date': TimestampReader,
-            'timestamp': TimestampReader
+            'indexedstring': rw.IndexedStringReader,
+            'fixedstring': rw.FixedStringReader,
+            'categorical': rw.CategoricalReader,
+            'boolean': rw.NumericReader,
+            'numeric': rw.NumericReader,
+            'datetime': rw.TimestampReader,
+            'date': rw.TimestampReader,
+            'timestamp': rw.TimestampReader
         }
 
         fieldtype = field.attrs['fieldtype'].split(',')[0]
@@ -2020,14 +1140,14 @@ class DataStore:
             raise ValueError(f"'{field_name}' is not a well-formed field")
 
         fieldtype_map = {
-            'indexedstring': IndexedStringReader,
-            'fixedstring': FixedStringReader,
-            'categorical': CategoricalReader,
-            'boolean': NumericReader,
-            'numeric': NumericReader,
-            'datetime': TimestampReader,
-            'date': TimestampReader,
-            'timestamp': TimestampReader
+            'indexedstring': rw.IndexedStringReader,
+            'fixedstring': rw.FixedStringReader,
+            'categorical': rw.CategoricalReader,
+            'boolean': rw.NumericReader,
+            'numeric': rw.NumericReader,
+            'datetime': rw.TimestampReader,
+            'date': rw.TimestampReader,
+            'timestamp': rw.TimestampReader
         }
 
         fieldtype = field.attrs['fieldtype'].split(',')[0]
@@ -2039,25 +1159,25 @@ class DataStore:
 
     def get_indexed_string_writer(self, group, name,
                                   timestamp=None, writemode='write'):
-        return IndexedStringWriter(self, group, name, timestamp, writemode)
+        return rw.IndexedStringWriter(self, group, name, timestamp, writemode)
 
 
     def get_fixed_string_writer(self, group, name, width,
                                 timestamp=None, writemode='write'):
-        return FixedStringWriter(self, group, name, width, timestamp, writemode)
+        return rw.FixedStringWriter(self, group, name, width, timestamp, writemode)
 
 
     def get_categorical_writer(self, group, name, categories,
                                timestamp=None, writemode='write'):
-        return CategoricalWriter(self, group, name, categories, timestamp, writemode)
+        return rw.CategoricalWriter(self, group, name, categories, timestamp, writemode)
 
 
     def get_numeric_writer(self, group, name, dtype, timestamp=None, writemode='write'):
-        return NumericWriter(self, group, name, dtype, timestamp, writemode)
+        return rw.NumericWriter(self, group, name, dtype, timestamp, writemode)
 
 
     def get_timestamp_writer(self, group, name, timestamp=None, writemode='write'):
-        return TimestampWriter(self, group, name, timestamp, writemode)
+        return rw.TimestampWriter(self, group, name, timestamp, writemode)
 
 
     def get_compatible_writer(self, field, dest_group, dest_name,
@@ -2086,14 +1206,14 @@ class DataStore:
         # TODO: modifying the dictionaries in place is not great
         input_readers = dict()
         for k, v in inputs.items():
-            if isinstance(v, Reader):
+            if isinstance(v, rw.Reader):
                 input_readers[k] = v
             else:
                 input_readers[k] = self.get_reader(v)
         output_writers = dict()
         output_arrays = dict()
         for k, v in outputs.items():
-            if isinstance(v, Writer):
+            if isinstance(v, rw.Writer):
                 output_writers[k] = v
             else:
                 raise ValueError("'outputs': all values must be 'Writers'")
@@ -2123,14 +1243,14 @@ class DataStore:
 
 
     def get_index(self, target, foreign_key, destination=None):
-        print('  building patient_id index')
+        # print('  building patient_id index')
         t0 = time.time()
         target_lookup = dict()
         for i, v in enumerate(target[:]):
             target_lookup[v] = i
-        print(f'  target lookup built in {time.time() - t0}s')
+        # print(f'  target lookup built in {time.time() - t0}s')
 
-        print('  perform initial index')
+        # print('  perform initial index')
         t0 = time.time()
         foreign_key_elems = foreign_key[:]
         # foreign_key_index = np.asarray([target_lookup.get(i, -1) for i in foreign_key_elems],
@@ -2144,7 +1264,7 @@ class DataStore:
                 current_invalid += 1
                 target_lookup[k] = index
             foreign_key_index[i_k] = index
-        print(f'  initial index performed in {time.time() - t0}s')
+        # print(f'  initial index performed in {time.time() - t0}s')
 
         if destination:
             destination.write(foreign_key_index)
@@ -2157,7 +1277,7 @@ class DataStore:
             raise ValueError("'keys' must be a tuple")
         concatted = None
         for k in keys:
-            raw_field = _raw_array_from_parameter(self, 'keys', k)
+            raw_field = val.raw_array_from_parameter(self, 'keys', k)
             if concatted is None:
                 concatted = pd.unique(raw_field)
             else:

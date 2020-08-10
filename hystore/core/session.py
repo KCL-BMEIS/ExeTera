@@ -7,6 +7,9 @@ import pandas as pd
 
 from hystore.core import persistence as per
 from hystore.core import fields as fld
+from hystore.core import readerwriter as rw
+from hystore.core import validation as val
+from hystore.core import operations as ops
 
 
 # TODO:
@@ -56,6 +59,24 @@ class Session:
         self.timestamp = timestamp
 
 
+    def get_shared_index(self, keys):
+        if not isinstance(keys, tuple):
+            raise ValueError("'keys' must be a tuple")
+        concatted = None
+        raw_keys = list()
+        for k in keys:
+            raw_field = val.raw_array_from_parameter(self, 'keys', k)
+            raw_keys.append(raw_field)
+            if concatted is None:
+                concatted = pd.unique(raw_field)
+            else:
+                concatted = np.concatenate((concatted, raw_field), axis=0)
+        concatted = pd.unique(concatted)
+        concatted = np.sort(concatted)
+
+        return tuple(np.searchsorted(concatted, k) for k in raw_keys)
+
+
     def set_timestamp(self, timestamp=str(datetime.now(timezone.utc))):
         if not isinstance(timestamp, str):
             error_str = "'timestamp' must be a string but is of type {}"
@@ -78,7 +99,7 @@ class Session:
             t1 = time.time()
             r = self.get_reader(src_group[k])
             w = r.get_writer(dest_group, k, timestamp, write_mode=write_mode)
-            self.apply_sort_index(sorted_index, r, w)
+            self.apply_index(sorted_index, r, w)
             del r
             del w
             print(f"  '{k}' reordered in {time.time() - t1}s")
@@ -86,15 +107,15 @@ class Session:
 
 
     def dataset_sort_index(self, sort_indices, index=None):
-        per._check_all_readers_valid_and_same_type(sort_indices)
+        val._check_all_readers_valid_and_same_type(sort_indices)
         r_readers = tuple(reversed(sort_indices))
 
-        raw_data = per._raw_array_from_parameter(self, 'readers', r_readers[0])
+        raw_data = val.raw_array_from_parameter(self, 'readers', r_readers[0])
 
         if index is None:
             raw_index = np.arange(len(raw_data))
         else:
-            raw_index = per._raw_array_from_parameter(self, 'index', index)
+            raw_index = val.raw_array_from_parameter(self, 'index', index)
 
         acc_index = raw_index
         fdata = raw_data
@@ -102,7 +123,7 @@ class Session:
         acc_index = acc_index[index]
 
         for r in r_readers[1:]:
-            raw_data = per._raw_array_from_parameter(self, 'readers', r)
+            raw_data = val.raw_array_from_parameter(self, 'readers', r)
             fdata = raw_data[acc_index]
             index = np.argsort(fdata, kind='stable')
             acc_index = acc_index[index]
@@ -110,86 +131,42 @@ class Session:
         return acc_index
 
 
-    # # TODO: index should be able to be either a reader or an ndarray
-    # def apply_sort_index(self, index, reader, writer=None):
-    #     index_ = per._raw_array_from_parameter(self, 'index', index)
-    #     per._check_is_reader_substitute('reader', reader)
-    #     per._check_is_appropriate_writer_if_set(self, 'writer', reader, writer)
-    #     reader_ = per._reader_from_group_if_required(self, 'reader', reader)
-    #     if isinstance(reader_, per.IndexedStringReader):
-    #         src_indices = reader_.field['index'][:]
-    #         src_values = reader_.field.get('values', np.zeros(0, dtype=np.uint8))[:]
-    #         indices, values = per._apply_sort_to_index_values(index_, src_indices, src_values)
-    #         if len(src_indices) != len(index) + 1:
-    #             raise ValueError(f"'indices' (length {len(indices)}) must be one longer than "
-    #                              f"'index' (length {len(index)})")
-    #         if writer:
-    #             writer.write_raw(indices, values)
-    #         return indices, values
-    #     else:
-    #         reader_ = per._raw_array_from_parameter(reader_)
-    #         per._check_equal_length('index', index_, 'reader', reader_)
-    #         result = per._apply_sort_to_array(index_, reader_)
-    #         if writer:
-    #             writer.write(result)
-    #         return result
-
-
-    # TODO: write filter with new readers / writers rather than deleting this
-    def apply_filter(self, filter_to_apply, reader, writer=None):
-        filter_to_apply_ =\
-            per._raw_array_from_parameter(self, 'filter_to_apply', filter_to_apply)
-        per._check_is_reader_substitute('reader', reader)
-
+    def apply_filter(self, index_to_apply, src, dest=None):
+        index_to_apply_ = val.array_from_parameter(self, 'index_to_apply', index_to_apply)
         writer_ = None
-        if writer is not None:
-            writer_ = per._writer_from_writer_or_group(self, 'writer', writer)
-            per._check_is_appropriate_writer_if_set(self, 'writer', reader, writer_)
-        reader_ = per._reader_from_group_if_required(self, 'reader', reader)
-        if isinstance(reader, per.IndexedStringReader):
-            src_indices = reader.field['index'][:]
-            src_values = reader.field.get('values', np.zeros(0, dtype=np.uint8))[:]
-            if len(src_indices) != len(filter_to_apply_) + 1:
-                raise ValueError(f"'indices' (length {len(indices)}) must be one longer than "
-                                 f"'filter_to_apply' (length {len(filter_to_apply_)})")
-
-            indices, values = per._apply_filter_to_index_values(filter_to_apply_,
-                                                                src_indices, src_values)
+        if writer_:
+            writer_ = val.field_from_parameter(self, 'writer', dest)
+        if isinstance(src, fld.IndexedStringField):
+            src_ = val.field_from_parameter(self, 'reader', src)
+            dest_indices, dest_values =\
+                ops.apply_filter_to_index_values(index_to_apply_,
+                                                  src_.indices[:], src_.values[:])
             if writer_:
-                writer_.write_raw(indices, values)
-            return indices, values
+                writer_.write_raw(dest_indices, dest_values)
+            return dest_indices, dest_values
         else:
-            reader_ = per._raw_array_from_parameter(self, 'reader', reader_)
-            per._check_equal_length('filter_to_apply', filter_to_apply_, 'reader', reader_)
-            result = reader_[filter_to_apply_]
+            reader_ = val.array_from_parameter(self, 'reader', src)
+            result = reader_[index_to_apply]
             if writer_:
                 writer_.write(result)
             return result
 
 
-    def apply_index(self, index_to_apply, reader, writer=None):
-        index_to_apply_ = per._raw_array_from_parameter(self, 'index_to_apply', index_to_apply)
-        per._check_is_reader_substitute('reader', reader)
+    def apply_index(self, index_to_apply, src, dest=None):
+        index_to_apply_ = val.array_from_parameter(self, 'index_to_apply', index_to_apply)
         writer_ = None
-        if writer is not None:
-            writer_ = per._writer_from_writer_or_group(self, 'writer', writer)
-            per._check_is_appropriate_writer_if_set(self, 'writer', reader, writer_)
-        reader_ = per._reader_from_group_if_required(self, 'reader', reader)
-        if isinstance(reader, per.IndexedStringReader):
-            src_indices = reader.field['index'][:]
-            src_values = reader.field.get('values', np.zeros(0, dtype=np.uint8))[:]
-            if len(src_indices) != len(index_to_apply_) + 1:
-                raise ValueError(f"'indices' (length {len(indices)}) must be one longer than "
-                                 f"'index_filter' (length {len(index_filter)})")
-
-            indices, values = per._apply_indices_to_index_values(index_to_apply,
-                                                                 src_indices, src_values)
+        if writer_:
+            writer_ = val.field_from_parameter(self, 'writer', dest)
+        if isinstance(src, fld.IndexedStringField):
+            src_ = val.field_from_parameter(self, 'reader', src)
+            dest_indices, dest_values =\
+                ops.apply_indices_to_index_values(index_to_apply_,
+                                                  src_.indices[:], src_.values[:])
             if writer_:
-                writer_.write_raw(indices, values)
-            return indices, values
+                writer_.write_raw(dest_indices, dest_values)
+            return dest_indices, dest_values
         else:
-            reader_ = per._raw_array_from_parameter(self, 'reader', reader_)
-            per._check_equal_length('index_to_apply', index_to_apply_, 'reader', reader_)
+            reader_ = val.array_from_parameter(self, 'reader', src)
             result = reader_[index_to_apply]
             if writer_:
                 writer_.write(result)
@@ -224,159 +201,105 @@ class Session:
         raw_field = None
         raw_fields = None
         if field is not None:
-            per._check_is_reader_or_ndarray('field', field)
-            raw_field = field[:] if isinstance(field, per.Reader) else field
+            val._check_is_reader_or_ndarray('field', field)
+            raw_field = field[:] if isinstance(field, rw.Reader) else field
         else:
             raw_fields = []
             for f in fields:
-                per._check_is_reader_or_ndarray('elements of tuple/list fields', f)
-                raw_fields.append(f[:] if isinstance(f, per.Reader) else f)
+                val._check_is_reader_or_ndarray('elements of tuple/list fields', f)
+                raw_fields.append(f[:] if isinstance(f, rw.Reader) else f)
         return per._get_spans(raw_field, raw_fields)
 
 
-    # TODO: needs a predicate to break ties: first, last?
-    def apply_spans_index_of_min(self, spans, reader, writer=None):
-        per._check_is_reader_or_ndarray('reader', reader)
-        per._check_is_reader_or_ndarray_if_set('writer', reader)
-
-        if isinstance(reader, per.Reader):
-            raw_reader = reader[:]
-        else:
-            raw_reader = reader
-
-        if writer is not None:
-            if isinstance(writer, per.Writer):
-                raw_writer = writer[:]
+    def _apply_spans_no_src(self, predicate, spans, dest=None):
+        if dest:
+            if val.is_field_parameter(self, 'dest', dest):
+                dest_ = val.field_from_parameter(self, 'dest', dest)
+                results = np.zeros(len(spans) - 1, dtype=dest_.dtype)
+                predicate(spans, results)
+                dest_.write(results)
+                return results
             else:
-                raw_writer = writer
+                dest_ = val.array_from_parameter(self, 'dest', dest)
+                if len(dest_) != len(spans) - 1:
+                    error_msg = ("if 'dest' (length {}) is an ndarray, it must be one element "
+                                 "shorter than the length of 'spans' (length{})")
+                    raise ValueError(error_msg.format(len(dest_), len(spans)))
+                    predicate(spans, dest_)
+                return dest_
         else:
-            raw_writer = np.zeros(len(spans)-1, dtype=np.int64)
-            per._apply_spans_index_of_min(spans, raw_reader, raw_writer)
-        if isinstance(writer, per.Writer):
-            writer.write(raw_writer)
-        else:
-            return raw_writer
+            results = np.zeros(len(spans) - 1, dtype='int64')
+            predicate(spans, results)
+            return results
 
 
-    def apply_spans_index_of_max(self, spans, reader, writer=None):
-        per._check_is_reader_or_ndarray('reader', reader)
-        per._check_is_reader_or_ndarray_if_set('writer', reader)
+    def _apply_spans_src(self, predicate, spans, src, dest=None):
+        src_ = val.array_from_parameter(src)
+        if len(src) != len(spans) - 1:
+            error_msg = ("'src' (length {}) must be one element shorter than 'spans' "
+                         "(length {})")
+            raise ValueError(error_msg.format(len(src_), len(spans)))
 
-        if isinstance(reader, per.Reader):
-            raw_reader = reader[:]
-        else:
-            raw_reader = reader
-
-        if writer is not None:
-            if isinstance(writer, per.Writer):
-                raw_writer = writer[:]
+        if dest:
+            if val.is_field_parameter(self, 'dest', dest):
+                dest_ = val.field_from_parameter(self, 'dest', dest)
+                results = np.zeros(len(spans) - 1, dtype=dest_.dtype)
+                predicate(spans, results)
+                dest_.write(results)
+                return results
             else:
-                raw_writer = writer
+                dest_ = val.array_from_parameter(self, 'dest', dest)
+                if len(dest_) != len(spans) - 1:
+                    error_msg = ("if 'dest' (length {}) is an ndarray, it must be one element "
+                                 "shorter than the length of 'spans' (length{})")
+                    raise ValueError(error_msg.format(len(dest_), len(spans)))
+                    predicate(spans, dest_)
+                return dest_
         else:
-            raw_writer = np.zeros(len(spans)-1, dtype=np.int64)
-            per._apply_spans_index_of_max(spans, raw_reader, raw_writer)
-        if isinstance(writer, per.Writer):
-            writer.write(raw_writer)
-        else:
-            return raw_writer
+            results = np.zeros(len(spans) - 1, dtype='int64')
+            predicate(spans, results)
+            return results
 
+    def apply_spans_index_of_min(self, spans, src, dest=None):
+        return self._apply_spans_src(ops.apply_spans_index_of_min, spans, src, dest)
 
-    # TODO - for all apply_spans methods, spans should be able to be an ndarray
-    def apply_spans_count(self, spans, _, writer):
-        if isinstance(writer, per.Writer):
-            dest_values = writer.chunk_factory(len(spans) - 1)
-            per._apply_spans_count(spans, dest_values)
-            writer.write(dest_values)
-        elif isinstance(writer, np.ndarray):
-            per._apply_spans_count(spans, writer)
-        else:
-            raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
+    def apply_spans_index_of_max(self, spans, src, dest=None):
+        return self._apply_spans_src(ops.apply_spans_index_of_max, spans, src, dest)
 
-    def apply_spans_first(self, spans, reader, writer):
-        if isinstance(reader, per.Reader):
-            read_values = reader[:]
-        elif isinstance(reader.np.ndarray):
-            read_values = reader
-        else:
-            raise ValueError(f"'reader' must be one of 'Reader' or 'ndarray' but is {type(reader)}")
+    def apply_spans_index_of_first(self, spans, dest=None):
+        return self._apply_spans_no_src(ops.apply_spans_index_of_first, spans, dest)
 
-        if isinstance(writer, per.Writer):
-            dest_values = writer.chunk_factory(len(spans) - 1)
-            per._apply_spans_first(spans, read_values, dest_values)
-            writer.write(dest_values)
-        elif isinstance(writer, np.ndarray):
-            per._apply_spans_first(spans, read_values, writer)
-        else:
-            raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
+    def apply_spans_index_of_last(self, spans, dest=None):
+        return self._apply_spans_no_src(ops.apply_spans_index_of_last, spans, dest)
 
+    def apply_spans_count(self, spans, dest=None):
+        return self._apply_spans_no_src(ops.apply_spans_count, spans, dest)
 
-    def apply_spans_last(self, spans, reader, writer):
-        if isinstance(reader, per.Reader):
-            read_values = reader[:]
-        elif isinstance(reader.np.ndarray):
-            read_values = reader
-        else:
-            raise ValueError(f"'reader' must be one of 'Reader' or 'ndarray' but is {type(reader)}")
+    def apply_spans_min(self, spans, src, dest=None):
+        return self._apply_spans_src(ops.apply_spans_min, spans, src, dest)
 
-        if isinstance(writer, per.Writer):
-            dest_values = writer.chunk_factory(len(spans) - 1)
-            per._apply_spans_last(spans, read_values, dest_values)
-            writer.write(dest_values)
-        elif isinstance(writer, np.ndarray):
-            per._apply_spans_last(spans, read_values, writer)
-        else:
-            raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
+    def apply_spans_max(self, spans, src, dest=None):
+        return self._apply_spans_src(ops.apply_spans_max, spans, src, dest)
 
+    def apply_spans_first(self, spans, dest=None):
+        return self._apply_spans_no_src(ops.apply_spans_first, spans, dest)
 
-    def apply_spans_min(self, spans, reader, writer):
-        if isinstance(reader, per.Reader):
-            read_values = reader[:]
-        elif isinstance(reader.np.ndarray):
-            read_values = reader
-        else:
-            raise ValueError(f"'reader' must be one of 'Reader' or 'ndarray' but is {type(reader)}")
+    def apply_spans_last(self, spans, dest=None):
+        return self._apply_spans_no_src(ops.apply_spans_last, spans, dest)
 
-        if isinstance(writer, per.Writer):
-            dest_values = writer.chunk_factory(len(spans) - 1)
-            per._apply_spans_min(spans, read_values, dest_values)
-            writer.write(dest_values)
-        elif isinstance(reader, per.Reader):
-            per._apply_spans_min(spans, read_values, writer)
-        else:
-            raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
+    def apply_spans_concat(self, spans, src, dest):
+        if not isinstance(src, fld.IndexedStringField):
+            raise ValueError(f"'src' must be one of 'IndexedStringField' but is {type(src)}")
+        if not isinstance(dest, fld.IndexedStringField):
+            raise ValueError(f"'dest' must be one of 'IndexedStringField' but is {type(dest)}")
 
+        src_index = src.indices[:]
+        src_values = src.values[:]
+        dest_index = np.zeros(src.chunksize, src_index.dtype)
+        dest_values = np.zeros(dest.chunksize * 16, src_values.dtype)
 
-    def apply_spans_max(self, spans, reader, writer):
-        if isinstance(reader, per.Reader):
-            read_values = reader[:]
-        elif isinstance(reader.np.ndarray):
-            read_values = reader
-        else:
-            raise ValueError(f"'reader' must be one of 'Reader' or 'ndarray' but is {type(reader)}")
-
-        if isinstance(writer, per.Writer):
-            dest_values = writer.chunk_factory(len(spans) - 1)
-            per._apply_spans_max(spans, read_values, dest_values)
-            writer.write(dest_values)
-        elif isinstance(reader, per.Reader):
-            per._apply_spans_max(spans, read_values, writer)
-        else:
-            raise ValueError(f"'writer' must be one of 'Writer' or 'ndarray' but is {type(writer)}")
-
-
-    def apply_spans_concat(self, spans, reader, writer):
-        if not isinstance(reader, per.IndexedStringReader):
-            raise ValueError(f"'reader' must be one of 'IndexedStringReader' but is {type(reader)}")
-        if not isinstance(writer, per.IndexedStringWriter):
-            raise ValueError(f"'writer' must be one of 'IndexedStringWriter' but is {type(writer)}")
-
-        src_index = reader.field['index'][:]
-        src_values = reader.field['values'][:]
-        dest_index = np.zeros(reader.chunksize, src_index.dtype)
-        dest_values = np.zeros(reader.chunksize * 16, src_values.dtype)
-
-        max_index_i = reader.chunksize
-        max_value_i = reader.chunksize * 8
+        max_index_i = src.chunksize
+        max_value_i = dest.chunksize * 8
         s = 0
         while s < len(spans) - 1:
             s, index_i, index_v = per._apply_spans_concat(spans, src_index, src_values,
@@ -384,68 +307,99 @@ class Session:
                                                           max_index_i, max_value_i, s)
 
             if index_i > 0 or index_v > 0:
-                writer.write_raw(dest_index[:index_i], dest_values[:index_v])
-        writer.flush()
+                dest.write_raw(dest_index[:index_i], dest_values[:index_v])
+        dest.complete()
+
+
+    def _aggregate_impl(self, predicate, fkey_indices=None, fkey_index_spans=None,
+                        src=None, dest=None, result_dtype=None):
+        if fkey_indices is None and fkey_index_spans is None:
+            raise ValueError("One of 'fkey_indices' or 'fkey_index_spans' must be set")
+        if fkey_indices is not None and fkey_index_spans is not None:
+            raise ValueError("Only one of 'fkey_indices' and 'fkey_index_spans' may be set")
+        if dest is not None:
+            if not isinstance(dest, (fld.Field, np.ndarray)):
+                raise ValueError("'writer' must be either a Writer or an ndarray instance")
+
+        if fkey_index_spans is None:
+            fkey_index_spans = self.get_spans(field=fkey_indices)
+
+        if isinstance(dest, np.ndarray):
+            if len(dest) != len(fkey_index_spans) - 1:
+                error = "'writer': ndarray must be of length {} but is of length {}"
+                raise ValueError(error.format(len(fkey_index_spans) - 1), len(dest))
+            elif dest.dtype != result_dtype:
+                raise ValueError(f"'writer' dtype must be {result_dtype} but is {dest.dtype}")
+
+        if isinstance(dest, fld.Field) or dest is None:
+            results = np.zeros(len(fkey_index_spans) - 1, dtype=result_dtype)
+        else:
+            results = dest
+
+        # execute the predicate (note that not every predicate requires a reader)
+        predicate(fkey_index_spans, src, results)
+
+        if isinstance(dest, fld.Field):
+            dest.data.write(results)
+
+        return dest if dest is not None else results
 
 
     def aggregate_count(self, fkey_indices=None, fkey_index_spans=None,
-                        reader=None, writer=None):
+                        src=None, dest=None):
         return per._aggregate_impl(self.apply_spans_count, fkey_indices, fkey_index_spans,
-                                   reader, writer, np.uint32)
+                                   src, dest, np.uint32)
 
 
     def aggregate_first(self, fkey_indices=None, fkey_index_spans=None,
-                        reader=None, writer=None):
+                        src=None, dest=None):
         return self.aggregate_custom(self.apply_spans_first, fkey_indices, fkey_index_spans,
-                                     reader, writer)
+                                     src, dest)
 
 
     def aggregate_last(self, fkey_indices=None, fkey_index_spans=None,
-                       reader=None, writer=None):
+                       src=None, dest=None):
         return self.aggregate_custom(self.apply_spans_last, fkey_indices, fkey_index_spans,
-                                     reader, writer)
+                                     src, dest)
 
 
-    def aggregate_min(self,fkey_indices=None, fkey_index_spans=None,
-                      reader=None, writer=None):
+    def aggregate_min(self, fkey_indices=None, fkey_index_spans=None,
+                      src=None, dest=None):
         return self.aggregate_custom(self.apply_spans_min, fkey_indices, fkey_index_spans,
-                                     reader, writer)
+                                     src, dest)
 
 
     def aggregate_max(self, fkey_indices=None, fkey_index_spans=None,
-                      reader=None, writer=None):
+                      src=None, dest=None):
         return self.aggregate_custom(self.apply_spans_max, fkey_indices, fkey_index_spans,
-                                     reader, writer)
+                                     src, dest)
 
 
     def aggregate_custom(self,
                          predicate, fkey_indices=None, fkey_index_spans=None,
-                         reader=None, writer=None):
-        if reader is None:
+                         src=None, dest=None):
+        if src is None:
             raise ValueError("'reader' must not be None")
-        if not isinstance(reader, (per.Reader, np.ndarray)):
-            raise ValueError(f"'reader' must be a Reader or an ndarray but is {type(reader)}")
-        if isinstance(reader, per.Reader):
-            required_dtype = reader.dtype()
-        else:
-            required_dtype = reader.dtype
+        if not isinstance(src, (rw.Reader, np.ndarray)):
+            raise ValueError(f"'reader' must be a Reader or an ndarray but is {type(src)}")
+        required_dtype = src.dtype
         return per._aggregate_impl(predicate, fkey_indices, fkey_index_spans,
-                                   reader, writer, required_dtype)
+                                   src, dest, required_dtype)
 
 
     def join(self,
              destination_pkey, fkey_indices, values_to_join,
              writer=None, fkey_index_spans=None):
         if fkey_indices is not None:
-            if not isinstance(fkey_indices, (per.Reader, np.ndarray)):
+            if not isinstance(fkey_indices, (rw.Reader, np.ndarray)):
                 raise ValueError(f"'fkey_indices' must be a type of Reader or an ndarray")
         if values_to_join is not None:
-            if not isinstance(values_to_join, (per.Reader, np.ndarray)):
+            if not isinstance(values_to_join, (rw.Reader, np.ndarray)):
                 raise ValueError(f"'values_to_join' must be a type of Reader but is {type(values_to_join)}")
-            if isinstance(values_to_join, per.IndexedStringReader):
+            if isinstance(values_to_join, rw.IndexedStringReader):
                 raise ValueError(f"Joins on indexed string fields are not supported")
 
-        if isinstance(values_to_join, per.Reader):
+        if isinstance(values_to_join, rw.Reader):
             raw_values_to_join = values_to_join[:]
         else:
             raw_values_to_join = values_to_join
@@ -484,9 +438,9 @@ class Session:
                            predicate, destination_pkey, fkey_indices,
                            reader=None, writer=None, fkey_index_spans=None):
         if reader is not None:
-            if not isinstance(reader, per.Reader):
+            if not isinstance(reader, rw.Reader):
                 raise ValueError(f"'reader' must be a type of Reader but is {type(reader)}")
-            if isinstance(reader, per.IndexedStringReader):
+            if isinstance(reader, rw.IndexedStringReader):
                 raise ValueError(f"Joins on indexed string fields are not supported")
 
         # generate spans for the sorted key indices if not provided
@@ -524,7 +478,7 @@ class Session:
 
     def get(self, field):
         if 'fieldtype' not in field.attrs.keys():
-            raise ValueError(f"'{field_name}' is not a well-formed field")
+            raise ValueError(f"'{field}' is not a well-formed field")
 
         fieldtype_map = {
             'indexedstring': fld.IndexedStringField,
@@ -540,73 +494,81 @@ class Session:
         fieldtype = field.attrs['fieldtype'].split(',')[0]
         return fieldtype_map[fieldtype](self, field)
 
-    def get_reader(self, field):
+
+    def create_like(self, field, dest_group, dest_name, timestamp=None, chunksize=None):
         if 'fieldtype' not in field.attrs.keys():
-            raise ValueError(f"'{field_name}' is not a well-formed field")
+            raise ValueError("{} is not a well-formed field".format(field))
 
-        fieldtype_map = {
-            'indexedstring': per.IndexedStringReader,
-            'fixedstring': per.FixedStringReader,
-            'categorical': per.CategoricalReader,
-            'boolean': per.NumericReader,
-            'numeric': per.NumericReader,
-            'datetime': per.TimestampReader,
-            'date': per.TimestampReader,
-            'timestamp': per.TimestampReader
-        }
-
-        fieldtype = field.attrs['fieldtype'].split(',')[0]
-        return fieldtype_map[fieldtype](self, field)
+        f = self.get(field)
+        f.create_like(dest_group, dest_name)
 
 
-    def get_existing_writer(self, field, timestamp=None):
-        if 'fieldtype' not in field.attrs.keys():
-            raise ValueError(f"'{field_name}' is not a well-formed field")
-
-        fieldtype_map = {
-            'indexedstring': per.IndexedStringReader,
-            'fixedstring': per.FixedStringReader,
-            'categorical': per.CategoricalReader,
-            'boolean': per.NumericReader,
-            'numeric': per.NumericReader,
-            'datetime': per.TimestampReader,
-            'date': per.TimestampReader,
-            'timestamp': per.TimestampReader
-        }
-
-        fieldtype = field.attrs['fieldtype'].split(',')[0]
-        reader = fieldtype_map[fieldtype](self, field)
-        group = field.parent
-        name = field.name.split('/')[-1]
-        return reader.get_writer(group, name, timestamp=timestamp, write_mode='overwrite')
-
-
-    def get_indexed_string_writer(self, group, name, timestamp=None, writemode='write'):
-        return per.IndexedStringWriter(self, group, name, timestamp, writemode)
-
-
-    def get_fixed_string_writer(self, group, name, width,
-                                timestamp=None, writemode='write'):
-        return per.FixedStringWriter(self, group, name, width, timestamp, writemode)
-
-
-    def get_categorical_writer(self, group, name, categories,
-                               timestamp=None, writemode='write'):
-        return per.CategoricalWriter(self, group, name, categories, timestamp, writemode)
-
-
-    def get_numeric_writer(self, group, name, dtype, timestamp=None, writemode='write'):
-        return per.NumericWriter(self, group, name, dtype, timestamp, writemode)
-
-
-    def get_timestamp_writer(self, group, name, timestamp=None, writemode='write'):
-        return per.TimestampWriter(self, group, name, timestamp, writemode)
+    # def get_reader(self, field):
+    #     if 'fieldtype' not in field.attrs.keys():
+    #         raise ValueError(f"'{field}' is not a well-formed field")
+    #
+    #     fieldtype_map = {
+    #         'indexedstring': rw.IndexedStringReader,
+    #         'fixedstring': rw.FixedStringReader,
+    #         'categorical': rw.CategoricalReader,
+    #         'boolean': rw.NumericReader,
+    #         'numeric': rw.NumericReader,
+    #         'datetime': rw.TimestampReader,
+    #         'date': rw.TimestampReader,
+    #         'timestamp': rw.TimestampReader
+    #     }
+    #
+    #     fieldtype = field.attrs['fieldtype'].split(',')[0]
+    #     return fieldtype_map[fieldtype](self, field)
+    #
+    #
+    # def get_existing_writer(self, field, timestamp=None):
+    #     if 'fieldtype' not in field.attrs.keys():
+    #         raise ValueError(f"'{field_name}' is not a well-formed field")
+    #
+    #     fieldtype_map = {
+    #         'indexedstring': rw.IndexedStringReader,
+    #         'fixedstring': rw.FixedStringReader,
+    #         'categorical': rw.CategoricalReader,
+    #         'boolean': rw.NumericReader,
+    #         'numeric': rw.NumericReader,
+    #         'datetime': rw.TimestampReader,
+    #         'date': rw.TimestampReader,
+    #         'timestamp': rw.TimestampReader
+    #     }
+    #
+    #     fieldtype = field.attrs['fieldtype'].split(',')[0]
+    #     reader = fieldtype_map[fieldtype](self, field)
+    #     group = field.parent
+    #     name = field.name.split('/')[-1]
+    #     return reader.get_writer(group, name, timestamp=timestamp, write_mode='overwrite')
 
 
-    def get_compatible_writer(self, field, dest_group, dest_name,
-                              timestamp=None, writemode='write'):
-        reader = self.get_reader(field)
-        return reader.get_writer(dest_group, dest_name, timestamp, writemode)
+    def create_indexed_string(self, group, name, timestamp=None, chunksize=None):
+        fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
+        return fld.IndexedStringField(self, group[name])
+
+
+    def create_fixed_string(self, group, name, length, timestamp=None, chunksize=None):
+        fld.fixed_string_field_constructor(self, group, name, length, timestamp, chunksize)
+        return fld.FixedStringField(self, group[name])
+
+
+    def create_categorical(self, group, name, nformat, key,
+                           timestamp=None, chunksize=None):
+        fld.categorical_field_constructor(self, group, name, nformat, key,
+                                          timestamp, chunksize)
+        return fld.CategoricalField(self, group[name])
+
+
+    def create_numeric(self, group, name, nformat, timestamp=None, chunksize=None):
+        fld.numeric_field_constructor(self, group, name, nformat, timestamp, chunksize)
+        return fld.NumericField(self, group[name])
+
+
+    def create_timestamp(self, group, name, timestamp=None, chunksize=None):
+        fld.timestamp_field_constructor(self, group, name, timestamp, chunksize)
+        return fld.TimestampField(self, group[name])
 
 
     def get_or_create_group(self, group, name):
@@ -629,14 +591,14 @@ class Session:
         # TODO: modifying the dictionaries in place is not great
         input_readers = dict()
         for k, v in inputs.items():
-            if isinstance(v, per.Reader):
+            if isinstance(v, rw.Reader):
                 input_readers[k] = v
             else:
                 input_readers[k] = self.get_reader(v)
         output_writers = dict()
         output_arrays = dict()
         for k, v in outputs.items():
-            if isinstance(v, per.Writer):
+            if isinstance(v, rw.Writer):
                 output_writers[k] = v
             else:
                 raise ValueError("'outputs': all values must be 'Writers'")
@@ -721,11 +683,11 @@ class Session:
         if map_mode not in valid_map_modes:
             raise ValueError("'map_mode' must be one of {}".format(valid_map_modes))
 
-        l_key_raw = per._raw_array_from_parameter(self, 'left_on', left_on)
+        l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
 
-        r_key_raw = per._raw_array_from_parameter(self, 'right_on', right_on)
+        r_key_raw = val.raw_array_from_parameter(self, 'right_on', right_on)
         r_index = np.arange(len(r_key_raw), dtype=np.int64)
         r_df = pd.DataFrame({'r_k': r_key_raw, 'r_index': r_index})
 
@@ -737,11 +699,11 @@ class Session:
         return l_to_r_map, l_to_r_filt, r_to_l_map, r_to_l_filt
 
     def map_right(self, left_on, right_on, map_mode='both'):
-        l_key_raw = per._raw_array_from_parameter(self, 'left_on', left_on)
+        l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
 
-        r_key_raw = per._raw_array_from_parameter(self, 'right_on', right_on)
+        r_key_raw = val.raw_array_from_parameter(self, 'right_on', right_on)
         r_index = np.arange(len(r_key_raw), dtype=np.int64)
         r_df = pd.DataFrame({'r_k': r_key_raw, 'r_index': r_index})
 
@@ -771,13 +733,13 @@ class Session:
 
 
     def merge_left(self, left_on, right_on,
-                   left_fields=None, right_fields=None,
+                   left_fields=tuple(), right_fields=tuple(),
                    left_writers=None, right_writers=None):
-        l_key_raw = per._raw_array_from_parameter(self, 'left_on', left_on)
+        l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
 
-        r_key_raw = per._raw_array_from_parameter(self, 'right_on', right_on)
+        r_key_raw = val.raw_array_from_parameter(self, 'right_on', right_on)
         r_index = np.arange(len(r_key_raw), dtype=np.int64)
         r_df = pd.DataFrame({'r_k': r_key_raw, 'r_index': r_index})
 
@@ -786,15 +748,15 @@ class Session:
         l_to_r_filt = np.logical_not(df['l_index'].isnull()).to_numpy()
         r_to_l_map = df['r_index'].to_numpy(dtype=np.int64)
         r_to_l_filt = np.logical_not(df['r_index'].isnull()).to_numpy()
-        print(df)
+        # print(df)
 
-        print("l_to_r_map:", l_to_r_map, l_to_r_map.dtype)
-        print("r_to_l_map:", r_to_l_map, r_to_l_map.dtype)
+        # print("l_to_r_map:", l_to_r_map, l_to_r_map.dtype)
+        # print("r_to_l_map:", r_to_l_map, r_to_l_map.dtype)
 
         # print(r_to_l_map > -1)
         left_results = list()
         for ilf, lf in enumerate(left_fields):
-            lf_raw = per._raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
+            lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
             joined_field = per._safe_map(lf_raw, l_to_r_map, l_to_r_filt)
             print(joined_field)
             if left_writers == None:
@@ -804,7 +766,7 @@ class Session:
 
         right_results = list()
         for irf, rf in enumerate(right_fields):
-            rf_raw = per._raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
+            rf_raw = val.raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
             joined_field = per._safe_map(rf_raw, r_to_l_map, r_to_l_filt)
             print(joined_field)
             if right_writers == None:
@@ -819,11 +781,11 @@ class Session:
     def merge_right(self, left_on, right_on,
                     left_fields=None, right_fields=None,
                     left_writers=None, right_writers=None):
-        l_key_raw = per._raw_array_from_parameter(self, 'left_on', left_on)
+        l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
 
-        r_key_raw = per._raw_array_from_parameter(self, 'right_on', right_on)
+        r_key_raw = val.raw_array_from_parameter(self, 'right_on', right_on)
         r_index = np.arange(len(r_key_raw), dtype=np.int64)
         r_df = pd.DataFrame({'r_k': r_key_raw, 'r_index': r_index})
 

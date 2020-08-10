@@ -12,7 +12,7 @@
 import h5py
 
 from hystore.core import dataset, persistence
-from hystore.core.importer import DatasetImporter
+from hystore.core.importer import DatasetImporter, NewDatasetImporter
 
 """
  * field source
@@ -54,6 +54,7 @@ def import_to_hdf5(timestamp, dest_file_name, data_schema,
     datastore = persistence.DataStore()
     with h5py.File(dest_file_name, 'w') as hf:
         writer_factory = data_schema.field_writers
+        # writer_factory = data_schema.new_field_writers
 
         show_every = 100000
         import_patients = True

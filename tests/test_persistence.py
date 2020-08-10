@@ -8,6 +8,8 @@ import numpy as np
 import h5py
 
 from hystore.core import persistence
+import hystore.core.readerwriter as rw
+import hystore.core.validation as val
 
 
 class TestPersistence(unittest.TestCase):
@@ -63,7 +65,7 @@ class TestPersistence(unittest.TestCase):
             values = [entries[random.randint(0, 4)] for _ in range(95)]
             print(values)
 
-            persistence.FixedStringWriter(datastore, htest, 'foo', 1, ts).write(values)
+            rw.FixedStringWriter(datastore, htest, 'foo', 1, ts).write(values)
 
             # non_empty = datastore.filter(
             #     htest, htest['foo']['values'], 'non_empty_foo', lambda x: len(x) == 0, ts)
@@ -90,7 +92,7 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             hf.create_group('test')
 
-            foo = persistence.IndexedStringWriter(datastore, hf, 'foo', ts)
+            foo = rw.IndexedStringWriter(datastore, hf, 'foo', ts)
             foo.write_part(values[0:10])
             foo.write_part(values[10:20])
             foo.write_part(values[20:30])
@@ -108,7 +110,7 @@ class TestPersistence(unittest.TestCase):
             self.assertListEqual(values, actual)
 
         with h5py.File(bio, 'r') as hf:
-            foo = persistence.IndexedStringReader(datastore, hf['foo'])
+            foo = rw.IndexedStringReader(datastore, hf['foo'])
             print(foo[:])
 
     def test_indexed_string_importer_2(self):
@@ -119,7 +121,7 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             hf.create_group('test')
 
-            foo = persistence.IndexedStringWriter(datastore, hf, 'foo', ts)
+            foo = rw.IndexedStringWriter(datastore, hf, 'foo', ts)
             values = ['', '', '1.0.0', '', '1.0.0', '1.0.0', '1.0.0', '1.0.0', '', '',
                       '1.0.0', '1.0.0', '', '1.0.0', '1.0.0', '1.0.0', '', '1.0.0', '1.0.0', '']
             foo.write(values)
@@ -149,7 +151,7 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             hf.create_group('test')
 
-            persistence.IndexedStringWriter(datastore, hf, 'foo', ts).write(values)
+            rw.IndexedStringWriter(datastore, hf, 'foo', ts).write(values)
 
             reader = datastore.get_reader(hf['foo'])
             writer = reader.get_writer(hf, 'foo2', ts)
@@ -165,7 +167,7 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             hf.create_group('test')
 
-            foo = persistence.FixedStringWriter(datastore, hf, 'foo', 5, ts)
+            foo = rw.FixedStringWriter(datastore, hf, 'foo', 5, ts)
             values = ['', '', '1.0.0', '', '1.0.0', '1.0.0', '1.0.0', '1.0.0', '', '',
                       '1.0.0', '1.0.0', '', '1.0.0', '1.0.0', '1.0.0', '', '1.0.0', '1.0.0', '']
             bvalues = [v.encode() for v in values]
@@ -174,7 +176,7 @@ class TestPersistence(unittest.TestCase):
             print('timestamp:', hf['foo'].attrs['timestamp'])
             print('completed:', hf['foo'].attrs['completed'])
 
-            print(persistence.FixedStringReader(datastore, hf['foo'])[:])
+            print(rw.FixedStringReader(datastore, hf['foo'])[:])
 
 
     def test_new_fixed_string_importer_1(self):
@@ -185,7 +187,7 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             hf.create_group('test')
 
-            foo = persistence.FixedStringWriter(datastore, hf, 'foo', 5, ts)
+            foo = rw.FixedStringWriter(datastore, hf, 'foo', 5, ts)
             values = ['', '', '1.0.0', '', '1.0.0', '1.0.0', '1.0.0', '1.0.0', '', '',
                       '1.0.0', '1.0.0', '', '1.0.0', '1.0.0', '1.0.0', '', '1.0.0', '1.0.0', '']
             foo.write_part(np.asarray(values[0:10], dtype="S5"))
@@ -195,7 +197,7 @@ class TestPersistence(unittest.TestCase):
             print('timestamp:', hf['foo'].attrs['timestamp'])
             print('completed:', hf['foo'].attrs['completed'])
 
-            print(persistence.FixedStringReader(datastore, hf['foo']))
+            print(rw.FixedStringReader(datastore, hf['foo']))
 
 
     def test_fixed_string_reader(self):
@@ -207,11 +209,11 @@ class TestPersistence(unittest.TestCase):
                   '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
         bvalues = [v.encode() for v in values]
         with h5py.File(bio, 'w') as hf:
-            foo = persistence.FixedStringWriter(datastore, hf, 'foo', 6, ts)
+            foo = rw.FixedStringWriter(datastore, hf, 'foo', 6, ts)
             foo.write(bvalues)
 
         with h5py.File(bio, 'r') as hf:
-            r_bytes = persistence.FixedStringReader(datastore, hf['foo'])[:]
+            r_bytes = rw.FixedStringReader(datastore, hf['foo'])[:]
             for i in range(len(r_bytes)):
                 self.assertEqual(bvalues[i], r_bytes[i])
 
@@ -223,11 +225,11 @@ class TestPersistence(unittest.TestCase):
                   '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
         bvalues = [v.encode() for v in values]
         with h5py.File(bio, 'w') as hf:
-            foo = persistence.FixedStringWriter(datastore, hf, 'foo', 6, ts)
+            foo = rw.FixedStringWriter(datastore, hf, 'foo', 6, ts)
             foo.write(bvalues)
 
         with h5py.File(bio, 'r') as hf:
-            r_bytes = persistence.FixedStringReader(datastore, hf['foo'])[:]
+            r_bytes = rw.FixedStringReader(datastore, hf['foo'])[:]
             r_filtered = r_bytes == b'1.0.0'
             print(r_filtered)
             for i in range(len(r_bytes)):
@@ -244,7 +246,7 @@ class TestPersistence(unittest.TestCase):
                   '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
         bvalues = [v.encode() for v in values]
         with h5py.File(bio, 'w') as hf:
-            persistence.FixedStringWriter(datastore, hf, 'foo', 6, ts).write(bvalues)
+            rw.FixedStringWriter(datastore, hf, 'foo', 6, ts).write(bvalues)
 
             reader = datastore.get_reader(hf['foo'])
             writer = reader.get_writer(hf, 'foo2', ts)
@@ -267,9 +269,9 @@ class TestPersistence(unittest.TestCase):
         print(type(values[0]))
         with h5py.File(bio, 'w') as hf:
             hf.create_group('test')
-            foo = persistence.NumericWriter(datastore, hf, 'foo', 'bool', ts).write(arrvalues)
+            foo = rw.NumericWriter(datastore, hf, 'foo', 'bool', ts).write(arrvalues)
 
-            foo = persistence.NumericReader(datastore, hf['foo'])[:]
+            foo = rw.NumericReader(datastore, hf['foo'])[:]
             self.assertTrue(np.array_equal(arrvalues, foo))
 
 
@@ -281,12 +283,12 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
-            foo = persistence.NumericImporter(datastore, hf, 'foo', 'float32',
+            foo = rw.NumericImporter(datastore, hf, 'foo', 'float32',
                                               persistence.try_str_to_float, ts)
             foo.write(values)
 
-            print(persistence.NumericReader(datastore, hf['foo'])[:])
-            print(persistence.NumericReader(datastore, hf['foo_valid'])[:])
+            print(rw.NumericReader(datastore, hf['foo'])[:])
+            print(rw.NumericReader(datastore, hf['foo_valid'])[:])
 
 
     def test_numeric_reader_float32(self):
@@ -297,13 +299,13 @@ class TestPersistence(unittest.TestCase):
         values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                   '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
         with h5py.File(bio, 'w') as hf:
-            foo = persistence.NumericImporter(datastore, hf, 'foo', 'float32',
+            foo = rw.NumericImporter(datastore, hf, 'foo', 'float32',
                                               persistence.try_str_to_float, ts)
 
             foo.write(values)
 
         with h5py.File(bio, 'r') as hf:
-            foo = persistence.NumericReader(datastore, hf['foo'])
+            foo = rw.NumericReader(datastore, hf['foo'])
             print(foo[:])
 
 
@@ -315,8 +317,8 @@ class TestPersistence(unittest.TestCase):
         values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                   '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
         with h5py.File(bio, 'w') as hf:
-            foov = persistence.NumericWriter(datastore, hf, 'foo', 'float32', ts)
-            foof = persistence.NumericWriter(datastore, hf, 'foo_filter', 'bool', ts)
+            foov = rw.NumericWriter(datastore, hf, 'foo', 'float32', ts)
+            foof = rw.NumericWriter(datastore, hf, 'foo_filter', 'bool', ts)
             out_values = np.zeros(len(values), dtype=np.float32)
             out_filter = np.zeros(len(values), dtype=np.bool)
             for i in range(len(values)):
@@ -332,8 +334,8 @@ class TestPersistence(unittest.TestCase):
             foof.flush()
 
         with h5py.File(bio, 'r') as hf:
-            foov = persistence.NumericReader(datastore, hf['foo'])
-            foof = persistence.NumericReader(datastore, hf['foo_filter'])
+            foov = rw.NumericReader(datastore, hf['foo'])
+            foof = rw.NumericReader(datastore, hf['foo_filter'])
             print(foov[5:15])
             print(foof[5:15])
 
@@ -355,8 +357,8 @@ class TestPersistence(unittest.TestCase):
                 except:
                     out_values[i] = 0
                     out_filter[i] = False
-            persistence.NumericWriter(datastore, hf, 'foo', 'float32', ts).write(out_values)
-            persistence.NumericWriter(datastore, hf, 'foo_filter', 'bool', ts).write(out_filter)
+            rw.NumericWriter(datastore, hf, 'foo', 'float32', ts).write(out_values)
+            rw.NumericWriter(datastore, hf, 'foo_filter', 'bool', ts).write(out_filter)
 
             reader = datastore.get_reader(hf['foo'])
             writer = reader.get_writer(hf, 'foo2', ts)
@@ -373,11 +375,11 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
-            foo = persistence.NumericImporter(datastore, hf, 'foo', 'int32',
+            foo = rw.NumericImporter(datastore, hf, 'foo', 'int32',
                                               persistence.try_str_to_int, ts).write(values)
 
-            print(list(zip(persistence.NumericReader(datastore, hf['foo'])[:],
-                           persistence.NumericReader(datastore, hf['foo_valid'])[:])))
+            print(list(zip(rw.NumericReader(datastore, hf['foo'])[:],
+                           rw.NumericReader(datastore, hf['foo_valid'])[:])))
 
 
     def test_new_numeric_importer_int32(self):
@@ -388,7 +390,7 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       0, 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
-            foo = persistence.NumericImporter(datastore, hf, 'foo', 'int32',
+            foo = rw.NumericImporter(datastore, hf, 'foo', 'int32',
                                               persistence.try_str_to_float_to_int, ts)
             foo.write_part(values[0:10])
             foo.write_part(values[10:20])
@@ -404,8 +406,8 @@ class TestPersistence(unittest.TestCase):
                         True, False, True, True, True, True, False, True, True, True, True],
                        dtype=np.bool)
         with h5py.File(bio, 'r') as hf:
-            foo = persistence.NumericReader(datastore, hf['foo'])
-            foo_valid = persistence.NumericReader(datastore, hf['foo_valid'])
+            foo = rw.NumericReader(datastore, hf['foo'])
+            foo_valid = rw.NumericReader(datastore, hf['foo_valid'])
             self.assertTrue(np.alltrue(foo[:] == expected))
             self.assertTrue(np.alltrue(foo_valid[:] == expected_valid))
 
@@ -418,11 +420,11 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
-            foo = persistence.NumericImporter(datastore, hf, 'foo', 'uint32',
+            foo = rw.NumericImporter(datastore, hf, 'foo', 'uint32',
                                               persistence.try_str_to_int, ts).write(values)
 
-            print(list(zip(persistence.NumericReader(datastore, hf['foo'])[:],
-                           persistence.NumericReader(datastore, hf['foo_valid'])[:])))
+            print(list(zip(rw.NumericReader(datastore, hf['foo'])[:],
+                           rw.NumericReader(datastore, hf['foo_valid'])[:])))
 
 
     def test_categorical_string_importer(self):
@@ -435,7 +437,7 @@ class TestPersistence(unittest.TestCase):
             # ds = hf.create_dataset('foo', (10,), dtype=h5py.string_dtype(encoding='utf-8'))
             # ds[:] = values
             # print(ds)
-            foo = persistence.CategoricalImporter(datastore, hf, 'foo',
+            foo = rw.CategoricalImporter(datastore, hf, 'foo',
                                                   {'': 0, 'False': 1, 'True': 2}, ts)
             foo.write(values)
             print('fieldtype:', hf['foo'].attrs['fieldtype'])
@@ -480,11 +482,11 @@ class TestPersistence(unittest.TestCase):
                       '', 'True', 'False', 'False', '', '', 'True', 'False', 'True', '',
                       '', 'True', 'False', 'False', '']
             value_map = {'': 0, 'False': 1, 'True': 2}
-            foo = persistence.CategoricalImporter(datastore, hf, 'foo', value_map, ts)
+            foo = rw.CategoricalImporter(datastore, hf, 'foo', value_map, ts)
             foo.write(values)
 
         with h5py.File(bio, 'r') as hf:
-            foo_int = persistence.CategoricalReader(datastore, hf['foo'])
+            foo_int = rw.CategoricalReader(datastore, hf['foo'])
             print(foo_int.keys)
             for i in range(len(foo_int)):
                 self.assertEqual(value_map[values[i]], foo_int[i])
@@ -502,7 +504,7 @@ class TestPersistence(unittest.TestCase):
                       '', 'True', 'False', 'False', '', '', 'True', 'False', 'True', '',
                       '', 'True', 'False', 'False', '']
             value_map = {'': 0, 'False': 1, 'True': 2}
-            persistence.CategoricalImporter(datastore, hf, 'foo', value_map, ts).write(values)
+            rw.CategoricalImporter(datastore, hf, 'foo', value_map, ts).write(values)
 
             reader = datastore.get_reader(hf['foo'])
             writer = reader.get_writer(hf, 'foo2', ts)
@@ -522,14 +524,14 @@ class TestPersistence(unittest.TestCase):
         values = [dt + timedelta(seconds=d) for d in deltas]
 
         with h5py.File(bio, 'w') as hf:
-            foo = persistence.DateTimeWriter(datastore, hf, 'foo', ts)
+            foo = rw.DateTimeWriter(datastore, hf, 'foo', ts)
             # for v in values:
             #     foo.append(str(v))
             # foo.flush()
             foo.write([str(v).encode() for v in values])
 
         with h5py.File(bio, 'r') as hf:
-            foo = persistence.TimestampReader(datastore, hf['foo'])
+            foo = rw.TimestampReader(datastore, hf['foo'])
             actual = [f for f in foo[:]]
             self.assertEqual([v.timestamp() for v in values], actual)
 
@@ -547,7 +549,7 @@ class TestPersistence(unittest.TestCase):
         tsvalues = np.asarray([v.timestamp() for v in values], dtype=np.float64)
 
         with h5py.File(bio, 'w') as hf:
-            foo = persistence.DateTimeWriter(datastore, hf, 'foo', ts)
+            foo = rw.DateTimeWriter(datastore, hf, 'foo', ts)
             foo.write_part(svalues[0:20])
             foo.write_part(svalues[20:40])
             foo.write_part(svalues[40:60])
@@ -556,7 +558,7 @@ class TestPersistence(unittest.TestCase):
             foo.flush()
 
         with h5py.File(bio, 'r') as hf:
-            foo = persistence.TimestampReader(datastore, hf['foo'])
+            foo = rw.TimestampReader(datastore, hf['foo'])
             actual = foo[:]
             self.assertTrue(np.alltrue(tsvalues == actual))
 
@@ -574,7 +576,7 @@ class TestPersistence(unittest.TestCase):
         tsvalues = np.asarray([v.timestamp() for v in values], dtype=np.float64)
 
         with h5py.File(bio, 'w') as hf:
-            persistence.DateTimeWriter(datastore, hf, 'foo', ts).write(svalues)
+            rw.DateTimeWriter(datastore, hf, 'foo', ts).write(svalues)
 
             reader = datastore.get_reader(hf['foo'])
             writer = reader.get_writer(hf, 'foo2', ts)
@@ -615,7 +617,7 @@ class TestPersistenceConcat(unittest.TestCase):
         src_values = np.frombuffer(b'aabbbbccccddeeeeffgggghh', dtype='S1')
 
         with h5py.File(bio, 'w') as hf:
-            foo = persistence.IndexedStringWriter(datastore, hf, 'foo', ts)
+            foo = rw.IndexedStringWriter(datastore, hf, 'foo', ts)
             foo.write_raw(src_indices, src_values)
             foo_r = datastore.get_reader(hf['foo'])
             datastore.apply_spans_concat(src_spans, foo_r, foo_r.get_writer(hf, 'concatfoo', ts))
@@ -637,7 +639,7 @@ class TestPersistenceConcat(unittest.TestCase):
         src_values = np.frombuffer(
             b'aaaaaaaaaaaabbbbbbbbccccccccccccddddddddeeeeffffffffffggggghhhhh', dtype='S1')
         with h5py.File(bio, 'w') as hf:
-            foo = persistence.IndexedStringWriter(datastore, hf, 'foo', ts)
+            foo = rw.IndexedStringWriter(datastore, hf, 'foo', ts)
             foo.write_raw(src_indices, src_values)
             foo_r = datastore.get_reader(hf['foo'])
             datastore.apply_spans_concat(src_spans, foo_r, foo_r.get_writer(hf, 'concatfoo', ts))
@@ -660,7 +662,7 @@ class TestPersistenceConcat(unittest.TestCase):
         src_values = np.frombuffer(
             b'aaaaaaaaaaaabbbbbbbbccccccccccccddddddddeeeeffffffffffggggghhhhhiiiiiiii', dtype='S1')
         with h5py.File(bio, 'w') as hf:
-            foo = persistence.IndexedStringWriter(datastore, hf, 'foo', ts)
+            foo = rw.IndexedStringWriter(datastore, hf, 'foo', ts)
             foo.write_raw(src_indices, src_values)
             foo_r = datastore.get_reader(hf['foo'])
             datastore.apply_spans_concat(src_spans, foo_r, foo_r.get_writer(hf, 'concatfoo', ts))
@@ -799,7 +801,7 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             trash = hf.create_group('/trash/asmts')
             asmts = hf.create_group('asmts')
-            foo = persistence.NumericWriter(datastore, asmts, 'foo', 'int32', ts)
+            foo = rw.NumericWriter(datastore, asmts, 'foo', 'int32', ts)
             foo.write(np.arange(95, dtype='int32'))
             trash = datastore.get_trash_group(foo.field)
             hf.move('/asmts/foo', trash.name)
@@ -842,17 +844,17 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         ts = str(dt)
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
-            foo = persistence.NumericWriter(datastore, hf, 'foo', 'uint32', ts)
+            foo = rw.NumericWriter(datastore, hf, 'foo', 'uint32', ts)
             foo.write_part(values)
             foo.flush()
 
         with h5py.File(bio, 'w') as hf:
-            footwo = persistence.NumericWriter(datastore, hf, 'twofoo', 'uint32', ts)
-            foo = persistence.NumericReader(datastore, hf['foo'])
+            footwo = rw.NumericWriter(datastore, hf, 'twofoo', 'uint32', ts)
+            foo = rw.NumericReader(datastore, hf['foo'])
 
             datastore.process({'foo': foo}, {'footwo': footwo}, functor)
 
-            footwo = persistence.NumericReader(datastore, hf['twofoo'])
+            footwo = rw.NumericReader(datastore, hf['twofoo'])
             for i, j in zip(foo[:], footwo[:]):
                 self.assertTrue(j == i*2)
 
@@ -904,7 +906,7 @@ class TestPersistenceOperations(unittest.TestCase):
                 persistence._apply_filter_to_index_values(the_filter, raw_indices, raw_values)
             print(dest_indices)
             print(dest_values)
-            w = persistence.IndexedStringWriter(datastore, hf, name, ts)
+            w = rw.IndexedStringWriter(datastore, hf, name, ts)
             w.write_raw(dest_indices, dest_values)
             r = datastore.get_reader(hf[name])
             print(r[:])
@@ -922,7 +924,7 @@ class TestPersistenceOperations(unittest.TestCase):
         bio = BytesIO()
         ts = str(datetime.now(timezone.utc))
         with h5py.File(bio, 'w') as hf:
-            persistence.IndexedStringWriter(datastore, hf, 'foo', ts).write(values)
+            rw.IndexedStringWriter(datastore, hf, 'foo', ts).write(values)
 
             raw_indices = hf['foo']['index'][:]
             raw_values = hf['foo']['values'][:]
@@ -963,7 +965,7 @@ class TestPersistenceOperations(unittest.TestCase):
                 persistence._apply_indices_to_index_values(the_indices, raw_indices, raw_values)
             print(dest_indices)
             print(dest_values)
-            w = persistence.IndexedStringWriter(datastore, hf, name, ts)
+            w = rw.IndexedStringWriter(datastore, hf, name, ts)
             w.write_raw(dest_indices, dest_values)
             r = datastore.get_reader(hf[name])
             print(r[:])
@@ -981,7 +983,7 @@ class TestPersistenceOperations(unittest.TestCase):
         bio = BytesIO()
         ts = str(datetime.now(timezone.utc))
         with h5py.File(bio, 'w') as hf:
-            persistence.IndexedStringWriter(datastore, hf, 'foo', ts).write(values)
+            rw.IndexedStringWriter(datastore, hf, 'foo', ts).write(values)
 
             raw_indices = hf['foo']['index'][:]
             raw_values = hf['foo']['values'][:]
@@ -1040,16 +1042,16 @@ class TestPersistenceOperations(unittest.TestCase):
         ts = str(dt)
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
-            fva = persistence.NumericWriter(datastore, hf, 'va', 'uint32', ts)
+            fva = rw.NumericWriter(datastore, hf, 'va', 'uint32', ts)
             fva.write(va)
-            fvb = persistence.NumericWriter(datastore, hf, 'vb', 'uint32', ts)
+            fvb = rw.NumericWriter(datastore, hf, 'vb', 'uint32', ts)
             fvb.write(vb)
-            fvx = persistence.FixedStringWriter(datastore, hf, 'vx', 1, ts)
+            fvx = rw.FixedStringWriter(datastore, hf, 'vx', 1, ts)
             fvx.write(vx)
 
-            rva = persistence.NumericReader(datastore, hf['va'])
-            rvb = persistence.NumericReader(datastore, hf['vb'])
-            rvx = persistence.FixedStringReader(datastore, hf['vx'])
+            rva = rw.NumericReader(datastore, hf['va'])
+            rvb = rw.NumericReader(datastore, hf['vb'])
+            rvx = rw.FixedStringReader(datastore, hf['vx'])
             sindex = datastore.dataset_sort((rva, rvb), np.arange(5, dtype='uint32'))
 
             ava = persistence._apply_sort_to_array(sindex, rva[:])
@@ -1090,7 +1092,7 @@ class TestPersistenceOperations(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             hf.create_group('test')
 
-            foo = persistence.IndexedStringWriter(datastore, hf, 'foo', ts)
+            foo = rw.IndexedStringWriter(datastore, hf, 'foo', ts)
             foo.write_part(values[0:10])
             foo.write_part(values[10:20])
             foo.write_part(values[20:30])
@@ -1109,7 +1111,7 @@ class TestPersistenceOperations(unittest.TestCase):
             self.assertListEqual(values, actual)
 
         with h5py.File(bio, 'r') as hf:
-            foo = persistence.IndexedStringReader(datastore, hf['foo'])
+            foo = rw.IndexedStringReader(datastore, hf['foo'])
             index = np.asarray(
                 [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21,
                  23, 25, 27, 29, 31, 33, 35, 37, 39, 41,
@@ -1123,7 +1125,74 @@ class TestPersistenceOperations(unittest.TestCase):
 
 class TestJoining(unittest.TestCase):
 
+    def test_join_fk_to_pk(self):
+        ds = persistence.DataStore(10)
+        p_id = np.array([100, 200, 300, 400, 500, 600, 800, 900])
+        p_val = np.array([-1, -2, -3, -4, -5, -6, -8, -9])
+        a_pid = np.array([100, 100, 100, 200, 200, 400, 400, 400, 400, 600,
+                          600, 600, 700, 700, 900, 900, 900])
+        a_val = np.array([10, 11, 12, 23, 22, 43, 40, 41, 41, 60,
+                          63, 62, 71, 71, 92, 92, 92])
+        index = ds.get_index(p_id, a_pid)
+        print(index)
+        print(persistence._map_valid_indices(p_val, index, 0))
+        index = ds.get_index(a_pid, p_id)
+        print(index)
+        print(persistence._map_valid_indices(a_val, index, 0))
+
     def test_join_pk_to_fk(self):
+        ds = persistence.DataStore(10)
+        p_id = np.array([b'a', b'b', b'c', b'd', b'e'], dtype='S1')
+        t_pid = np.array([b'a', b'c', b'd'], dtype='S1')
+        index = ds.get_index(t_pid, p_id)
+        print(index)
+
+
+    def test_fk_in_pk(self):
+        ds = persistence.DataStore(10)
+        p_id = np.array([100, 200, 300, 400, 500, 600, 800, 900])
+        a_pid = np.array([100, 100, 100, 200, 200, 400, 400, 400, 400, 600,
+                          600, 600, 700, 700, 900, 900, 900])
+        fk_in_pk = persistence.foreign_key_is_in_primary_key(p_id, a_pid)
+        print(fk_in_pk)
+
+    def test_failure_case_from_supplements(self):
+        ds = persistence.DataStore(10)
+        # p_id = np.array([100, 200, 300, 400, 500, 600, 700, 800, 900])
+        p_id = np.array([900, 800, 700, 600, 500, 400, 300, 200, 100])
+        a_pid = np.array([100, 100, 100, 200, 200, 400, 400, 400, 400, 600,
+                          600, 600, 700, 700, 900, 900, 900])
+        a_val = np.array([10, 11, 12, 23, 22, 43, 40, 41, 41, 60,
+                          63, 62, 71, 71, 92, 92, 92])
+
+        a_spans = ds.get_spans(a_pid)
+        print("spans:", a_spans)
+        indices_of_max = ds.apply_spans_index_of_max(a_spans, a_val)
+        print("iom:", indices_of_max)
+        p_to_a_indices = ds.get_index(a_pid[indices_of_max], p_id)
+        print("ixd_a_pid:", a_pid[indices_of_max])
+        print("p_to_a_i:", p_to_a_indices)
+
+        p_to_vals = np.zeros(len(p_to_a_indices), np.int32)
+        for i_r in range(len(p_to_a_indices)):
+            if p_to_a_indices[i_r] >= persistence.INVALID_INDEX:
+                p_to_vals[i_r] = -1
+            else:
+                p_to_vals[i_r] = a_val[indices_of_max[p_to_a_indices[i_r]]]
+        print("p_to_vals:", p_to_vals)
+
+        sel_a_val = a_val[indices_of_max]
+        print("sel_a_val:", sel_a_val)
+        p_to_vals = np.zeros(len(p_to_a_indices), np.int32)
+        for i_r in range(len(p_to_a_indices)):
+            if p_to_a_indices[i_r] >= persistence.INVALID_INDEX:
+                p_to_vals[i_r] = -1
+            else:
+                p_to_vals[i_r] = sel_a_val[p_to_a_indices[i_r]]
+        print("p_to_vals:", p_to_vals)
+
+
+    def test_join_pk_to_fk_2(self):
         ds = persistence.DataStore(10)
         ts = str(datetime.now(timezone.utc))
         bio = BytesIO()
@@ -1139,13 +1208,13 @@ class TestJoining(unittest.TestCase):
                     'a', 'a', 'a', 'b', 'b', 'b', 'c', 'c', 'e']]
             )
             ds.get_numeric_writer(a, 'ill', 'int32', ts).write(
-                [1, 2, 3, 4, 5, 6, 7, 8, 9]
+                np.array([1, 2, 3, 4, 5, 6, 7, 8, 9], dtype=np.int32)
             )
             ds.get_fixed_string_writer(p, 'id', 1, ts).write(
                 [e.encode() for e in ['a', 'c', 'd', 'e']]
             )
-            ds.get_numeric_writer(p, 'age', 1, ts).write(
-                [18, 90, 45, 60]
+            ds.get_numeric_writer(p, 'age', 'int32', ts).write(
+                np.array([18, 90, 45, 60], dtype=np.int32)
             )
             ds.get_index(
                 ds.get_reader(a['pid']),
@@ -1206,12 +1275,12 @@ class TestSorting(unittest.TestCase):
             ts = str(dt)
             bio = BytesIO()
             with h5py.File(bio, 'w') as hf:
-                persistence.IndexedStringWriter(datastore, hf, 'vals', ts).write(sv)
+                rw.IndexedStringWriter(datastore, hf, 'vals', ts).write(sv)
 
-                vals = persistence.IndexedStringReader(datastore, hf['vals'])
+                vals = rw.IndexedStringReader(datastore, hf['vals'])
                 wvals = vals.get_writer(hf, 'sorted_vals', ts)
                 vals.sort(np.asarray(si, dtype=np.uint32), wvals)
-                actual = persistence.IndexedStringReader(datastore, hf['sorted_vals'])[:]
+                actual = rw.IndexedStringReader(datastore, hf['sorted_vals'])[:]
                 expected = [sv[i] for i in si]
                 self.assertListEqual(expected, actual)
 
@@ -1241,10 +1310,9 @@ class TestJittingSort(unittest.TestCase):
 class TestDataWriter(unittest.TestCase):
 
     def test_data_writer(self):
-        from hystore.core.persistence import DataWriter
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
-            DataWriter.write(hf, 'x', [], 0, dtype='int32')
+            rw.DataWriter.write(hf, 'x', [], 0, dtype='int32')
             print(hf['x'])
 
 
@@ -1309,9 +1377,9 @@ class TestValidation(unittest.TestCase):
             x = hf.create_group('x')
             ds.get_numeric_writer(x, 'a', 'int32').write(np.asarray([1, 2, 3, 4]))
             ds.get_fixed_string_writer(x, 'b', 1).write(np.asarray([b'a', b'b', b'c', b'd']))
-            persistence._check_all_readers_valid_and_same_type((x['a'], x['b']))
+            val._check_all_readers_valid_and_same_type((x['a'], x['b']))
             ra = ds.get_reader(x['a'])
             rb = ds.get_reader(x['b'])
-            persistence._check_all_readers_valid_and_same_type((ra, rb))
-            persistence._check_all_readers_valid_and_same_type((ra[:], rb[:]))
+            val._check_all_readers_valid_and_same_type((ra, rb))
+            val._check_all_readers_valid_and_same_type((ra[:], rb[:]))
 
