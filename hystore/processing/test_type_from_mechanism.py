@@ -28,7 +28,7 @@ def test_type_from_mechanism_v1(datastore, mechanism, mechanism_free,
     pcr_standard_answers.write(np.isin(r_mechanism, (1, 2, 3, 4)))
     antibody_standard_answers.write(np.isin(r_mechanism, (5, 6, 7)))
 
-    r_mechanism_free = per._raw_array_from_parameter(datastore, 'mechanism_free', mechanism_free)
+    r_mechanism_free = per._raw_array_from_parameter(datastore, 'mechanism_freetext', mechanism_free)
 
     f_pcr_strong = np.zeros(len(r_mechanism), dtype=np.bool)
     for p in pcr_strong:
