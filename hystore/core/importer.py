@@ -11,7 +11,7 @@
 
 import csv
 import time
-
+import hystore.core.utils as utils
 
 class DatasetImporter:
     def __init__(self, datastore, source, hf, space,
@@ -123,7 +123,8 @@ class DatasetImporter:
                     chunk_index += 1
                     if chunk_index == chunk_size:
                         for i_df in range(len(index_map)):
-                            new_field_list[i_df].write_part(field_chunk_list[i_df])
+                            with utils.Timer("writing to {}".format(self.names_[i_df])):
+                                new_field_list[i_df].write_part(field_chunk_list[i_df])
                         chunk_index = 0
 
             if chunk_index != 0:
@@ -249,6 +250,7 @@ class NewDatasetImporter:
                     chunk_index += 1
                     if chunk_index == chunk_size:
                         for i_df in range(len(index_map)):
+                            # with utils.Timer("writing to {}".format(self.names_[i_df])):
                             new_field_list[i_df].write_part(field_chunk_list[i_df])
                         chunk_index = 0
 
