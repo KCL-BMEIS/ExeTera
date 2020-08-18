@@ -113,8 +113,3 @@ def load_schema(source):
         nds = NewDataSchema(fk, fv)
         spaces[fk] = nds
     return spaces
-
-
-# filename = '/home/ben/covid/covid_schema.json'
-# with open(filename) as f:
-#     load_schema(f.read())
