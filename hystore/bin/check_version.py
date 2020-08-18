@@ -7,7 +7,11 @@ def enumerate_versions(filenames):
     for fn in filenames:
         print(fn)
         with open(fn) as f:
+            ds = dataset.Dataset(f, stop_after=1)
+            print(len(ds.names_))
+        with open(fn) as f:
             ds = dataset.Dataset(f, keys=('version',), show_progress_every=1000000)
+        print(len(ds.names_))
         sversions = set(ds.field_by_name('version'))
         print(sorted(list(sversions)))
 

@@ -14,8 +14,9 @@
 from datetime import datetime, timezone
 import os
 
-from hystore.covidspecific import data_schemas, importer
+# from hystore.covidspecific import data_schemas, importer
 from version import __version__
+from hystore.core import importer
 
 import argparse
 
@@ -23,6 +24,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--version', action='version', version=__version__)
 parser.add_argument('-te', '--territories', default=None,
                     help='the territory/territories to filter the dataset on (runs on all territories if not set)')
+parser.add_argument('-s', '--schema', required=True,
+                    help='the location and name of the schema file')
 parser.add_argument('-p', '--patient_data',
                     help='the location and name of the patient data csv file')
 parser.add_argument('-a', '--assessment_data',
@@ -40,6 +43,9 @@ parser.add_argument('-ts', '--timestamp', default=str(datetime.now(timezone.utc)
 args = parser.parse_args()
 
 errors = False
+if not os.path.isfile(args.schema):
+    print('-s/--schema argument must be an existing file')
+    errors = True
 if not os.path.isfile(args.patient_data):
     print('-p/--patient_data argument must be an existing file')
     errors = True
@@ -58,11 +64,15 @@ if 'dev' in __version__:
            "Please use one of the release versions for actual work")
     print(msg.format(__version__))
 
-data_schema_version = 1
-data_schema = data_schemas.DataSchema(data_schema_version)
-data_schema = data_schemas.DataSchema(1)
-importer.import_to_hdf5(args.timestamp, args.output_hdf5, data_schema,
-                        args.patient_data, args.assessment_data, args.test_data,
-                        args.territories)
+# data_schema_version = 1
+# data_schema = data_schemas.DataSchema(data_schema_version)
+# data_schema = data_schemas.DataSchema(1)
+files = {'patients': args.patient_data,
+         'assessments': args.assessment_data,
+         'tests': args.test_data}
+importer.import_with_schema(args.timestamp, args.output_hdf5, args.schema, files)
+# importer.import_to_hdf5(args.timestamp, args.output_hdf5, data_schema,
+#                         args.patient_data, args.assessment_data, args.test_data,
+#                         args.territories)
 
 

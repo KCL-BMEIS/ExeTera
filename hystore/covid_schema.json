@@ -1,0 +1,2568 @@
+{
+  "hystore": {
+    "version": "1.0.0"
+  },
+  "schema": {
+    "patients": {
+      "primary_keys": [
+        "id"
+      ],
+      "fields": {
+        "id": {
+          "field_type": "fixed_string",
+          "length": 32
+        },
+        "created_at": {
+          "field_type": "datetime"
+        },
+        "updated_at": {
+          "field_type": "datetime"
+        },
+        "version": {
+          "field_type": "fixed_string",
+          "length": 10
+        },
+        "country_code": {
+          "field_type": "fixed_string",
+          "length": 2
+        },
+        "a1c_measurement_mmol": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "a1c_measurement_percent": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "activity_change": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "pfnts": 1,
+              "decreased": 2,
+              "same": 3,
+              "increased": 4
+            }
+          }
+        },
+        "alcohol_change": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "pfnts": 1,
+              "decreased": 2,
+              "same": 3,
+              "increased": 4,
+              "no_alcohol": 5
+            }
+          }
+        },
+        "already_had_covid": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "always_used_shortage": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "all_needed": 1,
+              "reused": 2
+            }
+          }
+        },
+        "blood_group": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "a": 1,
+              "b": 2,
+              "ab": 3,
+              "o": 4,
+              "unsure": 5,
+              "pfnts": 6
+            }
+          }
+        },
+        "bmi": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "cancer_clinical_trial_site": {
+          "field_type": "string"
+        },
+        "cancer_type": {
+          "field_type": "string"
+        },
+        "classic_symptoms": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "classic_symptoms_days_ago": {
+          "field_type": "numeric",
+          "value_type": "uint16"
+        },
+        "clinical_study_institutions": {
+          "field_type": "string"
+        },
+        "clinical_study_names": {
+          "field_type": "string"
+        },
+        "clinical_study_nct_ids": {
+          "field_type": "string"
+        },
+        "contact_additional_studies": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "contact_health_worker": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diabetes_diagnosis_year": {
+          "field_type": "numeric",
+          "value_type": "uint16"
+        },
+        "diabetes_oral_biguanide": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diabetes_oral_dpp4": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diabetes_oral_meglitinides": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diabetes_oral_other_medication": {
+          "field_type": "string"
+        },
+        "diabetes_oral_sglt2": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diabetes_oral_sulfonylurea": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diabetes_oral_thiazolidinediones": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diabetes_treatment_basal_insulin": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diabetes_treatment_insulin_pump": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diabetes_treatment_lifestyle": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diabetes_treatment_none": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diabetes_treatment_other_injection": {
+          "field_type": "string"
+        },
+        "diabetes_treatment_other_oral": {
+          "field_type": "string"
+        },
+        "diabetes_treatment_pfnts": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diabetes_treatment_rapid_insulin": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diabetes_type": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "pfnts": 1,
+              "gestational": 2,
+              "type_1": 3,
+              "type_2": 4,
+              "unsure": 5,
+              "other": 6
+            }
+          }
+        },
+        "diabetes_type_other": {
+          "field_type": "string"
+        },
+        "diabetes_uses_cgm": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diet_change": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "pfnts": 1,
+              "decreased": 2,
+              "same": 3,
+              "increased": 4
+            }
+          }
+        },
+        "does_chemotherapy": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "ethnicity": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "prefer_not_to_say": 1,
+              "not_hispanic": 2,
+              "hispanic": 3
+            }
+          }
+        },
+        "ever_had_covid_test": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "gender": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "0": 1,
+              "1": 2,
+              "2": 3,
+              "3": 4,
+              "99999": 5
+            }
+          }
+        },
+        "has_asthma": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "has_cancer": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "has_diabetes": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "has_eczema": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "has_hayfever": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "has_heart_disease": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "has_kidney_disease": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "has_lung_disease": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "has_lung_disease_only": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "have_used_PPE": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "never": 1,
+              "sometimes": 2,
+              "always": 3
+            }
+          }
+        },
+        "have_worked_in_hospital_care_facility": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "have_worked_in_hospital_clinic": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "have_worked_in_hospital_home_health": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "have_worked_in_hospital_inpatient": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "have_worked_in_hospital_other": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "have_worked_in_hospital_outpatient": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "have_worked_in_hospital_school_clinic": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "healthcare_professional": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "no": 1,
+              "yes_does_not_interact": 2,
+              "yes_does_not_treat": 3,
+              "yes_does_interact": 4,
+              "yes_does_treat": 5
+            }
+          }
+        },
+        "height_cm": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "help_available": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "housebound_problems": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "ht_combined_oral_contraceptive_pill": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "ht_depot_injection_or_implant": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "ht_hormone_treatment_therapy": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "ht_mirena_or_other_coil": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "ht_none": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "ht_oestrogen_hormone_therapy": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "ht_pfnts": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "ht_progestone_only_pill": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "ht_testosterone_hormone_therapy": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "interacted_patients_with_covid": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "no": 1,
+              "yes_suspected": 2,
+              "yes_documented_suspected": 3,
+              "yes_documented": 4
+            }
+          }
+        },
+        "interacted_with_covid": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "no": 1,
+              "yes_suspected": 2,
+              "yes_documented_suspected": 3,
+              "yes_documented": 4
+            }
+          }
+        },
+        "is_carer_for_community": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_uk_biobank": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_uk_guys_trust": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_uk_twins": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_agricultural_health": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_american_cancer_society_cancer_prevention_study_3": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_aspree_xt": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_bwhs": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_c19_human_genetics": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_california_teachers": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_chasing_covid": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_colocare": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_colon_cancer_family_registry": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_covid_flu_near_you": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_covid_siren": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_environmental_polymorphisms": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_growing_up_today": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_gulf": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_harvard_health_professionals": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_hispanic_colorectal_cancer": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_louisiana_state_university": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_mass_eye_ear_infirmary": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_mary_washington_healthcare": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_mass_general_brigham": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_md_anderson_d3code": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_multiethnic_cohort": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_northshore_genomic_health_initiative": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_nurses_study": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_partners_biobank": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_predetermine": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_predict2": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_promise_pcrowd": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_sister": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_stanford_diabetes": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_stanford_nutrition": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_in_us_stanford_well": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_pregnant": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_smoker": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "ladcd": {
+          "field_type": "fixed_string",
+          "length": 9
+        },
+        "last_asked_level_of_isolation": {
+          "field_type": "datetime",
+          "optional": "True"
+        },
+        "lifestyle_version": {
+          "field_type": "fixed_string",
+          "length": 10
+        },
+        "limited_activity": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "lsoa11cd": {
+          "field_type": "fixed_string",
+          "length": 9
+        },
+        "lsoa11nm": {
+          "field_type": "string"
+        },
+        "mobility_aid": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "msoa11cd": {
+          "field_type": "fixed_string",
+          "length": 9
+        },
+        "msoa11nm": {
+          "field_type": "string"
+        },
+        "need_inside_help": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "need_outside_help": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "needs_help": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "never_used_shortage": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "not_available": 1,
+              "not_needed": 2
+            }
+          }
+        },
+        "on_cancer_clinical_trial": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "outward_postcode": {
+          "field_type": "string"
+        },
+        "outward_postcode_latitude": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "outward_postcode_longitude": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "outward_postcode_region": {
+          "field_type": "string"
+        },
+        "outward_postcode_town_area": {
+          "field_type": "string"
+        },
+        "past_symptom_abdominal_pain": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "past_symptom_anosmia": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "past_symptom_chest_pain": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "past_symptom_delirium": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "past_symptom_diarrhoea": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "past_symptom_fatigue": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "past_symptom_fever": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "past_symptom_hoarse_voice": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "past_symptom_persistent_cough": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "past_symptom_shortness_of_breath": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "past_symptom_skipped_meals": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "past_symptoms_changed": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "much_better": 1,
+              "little_better": 2,
+              "same": 3,
+              "little_worse": 4,
+              "much_worse": 5
+            }
+          }
+        },
+        "past_symptoms_days_ago": {
+          "field_type": "numeric",
+          "value_type": "uint16"
+        },
+        "period_frequency": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "less_frequent": 1,
+              "irregular": 2,
+              "regular": 3
+            }
+          }
+        },
+        "period_status": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "other": 1,
+              "pfnts": 2,
+              "never": 3,
+              "not_currently": 4,
+              "currently": 5,
+              "pregnant": 6,
+              "stopped": 7
+            }
+          }
+        },
+        "period_stopped_age": {
+          "field_type": "numeric",
+          "value_type": "uint16"
+        },
+        "pregnant_weeks": {
+          "field_type": "numeric",
+          "value_type": "uint16"
+        },
+        "profile_attributes_updated_at": {
+          "field_type": "datetime",
+          "optional": "True"
+        },
+        "race_is_other": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_is_prefer_not_to_say": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_is_uk_asian": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_is_uk_black": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_is_uk_chinese": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_is_uk_middle_eastern": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_is_uk_mixed_other": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_is_uk_mixed_white_black": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_is_uk_white": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_is_us_asian": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_is_us_black": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_is_us_hawaiian_pacific": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_is_us_indian_native": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_is_us_white": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "race_other": {
+          "field_type": "string"
+        },
+        "reported_by_another": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "False": 0,
+              "True": 1
+            }
+          }
+        },
+        "same_household_as_reporter": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "se_postcode": {
+          "field_type": "string"
+        },
+        "smoked_years_ago": {
+          "field_type": "numeric",
+          "value_type": "uint16"
+        },
+        "smoker_status": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "never": 1,
+              "not_currently": 2,
+              "yes": 3
+            }
+          }
+        },
+        "snacking_change": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "pfnts": 1,
+              "decreased": 2,
+              "same": 3,
+              "increased": 4
+            }
+          }
+        },
+        "sometimes_used_shortage": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "all_needed": 1,
+              "reused": 2,
+              "not_enough": 3
+            }
+          }
+        },
+        "still_have_past_symptoms": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "takes_any_blood_pressure_medications": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "takes_aspirin": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "takes_blood_pressure_medications_pril": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "takes_blood_pressure_medications_sartan": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "takes_corticosteroids": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "takes_immunosuppressants": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "unwell_month_before": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "vs_asked_at": {
+          "field_type": "datetime",
+          "optional": "True"
+        },
+        "vs_garlic": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "vs_multivitamins": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "vs_none": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "vs_omega_3": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "vs_other": {
+          "field_type": "string"
+        },
+        "vs_pftns": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "vs_probiotics": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "vs_vitamin_c": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "vs_vitamin_d": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "vs_zinc": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "weight_change": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "pfnts": 1,
+              "decreased": 2,
+              "same": 3,
+              "increased": 4
+            }
+          }
+        },
+        "weight_change_kg": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "weight_change_pounds": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "weight_kg": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "year_of_birth": {
+          "field_type": "numeric",
+          "raw_type": "float32",
+          "value_type": "uint32"
+        },
+        "zipcode": {
+          "field_type": "string"
+        }
+      }
+    },
+    "assessments": {
+      "primary_keys": [
+        "id"
+      ],
+      "foreign_keys": {
+        "patient_id": {
+          "space": "patients",
+          "key": "id"
+        }
+      },
+      "fields": {
+        "id": {
+          "field_type": "fixed_string",
+          "length": 32
+        },
+        "patient_id": {
+          "field_type": "fixed_string",
+          "length": 32
+        },
+        "created_at": {
+          "field_type": "datetime"
+        },
+        "updated_at": {
+          "field_type": "datetime"
+        },
+        "version": {
+          "field_type": "fixed_string",
+          "length": 10
+        },
+        "country_code": {
+          "field_type": "fixed_string",
+          "length": 2
+        },
+        "abdominal_pain": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "always_used_shortage": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "all_needed": 1,
+              "reused": 2
+            }
+          }
+        },
+        "blisters_on_feet": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "chest_pain": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "chills_or_shivers": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "date_test_occurred": {
+          "field_type": "date",
+          "optional": "True"
+        },
+        "date_test_occurred_guess": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "less_than_7_days_ago": 1,
+              "over_1_week_ago": 2,
+              "over_2_week_ago": 3,
+              "over_3_week_ago": 4,
+              "over_1_month_ago": 5
+            }
+          }
+        },
+        "delirium": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diarrhoea": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diarrhoea_frequency": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "one_to_two": 1,
+              "three_to_four": 2,
+              "five_or_more": 3
+            }
+          }
+        },
+        "dizzy_light_headed": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "eye_soreness": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "fatigue": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "no": 1,
+              "mild": 2,
+              "significant": 3,
+              "severe": 4
+            }
+          }
+        },
+        "fever": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "had_covid_test": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "have_used_PPE": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "never": 1,
+              "sometimes": 2,
+              "always": 3
+            }
+          }
+        },
+        "headache": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "headache_frequency": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "some_of_day": 1,
+              "most_of_day": 2,
+              "all_of_the_day": 3
+            }
+          }
+        },
+        "health_status": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "healthy": 1,
+              "not_healthy": 2
+            }
+          }
+        },
+        "hoarse_voice": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "interacted_any_patients": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "isolation_healthcare_provider": {
+          "field_type": "numeric",
+          "value_type": "uint16"
+        },
+        "isolation_little_interaction": {
+          "field_type": "numeric",
+          "value_type": "uint16"
+        },
+        "isolation_lots_of_people": {
+          "field_type": "numeric",
+          "value_type": "uint16"
+        },
+        "level_of_isolation": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "not_left_the_house": 1,
+              "rarely_left_the_house": 2,
+              "rarely_left_the_house_but_visited_lots": 3,
+              "often_left_the_house": 4
+            }
+          }
+        },
+        "location": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "home": 1,
+              "hospital": 2,
+              "back_from_hospital": 3
+            }
+          }
+        },
+        "loss_of_smell": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "mask_cloth_or_scarf": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "mask_n95_ffp": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "mask_not_sure_pfnts": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "mask_other": {
+          "field_type": "string"
+        },
+        "mask_surgical": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "nausea": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "never_used_shortage": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "not_needed": 1,
+              "not_available": 2
+            }
+          }
+        },
+        "other_symptoms": {
+          "field_type": "string"
+        },
+        "persistent_cough": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "red_welts_on_face_or_lips": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "shortness_of_breath": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "no": 1,
+              "mild": 2,
+              "significant": 3,
+              "severe": 4
+            }
+          }
+        },
+        "skipped_meals": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "sometimes_used_shortage": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "all_needed": 1,
+              "reused": 2,
+              "not_enough": 3
+            }
+          }
+        },
+        "sore_throat": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "temperature": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "temperature_unit": {
+          "field_type": "fixed_string",
+          "length": 1
+        },
+        "tested_covid_positive": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "waiting": 1,
+              "no": 2,
+              "yes": 3
+            }
+          }
+        },
+        "treated_patients_with_covid": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "no": 1,
+              "yes_suspected": 2,
+              "yes_documented_suspected": 3,
+              "yes_documented": 4
+            }
+          }
+        },
+        "treatment": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "none": 1,
+              "oxygen": 2,
+              "nonInvasiveVentilation": 3,
+              "invasiveVentilation": 4
+            },
+            "out_of_range": "freetext"
+          }
+        },
+        "typical_hayfever": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "unusual_muscle_pains": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "worn_face_mask": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "not_applicable": 1,
+              "never": 2,
+              "sometimes": 3,
+              "most_of_the_time": 4,
+              "always": 5
+            }
+          }
+        }
+      }
+    },
+    "tests": {
+      "primary_keys": [
+        "id"
+      ],
+      "foreign_keys": {
+        "patient_id": {
+          "space": "patients",
+          "key": "id"
+        }
+      },
+      "fields": {
+        "id": {
+          "field_type": "fixed_string",
+          "length": 32
+        },
+        "patient_id": {
+          "field_type": "fixed_string",
+          "length": 32
+        },
+        "created_at": {
+          "field_type": "datetime"
+        },
+        "updated_at": {
+          "field_type": "datetime"
+        },
+        "version": {
+          "field_type": "fixed_string",
+          "length": 10
+        },
+        "country_code": {
+          "field_type": "fixed_string",
+          "length": 2
+        },
+        "date_taken_between_end": {
+          "field_type": "date"
+        },
+        "date_taken_between_start": {
+          "field_type": "date"
+        },
+        "date_taken_specific": {
+          "field_type": "date"
+        },
+        "deleted": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "invited_to_test": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "location": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "home": 1,
+              "drive_through_rtc": 2,
+              "hospital": 3,
+              "gp": 4,
+              "chemist": 5,
+              "work": 6,
+              "local_health_dept": 7,
+              "drop_in_test_centre": 8,
+              "other": 9
+            }
+          }
+        },
+        "location_other": {
+          "field_type": "string"
+        },
+        "mechanism": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "nose_swab": 1,
+              "throat_swab": 2,
+              "nose_throat_swab": 3,
+              "spit_tube": 4,
+              "blood_sample": 5,
+              "blood_sample_finger_prick": 6,
+              "blood_sample_needle_draw": 7
+            },
+            "out_of_range": "freetext"
+          }
+        },
+        "result": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "waiting": 1,
+              "failed": 2,
+              "negative": 3,
+              "positive": 4
+            }
+          }
+        },
+        "trained_worker": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "trained": 1,
+              "untrained": 2,
+              "unsure": 3
+            }
+          }
+        }
+      }
+    }
+  }
+}

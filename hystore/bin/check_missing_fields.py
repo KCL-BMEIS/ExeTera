@@ -36,10 +36,10 @@ if __name__ == '__main__':
     for filename in sys.argv[1:]:
         schema = data_schemas.DataSchema(1)
         if 'patient' in filename:
-            check_missing_fields(schema.patient_field_types, schema.patient_field_entries, filename)
+            check_missing_fields(schema._patient_field_types, schema._patient_field_entries, filename)
         elif 'assessment' in filename:
-            check_missing_fields(schema.assessment_field_types, schema.assessment_field_entries, filename)
+            check_missing_fields(schema._assessment_field_types, schema._assessment_field_entries, filename)
         elif 'covid' in filename:
-            check_missing_fields(schema.test_field_types, schema.test_field_entries, filename)
+            check_missing_fields(schema._test_field_types, schema._test_field_entries, filename)
         else:
             raise ValueError("Can't handle this file")
