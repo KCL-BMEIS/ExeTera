@@ -13,7 +13,7 @@ import h5py
 
 from hystore.core import dataset, persistence
 # from hystore.core.importer import DatasetImporter
-from hystore.core.importer import NewDatasetImporter
+# from hystore.core.importer import NewDatasetImporter
 from hystore.core.importer import DatasetImporter
 from hystore.core.load_schema import load_schema
 
