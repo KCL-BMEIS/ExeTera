@@ -5,6 +5,7 @@ import time
 import numpy as np
 import pandas as pd
 
+import hystore.core.operations
 from hystore.core import persistence as per
 from hystore.core import fields as fld
 from hystore.core import readerwriter as rw
@@ -415,7 +416,7 @@ class Session:
 
         # generate a filter to remove invalid foreign key indices (where values in the
         # foreign key don't map to any values in the destination space
-        invalid_filter = unique_fkey_indices < per.INVALID_INDEX
+        invalid_filter = unique_fkey_indices < hystore.core.operations.INVALID_INDEX
         safe_unique_fkey_indices = unique_fkey_indices[invalid_filter]
 
         # the predicate results are in the same space as the unique_fkey_indices, which
@@ -454,7 +455,7 @@ class Session:
 
         # generate a filter to remove invalid foreign key indices (where values in the
         # foreign key don't map to any values in the destination space
-        invalid_filter = unique_fkey_indices < per.INVALID_INDEX
+        invalid_filter = unique_fkey_indices < hystore.core.operations.INVALID_INDEX
         safe_unique_fkey_indices = unique_fkey_indices[invalid_filter]
 
         # execute the predicate (note that not every predicate requires a reader)
@@ -642,10 +643,10 @@ class Session:
         #                                    dtype=np.int64)
         foreign_key_index = np.zeros(len(foreign_key_elems), dtype=np.int64)
 
-        current_invalid = np.int64(per.INVALID_INDEX)
+        current_invalid = np.int64(hystore.core.operations.INVALID_INDEX)
         for i_k, k in enumerate(foreign_key_elems):
             index = target_lookup.get(k, current_invalid)
-            if index >= per.INVALID_INDEX:
+            if index >= hystore.core.operations.INVALID_INDEX:
                 current_invalid += 1
                 target_lookup[k] = index
             foreign_key_index[i_k] = index
@@ -825,3 +826,147 @@ class Session:
 
     def merge_outer(self, left_on, left_fields, right_on, right_fields):
         raise NotImplementedError()
+
+    def _map_fields(self, field_map, field_sources, field_sinks):
+        rtn_sinks = None
+        if field_sinks is None:
+            left_sinks = list()
+            for src in field_sources:
+                src_ = val.array_from_parameter(self, 'left_field_sources', src)
+                snk_ = ops.map_valid(src_, field_map)
+                left_sinks.append(snk_)
+            rtn_sinks = left_sinks
+        elif val.is_field_parameter(field_sinks[0]):
+            # groups or fields
+            for src, snk in zip(field_sources, field_sinks):
+                src_ = val.array_from_parameter(self, 'left_field_sources', src)
+                snk_ = ops.map_valid(src_, field_map)
+                snk = val.field_from_parameter(self, 'left_field_sinks', snk)
+                snk.data.write(snk_)
+        else:
+            # raw arrays
+            for src, snk in zip(field_sources, field_sinks):
+                src_ = val.array_from_parameter(self, 'left_field_sources', src)
+                snk_ = val.array_from_parameter(self, 'left_field_sinks', snk)
+                ops.map_valid(src_, field_map, snk_)
+        return rtn_sinks
+
+    def ordered_merge(self, left_on, right_on, how,
+                      left_field_sources=tuple(), left_field_sinks=None,
+                      right_field_sources=tuple(), right_field_sinks=None,
+                      left_unique=False, right_unique=False):
+        if how == 'left':
+            return self.ordered_left_merge(left_on, right_on,
+                                           left_field_sources, left_field_sinks,
+                                           left_unique, right_unique)
+        elif how == 'right':
+            return self.ordered_left_merge(right_on, left_on,
+                                           right_field_sources, right_field_sinks,
+                                           right_unique, left_unique)
+        elif how == 'inner':
+            return self.ordered_inner_merge(left_on, right_on,
+                                            left_field_sources, left_field_sinks,
+                                            right_field_sources, right_field_sinks,
+                                            left_unique, right_unique)
+        else:
+            raise ValueError("'how' must be one of 'left', 'right' or 'inner'")
+
+
+    def ordered_left_merge(self, left_on, right_on,
+                           left_field_sources=tuple(), left_field_sinks=None,
+                           left_unique=False, right_unique=False):
+
+        if left_field_sinks is not None:
+            if len(left_field_sources) != len(left_field_sinks):
+                msg = ("{} and {} should be of the same length but are length {} and {} "
+                       "respectively")
+                raise ValueError(msg.format(len(left_field_sources), len(left_field_sinks)))
+        val.all_same_basic_type('left_field_sources', left_field_sources)
+        if left_field_sinks and len(left_field_sinks) > 0:
+            val.all_same_basic_type('left_field_sinks', left_field_sinks)
+
+        result = None
+        has_unmapped = None
+        if left_unique == False:
+            if right_unique == False:
+                raise NotImplementedError()
+            else:
+                raise NotImplementedError()
+        else:
+            if right_unique == False:
+                result = np.zeros(len(right_on), dtype=np.int64)
+                has_unmapped = ops.ordered_map_to_right_left_unique(left_on, right_on, result)
+
+            else:
+                result = np.zeros(len(right_on), dtype=np.int64)
+                has_unmapped = ops.ordered_map_to_right_both_unique(left_on, right_on, result)
+
+        rtn_left_sinks = self._map_fields(result, left_field_sources, left_field_sinks)
+        return rtn_left_sinks
+
+
+    def ordered_right_merge(self, left_on, right_on,
+                            right_field_sources=tuple(), right_field_sinks=None,
+                            left_unique=False, right_unique=False):
+        return self.ordered_left_merge(right_on, left_on,
+                                       right_field_sources, right_field_sinks,
+                                       right_unique, left_unique)
+
+
+    def ordered_inner_merge(self, left_on, right_on,
+                            left_field_sources=tuple(), left_field_sinks=None,
+                            right_field_sources=tuple(), right_field_sinks=None,
+                            left_unique=False, right_unique=False):
+
+        if left_field_sinks is not None:
+            if len(left_field_sources) != len(left_field_sinks):
+                msg = ("{} and {} should be of the same length but are length {} and {} "
+                       "respectively")
+                raise ValueError(msg.format(len(left_field_sources), len(left_field_sinks)))
+        val.all_same_basic_type('left_field_sources', left_field_sources)
+        if left_field_sinks and len(left_field_sinks) > 0:
+            val.all_same_basic_type('left_field_sinks', left_field_sinks)
+
+        if right_field_sinks is not None:
+            if len(right_field_sources) != len(right_field_sinks):
+                msg = ("{} and {} should be of the same length but are length {} and {} "
+                       "respectively")
+                raise ValueError(msg.format(len(right_field_sources), len(right_field_sinks)))
+        val.all_same_basic_type('right_field_sources', right_field_sources)
+        if right_field_sinks and len(right_field_sinks) > 0:
+            val.all_same_basic_type('right_field_sinks', right_field_sinks)
+
+        result = None
+        if left_unique is False:
+            if right_unique is False:
+                inner_length = ops.ordered_inner_map_result_size(left_on, right_on)
+                left_to_inner = np.zeros(inner_length, dtype=np.int64)
+                right_to_inner = np.zeros(inner_length, dtype=np.int64)
+                ops.ordered_inner_map(left_on, right_on, left_to_inner, right_to_inner)
+            else:
+                inner_length = ops.ordered_inner_map_result_size(left_on, right_on)
+                left_to_inner = np.zeros(inner_length, dtype=np.int64)
+                right_to_inner = np.zeros(inner_length, dtype=np.int64)
+                ops.ordered_inner_map_left_unique(right_on, left_on, right_to_inner, left_to_inner)
+        else:
+            if right_unique is False:
+                inner_length = ops.ordered_inner_map_result_size(left_on, right_on)
+                left_to_inner = np.zeros(inner_length, dtype=np.int64)
+                right_to_inner = np.zeros(inner_length, dtype=np.int64)
+                ops.ordered_inner_map_left_unique(left_on, right_on, left_to_inner, right_to_inner)
+            else:
+                inner_length = ops.ordered_inner_map_result_size(left_on, right_on)
+                left_to_inner = np.zeros(inner_length, dtype=np.int64)
+                right_to_inner = np.zeros(inner_length, dtype=np.int64)
+                ops.ordered_inner_map_both_unique(left_on, right_on, left_to_inner, right_to_inner)
+
+        rtn_left_sinks = self._map_fields(left_to_inner, left_field_sources, left_field_sinks)
+        rtn_right_sinks = self._map_fields(right_to_inner, right_field_sources, right_field_sinks)
+
+        if rtn_left_sinks:
+            if rtn_right_sinks:
+                return rtn_left_sinks, rtn_right_sinks
+            else:
+                return rtn_left_sinks
+        else:
+            return rtn_right_sinks

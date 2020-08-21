@@ -53,7 +53,9 @@ class Dataset:
 
         # build a full list of transforms by index whether they are are being filtered by 'keys' or not
         for i_n, n in enumerate(available_keys):
-            if field_descriptors and n in field_descriptors:
+            if field_descriptors and n in field_descriptors and\
+               field_descriptors[n].strings_to_values and\
+               field_descriptors[n].out_of_range_label is None:
                 # transforms by csv field index
                 transforms_by_index.append(field_descriptors[n])
             else:
@@ -97,7 +99,11 @@ class Dataset:
                 for i_df, i_f in enumerate(index_map):
                     f = row[i_f]
                     t = transforms_by_index[i_f]
-                    new_fields[i_df].append(f if not t else t.strings_to_values[f])
+                    try:
+                        new_fields[i_df].append(f if not t else t.strings_to_values[f])
+                    except Exception as e:
+                        msg = "{}: key error for value {} (permitted values are {}"
+                        print(msg.format(fields_to_use[i_f], f, t.strings_to_values))
                 del row
                 filtered_count += 1
                 if stop_after and i_r >= stop_after:

@@ -27,6 +27,7 @@ class TestSessionMerge(unittest.TestCase):
         s = session.Session()
         print(s.merge_left(l_id, r_id, left_fields=(l_vals,), right_fields=(r_vals2,)))
 
+
     def test_merge_left_2(self):
         s = session.Session()
         p_id = np.array([100, 200, 300, 400, 500, 600, 800, 900])
@@ -49,6 +50,67 @@ class TestSessionMerge(unittest.TestCase):
 
         s = session.Session()
         print(s.merge_right(l_id, r_id, left_fields=(l_vals,), right_fields=(r_vals,)))
+
+
+    def test_ordered_merge_left(self):
+        l_id = np.asarray(['a', 'b', 'd', 'f', 'g', 'h'])
+        l_vals = np.asarray([100, 200, 400, 600, 700, 800])
+        l_vals_2 = np.asarray([10000, 20000, 40000, 60000, 70000, 80000])
+
+        r_id = np.asarray(['a', 'c', 'c', 'd', 'd', 'e', 'e', 'f', 'f', 'h', 'h'])
+        r_vals = np.asarray([1000, 3000, 3001, 4000, 4001, 5000, 5001, 6000, 6001, 8000, 8001])
+        r_vals_2 = np.asarray([100000, 300001, 300000, 400001, 400000,
+                               500001, 50000, 600001, 600000, 800001, 800000])
+
+        l_vals_exp = np.asarray([100, 0, 0, 400, 400, 0, 0, 600, 600, 800, 800], dtype=np.int32)
+        l_vals_2_exp = np.asarray([10000, 0, 0, 40000, 40000, 0, 0, 60000, 60000, 80000, 80000],
+                                  dtype=np.int32)
+
+        s = session.Session()
+        actual = s.ordered_left_merge(l_id, r_id, left_field_sources=(l_vals,),
+                                      left_unique=True)
+        self.assertTrue(np.array_equal(actual[0], l_vals_exp))
+
+        actual = s.ordered_right_merge(r_id, l_id, right_field_sources=(l_vals,),
+                                       right_unique=True)
+        self.assertTrue(np.array_equal(actual[0], l_vals_exp))
+
+        actual = s.ordered_left_merge(l_id, r_id, left_field_sources=(l_vals, l_vals_2),
+                                      left_unique=True)
+        self.assertTrue(np.array_equal(actual[0], l_vals_exp))
+        self.assertTrue(np.array_equal(actual[1], l_vals_2_exp))
+
+        actual = s.ordered_right_merge(r_id, l_id, right_field_sources=(l_vals, l_vals_2),
+                                       right_unique=True)
+        self.assertTrue(np.array_equal(actual[0], l_vals_exp))
+        self.assertTrue(np.array_equal(actual[1], l_vals_2_exp))
+
+
+    def test_ordered_merge_inner(self):
+        l_id = np.asarray(['a', 'b', 'd', 'f', 'g', 'h'])
+        l_vals = np.asarray([100, 200, 400, 600, 700, 800])
+        l_vals_2 = np.asarray([10000, 20000, 40000, 60000, 70000, 80000])
+
+        r_id = np.asarray(['a', 'c', 'c', 'd', 'd', 'e', 'e', 'f', 'f', 'h', 'h'])
+        r_vals = np.asarray([1000, 3000, 3001, 4000, 4001, 5000, 5001, 6000, 6001, 8000, 8001])
+        r_vals_2 = np.asarray([100000, 300001, 300000, 400001, 400000,
+                               500001, 50000, 600001, 600000, 800001, 800000])
+
+        l_vals_exp = np.asarray([100, 400, 400, 600, 600, 800, 800], dtype=np.int32)
+        l_vals_2_exp = np.asarray([10000, 40000, 40000, 60000, 60000, 80000, 80000],
+                                  dtype=np.int32)
+        r_vals_exp = np.asarray([1000, 4000, 4001, 6000, 6001, 8000, 8001], dtype=np.int32)
+        r_vals_2_exp = np.asarray([100000, 400001, 400000, 600001, 600000, 800001, 800000],
+                                  dtype=np.int32)
+        s = session.Session()
+        actual = s.ordered_inner_merge(l_id, r_id,
+                                       left_field_sources=(l_vals, l_vals_2),
+                                       right_field_sources=(r_vals, r_vals_2),
+                                       left_unique=True, right_unique=False)
+        self.assertTrue(np.array_equal(actual[0][0], l_vals_exp))
+        self.assertTrue(np.array_equal(actual[0][1], l_vals_2_exp))
+        self.assertTrue(np.array_equal(actual[1][0], r_vals_exp))
+        self.assertTrue(np.array_equal(actual[1][1], r_vals_2_exp))
 
 
 class TestSessionSort(unittest.TestCase):

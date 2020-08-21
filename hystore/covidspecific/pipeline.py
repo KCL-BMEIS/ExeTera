@@ -18,11 +18,12 @@ from collections import defaultdict
 import numpy as np
 
 from hystore.core import dataset, filtered_field, regression
-from hystore.covidspecific import data_schemas, parsing_schemas
+from hystore.covidspecific import parsing_schemas
 from hystore.processing.age_from_year_of_birth import CalculateAgeFromYearOfBirth
 from hystore.processing.assessment_merge import CalculateMergedFieldCount, MergeAssessmentRows
 from hystore.processing.inconsistent_symptoms import CheckInconsistentSymptoms
 from hystore.processing.inconsistent_testing import CheckTestingConsistency
+from hystore.core import load_schema
 
 from hystore.core.utils import count_flag_empty, count_flag_set, build_histogram, map_between_categories, \
     to_categorical, print_diagnostic_row, valid_range_fac_inc, datetime_to_seconds, concatenate_maybe_strs
@@ -135,15 +136,18 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
         territories = tuple(territories.split(','))
         early_filter = ('country_code', lambda x: x in territories)
 
-    categorical_maps = data_schema.assessment_categorical_maps
+    # categorical_maps = data_schema.assessment_categorical_maps
     # TODO: use proper logging throughout
     print(); print()
     print('load patients')
     print('=============')
+    p_categorical_maps = {k: v for k, v in data_schema['patients'].fields.items()
+                          if v.strings_to_values is not None}
     with open(patient_filename) as f:
-        geoc_ds = dataset.Dataset(f, data_schema.patient_categorical_maps,
+        geoc_ds = dataset.Dataset(f, p_categorical_maps,
                                   early_filter=early_filter,
-                                  show_progress_every=1000000, )
+                                  show_progress_every=1000000,
+                                  stop_after=500000)
     print("sorting patients")
     geoc_ds.sort(('id',))
     geoc_ds.show()
@@ -153,10 +157,13 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print(); print()
     print('load assessments')
     print('================')
+    a_categorical_maps = {k: v for k, v in data_schema['assessments'].fields.items()
+                          if v.strings_to_values is not None}
     with open(assessment_filename) as f:
-        asmt_ds = dataset.Dataset(f, data_schema.assessment_categorical_maps,
+        asmt_ds = dataset.Dataset(f, a_categorical_maps,
                                   early_filter=early_filter,
-                                  show_progress_every=1000000)
+                                  show_progress_every=1000000,
+                                  stop_after=15000000)
     print('sorting assessments')
     asmt_ds.sort(('patient_id', 'updated_at'))
     asmt_ds.show()
@@ -292,9 +299,11 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print(build_histogram(asmt_ds.field_by_name('tested_covid_positive')))
 
     for f in flattened_fields:
+        flattened = {'': 0, 'no': 1, 'True': 2}
         print(f"flattened_field '{f[0]}' to categorical field '{f[1]}'")
-        remap = map_between_categories(categorical_maps[f[0]].strings_to_values,
-                                       categorical_maps[f[1]].strings_to_values)
+        remap = map_between_categories(a_categorical_maps[f[0]].strings_to_values,
+                                       flattened)
+                                       # a_categorical_maps[f[1]].strings_to_values)
         asmt_dest_fields[f[1]] =\
             to_categorical(asmt_ds.field_by_name(f[0]), remap)
         # TODO: this shouldn't be necessary as the fields were covered in 'symptomatic_fields'
@@ -314,8 +323,8 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     fn = CheckInconsistentSymptoms(FILTER_HEALTHY_BUT_SYMPTOMS, FILTER_NOT_HEALTHY_BUT_NO_SYMPTOMS)
     # TODO: keys should be got from the dataset once it is loaded rather than referring to the categorical maps directly
     fn(asmt_dest_fields['health_status'], any_symptoms, asmt_filter_status,
-       categorical_maps['health_status'].strings_to_values['healthy'],
-       categorical_maps['health_status'].strings_to_values['not_healthy'])
+       a_categorical_maps['health_status'].strings_to_values['healthy'],
+       a_categorical_maps['health_status'].strings_to_values['not_healthy'])
     for f in (FILTER_HEALTHY_BUT_SYMPTOMS, FILTER_NOT_HEALTHY_BUT_NO_SYMPTOMS):
         print(f'{assessment_flag_descs[f]}: {count_flag_set(asmt_filter_status, f)}')
 
@@ -328,7 +337,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print("--------------------------")
     sanitised_hct_covid_results = np.ndarray(asmt_ds.row_count(), dtype=np.uint8)
     sanitised_covid_results = np.ndarray(asmt_ds.row_count(), dtype=np.uint8)
-    sanitised_covid_results_key = categorical_maps['tested_covid_positive'].values_to_strings[:]
+    sanitised_covid_results_key = a_categorical_maps['tested_covid_positive'].values_to_strings[:]
 
     fn_fac = parsing_schema.class_entries['clean_covid_progression']
     fn = fn_fac(asmt_ds.field_by_name('had_covid_test'), asmt_ds.field_by_name('tested_covid_positive'),
@@ -584,7 +593,7 @@ def regression_test_patients(old_patients, new_patients):
 
 def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema):
 
-    categorical_maps = data_schema.assessment_categorical_maps
+    a_categorical_maps = {k: v for k, v in data_schema.items() if v.string_to_value is not None}
 
     p_ds, p_status, p_dest_fields,\
     a_ds, a_status, ra_fields, ra_status, res_fields, res_keys \
@@ -629,8 +638,8 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema
                 for irh, rh in enumerate(headers):
                     if rh in functor_fields:
                         row_values[irh] = functor_fields[rh](res_fields[rh][ir])
-                    elif rh in categorical_maps:
-                        v_to_s = categorical_maps[rh].values_to_strings
+                    elif rh in a_categorical_maps:
+                        v_to_s = a_categorical_maps[rh].values_to_strings
                         if res_fields[rh][ir] >= len(v_to_s):
                             print(f'{res_fields[rh][ir]} is out of range for {v_to_s}')
                         row_values[irh] = v_to_s[res_fields[rh][ir]]
@@ -693,13 +702,11 @@ if __name__ == '__main__':
 
         data_schema_version = 1
         early_filter = None
-        data_schema = data_schemas.DataSchema(data_schema_version)
         parsing_schema_version = args.parsing_schema
         parsing_schema = parsing_schemas.ParsingSchema(parsing_schema_version)
         pipeline_output = pipeline(args.patient_data, args.assessment_data,
-                                   data_schema, parsing_schema, args.year,
+                                   parsing_schema, args.year,
                                    territories=args.territories)
         print(f'cleaning completed in {time.time() - tstart} seconds')
 
-        save_csv(pipeline_output, args.patient_data_out, args.assessment_data_out,
-                 data_schema)
+        save_csv(pipeline_output, args.patient_data_out, args.assessment_data_out)

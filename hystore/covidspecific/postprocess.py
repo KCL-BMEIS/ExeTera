@@ -43,7 +43,7 @@ def log(*a, **kwa):
     print(*a, **kwa)
 
 
-def postprocess(dataset, destination, data_schema, process_schema, timestamp=None, flags='all'):
+def postprocess(dataset, destination, process_schema, timestamp=None, flags='all'):
 
     chunksize = 1 << 20
     ds = DataStore(timestamp=timestamp)

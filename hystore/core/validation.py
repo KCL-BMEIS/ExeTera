@@ -129,5 +129,20 @@ def field_from_parameter(session, name, field):
         error_str = "'{}' must be one of (Group, Field, or ndarray, but is {}"
         raise ValueError(error_str.format(name, type(field)))
 
-def is_field_parameter(session, field):
+def is_field_parameter(field):
     return isinstance(field, (fld.Field, h5py.Group))
+
+def all_same_basic_type(name, fields):
+    msg = "'{}' cannot be mixture of groups, fields and ndarrays".format(name)
+    if isinstance(fields[0], h5py.Group):
+        for f in fields[1:]:
+            if not isinstance(f, h5py.Group):
+                raise ValueError(msg)
+    if isinstance(fields[0], fld.Field):
+        for f in fields[1:]:
+            if not isinstance(f, fld.Field):
+                raise ValueError(msg)
+    if isinstance(fields[0], np.ndarray):
+        for f in fields[1:]:
+            if not isinstance(f, np.ndarray):
+                raise ValueError(msg)

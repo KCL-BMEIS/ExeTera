@@ -1,5 +1,28 @@
 import numpy as np
-from numba import njit
+from numba import jit, njit
+
+INVALID_INDEX = 1 << 62
+
+
+@njit
+def safe_map(data_field, map_field, map_filter, empty_value):
+    result = np.zeros_like(map_field, dtype=data_field.dtype)
+    for i in range(len(map_field)):
+        if map_filter[i]:
+            result[i] = data_field[map_field[i]]
+        else:
+            result[i] = empty_value
+    return result
+
+
+@njit
+def map_valid(data_field, map_field, result=None):
+    if result is None:
+        result = np.zeros_like(map_field, dtype=data_field.dtype)
+    for i in range(len(map_field)):
+        if map_field[i] < INVALID_INDEX:
+            result[i] = data_field[map_field[i]]
+    return result
 
 
 @njit
@@ -292,3 +315,152 @@ def apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
         if index_i >= max_index_i or index_v >= max_value_i:
             break
     return s+1, index_i, index_v
+
+
+@njit
+def ordered_map_to_right_left_unique(first, second, result):
+    if len(second) != len(result):
+        msg = "'second' and 'result' must be the same length"
+        raise ValueError(msg)
+    i = 0
+    j = 0
+
+    unmapped = 0
+    while i < len(first) and j < len(second):
+        if first[i] < second[j]:
+            i += 1
+        elif first[i] > second[j]:
+            result[j] = INVALID_INDEX
+            j += 1
+            unmapped += 1
+        else:
+            result[j] = i
+            if j+1 < len(second) and second[j+1] != second[j]:
+                i += 1
+            j += 1
+
+    while j < len(second):
+        result[j] = INVALID_INDEX
+        j += 1
+
+    return unmapped > 0
+
+
+@njit
+def ordered_map_to_right_both_unique(first, second, result):
+    if len(second) != len(result):
+        msg = "'second' and 'result' must be the same length"
+        raise ValueError(msg)
+    i = 0
+    j = 0
+
+    unmapped = 0
+    while i < len(first) and j < len(second):
+        if first[i] < second[j]:
+            i += 1
+        elif first[i] > second[j]:
+            result[j] = INVALID_INDEX
+            j += 1
+            unmapped += 1
+        else:
+            result[j] = i
+            i += 1
+            j += 1
+
+    while j < len(second):
+        result[j] = INVALID_INDEX
+        j += 1
+
+    return unmapped > 0
+
+
+@njit
+def ordered_inner_map_result_size(left, right):
+    i = 0
+    j = 0
+    result_size = 0
+
+    while i < len(left) and j < len(right):
+        if left[i] < right[j]:
+            i += 1
+        elif left[i] > right[j]:
+            j += 1
+        else:
+            cur_i_count = 1
+            while i+1 < len(left) and left[i + 1] == left[i]:
+                cur_i_count += 1
+                i += 1
+            cur_j_count = 1
+            while j+1 < len(right) and right[j + 1] == right[j]:
+                cur_j_count += 1
+                j += 1
+            result_size += cur_i_count * cur_j_count
+            i += 1
+            j += 1
+    return result_size
+
+
+@njit
+def ordered_inner_map_both_unique(left, right, left_to_inner, right_to_inner):
+    i = 0
+    j = 0
+    cur_m = 0
+    while i < len(left) and j < len(right):
+        if left[i] < right[j]:
+            i += 1
+        elif left[i] > right[j]:
+            j += 1
+        else:
+            left_to_inner[cur_m] = i
+            right_to_inner[cur_m] = j
+            cur_m += 1
+            i += 1
+            j += 1
+
+
+@njit
+def ordered_inner_map_left_unique(left, right, left_to_inner, right_to_inner):
+    i = 0
+    j = 0
+    cur_m = 0
+    while i < len(left) and j < len(right):
+        if left[i] < right[j]:
+            i += 1
+        elif left[i] > right[j]:
+            j += 1
+        else:
+            cur_j = j
+            while cur_j + 1 < len(right) and right[cur_j + 1] == right[cur_j]:
+                cur_j += 1
+            for jj in range(j, cur_j+1):
+                left_to_inner[cur_m] = i
+                right_to_inner[cur_m] = jj
+                cur_m += 1
+            i += 1
+            j = cur_j + 1
+
+
+@njit
+def ordered_inner_map(left, right, left_to_inner, right_to_inner):
+    i = 0
+    j = 0
+    cur_m = 0
+    while i < len(left) and j < len(right):
+        if left[i] < right[j]:
+            i += 1
+        elif left[i] > right[j]:
+            j += 1
+        else:
+            cur_i = i
+            while cur_i + 1 < len(left) and left[cur_i + 1] == left[cur_i]:
+                cur_i += 1
+            cur_j = j
+            while cur_j + 1 < len(right) and right[cur_j + 1] == right[cur_j]:
+                cur_j += 1
+            for ii in range(i, cur_i+1):
+                for jj in range(j, cur_j+1):
+                    left_to_inner[cur_m] = ii
+                    right_to_inner[cur_m] = jj
+                    cur_m += 1
+            i = cur_i + 1
+            j = cur_j + 1

@@ -7,6 +7,7 @@ from io import BytesIO
 import numpy as np
 import h5py
 
+import hystore.core.operations
 from hystore.core import persistence
 import hystore.core.readerwriter as rw
 import hystore.core.validation as val
@@ -1175,7 +1176,7 @@ class TestJoining(unittest.TestCase):
 
         p_to_vals = np.zeros(len(p_to_a_indices), np.int32)
         for i_r in range(len(p_to_a_indices)):
-            if p_to_a_indices[i_r] >= persistence.INVALID_INDEX:
+            if p_to_a_indices[i_r] >= hystore.core.operations.INVALID_INDEX:
                 p_to_vals[i_r] = -1
             else:
                 p_to_vals[i_r] = a_val[indices_of_max[p_to_a_indices[i_r]]]
@@ -1185,7 +1186,7 @@ class TestJoining(unittest.TestCase):
         print("sel_a_val:", sel_a_val)
         p_to_vals = np.zeros(len(p_to_a_indices), np.int32)
         for i_r in range(len(p_to_a_indices)):
-            if p_to_a_indices[i_r] >= persistence.INVALID_INDEX:
+            if p_to_a_indices[i_r] >= hystore.core.operations.INVALID_INDEX:
                 p_to_vals[i_r] = -1
             else:
                 p_to_vals[i_r] = sel_a_val[p_to_a_indices[i_r]]
