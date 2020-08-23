@@ -122,9 +122,9 @@ def array_from_parameter(session, name, field):
 
 def field_from_parameter(session, name, field):
     if isinstance(field, h5py.Group):
-        return session.get(field).data[:]
+        return session.get(field)
     elif isinstance(field, fld.Field):
-        return field.data[:]
+        return field
     else:
         error_str = "'{}' must be one of (Group, Field, or ndarray, but is {}"
         raise ValueError(error_str.format(name, type(field)))

@@ -51,7 +51,7 @@ from hystore.core import operations as ops
 
 class Session:
 
-    def __init__(self, chunksize=per.DEFAULT_CHUNKSIZE,
+    def __init__(self, chunksize=hystore.core.operations.DEFAULT_CHUNKSIZE,
                  timestamp=str(datetime.now(timezone.utc))):
         if not isinstance(timestamp, str):
             error_str = "'timestamp' must be a string but is of type {}"
@@ -218,7 +218,7 @@ class Session:
                 dest_ = val.field_from_parameter(self, 'dest', dest)
                 results = np.zeros(len(spans) - 1, dtype=dest_.dtype)
                 predicate(spans, results)
-                dest_.write(results)
+                dest_.data.write(results)
                 return results
             else:
                 dest_ = val.array_from_parameter(self, 'dest', dest)
@@ -246,7 +246,7 @@ class Session:
                 dest_ = val.field_from_parameter(self, 'dest', dest)
                 results = np.zeros(len(spans) - 1, dtype=dest_.dtype)
                 predicate(spans, results)
-                dest_.write(results)
+                dest_.data.write(results)
                 return results
             else:
                 dest_ = val.array_from_parameter(self, 'dest', dest)
@@ -547,29 +547,29 @@ class Session:
 
     def create_indexed_string(self, group, name, timestamp=None, chunksize=None):
         fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
-        return fld.IndexedStringField(self, group[name])
+        return fld.IndexedStringField(self, group[name], write_enabled=True)
 
 
     def create_fixed_string(self, group, name, length, timestamp=None, chunksize=None):
         fld.fixed_string_field_constructor(self, group, name, length, timestamp, chunksize)
-        return fld.FixedStringField(self, group[name])
+        return fld.FixedStringField(self, group[name], write_enabled=True)
 
 
     def create_categorical(self, group, name, nformat, key,
                            timestamp=None, chunksize=None):
         fld.categorical_field_constructor(self, group, name, nformat, key,
                                           timestamp, chunksize)
-        return fld.CategoricalField(self, group[name])
+        return fld.CategoricalField(self, group[name], write_enabled=True)
 
 
     def create_numeric(self, group, name, nformat, timestamp=None, chunksize=None):
         fld.numeric_field_constructor(self, group, name, nformat, timestamp, chunksize)
-        return fld.NumericField(self, group[name])
+        return fld.NumericField(self, group[name], write_enabled=True)
 
 
     def create_timestamp(self, group, name, timestamp=None, chunksize=None):
         fld.timestamp_field_constructor(self, group, name, timestamp, chunksize)
-        return fld.TimestampField(self, group[name])
+        return fld.TimestampField(self, group[name], write_enabled=True)
 
 
     def get_or_create_group(self, group, name):
@@ -872,7 +872,7 @@ class Session:
             raise ValueError("'how' must be one of 'left', 'right' or 'inner'")
 
 
-    def ordered_left_merge(self, left_on, right_on,
+    def ordered_left_merge(self, left_on, right_on, left_to_right_map,
                            left_field_sources=tuple(), left_field_sinks=None,
                            left_unique=False, right_unique=False):
 
@@ -885,6 +885,12 @@ class Session:
         if left_field_sinks and len(left_field_sinks) > 0:
             val.all_same_basic_type('left_field_sinks', left_field_sinks)
 
+        streamable = val.is_field_parameter(left_on) and \
+                     val.is_field_parameter(right_on) and \
+                     val.is_field_parameter(left_field_sources[0]) and \
+                     left_field_sinks is not None and \
+                     val.is_field_parameter(left_field_sinks[0])
+
         result = None
         has_unmapped = None
         if left_unique == False:
@@ -894,8 +900,15 @@ class Session:
                 raise NotImplementedError()
         else:
             if right_unique == False:
-                result = np.zeros(len(right_on), dtype=np.int64)
-                has_unmapped = ops.ordered_map_to_right_left_unique(left_on, right_on, result)
+                if streamable:
+                    has_unmapped =\
+                        ops.ordered_map_to_right_left_unique_streamed(left_on, right_on,
+                                                                      left_to_right_map)
+                    result = left_to_right_map.data[:]
+                else:
+                    result = np.zeros(len(right_on), dtype=np.int64)
+                    has_unmapped =\
+                        ops.ordered_map_to_right_left_unique(left_on, right_on, result)
 
             else:
                 result = np.zeros(len(right_on), dtype=np.int64)

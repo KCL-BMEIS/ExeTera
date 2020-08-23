@@ -1,7 +1,18 @@
 import numpy as np
 from numba import jit, njit
 
+from hystore.core import validation as val
+
+DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62
+
+
+def chunks(length, chunksize=1 << 20):
+    cur = 0
+    while cur < length:
+        next_ = min(length, cur + chunksize)
+        yield cur, next_
+        cur = next_
 
 
 @njit
@@ -24,6 +35,48 @@ def map_valid(data_field, map_field, result=None):
             result[i] = data_field[map_field[i]]
     return result
 
+
+# def ordered_map_valid_stream(data_field, map_field, result_field, chunksize=DEFAULT_CHUNKSIZE):
+#     df_it = iter(chunks(len(data_field.data)))
+#     mf_it = iter(chunks(len(map_field.data)))
+#     df_range = next(df_it)
+#     mf_range = next(mf_it)
+#     dfc = data_field.data[df_range[0]:df_range[1]]
+#     mfc = map_field.data[mf_range[0]:mf_range[1]]
+#     rslt = np.zeros(chunksize, dtype=data_field.data.dtype)
+#
+#     i = 0
+#     while i < len(map_field.data):
+#         ii, d = ordered_map_valid_partial(dfc, mfc, rslt)
+
+
+# 0 2 3 4 5 7 8 9 11 12 14 15 17 18 19
+# 0 0 0 0 1 1 1 1  2  2  2  2  3  3  3
+def ordered_map_valid_partial(data_field, map_field, result):
+    i = 0
+    while i < len(map_field):
+        val = map_field[i]
+        if val < INVALID_INDEX:
+            if val >= len(data_field):
+                # need a new data_field chunk
+                return i, val
+            result[i] = val
+        i += 1
+    return i, len(data_field)
+
+
+
+
+
+@njit
+def data_iterator(data_field, chunksize=1 << 20):
+    cur = np.int64(0)
+    chunks_ = chunks(len(data_field.data), chunksize)
+    for c in chunks_:
+        start = c[0]
+        data = data_field.data[start:start + chunksize * 2]
+        for v in range(c[0], c[1]):
+            yield data[v]
 
 @njit
 def apply_filter_to_index_values(index_filter, indices, values):
@@ -317,6 +370,72 @@ def apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
     return s+1, index_i, index_v
 
 
+def ordered_map_to_right_left_unique_streamed(left, right, left_to_right, chunksize=1 << 20):
+    i = 0
+    j = 0
+    lc_it = iter(chunks(len(left.data), chunksize))
+    lc_range = next(lc_it)
+    rc_it = iter(chunks(len(right.data), chunksize))
+    rc_range = next(rc_it)
+    lc = left.data[lc_range[0]:lc_range[1]]
+    rc = right.data[rc_range[0]:rc_range[1]]
+    acc_written = 0
+
+    ltri = np.zeros(chunksize, dtype=left_to_right.data.dtype)
+    unmapped = 0
+    while i < len(left.data) and j < len(right.data):
+        ii, jj, u = ordered_map_to_right_left_unique_partial(i, lc, rc, ltri)
+        unmapped += u
+        if jj > 0:
+            if val.is_field_parameter(left_to_right):
+                left_to_right.data.write(ltri[:jj])
+            else:
+                left_to_right[acc_written:acc_written + jj] = ltri[:jj]
+                acc_written += jj
+        i += ii
+        j += jj
+        if i > lc_range[1]:
+            raise ValueError("'i' has got ahead of current chunk; this shouldn't happen")
+        if j > rc_range[1]:
+            raise ValueError("'j' has got ahead of current chunk; this shouldn't happen")
+        if i == lc_range[1] and i < len(left.data):
+            lc_range = next(lc_it)
+            lc = left.data[lc_range[0]:lc_range[1]]
+        else:
+            lc = lc[ii:]
+        if j == rc_range[1] and j < len(right.data):
+            rc_range = next(rc_it)
+            rc = right.data[rc_range[0]:rc_range[1]]
+        else:
+            rc = rc[jj:]
+    return unmapped > 0
+
+"""
+Returns:
+[0]: how many positions forward i moved
+[1]: how many positions forward j moved
+[2]: how many elements were written
+"""
+@njit
+def ordered_map_to_right_left_unique_partial(d_i, left, right, left_to_right):
+    i = 0
+    j = 0
+    unmapped = 0
+    while i < len(left) and j < len(right):
+        if left[i] < right[j]:
+            i += 1
+        elif left[i] > right[j]:
+            left_to_right[j] = INVALID_INDEX
+            j += 1
+            unmapped += 1
+        else:
+            left_to_right[j] = i + d_i
+            if j+1 < len(right) and right[j+1] != right[j]:
+                i += 1
+            j += 1
+    return i, j, unmapped
+
+
 @njit
 def ordered_map_to_right_left_unique(first, second, result):
     if len(second) != len(result):
@@ -324,7 +443,6 @@ def ordered_map_to_right_left_unique(first, second, result):
         raise ValueError(msg)
     i = 0
     j = 0
-
     unmapped = 0
     while i < len(first) and j < len(second):
         if first[i] < second[j]:
@@ -416,6 +534,72 @@ def ordered_inner_map_both_unique(left, right, left_to_inner, right_to_inner):
             cur_m += 1
             i += 1
             j += 1
+
+
+def ordered_inner_map_left_unique_streamed(left, right, left_to_inner, right_to_inner,
+                                           chunksize=1 << 20):
+    i = 0
+    j = 0
+    left_chunks = chunks(len(left.data), 4)
+    right_chunks = chunks(len(right.data), 4)
+
+    lc_it = iter(left_chunks)
+    lc_range = next(lc_it)
+    rc_it = iter(right_chunks)
+    rc_range = next(rc_it)
+    lc = left.data[lc_range[0]:lc_range[1]]
+    rc = right.data[rc_range[0]:rc_range[1]]
+
+    lti = np.zeros(4, dtype=left_to_inner.data.dtype)
+    rti = np.zeros(4, dtype=right_to_inner.data.dtype)
+    while i < len(left.data) and j < len(right.data):
+        ii, jj, m = ordered_inner_map_left_unique_partial(i, j, lc, rc, lti, rti)
+        if m > 0:
+            left_to_inner.data.write(lti[:m])
+            right_to_inner.data.write(rti[:m])
+        i += ii
+        j += jj
+        if i > lc_range[1]:
+            raise ValueError("'i' has got ahead of current chunk; this shouldn't happen")
+        if j > rc_range[1]:
+            raise ValueError("'j' has got ahead of current chunk; this shouldn't happen")
+        if i == lc_range[1] and i < len(left.data):
+            lc_range = next(lc_it)
+            lc = left.data[lc_range[0]:lc_range[1]]
+        else:
+            lc = lc[ii:]
+        if j == rc_range[1] and j < len(right.data):
+            rc_range = next(rc_it)
+            rc = right.data[rc_range[0]:rc_range[1]]
+        else:
+            rc = rc[jj:]
+
+"""
+Returns:
+[0]: how many positions forward i moved
+[1]: how many positions forward j moved
+[2]: how many elements were written
+"""
+@njit
+def ordered_inner_map_left_unique_partial(d_i, d_j, left, right,
+                                          left_to_inner, right_to_inner):
+    i = 0
+    j = 0
+    m = 0
+    while i < len(left) and j < len(right) and m < len(left_to_inner):
+        if left[i] < right[j]:
+            i += 1
+
+        elif left[i] > right[j]:
+            j += 1
+        else:
+            left_to_inner[m] = i + d_i
+            right_to_inner[m] = j + d_j
+            m += 1
+            if j+1 < len(right) and right[j+1] != right[j]:
+                i += 1
+            j += 1
+    return i, j, m
 
 
 @njit

@@ -23,9 +23,7 @@ import pandas as pd
 
 import hystore.core.validation as val
 import hystore.core.readerwriter as rw
-from hystore.core.operations import INVALID_INDEX
-
-DEFAULT_CHUNKSIZE = 1 << 20
+from hystore.core.operations import INVALID_INDEX, DEFAULT_CHUNKSIZE
 
 # TODO: rename this persistence file to hdf5persistence
 # TODO: wrap the dataset in a withable so that different underlying
