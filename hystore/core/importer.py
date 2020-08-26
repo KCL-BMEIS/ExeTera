@@ -35,6 +35,8 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files):
         raise ValueError("none of the data sources in 'files' contain relevant data to the schema")
 
     importer_flags = {'patients': True, 'assessments': True, 'tests': True}
+    stop_after = {}
+    # stop_after = {'patients': 500000, 'assessments': 500000}
     datastore = per.DataStore()
     with h5py.File(dest_file_name, 'w') as hf:
         for sk in schema.keys():
@@ -53,7 +55,10 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files):
                 raise ValueError(msg.format(files[sk], missing_names))
 
             DatasetImporter(datastore, files[sk], hf, sk, schema[sk], timestamp,
+                            stop_after=stop_after.get(sk, None),
                             show_progress_every=show_every)
+
+        print(hf.keys())
 
 
 class DatasetImporter:
@@ -117,36 +122,41 @@ class DatasetImporter:
             ecsvf = iter(csvf)
 
             chunk_index = 0
-            for i_r, row in enumerate(ecsvf):
-                if show_progress_every:
-                    if i_r % show_progress_every == 0:
-                        print(f"{i_r} rows parsed in {time.time() - time0}s")
+            try:
+                for i_r, row in enumerate(ecsvf):
+                    if show_progress_every:
+                        if i_r % show_progress_every == 0:
+                            print(f"{i_r} rows parsed in {time.time() - time0}s")
 
-                if early_filter is not None:
-                    if not early_filter[1](row[early_key_index]):
-                        continue
+                    if early_filter is not None:
+                        if not early_filter[1](row[early_key_index]):
+                            continue
 
-                if i_r == stop_after:
-                    break
+                    if i_r == stop_after:
+                        break
 
-                if not filter_fn or filter_fn(i_r):
-                    for i_df, i_f in enumerate(index_map):
-                        f = row[i_f]
-                        categorical_map = categorical_map_list[i_df]
-                        if categorical_map is not None:
-                            if f not in categorical_map:
-                                error = "'{}' not valid: must be one of {} for field '{}'"
-                                raise KeyError(
-                                    error.format(f, categorical_map, self.names_[i_f]))
-                            f = categorical_map[f]
-                        field_chunk_list[i_df][chunk_index] = f
-                    chunk_index += 1
-                    if chunk_index == chunk_size:
-                        for i_df in range(len(index_map)):
-                            # with utils.Timer("writing to {}".format(self.names_[i_df])):
-                            #     new_field_list[i_df].write_part(field_chunk_list[i_df])
-                            new_field_list[i_df].write_part(field_chunk_list[i_df])
-                        chunk_index = 0
+                    if not filter_fn or filter_fn(i_r):
+                        for i_df, i_f in enumerate(index_map):
+                            f = row[i_f]
+                            categorical_map = categorical_map_list[i_df]
+                            if categorical_map is not None:
+                                if f not in categorical_map:
+                                    error = "'{}' not valid: must be one of {} for field '{}'"
+                                    raise KeyError(
+                                        error.format(f, categorical_map, self.names_[i_f]))
+                                f = categorical_map[f]
+                            field_chunk_list[i_df][chunk_index] = f
+                        chunk_index += 1
+                        if chunk_index == chunk_size:
+                            for i_df in range(len(index_map)):
+                                # with utils.Timer("writing to {}".format(self.names_[i_df])):
+                                #     new_field_list[i_df].write_part(field_chunk_list[i_df])
+                                new_field_list[i_df].write_part(field_chunk_list[i_df])
+                            chunk_index = 0
+            except Exception as e:
+                msg = "row {}: caught exception {}\nprevious row {}"
+                print(msg.format(i_r + 1, e, row))
+                raise
 
             if chunk_index != 0:
                 for i_df in range(len(index_map)):

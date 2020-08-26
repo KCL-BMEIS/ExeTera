@@ -1,6 +1,6 @@
 from setuptools import setup
 
-from version import __version__
+from hystore import __version__
 
 setup(
     name='hystore',
@@ -10,7 +10,8 @@ setup(
     author='Ben Murray',
     author_email='benjamin.murray@kcl.ac.uk',
     license='http://www.apache.org/licenses/LICENSE-2.0',
-    packages=['hystore', 'hystore.contrib', 'hystore.core', 'hystore.covidspecific', 'hystore.processing'],
+    packages=['hystore', 'hystore.contrib',
+              'hystore.core', 'hystore.covidspecific', 'hystore.processing'],
     install_requires=[
         'numpy',
         'numba',

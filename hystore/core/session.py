@@ -51,7 +51,7 @@ from hystore.core import operations as ops
 
 class Session:
 
-    def __init__(self, chunksize=hystore.core.operations.DEFAULT_CHUNKSIZE,
+    def __init__(self, chunksize=ops.DEFAULT_CHUNKSIZE,
                  timestamp=str(datetime.now(timezone.utc))):
         if not isinstance(timestamp, str):
             error_str = "'timestamp' must be a string but is of type {}"
