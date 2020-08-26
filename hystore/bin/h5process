@@ -19,7 +19,6 @@ import h5py
 try:
     import hystore
 except ModuleNotFoundError:
-    print('fixing path')
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import hystore
