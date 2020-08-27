@@ -13,13 +13,14 @@
 
 from datetime import datetime, timezone
 import os
+import sys
 
 try:
     import hystore
 except ModuleNotFoundError:
-    import sys
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-import hystore
+    fixed_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    sys.path.append(fixed_path)
+    import hystore
 
 from hystore.core import importer
 
