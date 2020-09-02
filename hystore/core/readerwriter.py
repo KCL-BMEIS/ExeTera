@@ -49,17 +49,19 @@ class DataWriter:
         if dtype is not None:
             if count == len(field):
                 ds = group.create_dataset(
-                    name, (count,), maxshape=(None,), dtype=dtype)
+                    name, (count,), maxshape=(None,), chunks=(1 << 20,), dtype=dtype)
                 ds[:] = field
             else:
                 ds = group.create_dataset(
-                    name, (count,), maxshape=(None,), dtype=dtype)
+                    name, (count,), maxshape=(None,), chunks=(1 << 20,), dtype=dtype)
                 ds[:] = field[:count]
         else:
             if count == len(field):
-                group.create_dataset(name, (count,), maxshape=(None,), data=field)
+                group.create_dataset(name, (count,), maxshape=(None,), chunks=(1 << 20,),
+                                     data=field)
             else:
-                group.create_dataset(name, (count,), maxshape=(None,), data=field[:count])
+                group.create_dataset(name, (count,), maxshape=(None,), chunks=(1 << 20,),
+                                     data=field[:count])
 
     @staticmethod
     def write_first(group, name, field, count, dtype=None):

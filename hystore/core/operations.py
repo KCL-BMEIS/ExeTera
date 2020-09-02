@@ -36,18 +36,19 @@ def map_valid(data_field, map_field, result=None):
     return result
 
 
-# def ordered_map_valid_stream(data_field, map_field, result_field, chunksize=DEFAULT_CHUNKSIZE):
-#     df_it = iter(chunks(len(data_field.data)))
-#     mf_it = iter(chunks(len(map_field.data)))
-#     df_range = next(df_it)
-#     mf_range = next(mf_it)
-#     dfc = data_field.data[df_range[0]:df_range[1]]
-#     mfc = map_field.data[mf_range[0]:mf_range[1]]
-#     rslt = np.zeros(chunksize, dtype=data_field.data.dtype)
-#
-#     i = 0
-#     while i < len(map_field.data):
-#         ii, d = ordered_map_valid_partial(dfc, mfc, rslt)
+def ordered_map_valid_stream(data_field, map_field, result_field, chunksize=DEFAULT_CHUNKSIZE):
+    df_it = iter(chunks(len(data_field.data)))
+    mf_it = iter(chunks(len(map_field.data)))
+    df_range = next(df_it)
+    mf_range = next(mf_it)
+    dfc = data_field.data[df_range[0]:df_range[1]]
+    mfc = map_field.data[mf_range[0]:mf_range[1]]
+    rslt = np.zeros(chunksize, dtype=data_field.data.dtype)
+
+    i = 0
+    while i < len(map_field.data):
+        ii, d = ordered_map_valid_partial(dfc, mfc, rslt)
+
 
 
 # 0 2 3 4 5 7 8 9 11 12 14 15 17 18 19

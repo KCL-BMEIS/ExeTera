@@ -14,8 +14,8 @@ import time
 
 import h5py
 
-import hystore.core.dataset as dataset
-import hystore.core.persistence as per
+from hystore.core import dataset as dataset
+from hystore.core import persistence as per
 from hystore.core.load_schema import load_schema
 
 

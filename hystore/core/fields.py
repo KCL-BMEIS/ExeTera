@@ -341,7 +341,8 @@ def timestamp_field_constructor(session, group, name, timestamp=None, chunksize=
 class IndexedStringField(Field):
     def __init__(self, session, group, name=None, timestamp=None, write_enabled=False):
         super().__init__(session, group, name=name,
-                         timestamp=timestamp, write_enabled=write_enabled)
+                         # timestamp=timestamp,
+                         write_enabled=write_enabled)
         self._session = session
         self._data_wrapper = None
         self._index_wrapper = None

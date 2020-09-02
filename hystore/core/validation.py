@@ -2,9 +2,9 @@ import numpy as np
 
 import h5py
 
-import hystore.core.persistence as per
-import hystore.core.fields as fld
-import hystore.core.readerwriter as rw
+from hystore.core import persistence as per
+from hystore.core import fields as fld
+from hystore.core import readerwriter as rw
 
 
 def _writer_from_writer_or_group(writer_getter, param_name, writer):

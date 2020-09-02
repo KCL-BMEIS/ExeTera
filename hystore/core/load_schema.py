@@ -1,8 +1,8 @@
 import copy
 import json
 
-import hystore.core.data_schema as data_schema
-import hystore.core.persistence as per
+from hystore.core import data_schema
+from hystore.core import persistence as per
 
 
 class NewDataSchema:

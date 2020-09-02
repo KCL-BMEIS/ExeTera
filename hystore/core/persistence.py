@@ -21,8 +21,8 @@ import numba
 from numba import jit, njit
 import pandas as pd
 
-import hystore.core.validation as val
-import hystore.core.readerwriter as rw
+from hystore.core import validation as val
+from hystore.core import readerwriter as rw
 from hystore.core.operations import INVALID_INDEX, DEFAULT_CHUNKSIZE
 
 # TODO: rename this persistence file to hdf5persistence

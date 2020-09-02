@@ -1,4 +1,5 @@
-import hystore.core.readerwriter as rw
+import hystore
+from hystore.core import readerwriter as rw
 
 
 # field_writers = {

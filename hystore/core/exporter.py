@@ -5,7 +5,7 @@ import pandas
 
 
 from hystore.core import utils, persistence
-import hystore.core.readerwriter as rw
+from hystore.core import readerwriter as rw
 
 def transform_from_reader_type(reader):
     if isinstance(reader, rw.FixedStringReader):

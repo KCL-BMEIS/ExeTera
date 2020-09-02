@@ -5,12 +5,13 @@ import time
 import numpy as np
 import pandas as pd
 
-import hystore.core.operations
+from hystore.core import operations
 from hystore.core import persistence as per
 from hystore.core import fields as fld
 from hystore.core import readerwriter as rw
 from hystore.core import validation as val
 from hystore.core import operations as ops
+from hystore.core import utils
 
 
 # TODO:
@@ -61,6 +62,26 @@ class Session:
 
 
     def get_shared_index(self, keys):
+        """
+        Create a shared index based on a tuple numpy arrays containing keys.
+        This function generates the sorted union of a tuple of key fields and
+        then maps the individual arrays to their corresponding indices in the
+        sorted union.
+
+        Example:
+            key_1 = ['a', 'b', 'e', 'g', 'i']
+            key_2 = ['b', 'b', 'c', 'c, 'e', 'g', 'j']
+            key_3 = ['a', 'c' 'd', 'e', 'g', 'h', 'h', 'i']
+
+            sorted_union = ['a', 'b', 'c', 'd', 'e', 'g', 'h', 'i', 'j']
+
+            key_1_index = [0, 1, 4, 5, 7]
+            key_2_index = [1, 1, 2, 2, 4, 5, 8]
+            key_3_index = [0, 2, 3, 4, 5, 6, 6, 7]
+
+        Parameters:
+            keys: a tuple of groups, fields or ndarrays whose contents represent keys
+        """
         if not isinstance(keys, tuple):
             raise ValueError("'keys' must be a tuple")
         concatted = None
@@ -78,6 +99,13 @@ class Session:
         return tuple(np.searchsorted(concatted, k) for k in raw_keys)
 
 
+    """
+    Set the default timestamp to be used when creating fields without an explicit
+    timestamp specified.
+
+    Parameters:
+        timestamp a string representing a valid Datetime
+    """
     def set_timestamp(self, timestamp=str(datetime.now(timezone.utc))):
         if not isinstance(timestamp, str):
             error_str = "'timestamp' must be a string but is of type {}"
@@ -85,9 +113,9 @@ class Session:
         self.timestamp = timestamp
 
 
-    # TODO: fields is being ignored at present
     def sort_on(self, src_group, dest_group, keys,
                 timestamp=datetime.now(timezone.utc), write_mode='write'):
+        # TODO: fields is being ignored at present
 
         readers = tuple(self.get_reader(src_group[f]) for f in keys)
         t1 = time.time()
@@ -119,7 +147,7 @@ class Session:
             raw_index = val.raw_array_from_parameter(self, 'index', index)
 
         acc_index = raw_index
-        fdata = raw_data
+        fdata = raw_data[acc_index]
         index = np.argsort(fdata, kind='stable')
         acc_index = acc_index[index]
 
@@ -416,7 +444,7 @@ class Session:
 
         # generate a filter to remove invalid foreign key indices (where values in the
         # foreign key don't map to any values in the destination space
-        invalid_filter = unique_fkey_indices < hystore.core.operations.INVALID_INDEX
+        invalid_filter = unique_fkey_indices < operations.INVALID_INDEX
         safe_unique_fkey_indices = unique_fkey_indices[invalid_filter]
 
         # the predicate results are in the same space as the unique_fkey_indices, which
@@ -455,7 +483,7 @@ class Session:
 
         # generate a filter to remove invalid foreign key indices (where values in the
         # foreign key don't map to any values in the destination space
-        invalid_filter = unique_fkey_indices < hystore.core.operations.INVALID_INDEX
+        invalid_filter = unique_fkey_indices < operations.INVALID_INDEX
         safe_unique_fkey_indices = unique_fkey_indices[invalid_filter]
 
         # execute the predicate (note that not every predicate requires a reader)
@@ -643,10 +671,10 @@ class Session:
         #                                    dtype=np.int64)
         foreign_key_index = np.zeros(len(foreign_key_elems), dtype=np.int64)
 
-        current_invalid = np.int64(hystore.core.operations.INVALID_INDEX)
+        current_invalid = np.int64(operations.INVALID_INDEX)
         for i_k, k in enumerate(foreign_key_elems):
             index = target_lookup.get(k, current_invalid)
-            if index >= hystore.core.operations.INVALID_INDEX:
+            if index >= operations.INVALID_INDEX:
                 current_invalid += 1
                 target_lookup[k] = index
             foreign_key_index[i_k] = index
@@ -839,10 +867,18 @@ class Session:
         elif val.is_field_parameter(field_sinks[0]):
             # groups or fields
             for src, snk in zip(field_sources, field_sinks):
-                src_ = val.array_from_parameter(self, 'left_field_sources', src)
-                snk_ = ops.map_valid(src_, field_map)
-                snk = val.field_from_parameter(self, 'left_field_sinks', snk)
-                snk.data.write(snk_)
+                with utils.Timer("reading"):
+                    src_ = val.array_from_parameter(self, 'left_field_sources', src)
+                with utils.Timer("mapping"):
+                    snk_ = ops.map_valid(src_, field_map)
+                with utils.Timer("getting_sink"):
+                    snk = val.field_from_parameter(self, 'left_field_sinks', snk)
+                with utils.Timer("writing"):
+                    snk.data.write(snk_)
+                # src_ = val.array_from_parameter(self, 'left_field_sources', src)
+                # snk_ = ops.map_valid(src_, field_map)
+                # snk = val.field_from_parameter(self, 'left_field_sinks', snk)
+                # snk.data.write(snk_)
         else:
             # raw arrays
             for src, snk in zip(field_sources, field_sinks):
@@ -891,30 +927,32 @@ class Session:
                      left_field_sinks is not None and \
                      val.is_field_parameter(left_field_sinks[0])
 
-        result = None
-        has_unmapped = None
-        if left_unique == False:
-            if right_unique == False:
-                raise NotImplementedError()
+        with utils.Timer("generating maps"):
+            result = None
+            has_unmapped = None
+            if left_unique == False:
+                if right_unique == False:
+                    raise NotImplementedError()
+                else:
+                    raise NotImplementedError()
             else:
-                raise NotImplementedError()
-        else:
-            if right_unique == False:
-                if streamable:
-                    has_unmapped =\
-                        ops.ordered_map_to_right_left_unique_streamed(left_on, right_on,
-                                                                      left_to_right_map)
-                    result = left_to_right_map.data[:]
+                if right_unique == False:
+                    if streamable:
+                        has_unmapped =\
+                            ops.ordered_map_to_right_left_unique_streamed(left_on, right_on,
+                                                                          left_to_right_map)
+                        result = left_to_right_map.data[:]
+                    else:
+                        result = np.zeros(len(right_on), dtype=np.int64)
+                        has_unmapped =\
+                            ops.ordered_map_to_right_left_unique(left_on, right_on, result)
+
                 else:
                     result = np.zeros(len(right_on), dtype=np.int64)
-                    has_unmapped =\
-                        ops.ordered_map_to_right_left_unique(left_on, right_on, result)
+                    has_unmapped = ops.ordered_map_to_right_both_unique(left_on, right_on, result)
 
-            else:
-                result = np.zeros(len(right_on), dtype=np.int64)
-                has_unmapped = ops.ordered_map_to_right_both_unique(left_on, right_on, result)
-
-        rtn_left_sinks = self._map_fields(result, left_field_sources, left_field_sinks)
+        with utils.Timer("mapping fields", new_line=True):
+            rtn_left_sinks = self._map_fields(result, left_field_sources, left_field_sinks)
         return rtn_left_sinks
 
 
