@@ -2,7 +2,7 @@ The KCL covid19 joinzoe data preparation pipeline.
 
 # Cleaning scripts
 
-Current version: v0.2.5
+Current release version: v0.2.5
 
 ---
 # Usage
