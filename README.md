@@ -2,7 +2,7 @@ The KCL covid19 joinzoe data preparation pipeline.
 
 # Cleaning scripts
 
-Current release version: v0.2.5
+Current release version: v0.2.6
 
 ---
 # Usage
@@ -124,6 +124,14 @@ python split.py --version
 
 ---
 ## Changes
+
+### v0.2.5 -> v0.2.6
+* Moving from DataSet to Session class offering cleaner syntax
+* Moving from Readers/Writers to Fields for cleaner syntax
+* Introduction of schema for import command
+* Consolidating commands
+  * h5import -> hystorex import
+  * h5process -> hystorex process
 
 ### v0.2.3 -> v0.2.5
 * Please note: there was no version v0.2.4; due to a numbering error when updating the version number
