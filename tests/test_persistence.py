@@ -10,6 +10,7 @@ import h5py
 from hystore.core import operations, persistence
 from hystore.core import readerwriter as rw
 from hystore.core import validation as val
+from hystore.core import utils
 
 
 class TestPersistence(unittest.TestCase):
@@ -1175,7 +1176,7 @@ class TestJoining(unittest.TestCase):
 
         p_to_vals = np.zeros(len(p_to_a_indices), np.int32)
         for i_r in range(len(p_to_a_indices)):
-            if p_to_a_indices[i_r] >= hystore.core.operations.INVALID_INDEX:
+            if p_to_a_indices[i_r] >= operations.INVALID_INDEX:
                 p_to_vals[i_r] = -1
             else:
                 p_to_vals[i_r] = a_val[indices_of_max[p_to_a_indices[i_r]]]
@@ -1185,7 +1186,7 @@ class TestJoining(unittest.TestCase):
         print("sel_a_val:", sel_a_val)
         p_to_vals = np.zeros(len(p_to_a_indices), np.int32)
         for i_r in range(len(p_to_a_indices)):
-            if p_to_a_indices[i_r] >= hystore.core.operations.INVALID_INDEX:
+            if p_to_a_indices[i_r] >= operations.INVALID_INDEX:
                 p_to_vals[i_r] = -1
             else:
                 p_to_vals[i_r] = sel_a_val[p_to_a_indices[i_r]]
@@ -1298,13 +1299,13 @@ class TestJittingSort(unittest.TestCase):
         values = np.random.rand(count)
         index = np.arange(count, dtype=np.uint32)
         t0 = time.time()
-        s_index = sorted(index, key=lambda x: values[x])
-        print(f"sorted in {time.time() - t0}s")
+        with utils.Timer("sorting values"):
+            s_index = sorted(index, key=lambda x: values[x])
 
         index = np.arange(count, dtype=np.uint32)
         t0 = time.time()
-        s_index = sorted(index, key=predicate)
-        print(f"sorted in {time.time() - t0}s")
+        with utils.Timer("sorting values"):
+            s_index = sorted(index, key=predicate)
 
 
 class TestDataWriter(unittest.TestCase):

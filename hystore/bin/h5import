@@ -70,6 +70,9 @@ if 'dev' in hystore.__version__:
            "Please use one of the release versions for actual work")
     print(msg.format(hystore.__version__))
 
+msg = ("Warning: the command 'h5import' is deprecated and will be removed in a future release. "
+       "Please use 'hystorex import' instead.")
+
 files = {}
 if args.patient_data is not None:
     files['patients'] = args.patient_data

@@ -26,10 +26,7 @@ from hystore.core import utils
 
 
 class Field:
-    def __init__(self, session, group,
-                 name=None, # additional_attributes=None, auxilliary_fields=None,
-                 # timestamp=None,
-                 write_enabled=False):
+    def __init__(self, session, group, name=None, write_enabled=False):
         # if name is None, the group is an existing field
         # if name is set but group[name] doesn't exist, then create the field
         if name is None:
@@ -41,27 +38,6 @@ class Field:
         self._field = field
         self._fieldtype = self._field.attrs['fieldtype']
         self._write_enabled = write_enabled
-    # else:
-        #     if name is not None:
-        #         if name in group.keys():
-        #             self._field = group[name]
-        #             self._fieldtype = self._field.attrs['fieldtype']
-        #             self._write_enabled = write_enabled
-        #         else:
-        #             all_attributes = {
-        #                 'timestamp': session.timestamp if timestamp is None else timestamp,
-        #                 'chunksize': session.chunksize,
-        #             }
-        #             all_attributes.update(additional_attributes)
-        #             DataWriter.create_group(group, name, all_attributes.items())
-        #
-        #             if auxilliary_fields is not None:
-        #                 for k, v in auxilliary_fields.items():
-        #                     DataWriter.write(group, k, v[0], len(v), dtype=v[1])
-        #
-        #             self._field = group[name]
-        #             self._fieldtype = self._field.attrs['fieldtype']
-        #             self._write_enabled = True
         self._value_wrapper = None
 
     @property
@@ -119,7 +95,6 @@ class WriteableFieldArray:
         self._field = field
         self._name = dataset_name
         self._dataset = field[dataset_name]
-        #self._dtype = dtype
 
     def __len__(self):
         return len(self._dataset)
@@ -339,10 +314,8 @@ def timestamp_field_constructor(session, group, name, timestamp=None, chunksize=
 
 
 class IndexedStringField(Field):
-    def __init__(self, session, group, name=None, timestamp=None, write_enabled=False):
-        super().__init__(session, group, name=name,
-                         # timestamp=timestamp,
-                         write_enabled=write_enabled)
+    def __init__(self, session, group, name=None, write_enabled=False):
+        super().__init__(session, group, name=name, write_enabled=write_enabled)
         self._session = session
         self._data_wrapper = None
         self._index_wrapper = None
@@ -380,10 +353,8 @@ class IndexedStringField(Field):
 
 
 class FixedStringField(Field):
-    def __init__(self, session, group, name=None, timestamp=None, write_enabled=False):
-        super().__init__(session, group, name=name,
-                         # timestamp=timestamp,
-                         write_enabled=write_enabled)
+    def __init__(self, session, group, name=None, write_enabled=False):
+        super().__init__(session, group, name=name, write_enabled=write_enabled)
 
     def writeable(self):
         return FixedStringField(self._session, self._field, write_enabled=True)
@@ -405,10 +376,8 @@ class FixedStringField(Field):
 
 
 class NumericField(Field):
-    def __init__(self, session, group, name=None, timestamp=None, write_enabled=False):
-        super().__init__(session, group, name=name,
-                         # timestamp=timestamp,
-                         write_enabled=write_enabled)
+    def __init__(self, session, group, name=None, write_enabled=False):
+        super().__init__(session, group, name=name, write_enabled=write_enabled)
 
     def writeable(self):
         return NumericField(self._session, self._field, write_enabled=True)
@@ -431,10 +400,8 @@ class NumericField(Field):
 
 class CategoricalField(Field):
     def __init__(self, session, group,
-                 name=None, timestamp=None, write_enabled=False):
-        super().__init__(session, group, name=name,
-                         # timestamp=timestamp,
-                         write_enabled=write_enabled)
+                 name=None, write_enabled=False):
+        super().__init__(session, group, name=name, write_enabled=write_enabled)
 
     def writeable(self):
         return CategoricalField(self._session, self._field, write_enabled=True)
@@ -468,10 +435,8 @@ class CategoricalField(Field):
 
 
 class TimestampField(Field):
-    def __init__(self, session, group, name=None, timestamp=None, write_enabled=False):
-        super().__init__(session, group, name=name,
-                         # timestamp=timestamp,
-                         write_enabled=write_enabled)
+    def __init__(self, session, group, name=None, write_enabled=False):
+        super().__init__(session, group, name=name, write_enabled=write_enabled)
 
     def writeable(self):
         return TimestampField(self._session, self._field, write_enabled=True)

@@ -43,9 +43,8 @@ def log(*a, **kwa):
     print(*a, **kwa)
 
 
-def postprocess(dataset, destination, process_schema, timestamp=None, flags='all'):
+def postprocess(dataset, destination, timestamp=None, flags='all'):
 
-    chunksize = 1 << 20
     ds = DataStore(timestamp=timestamp)
     patients_src = dataset['patients']
     patients_dest = ds.get_or_create_group(destination, 'patients')
@@ -55,8 +54,8 @@ def postprocess(dataset, destination, process_schema, timestamp=None, flags='all
     tests_src = dataset['tests']
     tests_dest = ds.get_or_create_group(destination, 'tests')
 
-    sort_enabled = lambda x: x in ('sort', 'all')
-    process_enabled = lambda x: x in ('process', 'all')
+    sort_enabled = lambda x: True
+    process_enabled = lambda x: True
 
     sort_patients = sort_enabled(flags) and True
     sort_assessments = sort_enabled(flags) and True

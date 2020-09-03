@@ -12,7 +12,7 @@
 # limitations under the License.
 
 from hystore.core.split import split_data
-import hystore.core.utils as utils
+from hystore.core import utils as utils
 
 if __name__ == '__main__':
     import argparse

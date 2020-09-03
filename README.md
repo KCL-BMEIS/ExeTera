@@ -18,20 +18,21 @@ be updated to match the hdf5 functionality.
 ## HDF5
 The HDF5 analytics tools allow you to import data from CSV sources into HDF5, a columnar data
 format more suited to performing analytics. This is done in two stages:
-1. Import the data using `h5import`
-2. Process the data using `h5process` to create a set of useful additional data from the base data
+1. Import the data using `hystorex import`
+2. Process the data using `hystorex postprocess` to create a set of useful additional data from the base data
 
 ### Why two stages?
 Importing from CSV is a lengthy process that you may only want to do once. Splitting the work
 between importing and processing means that the import can be done only once, and the imported file
 used as a source for processing even if the processing functionality significantly changes.
 
-### `h5import`
+### `hystorex import`
 ```
-h5import -te <territories> -p <patient_csv> -a <assessment_csv> -t <test_csv> -o <output_hdf5> -d <data_schema> -ts <timestamp>
+hystorex import -s <schema> -te <territories> -p <patient_csv> -a <assessment_csv> -t <test_csv> -o <output_hdf5> -d <data_schema> -ts <timestamp>
 ```
 
 #### Arguments
+ * `-s/--schema`: The location and name of the schema file
  * `-te/--territories`: If set, this only imports the listed territories. If left unset, all
    territories are imported
  * `-p/--patient_data`: The path and name of the patient data file
@@ -44,9 +45,9 @@ h5import -te <territories> -p <patient_csv> -a <assessment_csv> -t <test_csv> -o
 
 Expect this script to take about an hour or so to execute.
 
-### `h5process`
-```angular2html
-h5process -s <source_hdf5> -o <output_hdf5>
+### `hystorex process`
+```
+hystorex process -i <input_hdf5> -o <output_hdf5>
 ```
 #### Arguments
  * `-i/--input`: The path and name of the import hdf5 file

@@ -142,9 +142,9 @@ class TestSessionSort(unittest.TestCase):
 
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
-            s.get_fixed_string_writer(hf, 'x', 1).write(vx)
-            s.get_numeric_writer(hf, 'a', 'int32').write(va)
-            s.get_numeric_writer(hf, 'b', 'int32').write(vb)
+            s.create_fixed_string(hf, 'x', 1).data.write(vx)
+            s.create_numeric(hf, 'a', 'int32').data.write(va)
+            s.create_numeric(hf, 'b', 'int32').data.write(vb)
 
             ra = s.get_reader(hf['a'])
             rb = s.get_reader(hf['b'])
@@ -169,9 +169,9 @@ class TestSessionSort(unittest.TestCase):
 
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
-            s.get_fixed_string_writer(hf, 'x', 1).write(vx)
-            s.get_numeric_writer(hf, 'a', 'int32').write(va)
-            s.get_numeric_writer(hf, 'b', 'int32').write(vb)
+            s.create_fixed_string(hf, 'x', 1).data.write(vx)
+            s.create_numeric(hf, 'a', 'int32').data.write(va)
+            s.create_numeric(hf, 'b', 'int32').data.write(vb)
 
             sindex = s.dataset_sort_index((hf['a'], hf['b']), np.arange(5, dtype='uint32'))
 

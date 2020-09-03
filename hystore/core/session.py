@@ -79,8 +79,7 @@ class Session:
             key_2_index = [1, 1, 2, 2, 4, 5, 8]
             key_3_index = [0, 2, 3, 4, 5, 6, 6, 7]
 
-        Parameters:
-            keys: a tuple of groups, fields or ndarrays whose contents represent keys
+            :param keys: a tuple of groups, fields or ndarrays whose contents represent keys
         """
         if not isinstance(keys, tuple):
             raise ValueError("'keys' must be a tuple")
@@ -99,22 +98,35 @@ class Session:
         return tuple(np.searchsorted(concatted, k) for k in raw_keys)
 
 
-    """
-    Set the default timestamp to be used when creating fields without an explicit
-    timestamp specified.
-
-    Parameters:
-        timestamp a string representing a valid Datetime
-    """
     def set_timestamp(self, timestamp=str(datetime.now(timezone.utc))):
+        """
+        Set the default timestamp to be used when creating fields without an explicit
+        timestamp specified.
+
+        :param timestamp a string representing a valid Datetime
+        :return: None
+        """
         if not isinstance(timestamp, str):
             error_str = "'timestamp' must be a string but is of type {}"
             raise ValueError(error_str.format(type(timestamp)))
         self.timestamp = timestamp
 
 
+
     def sort_on(self, src_group, dest_group, keys,
                 timestamp=datetime.now(timezone.utc), write_mode='write'):
+        """
+        Sort a group (src_group) of fields by the specified set of keys, and write the
+        sorted fields to dest_group.
+
+        :param src_group: the group of fields that are to be sorted
+        :param dest_group: the group into which sorted fields are written
+        :param keys: fields to sort on
+        :param timestamp: optional - timestamp to write on the sorted fields
+        :param write_mode: optional - write mode to use if the destination fields already
+        exist
+        :return: None
+        """
         # TODO: fields is being ignored at present
 
         readers = tuple(self.get_reader(src_group[f]) for f in keys)
@@ -135,7 +147,15 @@ class Session:
         print(f"fields reordered in {time.time() - t0}s")
 
 
+
     def dataset_sort_index(self, sort_indices, index=None):
+        """
+        Generate a sorted index based on a set of fields upon which to sort and an optional
+        index to apply to the sort_indices
+        :param sort_indices: a tuple or list of indices that determine the sorted order
+        :param index: optional - the index by which the initial field should be permuted
+        :return: the resulting index that can be used to permute unsorted fields
+        """
         val._check_all_readers_valid_and_same_type(sort_indices)
         r_readers = tuple(reversed(sort_indices))
 
@@ -160,28 +180,48 @@ class Session:
         return acc_index
 
 
-    def apply_filter(self, index_to_apply, src, dest=None):
-        index_to_apply_ = val.array_from_parameter(self, 'index_to_apply', index_to_apply)
+    def apply_filter(self, filter_to_apply, src, dest=None):
+        """
+        Apply a filter to an a src field. The filtered field is written to dest if it set,
+        and returned from the function call. If the field is an IndexedStringField, the
+        indices and values are returned separately.
+
+        :param filter_to_apply: the filter to be applied to the source field
+        :param src: the field to be filtered
+        :param dest: optional - a field to write the filtered data to
+        :return: the filtered values
+        """
+        filter_to_apply_ = val.array_from_parameter(self, 'index_to_apply', filter_to_apply)
         writer_ = None
         if writer_:
             writer_ = val.field_from_parameter(self, 'writer', dest)
         if isinstance(src, fld.IndexedStringField):
             src_ = val.field_from_parameter(self, 'reader', src)
             dest_indices, dest_values =\
-                ops.apply_filter_to_index_values(index_to_apply_,
-                                                  src_.indices[:], src_.values[:])
+                ops.apply_filter_to_index_values(filter_to_apply_,
+                                                 src_.indices[:], src_.values[:])
             if writer_:
                 writer_.write_raw(dest_indices, dest_values)
             return dest_indices, dest_values
         else:
             reader_ = val.array_from_parameter(self, 'reader', src)
-            result = reader_[index_to_apply]
+            result = reader_[filter_to_apply]
             if writer_:
                 writer_.write(result)
             return result
 
 
     def apply_index(self, index_to_apply, src, dest=None):
+        """
+        Apply a index to an a src field. The indexed field is written to dest if it set,
+        and returned from the function call. If the field is an IndexedStringField, the
+        indices and values are returned separately.
+
+        :param index_to_apply: the index to be applied to the source field
+        :param src: the field to be index
+        :param dest: optional - a field to write the indexed data to
+        :return: the indexed values
+        """
         index_to_apply_ = val.array_from_parameter(self, 'index_to_apply', index_to_apply)
         writer_ = None
         if writer_:
@@ -223,6 +263,9 @@ class Session:
 
 
     def get_spans(self, field=None, fields=None):
+        """
+        Calculate a set of spans
+        """
         if field is None and fields is None:
             raise ValueError("One of 'field' and 'fields' must be set")
         if field is not None and fields is not None:

@@ -6,14 +6,17 @@ from hystore.core import persistence as per
 
 
 class NewDataSchema:
-    def __init__(self, name, schema_dict):
+    def __init__(self, name, schema_dict, verbosity=0):
         self.name_ = name
-        print(name)
+        self.verbosity_ = verbosity
+        if verbosity > 1:
+            print(name)
         primary_keys = schema_dict.get('primary_keys', None)
         foreign_keys = schema_dict.get('foreign_keys', None)
         fields = schema_dict.get('fields', None)
         self._field_entries = self._build_fields(fields)
-        print(self._field_entries)
+        if verbosity > 1:
+            print(self._field_entries)
 
     @property
     def name(self):
@@ -40,10 +43,11 @@ class NewDataSchema:
             raise ValueError(msg)
 
     @staticmethod
-    def _build_fields(fields):
+    def _build_fields(fields, verbosity=0):
         entries = dict()
         for fk, fv in fields.items():
-            print("  {}: {}".format(fk, fv))
+            if verbosity > 1:
+                print("  {}: {}".format(fk, fv))
             NewDataSchema._require_key(fk, 'field_type', fv)
             field_type = fv['field_type']
             strs_to_vals = None
@@ -104,9 +108,10 @@ class NewDataSchema:
         return entries
 
 
-def load_schema(source):
+def load_schema(source, verbosity=0):
     d = json.load(source)
-    print(d.keys())
+    if verbosity > 1:
+        print(d.keys())
     fields = d['schema']
     spaces = dict()
     for fk, fv in fields.items():
