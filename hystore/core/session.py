@@ -264,7 +264,19 @@ class Session:
 
     def get_spans(self, field=None, fields=None):
         """
-        Calculate a set of spans
+        Calculate a set of spans that indicate contiguous equal values.
+        The entries in the result array correspond to the inclusive start and
+        exclusive end of the span (the ith span is represented by element i and
+        element i+1 of the result array). The last entry of the result array is
+        the length of the source field.
+
+        Only one of 'field' or 'fields' may be set. If 'fields' is used and more
+        than one field specified, the fields are effectively zipped and the check
+        for spans is carried out on each corresponding tuple in the zipped field.
+
+        Example:
+            field: [1, 2, 2, 1, 1, 1, 3, 4, 4, 4, 2, 2, 2, 2, 2]
+            result: [0, 1, 3, 6, 7, 10, 15]
         """
         if field is None and fields is None:
             raise ValueError("One of 'field' and 'fields' must be set")
@@ -575,47 +587,6 @@ class Session:
         f.create_like(dest_group, dest_name)
 
 
-    # def get_reader(self, field):
-    #     if 'fieldtype' not in field.attrs.keys():
-    #         raise ValueError(f"'{field}' is not a well-formed field")
-    #
-    #     fieldtype_map = {
-    #         'indexedstring': rw.IndexedStringReader,
-    #         'fixedstring': rw.FixedStringReader,
-    #         'categorical': rw.CategoricalReader,
-    #         'boolean': rw.NumericReader,
-    #         'numeric': rw.NumericReader,
-    #         'datetime': rw.TimestampReader,
-    #         'date': rw.TimestampReader,
-    #         'timestamp': rw.TimestampReader
-    #     }
-    #
-    #     fieldtype = field.attrs['fieldtype'].split(',')[0]
-    #     return fieldtype_map[fieldtype](self, field)
-    #
-    #
-    # def get_existing_writer(self, field, timestamp=None):
-    #     if 'fieldtype' not in field.attrs.keys():
-    #         raise ValueError(f"'{field_name}' is not a well-formed field")
-    #
-    #     fieldtype_map = {
-    #         'indexedstring': rw.IndexedStringReader,
-    #         'fixedstring': rw.FixedStringReader,
-    #         'categorical': rw.CategoricalReader,
-    #         'boolean': rw.NumericReader,
-    #         'numeric': rw.NumericReader,
-    #         'datetime': rw.TimestampReader,
-    #         'date': rw.TimestampReader,
-    #         'timestamp': rw.TimestampReader
-    #     }
-    #
-    #     fieldtype = field.attrs['fieldtype'].split(',')[0]
-    #     reader = fieldtype_map[fieldtype](self, field)
-    #     group = field.parent
-    #     name = field.name.split('/')[-1]
-    #     return reader.get_writer(group, name, timestamp=timestamp, write_mode='overwrite')
-
-
     def create_indexed_string(self, group, name, timestamp=None, chunksize=None):
         fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
         return fld.IndexedStringField(self, group[name], write_enabled=True)
@@ -657,6 +628,7 @@ class Session:
             next = min(length, cur + chunksize)
             yield cur, next
             cur = next
+
 
     def process(self, inputs, outputs, predicate):
 
@@ -898,6 +870,7 @@ class Session:
     def merge_outer(self, left_on, left_fields, right_on, right_fields):
         raise NotImplementedError()
 
+
     def _map_fields(self, field_map, field_sources, field_sinks):
         rtn_sinks = None
         if field_sinks is None:
@@ -929,6 +902,7 @@ class Session:
                 snk_ = val.array_from_parameter(self, 'left_field_sinks', snk)
                 ops.map_valid(src_, field_map, snk_)
         return rtn_sinks
+
 
     def ordered_merge(self, left_on, right_on, how,
                       left_field_sources=tuple(), left_field_sinks=None,
