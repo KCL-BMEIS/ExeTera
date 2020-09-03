@@ -299,7 +299,7 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print(build_histogram(asmt_ds.field_by_name('tested_covid_positive')))
 
     for f in flattened_fields:
-        flattened = {'': 0, 'no': 1, 'True': 2}
+        flattened = {'': 0, 'no': 1, 'mild': 2, 'significant': 2, 'severe': 2}
         print(f"flattened_field '{f[0]}' to categorical field '{f[1]}'")
         remap = map_between_categories(a_categorical_maps[f[0]].strings_to_values,
                                        flattened)
@@ -337,7 +337,8 @@ def pipeline(patient_filename, assessment_filename, data_schema, parsing_schema,
     print("--------------------------")
     sanitised_hct_covid_results = np.ndarray(asmt_ds.row_count(), dtype=np.uint8)
     sanitised_covid_results = np.ndarray(asmt_ds.row_count(), dtype=np.uint8)
-    sanitised_covid_results_key = a_categorical_maps['tested_covid_positive'].values_to_strings[:]
+    sanitised_covid_results_key = \
+        list(a_categorical_maps['tested_covid_positive'].values_to_strings.values())
 
     fn_fac = parsing_schema.class_entries['clean_covid_progression']
     fn = fn_fac(asmt_ds.field_by_name('had_covid_test'), asmt_ds.field_by_name('tested_covid_positive'),
@@ -592,8 +593,9 @@ def regression_test_patients(old_patients, new_patients):
 
 
 def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema):
-
-    a_categorical_maps = {k: v for k, v in data_schema.items() if v.string_to_value is not None}
+    a_categorical_maps = \
+        {k: v for k, v in data_schema["assessments"].fields.items()
+         if v.strings_to_values is not None and v.out_of_range_label is None}
 
     p_ds, p_status, p_dest_fields,\
     a_ds, a_status, ra_fields, ra_status, res_fields, res_keys \
@@ -605,7 +607,7 @@ def save_csv(pipeline_output, patient_data_out, assessment_data_out, data_schema
         if p not in remaining_patients:
             p_status[ip] |= FILTER_NOT_IN_FINAL_ASSESSMENTS
 
-    print();
+    print()
     print(f'writing patient data to {patient_data_out}')
     tstart = time.time()
     with open(patient_data_out, 'w') as f:
