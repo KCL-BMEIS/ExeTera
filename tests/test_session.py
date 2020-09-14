@@ -41,6 +41,35 @@ class TestSessionMerge(unittest.TestCase):
         print(s.merge_left(a_pid, p_id, right_fields=(p_val,)))
 
 
+    def test_ordered_merge_left_2(self):
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            s = session.Session()
+            p_id = np.array([100, 200, 300, 400, 500, 600, 800, 900])
+            p_val = np.array([-1, -2, -3, -4, -5, -6, -8, -9])
+            a_pid = np.array([100, 100, 100, 200, 200, 400, 400, 400, 400, 600,
+                              600, 600, 700, 700, 900, 900, 900])
+            a_val = np.array([10, 11, 12, 23, 22, 43, 40, 41, 41, 60,
+                              63, 62, 71, 71, 92, 92, 92])
+            f_p_id = s.create_numeric(hf, 'p_id', 'int32')
+            f_p_id.data.write(p_id)
+            f_p_val = s.create_numeric(hf, 'p_val', 'int32')
+            f_p_val.data.write(p_val)
+            f_a_pid = s.create_numeric(hf, 'a_pid', 'int32')
+            f_a_pid.data.write(a_pid)
+            a_to_p = s.create_numeric(hf, 'a_to_p', 'int64')
+            f_a_p_val = s.create_numeric(hf, 'a_p_val', 'int32')
+            s.ordered_left_merge(f_a_pid, f_p_id, a_to_p,
+                                 left_field_sources=(f_p_val,),
+                                 left_field_sinks=(f_a_p_val,),
+                                 right_unique=True)
+
+            print(f_a_p_val.data[:])
+
+            # print(s.merge_left(p_id, a_pid, left_fields=(p_val,)))
+            print(s.merge_left(a_pid, p_id, right_fields=(p_val,))[1])
+
+
     def test_merge_right(self):
         l_id = np.asarray(['a', 'b', 'd', 'f', 'g', 'h'])
         l_vals = np.asarray([100, 200, 300, 400, 500, 600])
@@ -49,8 +78,8 @@ class TestSessionMerge(unittest.TestCase):
         r_vals = np.asarray([1000, 2000, 2001, 3000, 3001, 4000, 4001, 5000, 5001, 6000, 6001])
 
         s = session.Session()
-        print(s.merge_right(l_id, r_id, left_fields=(l_vals,), right_fields=(r_vals,)))
-
+        res = s.merge_right(l_id, r_id, left_fields=(l_vals,), right_fields=(r_vals,))
+        print(res)
 
     def test_ordered_merge_left(self):
         l_id = np.asarray(['a', 'b', 'd', 'f', 'g', 'h'])
@@ -182,6 +211,7 @@ class TestSessionSort(unittest.TestCase):
             self.assertListEqual([1, 1, 1, 2, 2], s.get_reader(hf['a'])[:].tolist())
             self.assertListEqual([1, 2, 5, 3, 4], s.get_reader(hf['b'])[:].tolist())
             self.assertListEqual([b'e', b'd', b'a', b'c', b'b'], s.get_reader(hf['x'])[:].tolist())
+
 
 
 class TestSessionFilter(unittest.TestCase):

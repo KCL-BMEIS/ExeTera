@@ -2563,6 +2563,980 @@
           }
         }
       }
+    },
+    "diet": {
+      "primary_keys": [
+        "id"
+      ],
+      "foreign_keys": {
+        "patient_id": {
+          "space": "patients",
+          "key": "id"
+        }
+      },
+      "fields": {
+        "id": {
+          "field_type": "fixed_string",
+          "length": 32
+        },
+        "patient_id": {
+          "field_type": "fixed_string",
+          "length": 32
+        },
+        "version": {
+          "field_type": "fixed_string",
+          "length": 10
+        },
+        "start_date": {
+          "field_type": "datetime"
+        },
+        "display_name": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "Feb 2020": 1,
+              "Recent 4 weeks": 2
+            }
+          }
+        },
+        "weight_kg": {
+          "field_type": "numeric",
+          "value_type": "float"
+        },
+        "weight_pounds": {
+          "field_type": "numeric",
+          "value_type": "float"
+        },
+        "weight_unsure": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "was_pregnant": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "hours_sleep_weekends": {
+          "field_type": "numeric",
+          "value_type": "float"
+        },
+        "hours_sleep_weekdays": {
+          "field_type": "numeric",
+          "value_type": "float"
+        },
+        "lost_control": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "shift_work": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "food_security": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "pfnts": 1,
+              "always_had_enough": 2,
+              "enough_not_kinds_wanted": 3,
+              "sometimes_not_enough": 4,
+              "often_not_enough": 5
+            }
+          }
+        },
+        "physical_activity": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "pfnts": 1,
+              "less_than_once_a_month": 2,
+              "less_than_once_a_week": 3,
+              "once_a_week": 4,
+              "twice_a_week": 5,
+              "three_to_four_a_week": 6,
+              "five_or_more_a_week": 7
+            }
+          }
+        },
+        "alcohol_frequency": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "pfnts": 1,
+              "never": 2,
+              "monthly": 3,
+              "two_to_four_a_month": 4,
+              "two_to_three_a_week": 5,
+              "four_or_more_a_week": 6
+            }
+          }
+        },
+        "alcohol_units": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "pfnts": 1,
+              "1-2": 2,
+              "3-4": 3,
+              "5-6": 4,
+              "7-9": 5,
+              "10+": 6
+            }
+          }
+        },
+        "takes_supplements": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "supplements_fibre": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "supplements_probiotic": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "supplements_iron": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "supplements_calcium": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "supplements_vitamin_d": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "supplements_zinc": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "supplements_vitamin_c": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "supplements_multivitamin": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "supplements_omega3": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "supplements_garlic": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "supplements_pfnts": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "supplements_other": {
+          "field_type": "string"
+        },
+        "first_calories": {
+          "field_type": "datetime"
+        },
+        "last_calories": {
+          "field_type": "datetime"
+        },
+        "eats_breakfast": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "main_meals": {
+          "field_type": "numeric",
+          "value_type": "int64"
+        },
+        "snacks": {
+          "field_type": "numeric",
+          "value_type": "int64"
+        },
+        "diet_mixed": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diet_vegetarian": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diet_vegan": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diet_pescatarian": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diet_keto": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diet_low_carb": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diet_low_fat": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diet_gluten_free": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diet_lactose_free": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "diet_low_calorie": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "ffq_fruit": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_fruit_juice": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_salad": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_vegetables": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_chips": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_pulses": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_fibre_rich_breakfast": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_wholemeal_bread": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_cheese_yogurt": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_crisps_snacks": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_sweets": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_ice_cream": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_fizzy_pop": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_red_meat": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_white_meat": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_red_processed_meat": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_white_processed_meat": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_white_fish_battered_breaded": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_white_fish": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_oily_fish": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_eggs": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_fast_food": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_live_probiotic_fermented": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_white_bread": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_rice": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_pasta": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "ffq_refined_breakfast": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "rarely_never": 1,
+              "less_than_once_a_week": 2,
+              "once_a_week": 3,
+              "two_to_three_a_week": 4,
+              "four_to_six_a_week": 5,
+              "one_to_two_a_day": 6,
+              "three_to_four_a_day": 7,
+              "five_or_more_a_day": 8
+            }
+          }
+        },
+        "portions_of_fruit": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "glasses_of_juice": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "portions_of_veg": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "milk_whole": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "milk_semi_skimmed": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "milk_skimmed": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "milk_rarely_never": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "milk_plant": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "milk_other": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "is_complete": {
+          "field_type": "numeric",
+          "value_type": "bool"
+        },
+        "other_info": {
+          "field_type": "string"
+        }
+
+      }
     }
   }
 }

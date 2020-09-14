@@ -34,7 +34,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files):
     if not any_parts_present:
         raise ValueError("none of the data sources in 'files' contain relevant data to the schema")
 
-    importer_flags = {'patients': True, 'assessments': True, 'tests': True}
+    importer_flags = {'patients': True, 'assessments': True, 'tests': True, 'diet': True}
     stop_after = {}
     # stop_after = {'patients': 500000, 'assessments': 500000}
     datastore = per.DataStore()

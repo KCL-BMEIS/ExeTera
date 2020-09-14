@@ -682,6 +682,9 @@ class DateTimeWriter(Writer):
                     # ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S%z')
                     ts = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
                                   int(value[11:13]), int(value[14:16]), int(value[17:19]))
+                elif len(value) == 19:
+                    ts = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
+                                  int(value[11:13]), int(value[14:16]), int(value[17:19]))
                 else:
                     raise ValueError(f"Date field '{self.field}' has unexpected format '{value}'")
                 timestamps[i] = ts.timestamp()

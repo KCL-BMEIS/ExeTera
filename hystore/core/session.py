@@ -791,6 +791,7 @@ class Session:
         l_to_r_map = df['l_index'].to_numpy()
         l_to_r_filt = np.logical_not(df['l_index'].isnull()).to_numpy()
         r_to_l_map = df['r_index'].to_numpy(dtype=np.int64)
+        # print("r_to_l_map:", r_to_l_map)
         r_to_l_filt = np.logical_not(df['r_index'].isnull()).to_numpy()
         # print(df)
 
@@ -802,7 +803,7 @@ class Session:
         for ilf, lf in enumerate(left_fields):
             lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
             joined_field = per._safe_map(lf_raw, l_to_r_map, l_to_r_filt)
-            print(joined_field)
+            # print(joined_field)
             if left_writers == None:
                 left_results.append(joined_field)
             else:
@@ -812,7 +813,7 @@ class Session:
         for irf, rf in enumerate(right_fields):
             rf_raw = val.raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
             joined_field = per._safe_map(rf_raw, r_to_l_map, r_to_l_filt)
-            print(joined_field)
+            # print(joined_field)
             if right_writers == None:
                 right_results.append(joined_field)
             else:
@@ -949,21 +950,29 @@ class Session:
             has_unmapped = None
             if left_unique == False:
                 if right_unique == False:
-                    raise NotImplementedError()
+                    raise ValueError("Right key must not have duplicates")
                 else:
-                    raise NotImplementedError()
-            else:
-                if right_unique == False:
                     if streamable:
-                        has_unmapped =\
-                            ops.ordered_map_to_right_left_unique_streamed(left_on, right_on,
+                        has_unmapped = \
+                            ops.ordered_map_to_right_right_unique_streamed(left_on, right_on,
                                                                           left_to_right_map)
                         result = left_to_right_map.data[:]
                     else:
-                        result = np.zeros(len(right_on), dtype=np.int64)
-                        has_unmapped =\
-                            ops.ordered_map_to_right_left_unique(left_on, right_on, result)
-
+                        result = np.zeros(len(left_on), dtype=np.int64)
+                        has_unmapped = \
+                            ops.ordered_map_to_right_right_unique(left_on, right_on, result)
+            else:
+                if right_unique == False:
+                    raise ValueError("Right key must not have duplicates")
+                    # if streamable:
+                    #     has_unmapped =\
+                    #         ops.ordered_map_to_right_left_unique_streamed(left_on, right_on,
+                    #                                                       left_to_right_map)
+                    #     result = left_to_right_map.data[:]
+                    # else:
+                    #     result = np.zeros(len(left_on), dtype=np.int64)
+                    #     has_unmapped =\
+                    #         ops.ordered_map_to_right_left_unique(left_on, right_on, result)
                 else:
                     result = np.zeros(len(right_on), dtype=np.int64)
                     has_unmapped = ops.ordered_map_to_right_both_unique(left_on, right_on, result)

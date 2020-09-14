@@ -371,7 +371,74 @@ def apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
     return s+1, index_i, index_v
 
 
-def ordered_map_to_right_left_unique_streamed(left, right, left_to_right, chunksize=1 << 20):
+# def ordered_map_to_right_left_unique_streamed(left, right, left_to_right, chunksize=1 << 20):
+#     i = 0
+#     j = 0
+#     lc_it = iter(chunks(len(left.data), chunksize))
+#     lc_range = next(lc_it)
+#     rc_it = iter(chunks(len(right.data), chunksize))
+#     rc_range = next(rc_it)
+#     lc = left.data[lc_range[0]:lc_range[1]]
+#     rc = right.data[rc_range[0]:rc_range[1]]
+#     acc_written = 0
+#
+#     ltri = np.zeros(chunksize, dtype=left_to_right.data.dtype)
+#     unmapped = 0
+#     while i < len(left.data) and j < len(right.data):
+#         ii, jj, u = ordered_map_to_right_left_unique_partial(i, lc, rc, ltri)
+#         unmapped += u
+#         if jj > 0:
+#             if val.is_field_parameter(left_to_right):
+#                 left_to_right.data.write(ltri[:jj])
+#             else:
+#                 left_to_right[acc_written:acc_written + jj] = ltri[:jj]
+#                 acc_written += jj
+#         i += ii
+#         j += jj
+#         if i > lc_range[1]:
+#             raise ValueError("'i' has got ahead of current chunk; this shouldn't happen")
+#         if j > rc_range[1]:
+#             raise ValueError("'j' has got ahead of current chunk; this shouldn't happen")
+#         if i == lc_range[1] and i < len(left.data):
+#             lc_range = next(lc_it)
+#             lc = left.data[lc_range[0]:lc_range[1]]
+#         else:
+#             lc = lc[ii:]
+#         if j == rc_range[1] and j < len(right.data):
+#             rc_range = next(rc_it)
+#             rc = right.data[rc_range[0]:rc_range[1]]
+#         else:
+#             rc = rc[jj:]
+#     return unmapped > 0
+
+
+# @njit
+# def ordered_map_to_right_left_unique_partial(d_i, left, right, left_to_right):
+#     """
+#     Returns:
+#     [0]: how many positions forward i moved
+#     [1]: how many positions forward j moved
+#     [2]: how many elements were written
+#     """
+#     i = 0
+#     j = 0
+#     unmapped = 0
+#     while i < len(left) and j < len(right):
+#         if left[i] < right[j]:
+#             i += 1
+#         elif left[i] > right[j]:
+#             left_to_right[j] = INVALID_INDEX
+#             j += 1
+#             unmapped += 1
+#         else:
+#             left_to_right[j] = i + d_i
+#             if j+1 < len(right) and right[j+1] != right[j]:
+#                 i += 1
+#             j += 1
+#     return i, j, unmapped
+
+
+def ordered_map_to_right_right_unique_streamed(left, right, left_to_right, chunksize=1 << 20):
     i = 0
     j = 0
     lc_it = iter(chunks(len(left.data), chunksize))
@@ -385,14 +452,14 @@ def ordered_map_to_right_left_unique_streamed(left, right, left_to_right, chunks
     ltri = np.zeros(chunksize, dtype=left_to_right.data.dtype)
     unmapped = 0
     while i < len(left.data) and j < len(right.data):
-        ii, jj, u = ordered_map_to_right_left_unique_partial(i, lc, rc, ltri)
+        ii, jj, u = ordered_map_to_right_right_unique_partial(j, lc, rc, ltri)
         unmapped += u
-        if jj > 0:
+        if ii > 0:
             if val.is_field_parameter(left_to_right):
-                left_to_right.data.write(ltri[:jj])
+                left_to_right.data.write(ltri[:ii])
             else:
-                left_to_right[acc_written:acc_written + jj] = ltri[:jj]
-                acc_written += jj
+                left_to_right[acc_written:acc_written + ii] = ltri[:ii]
+                acc_written += ii
         i += ii
         j += jj
         if i > lc_range[1]:
@@ -411,34 +478,37 @@ def ordered_map_to_right_left_unique_streamed(left, right, left_to_right, chunks
             rc = rc[jj:]
     return unmapped > 0
 
-"""
-Returns:
-[0]: how many positions forward i moved
-[1]: how many positions forward j moved
-[2]: how many elements were written
-"""
-@njit
-def ordered_map_to_right_left_unique_partial(d_i, left, right, left_to_right):
+# @njit
+def ordered_map_to_right_right_unique_partial(d_j, left, right, left_to_right):
+    """
+    Returns:
+    [0]: how many positions forward i moved
+    [1]: how many positions forward j moved
+    [2]: how many elements were written
+    """
     i = 0
     j = 0
     unmapped = 0
     while i < len(left) and j < len(right):
         if left[i] < right[j]:
+            left_to_right[i] = INVALID_INDEX
             i += 1
-        elif left[i] > right[j]:
-            left_to_right[j] = INVALID_INDEX
-            j += 1
             unmapped += 1
-        else:
-            left_to_right[j] = i + d_i
-            if j+1 < len(right) and right[j+1] != right[j]:
-                i += 1
+        elif left[i] > right[j]:
             j += 1
+        else:
+            left_to_right[i] = j + d_j
+            if i+1 < len(left) and left[i+1] != left[i]:
+                j += 1
+            i += 1
+            # if j+1 < len(right) and right[j+1] != right[j]:
+            #     i += 1
+            # j += 1
     return i, j, unmapped
 
 
 @njit
-def ordered_map_to_right_left_unique(first, second, result):
+def ordered_map_to_right_right_unique(first, second, result):
     if len(second) != len(result):
         msg = "'second' and 'result' must be the same length"
         raise ValueError(msg)
@@ -447,16 +517,16 @@ def ordered_map_to_right_left_unique(first, second, result):
     unmapped = 0
     while i < len(first) and j < len(second):
         if first[i] < second[j]:
+            result[i] = INVALID_INDEX
             i += 1
-        elif first[i] > second[j]:
-            result[j] = INVALID_INDEX
-            j += 1
             unmapped += 1
-        else:
-            result[j] = i
-            if j+1 < len(second) and second[j+1] != second[j]:
-                i += 1
+        elif first[i] > second[j]:
             j += 1
+        else:
+            result[i] = j
+            if i+1 < len(first) and first[i+1] != first[i]:
+                j += 1
+            i += 1
 
     while j < len(second):
         result[j] = INVALID_INDEX
@@ -476,19 +546,19 @@ def ordered_map_to_right_both_unique(first, second, result):
     unmapped = 0
     while i < len(first) and j < len(second):
         if first[i] < second[j]:
+            result[i] = INVALID_INDEX
             i += 1
-        elif first[i] > second[j]:
-            result[j] = INVALID_INDEX
-            j += 1
             unmapped += 1
+        elif first[i] > second[j]:
+            j += 1
         else:
-            result[j] = i
+            result[i] = j
             i += 1
             j += 1
 
-    while j < len(second):
-        result[j] = INVALID_INDEX
-        j += 1
+    while i < len(first):
+        result[i] = INVALID_INDEX
+        i += 1
 
     return unmapped > 0
 
