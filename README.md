@@ -28,16 +28,19 @@ used as a source for processing even if the processing functionality significant
 
 ### `hystorex import`
 ```
-hystorex import -s <schema> -te <territories> -p <patient_csv> -a <assessment_csv> -t <test_csv> -o <output_hdf5> -d <data_schema> -ts <timestamp>
+hystorex import
+-s covid/covid_schema.json \
+-i "patients:covid/patient_data.csv, assessments:covid/assessmentdata.csv, tests:covid/covid_test_data.csv, diet:covid/diet_study_data.csv" \
+-o /home/ben/covid/ds_20200901_base.hdf5
 ```
+
 
 #### Arguments
  * `-s/--schema`: The location and name of the schema file
  * `-te/--territories`: If set, this only imports the listed territories. If left unset, all
    territories are imported
- * `-p/--patient_data`: The path and name of the patient data file
- * `-a/--assessment_data`: The path and name of the assessment data csv file to be imported
- * `-t/--test_data`: The path and name of the test data csv file to be imported
+ * `-i/--inputs` : A comma separated list of 'name:file' pairs. This should be put in parentheses if it contains any
+  whitespace. See the example above.
  * `-o/--output_hdf5`: The path and name to where the resulting hdf5 dataset should be written
  * `-d/--data_schema`: The optional data schema to be used during import (default of 1)
  * `-ts/--timestamp`: An override for the timestamp to be written
@@ -124,6 +127,11 @@ python split.py --version
 
 ---
 ## Changes
+
+### v0.2.6 -> v0.2.7
+* Addition of diet questionnaire schema
+* Reworking of arguments for hystorex import to support arbitrary numbers and names of csvs
+* Provision of highly-scalable merge functionality through ordered merge functions
 
 ### v0.2.5 -> v0.2.6
 * Moving from DataSet to Session class offering cleaner syntax
