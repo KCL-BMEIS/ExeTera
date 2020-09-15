@@ -902,7 +902,7 @@ class Session:
                 src_ = val.array_from_parameter(self, 'left_field_sources', src)
                 snk_ = val.array_from_parameter(self, 'left_field_sinks', snk)
                 ops.map_valid(src_, field_map, snk_)
-        return rtn_sinks
+        return None if rtn_sinks is None else tuple(rtn_sinks)
 
 
     def ordered_merge(self, left_on, right_on, how,
@@ -929,7 +929,28 @@ class Session:
     def ordered_left_merge(self, left_on, right_on, left_to_right_map,
                            left_field_sources=tuple(), left_field_sinks=None,
                            left_unique=False, right_unique=False):
-
+        """
+        Generate the results of a left join apply it to the fields described in the tuple
+        'left_field_sources'. If 'left_field_sinks' is set, the mapped values are written
+        to the fields / arrays set there.
+        Note: in order to achieve best scalability, you should use groups / fields rather
+        than numpy arrays and provide a tuple of groups/fields to left_field_sinks, so
+        that the session and compute the merge and apply the mapping in a streaming
+        fashion.
+        :param left_on: the group/field/numba array that contains the left key values
+        :param right_on: the group/field/numba array that contains the right key values
+        :param left_to_right_map: a group/field/numba array that the map is written to. If
+        it is a numba array, it must be the size of the resulting merge
+        :param left_field_sources: a tuple of group/fields/numba arrays that contain the
+        fields to be joined
+        :param left_field_sinks: optional - a tuple of group/fields/numba arrays that
+        the mapped fields should be written to
+        :param left_unique: a hint to indicate whether the 'left_on' field contains unique
+        values
+        :param right_unique: a hint to indicate whether the 'right_on' field contains
+        unique values
+        :return: If left_field_sinks is not set, a tuple of the output fields is returned
+        """
         if left_field_sinks is not None:
             if len(left_field_sources) != len(left_field_sinks):
                 msg = ("{} and {} should be of the same length but are length {} and {} "
@@ -982,10 +1003,32 @@ class Session:
         return rtn_left_sinks
 
 
-    def ordered_right_merge(self, left_on, right_on,
+    def ordered_right_merge(self, left_on, right_on, right_to_left_map,
                             right_field_sources=tuple(), right_field_sinks=None,
                             left_unique=False, right_unique=False):
-        return self.ordered_left_merge(right_on, left_on,
+        """
+        Generate the results of a right join apply it to the fields described in the tuple
+        'right_field_sources'. If 'right_field_sinks' is set, the mapped values are written
+        to the fields / arrays set there.
+        Note: in order to achieve best scalability, you should use groups / fields rather
+        than numpy arrays and provide a tuple of groups/fields to right_field_sinks, so
+        that the session and compute the merge and apply the mapping in a streaming
+        fashion.
+        :param left_on: the group/field/numba array that contains the left key values
+        :param right_on: the group/field/numba array that contains the right key values
+        :param right_to_left_map: a group/field/numba array that the map is written to. If
+        it is a numba array, it must be the size of the resulting merge
+        :param right_field_sources: a tuple of group/fields/numba arrays that contain the
+        fields to be joined
+        :param right_field_sinks: optional - a tuple of group/fields/numba arrays that
+        the mapped fields should be written to
+        :param left_unique: a hint to indicate whether the 'left_on' field contains unique
+        values
+        :param right_unique: a hint to indicate whether the 'right_on' field contains
+        unique values
+        :return: If right_field_sinks is not set, a tuple of the output fields is returned
+        """
+        return self.ordered_left_merge(right_on, left_on, right_to_left_map,
                                        right_field_sources, right_field_sinks,
                                        right_unique, left_unique)
 

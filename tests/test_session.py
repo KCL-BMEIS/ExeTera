@@ -34,8 +34,8 @@ class TestSessionMerge(unittest.TestCase):
         p_val = np.array([-1, -2, -3, -4, -5, -6, -8, -9])
         a_pid = np.array([100, 100, 100, 200, 200, 400, 400, 400, 400, 600,
                           600, 600, 700, 700, 900, 900, 900])
-        a_val = np.array([10, 11, 12, 23, 22, 43, 40, 41, 41, 60,
-                          63, 62, 71, 71, 92, 92, 92])
+        a_val = np.array([10, 11, 12, 23, 22, 40, 43, 42, 41, 60,
+                          61, 63, 71, 71, 94, 93, 92])
 
         print(s.merge_left(p_id, a_pid, right_fields=(a_val,)))
         print(s.merge_left(a_pid, p_id, right_fields=(p_val,)))
@@ -49,8 +49,8 @@ class TestSessionMerge(unittest.TestCase):
             p_val = np.array([-1, -2, -3, -4, -5, -6, -8, -9])
             a_pid = np.array([100, 100, 100, 200, 200, 400, 400, 400, 400, 600,
                               600, 600, 700, 700, 900, 900, 900])
-            a_val = np.array([10, 11, 12, 23, 22, 43, 40, 41, 41, 60,
-                              63, 62, 71, 71, 92, 92, 92])
+            a_val = np.array([10, 11, 12, 23, 22, 40, 43, 42, 41, 60,
+                              61, 63, 71, 71, 94, 93, 92])
             f_p_id = s.create_numeric(hf, 'p_id', 'int32')
             f_p_id.data.write(p_id)
             f_p_val = s.create_numeric(hf, 'p_val', 'int32')
@@ -63,6 +63,35 @@ class TestSessionMerge(unittest.TestCase):
                                  left_field_sources=(f_p_val,),
                                  left_field_sinks=(f_a_p_val,),
                                  right_unique=True)
+
+            print(f_a_p_val.data[:])
+
+            # print(s.merge_left(p_id, a_pid, left_fields=(p_val,)))
+            print(s.merge_left(a_pid, p_id, right_fields=(p_val,))[1])
+
+
+    def test_ordered_merge_right_2(self):
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            s = session.Session()
+            p_id = np.array([100, 200, 300, 400, 500, 600, 800, 900])
+            p_val = np.array([-1, -2, -3, -4, -5, -6, -8, -9])
+            a_pid = np.array([100, 100, 100, 200, 200, 400, 400, 400, 400, 600,
+                              600, 600, 700, 700, 900, 900, 900])
+            a_val = np.array([10, 11, 12, 23, 22, 40, 43, 42, 41, 60,
+                              61, 63, 71, 71, 94, 93, 92])
+            f_p_id = s.create_numeric(hf, 'p_id', 'int32')
+            f_p_id.data.write(p_id)
+            f_p_val = s.create_numeric(hf, 'p_val', 'int32')
+            f_p_val.data.write(p_val)
+            f_a_pid = s.create_numeric(hf, 'a_pid', 'int32')
+            f_a_pid.data.write(a_pid)
+            a_to_p = s.create_numeric(hf, 'a_to_p', 'int64')
+            f_a_p_val = s.create_numeric(hf, 'a_p_val', 'int32')
+            s.ordered_right_merge(f_p_id, f_a_pid, a_to_p,
+                                 right_field_sources=(f_p_val,),
+                                 right_field_sinks=(f_a_p_val,),
+                                 left_unique=True)
 
             print(f_a_p_val.data[:])
 
