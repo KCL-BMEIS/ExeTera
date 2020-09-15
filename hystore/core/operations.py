@@ -37,36 +37,55 @@ def map_valid(data_field, map_field, result=None):
 
 
 def ordered_map_valid_stream(data_field, map_field, result_field, chunksize=DEFAULT_CHUNKSIZE):
-    df_it = iter(chunks(len(data_field.data)))
-    mf_it = iter(chunks(len(map_field.data)))
+    df_it = iter(chunks(len(data_field.data), chunksize=chunksize))
+    mf_it = iter(chunks(len(map_field.data), chunksize=chunksize))
     df_range = next(df_it)
     mf_range = next(mf_it)
     dfc = data_field.data[df_range[0]:df_range[1]]
     mfc = map_field.data[mf_range[0]:mf_range[1]]
-    rslt = np.zeros(chunksize, dtype=data_field.data.dtype)
 
-    i = 0
-    while i < len(map_field.data):
-        ii, d = ordered_map_valid_partial(dfc, mfc, rslt)
+    is_field_parameter = val.is_field_parameter(result_field)
+    result_dtype = result_field.data.dtype if is_field_parameter else result_field.dtype
+    rslt = np.zeros(chunksize, dtype=result_dtype)
+
+    m = 0
+    d = 0
+    while m < len(map_field.data):
+        mm, dd = ordered_map_valid_partial(df_range[0], dfc, mfc, rslt)
+        if mm > 0:
+            if is_field_parameter:
+                result_field.data.write(rslt[:mm])
+            else:
+                result_field[m:m + mm] = rslt[:mm]
+            rslt[:] = 0
+        m += mm
+        if m == mf_range[1] and m < len(map_field.data):
+            mf_range = next(mf_it)
+            mfc = map_field.data[mf_range[0]:mf_range[1]]
+        else:
+            mfc = mfc[mm:]
+        if dd >= df_range[1] and dd < len(data_field.data):
+            df_range = next(df_it)
+            dfc = data_field.data[df_range[0]:df_range[1]]
+        # else:
+        #     dfc = dfc[dd:]
 
 
 
 # 0 2 3 4 5 7 8 9 11 12 14 15 17 18 19
 # 0 0 0 0 1 1 1 1  2  2  2  2  3  3  3
-def ordered_map_valid_partial(data_field, map_field, result):
+def ordered_map_valid_partial(d, data_field, map_field, result):
     i = 0
-    while i < len(map_field):
+    while True:
         val = map_field[i]
         if val < INVALID_INDEX:
-            if val >= len(data_field):
+            if val >= d + len(data_field):
                 # need a new data_field chunk
                 return i, val
-            result[i] = val
+            result[i] = data_field[val - d]
         i += 1
-    return i, len(data_field)
-
-
-
+        if i >= len(map_field):
+            return i, val
 
 
 @njit
@@ -449,13 +468,15 @@ def ordered_map_to_right_right_unique_streamed(left, right, left_to_right, chunk
     rc = right.data[rc_range[0]:rc_range[1]]
     acc_written = 0
 
-    ltri = np.zeros(chunksize, dtype=left_to_right.data.dtype)
+    is_field_parameter = val.is_field_parameter(left_to_right)
+    result_dtype = left_to_right.data.dtype if is_field_parameter else left_to_right.dtype
+    ltri = np.zeros(chunksize, dtype=result_dtype)
     unmapped = 0
     while i < len(left.data) and j < len(right.data):
         ii, jj, u = ordered_map_to_right_right_unique_partial(j, lc, rc, ltri)
         unmapped += u
         if ii > 0:
-            if val.is_field_parameter(left_to_right):
+            if is_field_parameter:
                 left_to_right.data.write(ltri[:ii])
             else:
                 left_to_right[acc_written:acc_written + ii] = ltri[:ii]

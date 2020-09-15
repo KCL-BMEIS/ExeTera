@@ -52,6 +52,23 @@ class TestAggregation(unittest.TestCase):
         ops.apply_spans_index_of_last_filter(spans, dest, flt)
         print(dest, flt)
 
+    def test_ordered_map_valid_stream(self):
+        s = session.Session()
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            map_field = np.asarray([0, 0, 0, 1, 1, 3, 3, 3, 3, 5, 5, 5, 5,
+                                    ops.INVALID_INDEX, ops.INVALID_INDEX, 7, 7, 7],
+                                   dtype=np.int64)
+            data_field = np.asarray([-1, -2, -3, -4, -5, -6, -8, -9], dtype=np.int32)
+            f_map_field = s.create_numeric(hf, "map_field", "int64")
+            f_map_field.data.write(map_field)
+            f_data_field = s.create_numeric(hf, "data_field", "int32")
+            f_data_field.data.write(data_field)
+
+            result_field = np.zeros(len(map_field), dtype=np.int32)
+            ops.ordered_map_valid_stream(f_data_field, f_map_field, result_field, 4)
+            print(result_field)
+
     def test_ordered_map_to_right_both_unique(self):
         raw_ids = [0, 1, 2, 3, 5, 6, 7, 9]
         a_ids = np.asarray(raw_ids, dtype=np.int64)
