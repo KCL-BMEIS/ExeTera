@@ -499,7 +499,8 @@ def ordered_map_to_right_right_unique_streamed(left, right, left_to_right, chunk
             rc = rc[jj:]
     return unmapped > 0
 
-# @njit
+
+@njit
 def ordered_map_to_right_right_unique_partial(d_j, left, right, left_to_right):
     """
     Returns:
@@ -666,15 +667,15 @@ def ordered_inner_map_left_unique_streamed(left, right, left_to_inner, right_to_
         else:
             rc = rc[jj:]
 
-"""
-Returns:
-[0]: how many positions forward i moved
-[1]: how many positions forward j moved
-[2]: how many elements were written
-"""
 @njit
 def ordered_inner_map_left_unique_partial(d_i, d_j, left, right,
                                           left_to_inner, right_to_inner):
+    """
+    Returns:
+    [0]: how many positions forward i moved
+    [1]: how many positions forward j moved
+    [2]: how many elements were written
+    """
     i = 0
     j = 0
     m = 0
