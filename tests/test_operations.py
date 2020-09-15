@@ -74,17 +74,18 @@ class TestAggregation(unittest.TestCase):
         a_ids = np.asarray(raw_ids, dtype=np.int64)
         b_ids = np.asarray([1, 2, 3, 4, 5, 7, 8, 9], dtype=np.int64)
         results = np.zeros(len(b_ids), dtype=np.int64)
-        ops.ordered_map_to_right_both_unique(a_ids, b_ids, results)
+        ops.ordered_map_to_right_both_unique(b_ids, a_ids, results)
         expected = np.array([1, 2, 3, ops.INVALID_INDEX, 4, 6, ops.INVALID_INDEX, 7],
                             dtype=np.int64)
         self.assertTrue(np.array_equal(expected, results))
 
-    def test_ordered_map_to_right_left_unique(self):
+    def test_ordered_map_to_right_right_unique(self):
         raw_ids = [0, 1, 2, 3, 5, 6, 7, 9]
         a_ids = np.asarray(raw_ids, dtype=np.int64)
         b_ids = np.asarray([1, 2, 3, 4, 5, 7, 8, 9], dtype=np.int64)
         results = np.zeros(len(b_ids), dtype=np.int64)
-        ops.ordered_map_to_right_left_unique(a_ids, b_ids, results)
+        ops.ordered_map_to_right_right_unique(b_ids, a_ids, results)
+        print(results)
         expected = np.array([1, 2, 3, ops.INVALID_INDEX, 4, 6, ops.INVALID_INDEX, 7],
                             dtype=np.int64)
         self.assertTrue(np.array_equal(results, expected))
@@ -103,7 +104,7 @@ class TestAggregation(unittest.TestCase):
             b_ids_f = s.create_numeric(hf, 'b_ids', 'int64')
             b_ids_f.data.write(b_ids)
             left_to_right_result = s.create_numeric(hf, 'left_result', 'int64')
-            ops.ordered_map_to_right_left_unique_streamed(a_ids_f, b_ids_f,
+            ops.ordered_map_to_right_right_unique_streamed(a_ids_f, b_ids_f,
                                                        left_to_right_result)
             print(left_to_right_result.data[:])
 

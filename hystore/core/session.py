@@ -193,7 +193,7 @@ class Session:
         """
         filter_to_apply_ = val.array_from_parameter(self, 'index_to_apply', filter_to_apply)
         writer_ = None
-        if writer_:
+        if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
         if isinstance(src, fld.IndexedStringField):
             src_ = val.field_from_parameter(self, 'reader', src)
@@ -201,13 +201,14 @@ class Session:
                 ops.apply_filter_to_index_values(filter_to_apply_,
                                                  src_.indices[:], src_.values[:])
             if writer_:
-                writer_.write_raw(dest_indices, dest_values)
+                writer_.indices.write(dest_indices)
+                writer_.values.write(dest_values)
             return dest_indices, dest_values
         else:
             reader_ = val.array_from_parameter(self, 'reader', src)
             result = reader_[filter_to_apply]
             if writer_:
-                writer_.write(result)
+                writer_.data.write(result)
             return result
 
 
@@ -224,7 +225,7 @@ class Session:
         """
         index_to_apply_ = val.array_from_parameter(self, 'index_to_apply', index_to_apply)
         writer_ = None
-        if writer_:
+        if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
         if isinstance(src, fld.IndexedStringField):
             src_ = val.field_from_parameter(self, 'reader', src)
@@ -232,13 +233,14 @@ class Session:
                 ops.apply_indices_to_index_values(index_to_apply_,
                                                   src_.indices[:], src_.values[:])
             if writer_:
-                writer_.write_raw(dest_indices, dest_values)
+                writer_.indices.write(dest_indices)
+                writer_.values.write(dest_values)
             return dest_indices, dest_values
         else:
             reader_ = val.array_from_parameter(self, 'reader', src)
             result = reader_[index_to_apply]
             if writer_:
-                writer_.write(result)
+                writer_.data.write(result)
             return result
 
 
@@ -561,6 +563,9 @@ class Session:
         writer.write(destination_space_values)
 
     def get(self, field):
+        if isinstance(field, fld.Field):
+            return field
+
         if 'fieldtype' not in field.attrs.keys():
             raise ValueError(f"'{field}' is not a well-formed field")
 

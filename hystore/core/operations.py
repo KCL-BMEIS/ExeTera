@@ -520,7 +520,7 @@ def ordered_map_to_right_right_unique_partial(d_j, left, right, left_to_right):
             j += 1
         else:
             left_to_right[i] = j + d_j
-            if i+1 < len(left) and left[i+1] != left[i]:
+            if i+1 >= len(left) or left[i+1] != left[i]:
                 j += 1
             i += 1
             # if j+1 < len(right) and right[j+1] != right[j]:
@@ -529,10 +529,10 @@ def ordered_map_to_right_right_unique_partial(d_j, left, right, left_to_right):
     return i, j, unmapped
 
 
-@njit
+# @njit
 def ordered_map_to_right_right_unique(first, second, result):
-    if len(second) != len(result):
-        msg = "'second' and 'result' must be the same length"
+    if len(first) != len(result):
+        msg = "'first' and 'result' must be the same length"
         raise ValueError(msg)
     i = 0
     j = 0
@@ -546,7 +546,7 @@ def ordered_map_to_right_right_unique(first, second, result):
             j += 1
         else:
             result[i] = j
-            if i+1 < len(first) and first[i+1] != first[i]:
+            if i+1 >= len(first) or first[i+1] != first[i]:
                 j += 1
             i += 1
 
@@ -689,7 +689,7 @@ def ordered_inner_map_left_unique_partial(d_i, d_j, left, right,
             left_to_inner[m] = i + d_i
             right_to_inner[m] = j + d_j
             m += 1
-            if j+1 < len(right) and right[j+1] != right[j]:
+            if j+1 >= len(right) or right[j+1] != right[j]:
                 i += 1
             j += 1
     return i, j, m

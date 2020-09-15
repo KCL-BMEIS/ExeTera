@@ -125,21 +125,29 @@ class TestSessionMerge(unittest.TestCase):
                                   dtype=np.int32)
 
         s = session.Session()
-        actual = s.ordered_left_merge(l_id, r_id, left_field_sources=(l_vals,),
-                                      left_unique=True)
+        l_to_r = np.zeros(len(r_id), dtype=np.int64)
+        actual = s.ordered_left_merge(r_id, l_id, left_to_right_map=l_to_r,
+                                      left_field_sources=(l_vals,),
+                                      right_unique=True)
         self.assertTrue(np.array_equal(actual[0], l_vals_exp))
 
-        actual = s.ordered_right_merge(r_id, l_id, right_field_sources=(l_vals,),
-                                       right_unique=True)
+        r_to_l = np.zeros(len(l_id), dtype=np.int64)
+        actual = s.ordered_right_merge(l_id, r_id, right_to_left_map=r_to_l,
+                                       right_field_sources=(l_vals,),
+                                       left_unique=True)
         self.assertTrue(np.array_equal(actual[0], l_vals_exp))
 
-        actual = s.ordered_left_merge(l_id, r_id, left_field_sources=(l_vals, l_vals_2),
-                                      left_unique=True)
+        l_to_r = np.zeros(len(r_id), dtype=np.int64)
+        actual = s.ordered_left_merge(r_id, l_id, left_to_right_map=l_to_r,
+                                      left_field_sources=(l_vals, l_vals_2),
+                                      right_unique=True)
         self.assertTrue(np.array_equal(actual[0], l_vals_exp))
         self.assertTrue(np.array_equal(actual[1], l_vals_2_exp))
 
-        actual = s.ordered_right_merge(r_id, l_id, right_field_sources=(l_vals, l_vals_2),
-                                       right_unique=True)
+        r_to_l = np.zeros(len(l_id), dtype=np.int64)
+        actual = s.ordered_right_merge(l_id, r_id, right_to_left_map=r_to_l,
+                                       right_field_sources=(l_vals, l_vals_2),
+                                       left_unique=True)
         self.assertTrue(np.array_equal(actual[0], l_vals_exp))
         self.assertTrue(np.array_equal(actual[1], l_vals_2_exp))
 

@@ -57,14 +57,19 @@ chunk_sizes = {
 
 
 @numba.njit
-def _safe_map(data_field, map_field, map_filter):
+def _safe_map(data_field, map_field, map_filter=None):
     result = np.zeros_like(map_field, dtype=data_field.dtype)
     empty_val = result[0]
-    for i in range(len(map_field)):
-        if map_filter[i]:
+    if map_filter is not None:
+        for i in range(len(map_field)):
+            if map_filter[i]:
+                result[i] = data_field[map_field[i]]
+            else:
+                result[i] = empty_val
+    else:
+        for i in range(len(map_field)):
             result[i] = data_field[map_field[i]]
-        else:
-            result[i] = empty_val
+
     return result
 
 
