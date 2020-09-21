@@ -9,7 +9,7 @@ def score_component(fields, maps, fn, length):
     return fn(accumulated)
 
 
-def final_sum(fields):
+def healthy_diet_index(fields):
     nda = lambda x: np.array(x, dtype=np.float32)
 
     print(fields)

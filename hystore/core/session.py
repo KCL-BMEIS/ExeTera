@@ -296,7 +296,6 @@ class Session:
                 raw_fields.append(f[:] if isinstance(f, rw.Reader) else f)
         return per._get_spans(raw_field, raw_fields)
 
-
     def _apply_spans_no_src(self, predicate, spans, dest=None):
         if dest:
             if val.is_field_parameter(self, 'dest', dest):
@@ -318,10 +317,9 @@ class Session:
             predicate(spans, results)
             return results
 
-
     def _apply_spans_src(self, predicate, spans, src, dest=None):
-        src_ = val.array_from_parameter(src)
-        if len(src) != len(spans) - 1:
+        src_ = val.array_from_parameter(self, 'src', src)
+        if len(src) != spans[-1]:
             error_msg = ("'src' (length {}) must be one element shorter than 'spans' "
                          "(length {})")
             raise ValueError(error_msg.format(len(src_), len(spans)))
@@ -339,11 +337,11 @@ class Session:
                     error_msg = ("if 'dest' (length {}) is an ndarray, it must be one element "
                                  "shorter than the length of 'spans' (length{})")
                     raise ValueError(error_msg.format(len(dest_), len(spans)))
-                    predicate(spans, dest_)
+                    predicate(spans, src, dest_)
                 return dest_
         else:
-            results = np.zeros(len(spans) - 1, dtype='int64')
-            predicate(spans, results)
+            results = np.zeros(len(spans) - 1, dtype=src_.dtype)
+            predicate(spans, src, results)
             return results
 
     def apply_spans_index_of_min(self, spans, src, dest=None):
@@ -367,11 +365,11 @@ class Session:
     def apply_spans_max(self, spans, src, dest=None):
         return self._apply_spans_src(ops.apply_spans_max, spans, src, dest)
 
-    def apply_spans_first(self, spans, dest=None):
-        return self._apply_spans_no_src(ops.apply_spans_first, spans, dest)
+    def apply_spans_first(self, spans, src, dest=None):
+        return self._apply_spans_src(ops.apply_spans_first, spans, src, dest)
 
-    def apply_spans_last(self, spans, dest=None):
-        return self._apply_spans_no_src(ops.apply_spans_last, spans, dest)
+    def apply_spans_last(self, spans, src, dest=None):
+        return self._apply_spans_src(ops.apply_spans_last, spans, src, dest)
 
     def apply_spans_concat(self, spans, src, dest):
         if not isinstance(src, fld.IndexedStringField):
@@ -782,8 +780,7 @@ class Session:
 
 
     def merge_left(self, left_on, right_on,
-                   left_fields=tuple(), right_fields=tuple(),
-                   left_writers=None, right_writers=None):
+                   right_fields=tuple(), right_writers=None):
         l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
@@ -793,44 +790,23 @@ class Session:
         r_df = pd.DataFrame({'r_k': r_key_raw, 'r_index': r_index})
 
         df = pd.merge(left=l_df, right=r_df, left_on='l_k', right_on='r_k', how='left')
-        l_to_r_map = df['l_index'].to_numpy()
-        l_to_r_filt = np.logical_not(df['l_index'].isnull()).to_numpy()
         r_to_l_map = df['r_index'].to_numpy(dtype=np.int64)
-        # print("r_to_l_map:", r_to_l_map)
         r_to_l_filt = np.logical_not(df['r_index'].isnull()).to_numpy()
-        # print(df)
-
-        # print("l_to_r_map:", l_to_r_map, l_to_r_map.dtype)
-        # print("r_to_l_map:", r_to_l_map, r_to_l_map.dtype)
-
-        # print(r_to_l_map > -1)
-        left_results = list()
-        for ilf, lf in enumerate(left_fields):
-            lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
-            joined_field = per._safe_map(lf_raw, l_to_r_map, l_to_r_filt)
-            # print(joined_field)
-            if left_writers == None:
-                left_results.append(joined_field)
-            else:
-                left_writers[ilf].write(joined_field)
 
         right_results = list()
         for irf, rf in enumerate(right_fields):
             rf_raw = val.raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
             joined_field = per._safe_map(rf_raw, r_to_l_map, r_to_l_filt)
-            # print(joined_field)
-            if right_writers == None:
+            if right_writers is None:
                 right_results.append(joined_field)
             else:
-                right_writers[irf].write(joined_field)
+                right_writers[irf].data.write(joined_field)
 
-        if left_writers == None:
-            return left_results, right_results
+        return right_results
 
 
     def merge_right(self, left_on, right_on,
-                    left_fields=None, right_fields=None,
-                    left_writers=None, right_writers=None):
+                    left_fields=None, left_writers=None):
         l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
@@ -840,33 +816,19 @@ class Session:
         r_df = pd.DataFrame({'r_k': r_key_raw, 'r_index': r_index})
 
         df = pd.merge(left=r_df, right=l_df, left_on='r_k', right_on='l_k', how='left')
-        l_to_r_map = df['r_index'].to_numpy()
-        l_to_r_filt = np.logical_not(df['r_index'].isnull())
-        r_to_l_map = df['l_index'].to_numpy(dtype=np.int64)
-        r_to_l_filt = np.logical_not(df['l_index'].isnull())
-        print(df)
+        l_to_r_map = df['l_index'].to_numpy(dtype='int64')
+        l_to_r_filt = np.logical_not(df['l_index'].isnull()).to_numpy()
 
-        print("l_to_r_map:", l_to_r_map, l_to_r_map.dtype)
-        print("r_to_l_map:", r_to_l_map, r_to_l_map.dtype)
-
-        print(r_to_l_map > -1)
         left_results = list()
         for ilf, lf in enumerate(left_fields):
-            joined_field = per._safe_map(lf, r_to_l_map)
-            print(joined_field)
-            if left_writers == None:
+            lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
+            joined_field = per._safe_map(lf_raw, l_to_r_map, l_to_r_filt)
+            if left_writers is None:
                 left_results.append(joined_field)
             else:
                 left_writers[ilf].write(joined_field)
 
-        right_results = list()
-        for irf, rf in enumerate(right_fields):
-            joined_field = per._safe_map(rf, l_to_r_map)
-            print(joined_field)
-            if right_writers == None:
-                right_results.append(joined_field)
-            else:
-                right_writers[irf].write(joined_field)
+        return left_results
 
 
     def merge_inner(self, left_on, left_fields, right_on, right_fields):
@@ -1000,7 +962,7 @@ class Session:
                     #     has_unmapped =\
                     #         ops.ordered_map_to_right_left_unique(left_on, right_on, result)
                 else:
-                    result = np.zeros(len(right_on), dtype=np.int64)
+                    result = np.zeros(len(left_on), dtype=np.int64)
                     has_unmapped = ops.ordered_map_to_right_both_unique(left_on, right_on, result)
 
         with utils.Timer("mapping fields", new_line=True):

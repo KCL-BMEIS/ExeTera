@@ -185,7 +185,7 @@ class WriteableIndexedFieldArray:
         self._chunksize = self._field.attrs['chunksize']
         self._raw_values = np.zeros(self._chunksize, dtype=np.uint8)
         self._raw_indices = np.zeros(self._chunksize, dtype=np.int64)
-        self._accumulated = self._index_dataset[-1]
+        self._accumulated = self._index_dataset[-1] if len(self._index_dataset) else 0
         self._index_index = 0
         self._value_index = 0
 
@@ -222,7 +222,7 @@ class WriteableIndexedFieldArray:
         self._accumulated = 0
         DataWriter.clear_dataset(self._field, self._index_name)
         DataWriter.clear_dataset(self._field, self._values_name)
-        DataWriter.write(self._field, self._index_name, [0], 1, 'int64')
+        DataWriter.write(self._field, self._index_name, [], 0, 'int64')
         DataWriter.write(self._field, self._values_name, [], 0, 'uint8')
         self._index_dataset = self._field[self._index_name]
         self._values_dataset = self._field[self._values_name]
@@ -243,6 +243,8 @@ class WriteableIndexedFieldArray:
             self._raw_indices[self._index_index] = self._accumulated
             self._index_index += 1
             if self._index_index == self._chunksize:
+                if len(self._field['index']) == 0:
+                    DataWriter.write(self._field, self._index_name, [0], 1)
                 DataWriter.write(self._field, self._index_name,
                                  self._raw_indices, self._index_index)
                 self._index_index = 0
@@ -258,6 +260,8 @@ class WriteableIndexedFieldArray:
                              self._raw_values, self._value_index)
             self._value_index = 0
         if self._index_index != 0:
+            if len(self._field['index']) == 0:
+                DataWriter.write(self._field, self._index_name, [0], 1)
             DataWriter.write(self._field, self._index_name,
                              self._raw_indices, self._index_index)
             self._index_index = 0
@@ -277,7 +281,7 @@ def base_field_contructor(session, group, name, timestamp=None, chunksize=None):
 def indexed_string_field_constructor(session, group, name, timestamp=None, chunksize=None):
     field = base_field_contructor(session, group, name, timestamp, chunksize)
     field.attrs['fieldtype'] = 'indexedstring'
-    DataWriter.write(field, 'index', [0], 1, 'int64')
+    DataWriter.write(field, 'index', [], 0, 'int64')
     DataWriter.write(field, 'values', [], 0, 'uint8')
 
 

@@ -20,12 +20,12 @@ class TestSessionMerge(unittest.TestCase):
         r_vals = np.asarray([1000, 2000, 2001, 3000, 3001, 4000, 4001, 5000, 5001, 6000, 6001])
 
         s = session.Session()
-        print(s.merge_left(l_id, r_id, left_fields=(l_vals,), right_fields=(r_vals,)))
+        print(s.merge_left(l_id, r_id, right_fields=(r_vals,)))
 
         r_vals2 = np.asarray(['a0', 'c0', 'c1', 'd0', 'd1', 'e0', 'e1', 'f0', 'f1', 'h0', 'h1'])
 
         s = session.Session()
-        print(s.merge_left(l_id, r_id, left_fields=(l_vals,), right_fields=(r_vals2,)))
+        print(s.merge_left(l_id, r_id, right_fields=(r_vals2,)))
 
 
     def test_merge_left_2(self):
@@ -39,6 +39,22 @@ class TestSessionMerge(unittest.TestCase):
 
         print(s.merge_left(p_id, a_pid, right_fields=(a_val,)))
         print(s.merge_left(a_pid, p_id, right_fields=(p_val,)))
+
+
+    def test_merge_left_3(self):
+        s = session.Session()
+        p_id = np.array([10, 20, 30, 40, 50, 60, 70, 80])
+        d_pid = np.array([10, 30, 40, 60, 80])
+        d_counts = np.array([2, 1, 2, 3, 2])
+        d_to_p = np.zeros(len(p_id))
+        import pandas as pd
+        pdf = pd.DataFrame({'id': p_id})
+        ddf = pd.DataFrame({'patient_id': d_pid, 'd_counts': d_counts})
+        print(pd.merge(left=pdf, right=ddf, left_on='id', right_on='patient_id', how='left'))
+        print(s.merge_left(left_on=p_id, right_on=d_pid, right_fields=(d_counts,)))
+        print(s.ordered_left_merge(left_on=p_id, right_on=d_pid, left_to_right_map=d_to_p,
+                                   left_field_sources=(d_counts,),
+                                   left_unique=True, right_unique=True))
 
 
     def test_ordered_merge_left_2(self):
@@ -67,7 +83,7 @@ class TestSessionMerge(unittest.TestCase):
             print(f_a_p_val.data[:])
 
             # print(s.merge_left(p_id, a_pid, left_fields=(p_val,)))
-            print(s.merge_left(a_pid, p_id, right_fields=(p_val,))[1])
+            print(s.merge_left(a_pid, p_id, right_fields=(p_val,)))
 
 
     def test_ordered_merge_right_2(self):
@@ -96,7 +112,7 @@ class TestSessionMerge(unittest.TestCase):
             print(f_a_p_val.data[:])
 
             # print(s.merge_left(p_id, a_pid, left_fields=(p_val,)))
-            print(s.merge_left(a_pid, p_id, right_fields=(p_val,))[1])
+            print(s.merge_left(a_pid, p_id, right_fields=(p_val,)))
 
 
     def test_merge_right(self):
@@ -107,7 +123,7 @@ class TestSessionMerge(unittest.TestCase):
         r_vals = np.asarray([1000, 2000, 2001, 3000, 3001, 4000, 4001, 5000, 5001, 6000, 6001])
 
         s = session.Session()
-        res = s.merge_right(l_id, r_id, left_fields=(l_vals,), right_fields=(r_vals,))
+        res = s.merge_right(l_id, r_id, left_fields=(l_vals,))
         print(res)
 
     def test_ordered_merge_left(self):

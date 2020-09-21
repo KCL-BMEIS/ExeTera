@@ -23,12 +23,11 @@ from hystore.processing.temperature import validate_temperature_1
 from hystore.processing.combined_healthcare_worker import combined_hcw_with_contact
 from hystore.core import persistence
 from hystore.core.persistence import DataStore
+from hystore.core.session import Session
 from hystore.core import readerwriter as rw
 from hystore.core import utils
 
-
-# TODO: hard filter
-# TODO: journalling for hdf5 robustness
+# TODO: replace datastore with session and readers/writers with fields
 
 # TODO: postprocessing activities
 # * assessment sort by (patient_id, created_at)
@@ -70,9 +69,11 @@ def postprocess(dataset, destination, timestamp=None, flags='all'):
     make_patient_level_assessment_metrics = process_enabled(flags) and True
     make_patient_level_daily_assessment_metrics = process_enabled(flags) and do_daily_asmts
     make_new_test_level_metrics = process_enabled(flags) and True
-
+    make_diet_level_metrics = True
+    make_healthy_diet_index = True
 
     ds = DataStore(timestamp=timestamp)
+    s = Session()
 
     # patients ================================================================
 
@@ -254,148 +255,6 @@ def postprocess(dataset, destination, timestamp=None, flags='all'):
     # write_mode = 'overwrite'
     write_mode = 'write'
 
-    # Sorting
-    # #######
-
-    # if sort_patients:
-    #     duplicate_filter =\
-    #         persistence.filter_duplicate_fields(ds.get_reader(patients_src['id'])[:])
-    #     print("duplicate True/False:", duplicate_filter)
-    #
-    #     for k in patients_src.keys():
-    #         t0 = time.time()
-    #         r = ds.get_reader(patients_src[k])
-    #         w = r.get_writer(patients_dest, k)
-    #         ds.apply_filter(duplicate_filter, r, w)
-    #         print(f"'{k}' filtered in {time.time() - t0}s")
-    #
-    #     print(np.count_nonzero(duplicate_filter == True),
-    #           np.count_nonzero(duplicate_filter == False))
-    #     sort_keys = ('id',)
-    #     ds.sort_on(
-    #         patients_dest, patients_dest, sort_keys, write_mode='overwrite')
-
-    # if sort_assessments:
-    #     sort_keys = ('patient_id', 'created_at')
-    #     ds.sort_on(
-    #         assessments_src, assessments_dest, sort_keys)
-
-    # if sort_tests:
-    #     sort_keys = ('patient_id', 'created_at')
-    #     ds.sort_on(tests_src, tests_dest, sort_keys)
-
-
-    # Processing
-    # ##########
-
-    # sorted_patients_src = patients_dest if sort_patients else patients_src
-    # sorted_assessments_src = assessments_dest if sort_assessments else assessments_src
-    # sorted_patients_src = patients_dest
-    # sorted_assessments_src = assessments_dest
-
-    # # Patient processing
-    # # ==================
-    #
-    # if year_from_age:
-    #     log("year of birth -> age; 18 to 90 filter")
-    #     t0 = time.time()
-    #     age = ds.get_numeric_writer(patients_dest, 'age', 'uint32',
-    #                                 write_mode)
-    #     age_filter = ds.get_numeric_writer(patients_dest, 'age_filter',
-    #                                        'bool', write_mode)
-    #     age_16_to_90 = ds.get_numeric_writer(patients_dest, '16_to_90_years',
-    #                                          'bool', write_mode)
-    #     print('year_of_birth:', patients_dest['year_of_birth'])
-    #     for k in patients_dest['year_of_birth'].attrs.keys():
-    #         print(k, patients_dest['year_of_birth'].attrs[k])
-    #     calculate_age_from_year_of_birth_fast(
-    #         ds, 16, 90,
-    #         patients_dest['year_of_birth'], patients_dest['year_of_birth_valid'],
-    #         age, age_filter, age_16_to_90,
-    #         2020)
-    #     log(f"completed in {time.time() - t0}")
-    #
-    #     print('age_filter count:', np.sum(patients_dest['age_filter']['values'][:]))
-    #     print('16_to_90_years count:', np.sum(patients_dest['16_to_90_years']['values'][:]))
-    #
-    # if clean_weight_height_bmi:
-    #     log("height / weight / bmi; standard range filters")
-    #     t0 = time.time()
-    #
-    #     weights_clean = ds.get_numeric_writer(patients_dest, 'weight_kg_clean',
-    #                                           'float32', write_mode)
-    #     weights_filter = ds.get_numeric_writer(patients_dest, '40_to_200_kg',
-    #                                            'bool', write_mode)
-    #     heights_clean = ds.get_numeric_writer(patients_dest, 'height_cm_clean',
-    #                                           'float32', write_mode)
-    #     heights_filter = ds.get_numeric_writer(patients_dest, '110_to_220_cm',
-    #                                            'bool', write_mode)
-    #     bmis_clean = ds.get_numeric_writer(patients_dest, 'bmi_clean',
-    #                                        'float32', write_mode)
-    #     bmis_filter = ds.get_numeric_writer(patients_dest, '15_to_55_bmi',
-    #                                         'bool', write_mode)
-    #
-    #     weight_height_bmi_fast_1(ds, 40, 200, 110, 220, 15, 55,
-    #                              None, None, None, None,
-    #                              patients_dest['weight_kg'], patients_dest['weight_kg_valid'],
-    #                              patients_dest['height_cm'], patients_dest['height_cm_valid'],
-    #                              patients_dest['bmi'], patients_dest['bmi_valid'],
-    #                              weights_clean, weights_filter, None,
-    #                              heights_clean, heights_filter, None,
-    #                              bmis_clean, bmis_filter, None)
-    #     log(f"completed in {time.time() - t0}")
-    #
-    # if health_worker_with_contact:
-    #     log("health_worker_with_contact field")
-    #     #writer = ds.get_categorical_writer(patients_dest, 'health_worker_with_contact', 'int8')
-    #     combined_hcw_with_contact(ds,
-    #                               ds.get_reader(patients_dest['healthcare_professional']),
-    #                               ds.get_reader(patients_dest['contact_health_worker']),
-    #                               ds.get_reader(patients_dest['is_carer_for_community']),
-    #                               patients_dest, 'health_worker_with_contact')
-
-    # Assessment processing
-    # =====================
-
-    # if make_assessment_patient_id_fkey:
-    #     print("creating 'assessment_patient_id_fkey' foreign key index for 'patient_id'")
-    #     t0 = time.time()
-    #     patient_ids = ds.get_reader(sorted_patients_src['id'])
-    #     assessment_patient_ids =\
-    #         ds.get_reader(sorted_assessments_src['patient_id'])
-    #     assessment_patient_id_fkey =\
-    #         ds.get_numeric_writer(assessments_dest, 'assessment_patient_id_fkey', 'int64')
-    #     ds.get_index(patient_ids, assessment_patient_ids, assessment_patient_id_fkey)
-    #     print(f"completed in {time.time() - t0}s")
-    #
-    #
-    # if clean_temperatures:
-    #     print("clean temperatures")
-    #     t0 = time.time()
-    #     temps = ds.get_reader(sorted_assessments_src['temperature'])
-    #     temp_units = ds.get_reader(sorted_assessments_src['temperature_unit'])
-    #     temps_valid = ds.get_reader(sorted_assessments_src['temperature_valid'])
-    #     dest_temps = temps.get_writer(assessments_dest, 'temperature_c_clean', write_mode)
-    #     dest_temps_valid =\
-    #         temps_valid.get_writer(assessments_dest, 'temperature_35_to_42_inclusive', write_mode)
-    #     dest_temps_modified =\
-    #         temps_valid.get_writer(assessments_dest, 'temperature_modified', write_mode)
-    #     validate_temperature_1(35.0, 42.0,
-    #                            temps, temp_units, temps_valid,
-    #                            dest_temps, dest_temps_valid, dest_temps_modified)
-    #     print(f"temperature cleaning done in {time.time() - t0}")
-    #
-    #
-    # if check_symptoms:
-    #     print('check inconsistent health_status')
-    #     t0 = time.time()
-    #     check_inconsistent_symptoms_1(ds, sorted_assessments_src, assessments_dest)
-    #     print(time.time() - t0)
-    #
-
-    # Test processing
-    # ===============
-
 
     # Daily assessments
     # =================
@@ -524,7 +383,7 @@ def postprocess(dataset, destination, timestamp=None, flags='all'):
 
     # TODO - patient measure: daily assessments per patient
 
-    if make_patient_level_daily_assessment_metrics:
+    if has_assessments and do_daily_asmts and make_patient_level_daily_assessment_metrics:
         print("creating 'daily_assessment_patient_id_fkey' foreign key index for 'patient_id'")
         t0 = time.time()
         patient_ids = ds.get_reader(sorted_patients_src['id'])
@@ -551,7 +410,7 @@ def postprocess(dataset, destination, timestamp=None, flags='all'):
 
 
     # TODO - new test count per patient:
-    if make_new_test_level_metrics:
+    if has_tests and make_new_test_level_metrics:
         print("creating 'test_patient_id_fkey' foreign key index for 'patient_id'")
         t0 = time.time()
         patient_ids = ds.get_reader(sorted_patients_src['id'])
@@ -577,3 +436,13 @@ def postprocess(dataset, destination, timestamp=None, flags='all'):
         aggregated_results = ds.aggregate_max(fkey_index_spans=spans, reader=test_results)
         ds.join(ids, test_patient_id_fkey, aggregated_results, writer, spans)
         print(f"calculated max_test_result per patient in {time.time() - t0}")
+
+    if has_diet and make_diet_level_metrics:
+        with utils.Timer("Making patient-level diet questions count", new_line=True):
+            d_pids_ = s.get(diet_dest['patient_id']).data[:]
+            d_pid_spans = s.get_spans(d_pids_)
+            d_distinct_pids = s.apply_spans_first(d_pid_spans, d_pids_)
+            d_pid_counts = s.apply_spans_count(d_pid_spans)
+            p_diet_counts = s.create_numeric(patients_dest, 'diet_counts', 'int32')
+            s.merge_left(left_on=s.get(patients_dest['id']).data[:], right_on=d_distinct_pids,
+                         right_fields=(d_pid_counts,), right_writers=(p_diet_counts,))

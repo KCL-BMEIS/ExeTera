@@ -559,7 +559,7 @@ def ordered_map_to_right_right_unique(first, second, result):
 
 @njit
 def ordered_map_to_right_both_unique(first, second, result):
-    if len(second) != len(result):
+    if len(first) != len(result):
         msg = "'second' and 'result' must be the same length"
         raise ValueError(msg)
     i = 0
