@@ -529,7 +529,7 @@ def ordered_map_to_right_right_unique_partial(d_j, left, right, left_to_right):
     return i, j, unmapped
 
 
-# @njit
+@njit
 def ordered_map_to_right_right_unique(first, second, result):
     if len(first) != len(result):
         msg = "'first' and 'result' must be the same length"
