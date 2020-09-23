@@ -468,7 +468,7 @@ def supplement_paper_processing_2(ds, src_data, dest_data):
 
     initial_fields = ['id', '']
     asmt_fields = ['fatigue', 'loss_of_smell', 'persistent_cough', 'skipped_meals',
-                   'hospitalization', 'treatment', 'prediction_score', 'prediction']
+                   'hospitalization', 'treatment', 'prediction_score', 'sore_throat', 'prediction']
 
     first_patient_fields = ['id', 'created_at', 'updated_at', 'version', 'country_code']
     last_patient_fields = ['old_test_result', 'old_test_month', 'new_test_result', 'new_test_month']
@@ -495,9 +495,10 @@ def supplement_paper_processing_diet(ds, src_data, dest_data):
     supplement_fields = ('vs_garlic', 'vs_multivitamins', 'vs_none', 'vs_omega_3',
                          'vs_pftns', 'vs_probiotics', 'vs_vitamin_c', 'vs_vitamin_d', 'vs_zinc')
     ptnt_sup_fields = ('vs_none', 'vs_omega_3', 'vs_multivitamins',
-                       'vs_vitamin_c', 'vs_vitamin_d', 'vs_zinc')
+                       'vs_vitamin_c', 'vs_vitamin_d', 'vs_zinc', 'vs_garlic', 'vs_probiotics')
     diet_sup_fields = ('takes_supplements', 'supplements_omega3', 'supplements_multivitamin',
-                       'supplements_vitamin_c', 'supplements_vitamin_d', 'supplements_zinc')
+                       'supplements_vitamin_c', 'supplements_vitamin_d', 'supplements_zinc',
+                       'supplements_garlic', 'supplements_probiotic')
     consistent_sup_fields = ['{}_consistent'.format(f) for f in ptnt_sup_fields]
 
     verbose = True
@@ -652,7 +653,7 @@ def supplement_paper_processing_diet(ds, src_data, dest_data):
                         ds.get_reader(flt_ptnts['id']), ds.get_reader(src_asmts['patient_id']))
 
             symptom_operators = ('persistent_cough', 'skipped_meals', 'loss_of_smell',
-                                 'fatigue')
+                                 'fatigue', 'sore_throat')
             symptom_thresholds = {s: 2 for s in symptom_operators}
             symptom_thresholds['fatigue'] = 3
             for s in symptom_operators:
@@ -928,7 +929,7 @@ def supplement_paper_processing_diet(ds, src_data, dest_data):
     print(np.array_equal(p_ids_, a_pids_))
 
     initial_fields = ['id', '']
-    asmt_fields = ['fatigue', 'loss_of_smell', 'persistent_cough', 'skipped_meals',
+    asmt_fields = ['fatigue', 'loss_of_smell', 'persistent_cough', 'skipped_meals', 'sore_throat',
                    'hospitalization', 'treatment', 'prediction_score', 'prediction']
 
     first_patient_fields = ['id', 'created_at', 'updated_at', 'version', 'country_code']
@@ -947,5 +948,5 @@ if __name__ == '__main__':
     src_file = '/home/ben/covid/ds_20200914_full.hdf5'
     dest_file = '/home/ben/covid/ds_20200914_supplements.hdf5'
     with h5py.File(src_file, 'r') as src_data:
-        with h5py.File(dest_file, 'r+') as dest_data:
+        with h5py.File(dest_file, 'w') as dest_data:
             supplement_paper_processing_diet(datastore, src_data, dest_data)
