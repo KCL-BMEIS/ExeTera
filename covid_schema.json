@@ -2603,11 +2603,11 @@
         },
         "weight_kg": {
           "field_type": "numeric",
-          "value_type": "float"
+          "value_type": "float32"
         },
         "weight_pounds": {
           "field_type": "numeric",
-          "value_type": "float"
+          "value_type": "float32"
         },
         "weight_unsure": {
           "field_type": "categorical",
@@ -2633,11 +2633,11 @@
         },
         "hours_sleep_weekends": {
           "field_type": "numeric",
-          "value_type": "float"
+          "value_type": "float32"
         },
         "hours_sleep_weekdays": {
           "field_type": "numeric",
-          "value_type": "float"
+          "value_type": "float32"
         },
         "lost_control": {
           "field_type": "categorical",

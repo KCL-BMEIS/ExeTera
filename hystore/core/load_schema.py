@@ -14,9 +14,12 @@ class NewDataSchema:
         primary_keys = schema_dict.get('primary_keys', None)
         foreign_keys = schema_dict.get('foreign_keys', None)
         fields = schema_dict.get('fields', None)
-        self._field_entries = self._build_fields(fields)
+        self.permitted_numeric_types = ('float32', 'float64', 'bool', 'int8', 'uint8', 'int16', 'uint16', 'int32',
+                                        'uint32', 'int64')
+        self._field_entries = self._build_fields(fields, self.permitted_numeric_types)
         if verbosity > 1:
             print(self._field_entries)
+
 
     @property
     def name(self):
@@ -43,7 +46,7 @@ class NewDataSchema:
             raise ValueError(msg)
 
     @staticmethod
-    def _build_fields(fields, verbosity=0):
+    def _build_fields(fields, permitted_numeric_types, verbosity=0):
         entries = dict()
         for fk, fv in fields.items():
             if verbosity > 1:
@@ -85,7 +88,10 @@ class NewDataSchema:
                         raise ValueError(msg.format(fk, raw_type, value_type))
                     converter = per.try_str_to_float_to_int
                 else:
-                    if value_type in ('float32', 'float64'):
+                    if value_type not in permitted_numeric_types:
+                        msg = "Field {} has an invalid value_type '{}'. Permitted types are {}"
+                        raise ValueError(msg.format(fk, value_type, permitted_numeric_types))
+                    if value_type in ('float', 'float32', 'float64'):
                         converter = per.try_str_to_float
                     else:
                         converter = per.try_str_to_int

@@ -2,7 +2,7 @@ The KCL covid19 joinzoe data preparation pipeline.
 
 # Cleaning scripts
 
-Current release version: v0.2.7
+Current release version: v0.2.7.1
 
 ---
 # Usage
@@ -127,6 +127,9 @@ python split.py --version
 
 ---
 ## Changes
+
+### v0.2.7 -> v0.2..1
+* Fix to covid_schema.json for numeric diet fields marked 'float' instead of 'float32'
 
 ### v0.2.6 -> v0.2.7
 * Addition of diet questionnaire schema
