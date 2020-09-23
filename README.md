@@ -2,7 +2,7 @@ The KCL covid19 joinzoe data preparation pipeline.
 
 # Cleaning scripts
 
-Current release version: v0.2.6.2
+Current release version: v0.2.7
 
 ---
 # Usage
@@ -132,6 +132,7 @@ python split.py --version
 * Addition of diet questionnaire schema
 * Reworking of arguments for hystorex import to support arbitrary numbers and names of csvs
 * Provision of highly-scalable merge functionality through ordered merge functions
+  * Fix for filtering of indexed string fields
 
 ### v0.2.5 -> v0.2.6
 * Moving from DataSet to Session class offering cleaner syntax
