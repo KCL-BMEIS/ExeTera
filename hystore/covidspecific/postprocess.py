@@ -43,9 +43,12 @@ def log(*a, **kwa):
     print(*a, **kwa)
 
 
-def postprocess(dataset, destination, timestamp=None, flags='all'):
+def postprocess(dataset, destination, timestamp=None, flags=None):
 
-    do_daily_asmts = False
+    if flags is None:
+        flags = set()
+
+    do_daily_asmts = 'daily' in flags
     has_patients = 'patients' in dataset.keys()
     has_assessments = 'assessments' in dataset.keys()
     has_tests = 'tests' in dataset.keys()
@@ -93,7 +96,6 @@ def postprocess(dataset, destination, timestamp=None, flags='all'):
             if sort_patients:
                 duplicate_filter = \
                     persistence.filter_duplicate_fields(ds.get_reader(patients_src['id'])[:])
-                print("duplicate True/False:", duplicate_filter)
 
                 for k in patients_src.keys():
                     t0 = time.time()

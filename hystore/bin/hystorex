@@ -35,25 +35,24 @@ subparsers = parser.add_subparsers(dest='command')
 
 parser_import = subparsers.add_parser('import')
 parser_import.add_argument('-te', '--territories', default=None,
-                           help=('the territory/territories to filter the dataset on '
+                           help=('The territory/territories to filter the dataset on '
                                  '(runs on all territories if not set)'))
 parser_import.add_argument('-s', '--schema', required=True,
-                           help='the location and name of the schema file')
-parser_import.add_argument('-p', '--patient_data',
-                           help='the location and name of the patient data csv file')
-parser_import.add_argument('-a', '--assessment_data',
-                           help='the location and name of the assessment data csv file')
-parser_import.add_argument('-t', '--test_data',
-                           help='the location and name of the assessment data csv file')
+                           help='The location and name of the schema file')
 parser_import.add_argument('-i', '--inputs', required=True)
 parser_import.add_argument('-o', '--output_hdf5',
-                           help='the location and name of the output hdf5 file')
+                           help='The location and name of the output hdf5 file. If this is an existing file, it will'
+                                ' be overwritten')
 parser_import.add_argument('-ts', '--timestamp', default=str(datetime.now(timezone.utc)),
-                           help='override for the import datetime (the current time is selected otherwise')
+                           help='Override for the import datetime (the current time is selected otherwise)')
 
 parser_postprocess = subparsers.add_parser('process')
-parser_postprocess.add_argument('-i', '--input', required=True, help='the dataset to load')
-parser_postprocess.add_argument('-o', '--output', help='the dataset to write results to')
+parser_postprocess.add_argument('-i', '--input', required=True, help='The dataset to load')
+parser_postprocess.add_argument('-o', '--output', required=True,
+                                help='The dataset to write results to. If this is an existing file, it will be'
+                                     ' overwritten')
+parser_postprocess.add_argument('-d', '--daily', action='store_true',
+                                help='If set, generate daily assessments from assessments')
 
 args = parser.parse_args()
 
@@ -102,6 +101,10 @@ if args.command == 'import':
 elif args.command == 'process':
     timestamp = str(datetime.now(timezone.utc))
 
+    flags = set()
+    if args.daily is True:
+        flags.add('daily')
+
     with h5py.File(args.input, 'r') as ds:
         with h5py.File(args.output, 'w') as ts:
-            postprocess.postprocess(ds, ts, timestamp)
+            postprocess.postprocess(ds, ts, timestamp, flags)
