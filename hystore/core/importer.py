@@ -44,7 +44,6 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files):
                 continue
 
             fields = schema[sk].fields
-            show_every = 100000
 
             with open(files[sk]) as f:
                 ds = dataset.Dataset(f, stop_after=1)
@@ -52,7 +51,20 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files):
             missing_names = names.difference(fields.keys())
             if len(missing_names) > 0:
                 msg = "The following fields are present in {} but not part of the schema: {}"
-                raise ValueError(msg.format(files[sk], missing_names))
+                print("Warning:", msg.format(files[sk], missing_names))
+                # raise ValueError(msg.format(files[sk], missing_names))
+
+        for sk in schema.keys():
+            if sk not in files or importer_flags[sk] == False:
+                continue
+
+            fields = schema[sk].fields
+            show_every = 100000
+
+            with open(files[sk]) as f:
+                ds = dataset.Dataset(f, stop_after=1)
+            names = set(ds.names_)
+            missing_names = names.difference(fields.keys())
 
             DatasetImporter(datastore, files[sk], hf, sk, schema[sk], timestamp,
                             stop_after=stop_after.get(sk, None),
@@ -66,7 +78,7 @@ class DatasetImporter:
                  keys=None,
                  stop_after=None, show_progress_every=None, filter_fn=None,
                  early_filter=None):
-        self.names_ = list()
+        # self.names_ = list()
         self.index_ = None
 
         time0 = time.time()
@@ -79,18 +91,22 @@ class DatasetImporter:
 
         with open(source) as sf:
             csvf = csv.DictReader(sf, delimiter=',', quotechar='"')
-            self.names_ = csvf.fieldnames
+            # self.names_ = csvf.fieldnames
 
-            available_keys = csvf.fieldnames
+            available_keys = [k for k in csvf.fieldnames if k in schema.fields]
+            # available_keys = csvf.fieldnames
+
             if not keys:
                 fields_to_use = available_keys
-                index_map = [i for i in range(len(fields_to_use))]
+                # index_map = [csvf.fieldnames.index(k) for k in fields_to_use]
+                # index_map = [i for i in range(len(fields_to_use))]
             else:
                 for k in keys:
                     if k not in available_keys:
                         raise ValueError(f"key '{k}' isn't in the available keys ({keys})")
                 fields_to_use = keys
-                index_map = [available_keys.index(k) for k in keys]
+                # index_map = [csvf.fieldnames.index(k) for k in fields_to_use]
+            index_map = [csvf.fieldnames.index(k) for k in fields_to_use]
 
             early_key_index = None
             if early_filter is not None:
@@ -143,7 +159,7 @@ class DatasetImporter:
                                 if f not in categorical_map:
                                     error = "'{}' not valid: must be one of {} for field '{}'"
                                     raise KeyError(
-                                        error.format(f, categorical_map, self.names_[i_f]))
+                                        error.format(f, categorical_map, available_keys[i_f]))
                                 f = categorical_map[f]
                             field_chunk_list[i_df][chunk_index] = f
                         chunk_index += 1
