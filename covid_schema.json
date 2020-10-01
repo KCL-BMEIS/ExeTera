@@ -775,6 +775,17 @@
             }
           }
         },
+        "is_in_uk_nhs_asymptomatic_study": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
         "is_in_uk_twins": {
           "field_type": "categorical",
           "categorical": {
@@ -3447,6 +3458,18 @@
               "one_to_two_a_day": 6,
               "three_to_four_a_day": 7,
               "five_or_more_a_day": 8
+            }
+          }
+        },
+        "has_diet_changed": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "no": 1,
+              "not_sure": 2,
+              "yes": 3
             }
           }
         },

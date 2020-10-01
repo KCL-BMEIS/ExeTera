@@ -5,6 +5,8 @@ import time
 import numpy as np
 import pandas as pd
 
+import h5py
+
 from hystore.core import operations
 from hystore.core import persistence as per
 from hystore.core import fields as fld
@@ -583,11 +585,15 @@ class Session:
 
 
     def create_like(self, field, dest_group, dest_name, timestamp=None, chunksize=None):
-        if 'fieldtype' not in field.attrs.keys():
-            raise ValueError("{} is not a well-formed field".format(field))
-
-        f = self.get(field)
-        f.create_like(dest_group, dest_name)
+        if isinstance(field, h5py.Group):
+            if 'fieldtype' not in field.attrs.keys():
+                raise ValueError("{} is not a well-formed field".format(field))
+            f = self.get(field)
+            return f.create_like(dest_group, dest_name)
+        elif isinstance(field, field.Field):
+            return field.create_like(dest_group, dest_name)
+        else:
+            raise ValueError("'field' must be either a Field or a h5py.Group, but is {}".format(type(field)))
 
 
     def create_indexed_string(self, group, name, timestamp=None, chunksize=None):
