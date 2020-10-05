@@ -931,15 +931,15 @@ class Session:
                       right_field_sources=tuple(), right_field_sinks=None,
                       left_unique=False, right_unique=False):
         if how == 'left':
-            return self.ordered_left_merge(left_on, right_on,
+            return self.ordered_merge_left(left_on, right_on,
                                            left_field_sources, left_field_sinks,
                                            left_unique, right_unique)
         elif how == 'right':
-            return self.ordered_left_merge(right_on, left_on,
+            return self.ordered_merge_left(right_on, left_on,
                                            right_field_sources, right_field_sinks,
                                            right_unique, left_unique)
         elif how == 'inner':
-            return self.ordered_inner_merge(left_on, right_on,
+            return self.ordered_merge_inner(left_on, right_on,
                                             left_field_sources, left_field_sinks,
                                             right_field_sources, right_field_sinks,
                                             left_unique, right_unique)
@@ -947,7 +947,7 @@ class Session:
             raise ValueError("'how' must be one of 'left', 'right' or 'inner'")
 
 
-    def ordered_left_merge(self, left_on, right_on, left_to_right_map,
+    def ordered_merge_left(self, left_on, right_on, left_to_right_map=None,
                            left_field_sources=tuple(), left_field_sinks=None,
                            left_unique=False, right_unique=False):
         """
@@ -1029,9 +1029,9 @@ class Session:
                 return rtn_left_sinks
 
 
-    def ordered_right_merge(self, left_on, right_on, right_to_left_map,
+    def ordered_merge_right(self, left_on, right_on,
                             right_field_sources=tuple(), right_field_sinks=None,
-                            left_unique=False, right_unique=False):
+                            right_to_left_map=None, left_unique=False, right_unique=False):
         """
         Generate the results of a right join apply it to the fields described in the tuple
         'right_field_sources'. If 'right_field_sinks' is set, the mapped values are written
@@ -1054,15 +1054,16 @@ class Session:
         unique values
         :return: If right_field_sinks is not set, a tuple of the output fields is returned
         """
-        return self.ordered_left_merge(right_on, left_on, right_to_left_map,
+        return self.ordered_merge_left(right_on, left_on, right_to_left_map,
                                        right_field_sources, right_field_sinks,
                                        right_unique, left_unique)
 
 
-    def ordered_inner_merge(self, left_on, right_on,
+    def ordered_merge_inner(self, left_on, right_on,
                             left_field_sources=tuple(), left_field_sinks=None,
                             right_field_sources=tuple(), right_field_sinks=None,
-                            left_unique=False, right_unique=False):
+                            left_to_inner_map=None, right_to_inner_map=None,
+                            left_unique=False, right_unique=False,):
 
         if left_field_sinks is not None:
             if len(left_field_sources) != len(left_field_sinks):
