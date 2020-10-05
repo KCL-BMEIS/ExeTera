@@ -74,6 +74,7 @@ def ordered_map_valid_stream(data_field, map_field, result_field, chunksize=DEFA
 
 # 0 2 3 4 5 7 8 9 11 12 14 15 17 18 19
 # 0 0 0 0 1 1 1 1  2  2  2  2  3  3  3
+@njit
 def ordered_map_valid_partial(d, data_field, map_field, result):
     i = 0
     while True:

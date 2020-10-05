@@ -38,7 +38,6 @@ class TestSessionMerge(unittest.TestCase):
                           61, 63, 71, 71, 94, 93, 92])
 
         print(s.merge_left(p_id, a_pid, right_fields=(a_val,)))
-        print(s.merge_left(a_pid, p_id, right_fields=(p_val,)))
 
 
     def test_merge_left_3(self):
@@ -166,6 +165,32 @@ class TestSessionMerge(unittest.TestCase):
                                        left_unique=True)
         self.assertTrue(np.array_equal(actual[0], l_vals_exp))
         self.assertTrue(np.array_equal(actual[1], l_vals_2_exp))
+
+
+    def test_merge_inner(self):
+        l_id = np.asarray(['a', 'b', 'd', 'f', 'g', 'h'])
+        l_vals = np.asarray([100, 200, 400, 600, 700, 800])
+        l_vals_2 = np.asarray([10000, 20000, 40000, 60000, 70000, 80000])
+
+        r_id = np.asarray(['a', 'c', 'c', 'd', 'd', 'e', 'e', 'f', 'f', 'h', 'h'])
+        r_vals = np.asarray([1000, 3000, 3001, 4000, 4001, 5000, 5001, 6000, 6001, 8000, 8001])
+        r_vals_2 = np.asarray([100000, 300001, 300000, 400001, 400000,
+                               500001, 50000, 600001, 600000, 800001, 800000])
+
+        l_vals_exp = np.asarray([100, 400, 400, 600, 600, 800, 800], dtype=np.int32)
+        l_vals_2_exp = np.asarray([10000, 40000, 40000, 60000, 60000, 80000, 80000],
+                                  dtype=np.int32)
+        r_vals_exp = np.asarray([1000, 4000, 4001, 6000, 6001, 8000, 8001], dtype=np.int32)
+        r_vals_2_exp = np.asarray([100000, 400001, 400000, 600001, 600000, 800001, 800000],
+                                  dtype=np.int32)
+        s = session.Session()
+        actual = s.merge_inner(l_id, r_id,
+                               left_fields=(l_vals, l_vals_2),
+                               right_fields=(r_vals, r_vals_2))
+        self.assertTrue(np.array_equal(actual[0][0], l_vals_exp))
+        self.assertTrue(np.array_equal(actual[0][1], l_vals_2_exp))
+        self.assertTrue(np.array_equal(actual[1][0], r_vals_exp))
+        self.assertTrue(np.array_equal(actual[1][1], r_vals_2_exp))
 
 
     def test_ordered_merge_inner(self):
