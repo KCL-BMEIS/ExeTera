@@ -42,7 +42,6 @@ hystorex import
  * `-i/--inputs` : A comma separated list of 'name:file' pairs. This should be put in parentheses if it contains any
   whitespace. See the example above.
  * `-o/--output_hdf5`: The path and name to where the resulting hdf5 dataset should be written
- * `-d/--data_schema`: The optional data schema to be used during import (default of 1)
  * `-ts/--timestamp`: An override for the timestamp to be written
    (defaults to `datetime.now(timezone.utc)`)
 
@@ -50,11 +49,12 @@ Expect this script to take about an hour or so to execute.
 
 ### `hystorex process`
 ```
-hystorex process -i <input_hdf5> -o <output_hdf5>
+hystorex process -i <input_hdf5> -d -o <output_hdf5>
 ```
 #### Arguments
  * `-i/--input`: The path and name of the import hdf5 file
  * `-o/--output`: The path and name of the processed hdf5 file
+ * `-d/--daily`: A flag to indicate whether to generate daily assessments
 
 ## How do I work on the resulting dataset?
 See the wiki for detailed examples of how to interact with the hdf5 datastore.
@@ -128,9 +128,10 @@ python split.py --version
 ---
 ## Changes
 
-### v0.2.7 -> v0.2.7.2
+### v0.2.7 -> v0.2.7.3
 * Fix to covid_schema.json for numeric diet fields marked 'float' instead of 'float32'
 * Addition of --daily flag to enable / disable generation of daily assessments
+* Addition of 
 
 ### v0.2.6 -> v0.2.7
 * Addition of diet questionnaire schema
