@@ -51,9 +51,9 @@ class TestSessionMerge(unittest.TestCase):
         ddf = pd.DataFrame({'patient_id': d_pid, 'd_counts': d_counts})
         print(pd.merge(left=pdf, right=ddf, left_on='id', right_on='patient_id', how='left'))
         print(s.merge_left(left_on=p_id, right_on=d_pid, right_fields=(d_counts,)))
-        print(s.ordered_merge_left(left_on=p_id, right_on=d_pid, left_to_right_map=d_to_p,
-                                   left_field_sources=(d_counts,),
-                                   left_unique=True, right_unique=True))
+        print(
+            s.ordered_merge_left(left_on=p_id, right_on=d_pid, left_field_sources=(d_counts,), left_to_right_map=d_to_p,
+                                 left_unique=True, right_unique=True))
 
 
     def test_ordered_merge_left_2(self):
@@ -74,11 +74,8 @@ class TestSessionMerge(unittest.TestCase):
             f_a_pid.data.write(a_pid)
             a_to_p = s.create_numeric(hf, 'a_to_p', 'int64')
             f_a_p_val = s.create_numeric(hf, 'a_p_val', 'int32')
-            s.ordered_merge_left(f_a_pid, f_p_id,
-                                 left_field_sources=(f_p_val,),
-                                 left_field_sinks=(f_a_p_val,),
-                                 left_to_right_map=a_to_p,
-                                 right_unique=True)
+            s.ordered_merge_left(f_a_pid, f_p_id, left_field_sources=(f_p_val,), left_field_sinks=(f_a_p_val,),
+                                 left_to_right_map=a_to_p, right_unique=True)
 
             p_to_a_vals_exp = np.asarray([-1, -1, -1, -2, -2, -4, -4, -4, -4, -6, -6, -6, 0, 0, -9, -9, -9], dtype=np.int32)
             actual = s.merge_left(a_pid, p_id, right_fields=(p_val,))

@@ -890,18 +890,10 @@ class Session:
         elif val.is_field_parameter(field_sinks[0]):
             # groups or fields
             for src, snk in zip(field_sources, field_sinks):
-                with utils.Timer("reading"):
-                    src_ = val.array_from_parameter(self, 'left_field_sources', src)
-                with utils.Timer("mapping"):
-                    snk_ = ops.map_valid(src_, field_map)
-                with utils.Timer("getting_sink"):
-                    snk = val.field_from_parameter(self, 'left_field_sinks', snk)
-                with utils.Timer("writing"):
-                    snk.data.write(snk_)
-                # src_ = val.array_from_parameter(self, 'left_field_sources', src)
-                # snk_ = ops.map_valid(src_, field_map)
-                # snk = val.field_from_parameter(self, 'left_field_sinks', snk)
-                # snk.data.write(snk_)
+                src_ = val.array_from_parameter(self, 'left_field_sources', src)
+                snk_ = ops.map_valid(src_, field_map)
+                snk = val.field_from_parameter(self, 'left_field_sinks', snk)
+                snk.data.write(snk_)
         else:
             # raw arrays
             for src, snk in zip(field_sources, field_sinks):
@@ -918,26 +910,20 @@ class Session:
         # field sources and sinks must be the same length
         map_ = val.field_from_parameter(self, 'field_map', field_map)
         for src, snk in zip(field_sources, field_sinks):
-            with utils.Timer("getting source"):
-                src_ = val.field_from_parameter(self, 'field_sources', src)
-            with utils.Timer("getting sink"):
-                snk_ = val.field_from_parameter(self, 'field_sinks', snk)
-            with utils.Timer("mapping"):
-                ops.ordered_map_valid_stream(src_, map_, snk_)
-
+            src_ = val.field_from_parameter(self, 'field_sources', src)
+            snk_ = val.field_from_parameter(self, 'field_sinks', snk)
+            ops.ordered_map_valid_stream(src_, map_, snk_)
 
     def ordered_merge(self, left_on, right_on, how,
                       left_field_sources=tuple(), left_field_sinks=None,
                       right_field_sources=tuple(), right_field_sinks=None,
                       left_unique=False, right_unique=False):
         if how == 'left':
-            return self.ordered_merge_left(left_on, right_on,
-                                           left_field_sources, left_field_sinks,
-                                           left_unique, right_unique)
+            return self.ordered_merge_left(left_on, right_on, left_field_sinks, left_unique, left_field_sources,
+                                           right_unique)
         elif how == 'right':
-            return self.ordered_merge_left(right_on, left_on,
-                                           right_field_sources, right_field_sinks,
-                                           right_unique, left_unique)
+            return self.ordered_merge_left(right_on, left_on, right_field_sinks, right_unique, right_field_sources,
+                                           left_unique)
         elif how == 'inner':
             return self.ordered_merge_inner(left_on, right_on,
                                             left_field_sources, left_field_sinks,
@@ -947,9 +933,8 @@ class Session:
             raise ValueError("'how' must be one of 'left', 'right' or 'inner'")
 
 
-    def ordered_merge_left(self, left_on, right_on, left_to_right_map=None,
-                           left_field_sources=tuple(), left_field_sinks=None,
-                           left_unique=False, right_unique=False):
+    def ordered_merge_left(self, left_on, right_on, left_field_sources=tuple(), left_field_sinks=None,
+                           left_to_right_map=None, left_unique=False, right_unique=False):
         """
         Generate the results of a left join apply it to the fields described in the tuple
         'left_field_sources'. If 'left_field_sinks' is set, the mapped values are written
@@ -987,46 +972,44 @@ class Session:
                      left_field_sinks is not None and \
                      val.is_field_parameter(left_field_sinks[0])
 
-        with utils.Timer("generating maps"):
-            result = None
-            has_unmapped = None
-            if left_unique == False:
-                if right_unique == False:
-                    raise ValueError("Right key must not have duplicates")
-                else:
-                    if streamable:
-                        has_unmapped = \
-                            ops.ordered_map_to_right_right_unique_streamed(left_on, right_on,
-                                                                          left_to_right_map)
-                        result = left_to_right_map
-                    else:
-                        result = np.zeros(len(left_on), dtype=np.int64)
-                        has_unmapped = \
-                            ops.ordered_map_to_right_right_unique(left_on, right_on, result)
-
+        result = None
+        has_unmapped = None
+        if left_unique == False:
+            if right_unique == False:
+                raise ValueError("Right key must not have duplicates")
             else:
-                if right_unique == False:
-                    raise ValueError("Right key must not have duplicates")
-                    # if streamable:
-                    #     has_unmapped =\
-                    #         ops.ordered_map_to_right_left_unique_streamed(left_on, right_on,
-                    #                                                       left_to_right_map)
-                    #     result = left_to_right_map.data[:]
-                    # else:
-                    #     result = np.zeros(len(left_on), dtype=np.int64)
-                    #     has_unmapped =\
-                    #         ops.ordered_map_to_right_left_unique(left_on, right_on, result)
+                if streamable:
+                    has_unmapped = \
+                        ops.ordered_map_to_right_right_unique_streamed(left_on, right_on,
+                                                                      left_to_right_map)
+                    result = left_to_right_map
                 else:
                     result = np.zeros(len(left_on), dtype=np.int64)
-                    has_unmapped = ops.ordered_map_to_right_both_unique(left_on, right_on, result)
+                    has_unmapped = \
+                        ops.ordered_map_to_right_right_unique(left_on, right_on, result)
 
-        with utils.Timer("mapping fields", new_line=True):
-            if streamable:
-                self._streaming_map_fields(result, left_field_sources, left_field_sinks)
-                return None
+        else:
+            if right_unique == False:
+                raise ValueError("Right key must not have duplicates")
+                # if streamable:
+                #     has_unmapped =\
+                #         ops.ordered_map_to_right_left_unique_streamed(left_on, right_on,
+                #                                                       left_to_right_map)
+                #     result = left_to_right_map.data[:]
+                # else:
+                #     result = np.zeros(len(left_on), dtype=np.int64)
+                #     has_unmapped =\
+                #         ops.ordered_map_to_right_left_unique(left_on, right_on, result)
             else:
-                rtn_left_sinks = self._map_fields(result, left_field_sources, left_field_sinks)
-                return rtn_left_sinks
+                result = np.zeros(len(left_on), dtype=np.int64)
+                has_unmapped = ops.ordered_map_to_right_both_unique(left_on, right_on, result)
+
+        if streamable:
+            self._streaming_map_fields(result, left_field_sources, left_field_sinks)
+            return None
+        else:
+            rtn_left_sinks = self._map_fields(result, left_field_sources, left_field_sinks)
+            return rtn_left_sinks
 
 
     def ordered_merge_right(self, left_on, right_on,
@@ -1054,8 +1037,7 @@ class Session:
         unique values
         :return: If right_field_sinks is not set, a tuple of the output fields is returned
         """
-        return self.ordered_merge_left(right_on, left_on, right_to_left_map,
-                                       right_field_sources, right_field_sinks,
+        return self.ordered_merge_left(right_on, left_on, right_field_sources, right_field_sinks, right_to_left_map,
                                        right_unique, left_unique)
 
 
