@@ -169,6 +169,8 @@ class DatasetImporter:
                                 #     new_field_list[i_df].write_part(field_chunk_list[i_df])
                                 new_field_list[i_df].write_part(field_chunk_list[i_df])
                             chunk_index = 0
+                print(f"{i_r} rows parsed in {time.time() - time0}s")
+
             except Exception as e:
                 msg = "row {}: caught exception {}\nprevious row {}"
                 print(msg.format(i_r + 1, e, row))
@@ -180,3 +182,4 @@ class DatasetImporter:
 
             for i_df in range(len(index_map)):
                 new_field_list[i_df].flush()
+
