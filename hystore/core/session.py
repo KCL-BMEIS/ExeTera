@@ -832,7 +832,7 @@ class Session:
             if left_writers is None:
                 left_results.append(joined_field)
             else:
-                left_writers[ilf].write(joined_field)
+                left_writers[ilf].data.write(joined_field)
 
         return left_results
 
@@ -860,7 +860,7 @@ class Session:
             if left_writers is None:
                 left_results.append(joined_field)
             else:
-                left_writers[ilf].write(joined_field)
+                left_writers[ilf].data.write(joined_field)
 
         right_results = list()
         for irf, rf in enumerate(right_fields):
@@ -869,7 +869,7 @@ class Session:
             if right_writers is None:
                 right_results.append(joined_field)
             else:
-                right_writers[irf].write(joined_field)
+                right_writers[irf].data.write(joined_field)
 
         return left_results, right_results
 
