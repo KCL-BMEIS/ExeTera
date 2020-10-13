@@ -71,14 +71,15 @@ def timestamp_to_day(field):
         return ''
     return f'{field[0:4]}-{field[5:7]}-{field[8:10]}'
 
-def timestamp_to_datetime(field):
+
+def string_to_datetime(field):
     try:
         ts = datetime.strptime(field, '%Y-%m-%d %H:%M:%S.%f%z')
     except ValueError:
         try:
             ts = datetime.strptime(field, '%Y-%m-%d %H:%M:%S%z')
         except ValueError:
-            ts = datetime.strptime(field, '%y-%m-%d')
+            ts = datetime.strptime(field, '%Y-%m-%d')
 
     return ts
 
