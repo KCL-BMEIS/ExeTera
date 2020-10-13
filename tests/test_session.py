@@ -55,6 +55,32 @@ class TestSessionMerge(unittest.TestCase):
             s.ordered_merge_left(left_on=p_id, right_on=d_pid, left_field_sources=(d_counts,), left_to_right_map=d_to_p,
                                  left_unique=True, right_unique=True))
 
+    def test_merge_left_dataset(self):
+        bio1 = BytesIO()
+        with h5py.File(bio1, 'w') as src:
+            s = session.Session()
+            p_id = np.array([100, 200, 300, 400, 500, 600, 800, 900])
+            p_val = np.array([-1, -2, -3, -4, -5, -6, -8, -9])
+            a_pid = np.array([100, 100, 100, 200, 200, 400, 400, 400, 400, 600,
+                              600, 600, 700, 700, 900, 900, 900])
+            a_val = np.array([10, 11, 12, 23, 22, 40, 43, 42, 41, 60,
+                              61, 63, 71, 71, 94, 93, 92])
+            src.create_group('p')
+            s.create_numeric(src['p'], 'id', 'int32').data.write(p_id)
+            s.create_numeric(src['p'], 'val', 'int32').data.write(p_val)
+            src.create_group('a')
+            s.create_numeric(src['a'], 'pid', 'int32').data.write(a_pid)
+
+        bio2 = BytesIO()
+        with h5py.File(bio1, 'r') as src:
+            with h5py.File(bio2, 'w') as snk:
+                s.merge_left(s.get(src['a']['pid']), s.get(src['p']['id']),
+                             right_fields=(s.get(src['p']['val']),),
+                             right_writers=(s.create_numeric(snk, 'val', 'int32'),)
+                             )
+
+                print(snk.keys())
+                print(s.get(snk['val']).data[:])
 
     def test_ordered_merge_left_2(self):
         bio = BytesIO()
