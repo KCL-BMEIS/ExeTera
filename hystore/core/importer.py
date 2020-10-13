@@ -10,12 +10,16 @@
 # limitations under the License.
 
 import csv
+from datetime import datetime, MAXYEAR
 import time
 
+import numpy as np
 import h5py
 
 from hystore.core import dataset as dataset
 from hystore.core import persistence as per
+from hystore.core import utils
+from hystore.core import operations as ops
 from hystore.core.load_schema import load_schema
 
 
@@ -37,9 +41,14 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files):
     importer_flags = {'patients': True, 'assessments': True, 'tests': True, 'diet': True}
     stop_after = {}
     # stop_after = {'patients': 500000, 'assessments': 500000}
+    reserved_column_names = ('j_valid_from', 'j_valid_to')
     datastore = per.DataStore()
     with h5py.File(dest_file_name, 'w') as hf:
         for sk in schema.keys():
+            if sk in reserved_column_names:
+                msg = "{} is a reserved column name: reserved names are {}"
+                raise ValueError(msg.format(sk, reserved_column_names))
+
             if sk not in files or importer_flags[sk] == False:
                 continue
 
@@ -69,6 +78,17 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files):
             DatasetImporter(datastore, files[sk], hf, sk, schema[sk], timestamp,
                             stop_after=stop_after.get(sk, None),
                             show_progress_every=show_every)
+
+            print(sk, hf.keys())
+            table = hf[sk]
+            ids = datastore.get_reader(table[list(table.keys())[0]])
+            jvf = datastore.get_timestamp_writer(table, 'j_valid_from')
+            ftimestamp = utils.string_to_datetime(timestamp).timestamp()
+            valid_froms = np.full(len(ids), ftimestamp)
+            jvf.write(valid_froms)
+            jvt = datastore.get_timestamp_writer(table, 'j_valid_to')
+            valid_tos = np.full(len(ids), ops.MAX_TIMESTAMP)
+            jvt.write(valid_tos)
 
         print(hf.keys())
 
@@ -169,7 +189,6 @@ class DatasetImporter:
                                 #     new_field_list[i_df].write_part(field_chunk_list[i_df])
                                 new_field_list[i_df].write_part(field_chunk_list[i_df])
                             chunk_index = 0
-                print(f"{i_r} rows parsed in {time.time() - time0}s")
 
             except Exception as e:
                 msg = "row {}: caught exception {}\nprevious row {}"
@@ -182,4 +201,6 @@ class DatasetImporter:
 
             for i_df in range(len(index_map)):
                 new_field_list[i_df].flush()
+
+            print(f"{i_r} rows parsed in {time.time() - time0}s")
 
