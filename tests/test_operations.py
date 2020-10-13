@@ -112,9 +112,21 @@ class TestAggregation(unittest.TestCase):
         a_ids = np.asarray([0, 1, 2, 2, 3, 5, 5, 5, 6, 8], dtype=np.int64)
         b_ids = np.asarray([1, 1, 2, 3, 5, 5, 6, 7, 8, 8, 8], dtype=np.int64)
         result_size = ops.ordered_inner_map_result_size(a_ids, b_ids)
-        self.assertEqual(result_size, 15)
+        self.assertEqual(15, result_size)
         result_size = ops.ordered_inner_map_result_size(b_ids, a_ids)
-        self.assertEqual(result_size, 15)
+        self.assertEqual(15, result_size)
+
+
+    def test_ordered_outer_map_result_size_both_unique(self):
+        a_ids = np.asarray([0, 2, 3, 4, 6, 8, 9, 10], dtype=np.int32)
+        b_ids = np.asarray([1, 3, 4, 5, 6, 7], dtype=np.int32)
+
+        result_size = ops.ordered_outer_map_result_size_both_unique(a_ids, b_ids)
+        self.assertEqual(11, result_size)
+
+        result_size = ops.ordered_outer_map_result_size_both_unique(b_ids, a_ids)
+        self.assertEqual(11, result_size)
+
 
     def test_ordered_inner_map_both_unique(self):
         a_ids = np.asarray([0, 1, 2, 3, 5, 6, 8], dtype=np.int64)
@@ -196,3 +208,43 @@ class TestAggregation(unittest.TestCase):
                                                        left_result, right_result)
             print(left_result.data[:])
             print(right_result.data[:])
+
+
+    def test_ordered_get_last_as_filter_all_unique(self):
+        field = np.asarray([b'ab', b'af', b'be', b'ez'])
+        print(ops.ordered_get_last_as_filter(field))
+
+
+    def test_ordered_get_last_as_filter(self):
+        field = np.asarray([b'ab', b'ab', b'af', b'be', b'be', b'ez', b'ez'])
+        print(ops.ordered_get_last_as_filter(field))
+
+
+    def test_ordered_generate_journalling_indices(self):
+        old = np.asarray([0, 0, 0, 1, 1, 2, 3, 3, 5, 5, 5], dtype=np.int32)
+        new = np.asarray([0, 2, 3, 4, 5, 6], dtype=np.int32)
+        old_i, new_i = ops.ordered_generate_journalling_indices(old, new)
+        print(old_i)
+        print(new_i)
+
+
+    def test_compare_rows_for_journalling(self):
+        old = np.asarray([0, 0, 0, 1, 1, 2, 3, 3, 5, 5, 5], dtype=np.int32)
+        new = np.asarray([0, 2, 3, 4, 5, 6], dtype=np.int32)
+        old_i, new_i = ops.ordered_generate_journalling_indices(old, new)
+
+        print(old_i)
+        print(new_i)
+
+        old_data = np.asarray([0, 1, 2, 10, 11, 20, 30, 31, 50, 51, 52])
+        new_data = np.asarray([2, 20, 31, 40, 52, 60])
+        to_keep = np.zeros(len(new_i), dtype=np.bool)
+        ops.compare_rows_for_journalling(old_i, new_i, old_data, new_data, to_keep)
+        print(to_keep)
+
+        old_data = np.asarray([0, 1, 2, 10, 11, 20, 30, 31, 50, 51, 52])
+        new_data = np.asarray([3, 21, 32, 41, 53, 61])
+        to_keep = np.zeros(len(new_i), dtype=np.bool)
+        ops.compare_rows_for_journalling(old_i, new_i, old_data, new_data, to_keep)
+        print(to_keep)
+

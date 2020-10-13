@@ -1,10 +1,13 @@
+from datetime import datetime
 import numpy as np
 from numba import jit, njit
+import numba
 
 from hystore.core import validation as val
 
 DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62
+MAX_TIMESTAMP = datetime(year=9999, month=1, day=1).timestamp()
 
 
 def chunks(length, chunksize=1 << 20):
@@ -612,6 +615,28 @@ def ordered_inner_map_result_size(left, right):
     return result_size
 
 
+def ordered_outer_map_result_size_both_unique(left, right):
+    i = 0
+    j = 0
+    result_size = 0
+    while i < len(left) and j < len(right):
+        if left[i] < right[j]:
+            i += 1
+        elif left[i] > right[j]:
+            j += 1
+        else:
+            i += 1
+            j += 1
+        result_size += 1
+    while i < len(left):
+        i += 1
+        result_size += 1
+    while j < len(right):
+        j += 1
+        result_size += 1
+    return result_size
+
+
 @njit
 def ordered_inner_map_both_unique(left, right, left_to_inner, right_to_inner):
     i = 0
@@ -742,3 +767,116 @@ def ordered_inner_map(left, right, left_to_inner, right_to_inner):
                     cur_m += 1
             i = cur_i + 1
             j = cur_j + 1
+
+
+@njit
+def ordered_get_last_as_filter(field):
+    result = np.zeros(len(field), dtype=numba.boolean)
+    for i in range(len(field)-1):
+        result[i] = field[i] != field[i+1]
+    result[-1] = True
+    return result
+
+
+@njit
+def ordered_generate_journalling_indices(old, new):
+    i = 0
+    j = 0
+    total = 0
+    while i < len(old) and j < len(new):
+        if old[i] < new[j]:
+            while i+1 < len(old) and old[i+1] == old[i]:
+                i += 1
+            i += 1
+            total += 1
+        elif old[i] > new[j]:
+            j += 1
+            total += 1
+        else:
+            while i+1 < len(old) and old[i+1] == old[i]:
+                i += 1
+            i += 1
+            j += 1
+            total += 1
+    while i < len(old):
+        while i+1 < len(old) and old[i+1] == old[i]:
+            i += 1
+        i += 1
+        total += 1
+    while j < len(new):
+        j += 1
+        total += 1
+
+    old_inds = np.full(total, -1, dtype=np.int64)
+    new_inds = np.full(total, -1, dtype=np.int64)
+
+    i = 0
+    j = 0
+    joint = 0
+    while i < len(old) and j < len(new):
+        if old[i] < new[j]:
+            while i+1 < len(old) and old[i+1] == old[i]:
+                i += 1
+            old_inds[joint] = i
+            new_inds[joint] = -1
+            i += 1
+            joint += 1
+        elif old[i] > new[j]:
+            old_inds[joint] = -1
+            new_inds[joint] = j
+            j += 1
+            joint += 1
+        else:
+            while i+1 < len(old) and old[i+1] == old[i]:
+                i += 1
+            old_inds[joint] = i
+            new_inds[joint] = j
+            i += 1
+            j += 1
+            joint += 1
+
+    while i < len(old):
+        while i+1 < len(old) and old[i+1] == old[i]:
+            i += 1
+        old_inds[joint] = i
+        new_inds[joint] = -1
+        i += 1
+        joint += 1
+    while j < len(new):
+        old_inds[joint] = -1
+        new_inds[joint] = j
+        j += 1
+        joint += 1
+
+    return old_inds, new_inds
+
+
+@njit
+def compare_rows_for_journalling(old_map, new_map, old_field, new_field, to_keep):
+    for i in range(len(old_map)):
+        if to_keep[i] == False:
+            if old_map[i] == -1 or new_map[i] == -1:
+                to_keep[i] = True
+            else:
+                to_keep[i] = old_field[old_map[i]] != new_field[new_map[i]]
+
+
+@njit
+def compare_indexed_rows_for_journalling(old_map, new_map,
+                                         old_indices, old_values, new_indices, new_values,
+                                         to_keep):
+    assert len(old_map) == len(new_map)
+    assert old_indices[-1] == len(old_values)
+    assert new_indices[-1] == len(new_values)
+    for i in range(len(old_map)):
+        if to_keep[i] == False:
+            if old_map[i] == -1:
+                # row is new so must be kept
+                to_keep[i] = True
+            elif new_map[i] == -1:
+                # row has been removed so don't count as kept
+                to_keep[i] = False
+            else:
+                old_value = old_values[old_indices[old_map[i]]:old_indices[old_map[i]+1]]
+                new_value = new_values[new_indices[new_map[i]]:new_indices[new_map[i]+1]]
+                to_keep[i] = np.array_equal(old_value, new_value)
