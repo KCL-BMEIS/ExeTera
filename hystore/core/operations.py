@@ -855,8 +855,12 @@ def ordered_generate_journalling_indices(old, new):
 def compare_rows_for_journalling(old_map, new_map, old_field, new_field, to_keep):
     for i in range(len(old_map)):
         if to_keep[i] == False:
-            if old_map[i] == -1 or new_map[i] == -1:
+            if old_map[i] == -1:
+                # row is new so must be kept
                 to_keep[i] = True
+            elif new_map[i] == -1:
+                # row has been removed so don't count as kept
+                to_keep[i] = False
             else:
                 to_keep[i] = old_field[old_map[i]] != new_field[new_map[i]]
 
@@ -879,4 +883,63 @@ def compare_indexed_rows_for_journalling(old_map, new_map,
             else:
                 old_value = old_values[old_indices[old_map[i]]:old_indices[old_map[i]+1]]
                 new_value = new_values[new_indices[new_map[i]]:new_indices[new_map[i]+1]]
-                to_keep[i] = np.array_equal(old_value, new_value)
+                to_keep[i] = not np.array_equal(old_value, new_value)
+
+
+def merge_journalled_entries(old_map, new_map, to_keep, old_src, new_src, dest):
+    cur_old = 0
+    cur_dest = 0
+    for i in range(len(old_map)):
+        # copy all rows up to the entry, if there are any
+        while cur_old <= old_map[i]:
+            dest[cur_dest] = old_src[cur_old]
+            cur_old += 1
+            cur_dest += 1
+        # copy the new row if there is one
+        if to_keep[i] == True:
+            dest[cur_dest] = new_src[new_map[i]]
+            cur_dest += 1
+
+
+def merge_indexed_journalled_entries_count(old_map, new_map, to_keep, old_src_inds, new_src_inds):
+    cur_old = 0
+    acc_val = 0
+    for i in range(len(old_map)):
+        while cur_old <= old_map[i]:
+            ind_delta = old_src_inds[cur_old+1] - old_src_inds[cur_old]
+            acc_val += ind_delta
+            cur_old += 1
+        if to_keep[i] == True:
+            ind_delta = new_src_inds[new_map[i]+1] - new_src_inds[new_map[i]]
+            acc_val += ind_delta
+    return acc_val
+
+
+def merge_indexed_journalled_entries(old_map, new_map, to_keep,
+                                    old_src_inds, old_src_vals,
+                                    new_src_inds, new_src_vals,
+                                    dest_inds, dest_vals):
+    cur_old = 0
+    cur_dest = 1
+    ind_acc = 0
+    dest_inds[0] = 0
+    for i in range(len(old_map)):
+        # copy all rows up to the entry, if there are any
+        while cur_old <= old_map[i]:
+            ind_delta = old_src_inds[cur_old + 1] - old_src_inds[cur_old]
+            ind_acc += ind_delta
+            dest_inds[cur_dest] = ind_acc
+            if ind_delta > 0:
+                dest_vals[ind_acc-ind_delta:ind_acc] = \
+                    old_src_vals[old_src_inds[cur_old]:old_src_inds[cur_old + 1]]
+            cur_old += 1
+            cur_dest += 1
+        # copy the new row if there is one
+        if to_keep[i] == True:
+            ind_delta = new_src_inds[new_map[i] + 1] - new_src_inds[new_map[i]]
+            ind_acc += ind_delta
+            dest_inds[cur_dest] = ind_acc
+            if ind_delta > 0:
+                dest_vals[ind_acc-ind_delta:ind_acc] = \
+                    new_src_vals[new_src_inds[new_map[i]]:new_src_inds[new_map[i] + 1]]
+            cur_dest += 1

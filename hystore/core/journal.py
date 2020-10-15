@@ -49,8 +49,6 @@ def journal_table(session, schema, old_src, new_src, src_pk, result):
 
     new_ids = session.get(new_src[src_pk]).data[:]
     new_sorted_index = session.dataset_sort_index((new_ids,))
-    print(old_sorted_index[:20])
-    print(new_sorted_index[:20])
 
     # get the row maps for rows that we need to compare
     old_map, new_map = ops.ordered_generate_journalling_indices(old_ids, new_ids)
@@ -58,6 +56,8 @@ def journal_table(session, schema, old_src, new_src, src_pk, result):
 
     schema_fields = schema.fields.keys()
     common_keys = [k for k in schema_fields if k in common_keys]
+    print("old_map:", old_map)
+    print("new_map:", new_map)
 
     for k in common_keys:
         if k in (src_pk, 'j_valid_from', 'j_valid_to'):
@@ -82,10 +82,13 @@ def journal_table(session, schema, old_src, new_src, src_pk, result):
             # new_f_ = new_f.data[:]
             ops.compare_rows_for_journalling(old_map, new_map, old_f_, new_f_, to_keep)
 
+        print("to_keep:", to_keep.astype(np.uint8))
         print(to_keep.sum(), len(to_keep))
 
     # merge the tables - the new field length is the original table field length + the number
     # of elements from the new table that are being kept
+
+
 
 
 def journal_test_harness(session, schema, old_file, new_file, dest_file):

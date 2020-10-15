@@ -27,17 +27,17 @@ class TestSessionMerge(unittest.TestCase):
         ts2 = datetime(2020, 9, 1).timestamp()
         tsf = ops.MAX_TIMESTAMP
 
-        d1_id = np.chararray(5)
-        d1_id[:] = np.asarray(['a', 'b', 'c', 'e', 'g'])
-        d1_v1 = np.asarray([100, 200, 300, 500, 700])
+        d1_id = np.chararray(9)
+        d1_id[:] = np.asarray(['a', 'a', 'b', 'b', 'c', 'e', 'e', 'e', 'g'])
+        d1_v1 = np.asarray([100, 101, 200, 201, 300, 500, 501, 502, 700])
         print(d1_id)
 
-        d1_jvf = np.asarray([ts1, ts1, ts1, ts1, ts1])
-        d1_jvt = np.asarray([tsf, tsf, tsf, tsf, tsf])
+        d1_jvf = np.asarray([ts1, ts1, ts1, ts1, ts1, ts1, ts1, ts1, ts1])
+        d1_jvt = np.asarray([tsf, tsf, tsf, tsf, tsf, tsf, tsf, tsf, tsf])
 
         d2_id = np.chararray(7)
         d2_id[:] = np.asarray(['a', 'b', 'c', 'd', 'e', 'f', 'g'])
-        d2_v1 = np.asarray([100, 201, 300, 400, 501, 600, 700])
+        d2_v1 = np.asarray([101, 202, 300, 400, 503, 600, 700])
 
         d2_jvf = np.asarray([ts2, ts2, ts2, ts2, ts2, ts2, ts2])
         d2_jvt = np.asarray([tsf, tsf, tsf, tsf, tsf, tsf, tsf])
@@ -45,9 +45,9 @@ class TestSessionMerge(unittest.TestCase):
         d1_bytes = BytesIO()
         d2_bytes = BytesIO()
         dr_bytes = BytesIO()
-        with h5py.File(d1_bytes) as d1_hf:
-            with h5py.File(d2_bytes) as d2_hf:
-                with h5py.File(dr_bytes) as dr_hf:
+        with h5py.File(d1_bytes, 'w') as d1_hf:
+            with h5py.File(d2_bytes, 'w') as d2_hf:
+                with h5py.File(dr_bytes, 'w') as dr_hf:
                     s = session.Session()
 
                     s.create_fixed_string(d1_hf, 'id', 1).data.write(d1_id)

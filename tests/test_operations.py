@@ -248,3 +248,96 @@ class TestAggregation(unittest.TestCase):
         ops.compare_rows_for_journalling(old_i, new_i, old_data, new_data, to_keep)
         print(to_keep)
 
+
+    def test_merge_journalled_entries(self):
+        old = np.asarray([0, 0, 0, 1, 1, 2, 3, 3, 5, 5, 5], dtype=np.int32)
+        new = np.asarray([0, 2, 3, 4, 5, 6], dtype=np.int32)
+        old_i, new_i = ops.ordered_generate_journalling_indices(old, new)
+
+        old_data = np.asarray([0, 1, 2, 10, 11, 20, 30, 31, 50, 51, 52])
+        new_data = np.asarray([2, 20, 31, 40, 52, 60])
+        to_keep = np.zeros(len(new_i), dtype=np.bool)
+        ops.compare_rows_for_journalling(old_i, new_i, old_data, new_data, to_keep)
+
+        dest = np.zeros(len(old) + to_keep.sum(), dtype=old.dtype)
+        ops.merge_journalled_entries(old_i, new_i, to_keep, old_data, new_data, dest)
+        expected = np.asarray([0, 1, 2, 10, 11, 20, 30, 31, 40, 50, 51, 52, 60], dtype=np.int32)
+        self.assertTrue(np.array_equal(dest, expected))
+
+        old_data = np.asarray([0, 1, 2, 10, 11, 20, 30, 31, 50, 51, 52])
+        new_data = np.asarray([3, 21, 32, 40, 53, 60])
+        to_keep = np.zeros(len(new_i), dtype=np.bool)
+        ops.compare_rows_for_journalling(old_i, new_i, old_data, new_data, to_keep)
+
+        dest = np.zeros(len(old) + to_keep.sum(), dtype=old.dtype)
+        ops.merge_journalled_entries(old_i, new_i, to_keep, old_data, new_data, dest)
+        expected = np.asarray([0, 1, 2, 3, 10, 11, 20, 21, 30, 31, 32, 40, 50, 51, 52, 53, 60], dtype=np.int32)
+        self.assertTrue(np.array_equal(dest, expected))
+
+
+    def test_merge_indexed_journalled_entries_count(self):
+        old = np.asarray([0, 0, 0, 1, 1, 2, 3, 3, 5, 5, 5], dtype=np.int32)
+        new = np.asarray([0, 2, 3, 4, 5, 6], dtype=np.int32)
+        old_i, new_i = ops.ordered_generate_journalling_indices(old, new)
+
+        old_inds = np.asarray([0, 2, 4, 6, 9, 12, 14, 17, 20, 23, 26, 29])
+        old_vals = np.frombuffer(
+            b''.join([b'aa', b'ab', b'ac', b'baa', b'bab', b'ca', b'daa', b'dab',
+                      b'faa', b'fab', b'fac']), dtype='S1')
+        print(old_inds)
+        print(old_vals)
+        new_inds = np.asarray([0, 2, 4, 7, 9, 12, 14])
+        new_vals = np.frombuffer(
+            b''.join([b'ad', b'cb', b'dac', b'ea', b'fad', b'ga']), dtype='S1')
+        to_keep = np.zeros(len(new_i), dtype=np.bool)
+        ops.compare_indexed_rows_for_journalling(old_i, new_i, old_inds, old_vals,
+                                                 new_inds, new_vals, to_keep)
+
+        count = ops.merge_indexed_journalled_entries_count(old_i, new_i, to_keep,
+                                                           old_inds, new_inds)
+        self.assertTrue(np.array_equal(count, 43))
+
+
+    def test_merge_indexed_journalled_entries(self):
+        old = np.asarray([0, 0, 0, 1, 1, 2, 3, 3, 5, 5, 5], dtype=np.int32)
+        new = np.asarray([0, 2, 3, 4, 5, 6], dtype=np.int32)
+        old_i, new_i = ops.ordered_generate_journalling_indices(old, new)
+
+        old_inds = np.asarray([0, 2, 4, 6, 9, 12, 14, 17, 20, 23, 26, 29])
+        old_vals = np.frombuffer(
+            b''.join([b'aa', b'ab', b'ac', b'baa', b'bab', b'ca', b'daa', b'dab',
+                      b'faa', b'fab', b'fac']), dtype='S1')
+        print(old_inds)
+        print(old_vals)
+        new_inds = np.asarray([0, 2, 4, 7, 9, 12, 14])
+        new_vals = np.frombuffer(
+            b''.join([b'ad', b'cb', b'dac', b'ea', b'fad', b'ga']), dtype='S1')
+        to_keep = np.zeros(len(new_i), dtype=np.bool)
+        ops.compare_indexed_rows_for_journalling(old_i, new_i, old_inds, old_vals,
+                                                 new_inds, new_vals, to_keep)
+
+        dest_inds = np.zeros(len(old) + to_keep.sum() + 1, dtype=old.dtype)
+        val_count = ops.merge_indexed_journalled_entries_count(old_i, new_i, to_keep,
+                                                               old_inds, new_inds)
+        dest_vals = np.zeros(val_count, dtype='S1')
+        ops.merge_indexed_journalled_entries(old_i, new_i, to_keep, old_inds, old_vals,
+                                             new_inds, new_vals, dest_inds, dest_vals)
+        expected_inds = \
+            np.asarray([0, 2, 4, 6, 8, 11, 14, 16, 18, 21, 24, 27, 29, 32, 35, 38, 41, 43],
+                       dtype=np.int32)
+        self.assertTrue(np.array_equal(dest_inds, expected_inds))
+        expected_vals = \
+            np.frombuffer(
+                b''.join([b'aa', b'ab', b'ac', b'ad', b'baa', b'bab', b'ca', b'cb',
+                          b'daa', b'dab', b'dac', b'ea' b'faa', b'fab', b'fac', b'fad', b'ga']),
+                dtype='S1')
+        self.assertTrue(np.array_equal(dest_vals, expected_vals))
+        # old_data = np.asarray([0, 1, 2, 10, 11, 20, 30, 31, 50, 51, 52])
+        # new_data = np.asarray([3, 21, 32, 40, 53, 60])
+        # to_keep = np.zeros(len(new_i), dtype=np.bool)
+        # ops.compare_rows_for_journalling(old_i, new_i, old_data, new_data, to_keep)
+        #
+        # dest = np.zeros(len(old_data) + to_keep.sum(), dtype=old.dtype)
+        # ops.merge_journalled_entries(old_i, new_i, to_keep, old_data, new_data, dest)
+        # expected = np.asarray([0, 1, 2, 3, 10, 11, 20, 21, 30, 31, 32, 40, 50, 51, 52, 53, 60], dtype=np.int32)
+        # self.assertTrue(np.array_equal(dest, expected))
