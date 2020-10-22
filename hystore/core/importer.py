@@ -87,7 +87,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files):
             valid_froms = np.full(len(ids), ftimestamp)
             jvf.write(valid_froms)
             jvt = datastore.get_timestamp_writer(table, 'j_valid_to')
-            valid_tos = np.full(len(ids), ops.MAX_TIMESTAMP)
+            valid_tos = np.full(len(ids), ops.MAX_DATETIME.timestamp())
             jvt.write(valid_tos)
 
         print(hf.keys())

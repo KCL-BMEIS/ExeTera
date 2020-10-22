@@ -9,7 +9,7 @@ def score_component(fields, maps, fn, length):
     return fn(accumulated)
 
 
-def healthy_diet_index(fields):
+def healthy_diet_index(fields: dict):
     nda = lambda x: np.array(x, dtype=np.float32)
 
     print(fields)
@@ -116,3 +116,4 @@ def healthy_diet_index(fields):
     nmes_score = score_component(fields, nmes_maps, nmes_fn, length)
 
     return fruit_score + veg_score + oily_fish_score + fat_score + nmes_score
+

@@ -337,6 +337,14 @@ def sort_mixed_list(values, check_fn, sort_fn):
     return values
 
 
+def chunks(length, chunksize):
+    cur = 0
+    while cur < length:
+        next = min(length, cur + chunksize)
+        yield cur, next
+        cur = next
+
+
 class Timer:
     def __init__(self, start_msg, new_line=False, end_msg='completed in'):
         print(start_msg, end=': ' if new_line is False else '\n')

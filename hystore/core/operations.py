@@ -2,12 +2,14 @@ from datetime import datetime
 import numpy as np
 from numba import jit, njit
 import numba
+from numba.typed import List
 
 from hystore.core import validation as val
+from hystore.core import utils
 
 DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62
-MAX_TIMESTAMP = datetime(year=9999, month=1, day=1).timestamp()
+MAX_DATETIME = datetime(year=9999, month=1, day=1) #.timestamp()
 
 
 def chunks(length, chunksize=1 << 20):
@@ -74,7 +76,6 @@ def ordered_map_valid_stream(data_field, map_field, result_field, chunksize=DEFA
         #     dfc = dfc[dd:]
 
 
-
 # 0 2 3 4 5 7 8 9 11 12 14 15 17 18 19
 # 0 0 0 0 1 1 1 1  2  2  2  2  3  3  3
 @njit
@@ -101,6 +102,7 @@ def data_iterator(data_field, chunksize=1 << 20):
         data = data_field.data[start:start + chunksize * 2]
         for v in range(c[0], c[1]):
             yield data[v]
+
 
 @njit
 def apply_filter_to_index_values(index_filter, indices, values):
@@ -886,6 +888,7 @@ def compare_indexed_rows_for_journalling(old_map, new_map,
                 to_keep[i] = not np.array_equal(old_value, new_value)
 
 
+@njit
 def merge_journalled_entries(old_map, new_map, to_keep, old_src, new_src, dest):
     cur_old = 0
     cur_dest = 0
@@ -900,7 +903,15 @@ def merge_journalled_entries(old_map, new_map, to_keep, old_src, new_src, dest):
             dest[cur_dest] = new_src[new_map[i]]
             cur_dest += 1
 
+# def merge_journalled_entries(old_map, new_map, to_keep, old_src, new_src, dest):
+#     for om, im, tk in zip(old_map, new_map, to_keep):
+#         for omi in old_map:
+#             dest.add_to(next(old_src))
+#         if tk:
+#             dest.add_to(next(new_src))
 
+
+@njit
 def merge_indexed_journalled_entries_count(old_map, new_map, to_keep, old_src_inds, new_src_inds):
     cur_old = 0
     acc_val = 0
@@ -915,6 +926,7 @@ def merge_indexed_journalled_entries_count(old_map, new_map, to_keep, old_src_in
     return acc_val
 
 
+@njit
 def merge_indexed_journalled_entries(old_map, new_map, to_keep,
                                     old_src_inds, old_src_vals,
                                     new_src_inds, new_src_vals,
@@ -943,3 +955,150 @@ def merge_indexed_journalled_entries(old_map, new_map, to_keep,
                 dest_vals[ind_acc-ind_delta:ind_acc] = \
                     new_src_vals[new_src_inds[new_map[i]]:new_src_inds[new_map[i] + 1]]
             cur_dest += 1
+
+
+def merge_entries_segment(i_start, cur_old_start,
+                          old_map, new_map, to_keep, old_src, new_src, dest):
+    """
+    :param i_start: the initial value to apply to 'i'
+    :param cur_old_start: the initial value to apply to 'cur_old
+    :param old_map: the map (in i-space) for the existing records
+    :param new_map: the map (in i-space) for the new records
+    :param to_keep: the flags (in i-space) indicating whether the new record should be kept
+    :param old_src: the source for the existing records
+    :param new_src: the source for the new records
+    :param dest: the sink for the merged sources
+    :return:
+    """
+    cur_old = cur_old_start
+    cur_dest = 0
+    for i in range(i_start, len(old_map)):
+        # copy all rows up to the entry, if there are any
+        while cur_old <= old_map[i]:
+            dest[cur_dest] = old_src[cur_old]
+            cur_old += 1
+            cur_dest += 1
+            if cur_dest == len(dest):
+                return i, cur_old
+        # copy the new row if there is one
+        if to_keep[i] == True:
+            dest[cur_dest] = new_src[new_map[i]]
+            cur_dest += 1
+            if cur_dest == len(dest):
+                return i, cur_old
+
+
+def streaming_sort_merge(src_index_f, src_value_f, tgt_index_f, tgt_value_f,
+                         segment_length, chunk_length):
+
+    # get the number of segments
+    segment_count = len(src_index_f.data) // segment_length
+    if len(src_index_f.data) % segment_length != 0:
+        segment_count += 1
+
+    segment_starts = np.zeros(segment_count, dtype=np.int64)
+    segment_lengths = np.zeros(segment_count, dtype=np.int64)
+    for i, s in enumerate(utils.chunks(len(src_index_f.data), segment_length)):
+        segment_starts[i] = s[0]
+        segment_lengths[i] = s[1] - s[0]
+
+    print(segment_starts)
+    print(segment_lengths)
+
+    # original segment indices for debugging
+    segment_indices = np.zeros(segment_count, dtype=np.int32)
+
+    # the index of the chunk within a given segment
+    chunk_indices = np.zeros(segment_count, dtype=np.int64)
+
+    # the (chunk_local) index for each segment
+    in_chunk_indices = np.zeros(segment_count, dtype=np.int64)
+
+    # the (chunk_local) length for each segment
+    in_chunk_lengths = np.zeros(segment_count, dtype=np.int64)
+
+
+    src_value_chunks = List()
+    src_index_chunks = List()
+
+    # get the first chunk for each segment
+    for i in range(segment_count):
+        index_start = segment_starts[i] + chunk_indices[i] * chunk_length
+        src_value_chunks.append(src_value_f.data[index_start:index_start+chunk_length])
+        src_index_chunks.append(src_index_f.data[index_start:index_start+chunk_length])
+        in_chunk_lengths[i] = len(src_value_chunks[i])
+
+    dest_indices = np.zeros(segment_count * chunk_length, dtype=src_index_f.data.dtype)
+    dest_values = np.zeros(segment_count * chunk_length, dtype=src_value_f.data.dtype)
+
+    target_index = 0
+    while target_index < len(src_index_f.data):
+        index_delta = streaming_sort_partial(in_chunk_indices, in_chunk_lengths,
+                                             src_value_chunks, src_index_chunks,
+                                             dest_values, dest_indices)
+        tgt_index_f.data.write(dest_indices[:index_delta])
+        tgt_value_f.data.write(dest_values[:index_delta])
+        target_index += index_delta
+
+        chunk_filter = np.ones(segment_count, dtype=np.bool)
+        for i in range(segment_count):
+            if in_chunk_indices[i] == in_chunk_lengths[i]:
+                chunk_indices[i] += 1
+                index_start = segment_starts[i] + chunk_indices[i] * chunk_length
+                remaining = segment_starts[i] + segment_lengths[i] - index_start
+                remaining = min(remaining, chunk_length)
+                if remaining > 0:
+                    src_value_chunks[i] = src_value_f.data[index_start:index_start+remaining]
+                    src_index_chunks[i] = src_index_f.data[index_start:index_start+remaining]
+                    in_chunk_lengths[i] = len(src_value_chunks[i])
+                    in_chunk_indices[i] = 0
+                else:
+                    # can't clear list contents because we are using numba list, but they
+                    # get filtered out in the following section
+                    chunk_filter[i] = 0
+
+        if chunk_filter.sum() < len(chunk_filter):
+            segment_count = chunk_filter.sum()
+            segment_indices = segment_indices[chunk_filter]
+            segment_starts = segment_starts[chunk_filter]
+            segment_lengths = segment_lengths[chunk_filter]
+            chunk_indices = chunk_indices[chunk_filter]
+            in_chunk_indices = in_chunk_indices[chunk_filter]
+            in_chunk_lengths = in_chunk_lengths[chunk_filter]
+            filtered_value_chunks = List()
+            filtered_index_chunks = List()
+            for i in range(len(src_value_chunks)):
+                if chunk_filter[i]:
+                    filtered_value_chunks.append(src_value_chunks[i])
+                    filtered_index_chunks.append(src_index_chunks[i])
+            src_value_chunks = filtered_value_chunks
+            src_index_chunks = filtered_index_chunks
+
+    print(tgt_index_f.data[:])
+    print(tgt_value_f.data[:])
+
+@njit
+def streaming_sort_partial(in_chunk_indices, in_chunk_lengths,
+                           src_value_chunks, src_index_chunks, dest_value_chunk, dest_index_chunk):
+    dest_index = 0
+    max_possible = in_chunk_lengths.sum()
+    while(dest_index < max_possible):
+        if in_chunk_indices[0] == in_chunk_lengths[0]:
+            return dest_index
+        min_value = src_value_chunks[0][in_chunk_indices[0]]
+        min_value_index = 0
+        for i in range(1, len(in_chunk_indices)):
+            if in_chunk_indices[i] == in_chunk_lengths[i]:
+                return dest_index
+            cur_value = src_value_chunks[i][in_chunk_indices[i]]
+            if cur_value < min_value:
+                min_value = cur_value
+                min_value_index = i
+
+        min_index = src_index_chunks[min_value_index][in_chunk_indices[min_value_index]]
+        dest_index_chunk[dest_index] = min_index
+        dest_value_chunk[dest_index] = min_value
+        dest_index += 1
+        in_chunk_indices[min_value_index] += 1
+
+    return dest_index

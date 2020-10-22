@@ -9,6 +9,7 @@ from hystore.core import session
 from hystore.core import fields
 from hystore.core import persistence as per
 from hystore.core import operations as ops
+from hystore.core import utils
 
 
 class TestAggregation(unittest.TestCase):
@@ -341,3 +342,36 @@ class TestAggregation(unittest.TestCase):
         # ops.merge_journalled_entries(old_i, new_i, to_keep, old_data, new_data, dest)
         # expected = np.asarray([0, 1, 2, 3, 10, 11, 20, 21, 30, 31, 32, 40, 50, 51, 52, 53, 60], dtype=np.int32)
         # self.assertTrue(np.array_equal(dest, expected))
+
+
+    def test_streaming_sort_merge(self):
+        s = session.Session()
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            rs = np.random.RandomState(12345678)
+            length = 105
+            segment_length = 25
+            chunk_length = 8
+            src_values = np.arange(length, dtype=np.int32)
+            src_values += 1000
+            rs.shuffle(src_values)
+            src_v_f = s.create_numeric(hf, 'src_values', 'int32')
+            src_v_f.data.write(src_values)
+            src_i_f = s.create_numeric(hf, 'src_indices', 'int64')
+            src_i_f.data.write(np.arange(length, dtype=np.int64))
+
+            for c in utils.chunks(length, segment_length):
+                sorted_index = np.argsort(src_v_f.data[c[0]:c[1]])
+                src_v_f.data[c[0]:c[1]] =\
+                    s.apply_index(sorted_index, src_v_f.data[c[0]:c[1]])
+                src_i_f.data[c[0]:c[1]] =\
+                    s.apply_index(sorted_index, src_i_f.data[c[0]:c[1]])
+
+            tgt_i_f = s.create_numeric(hf, 'tgt_values', 'int32')
+            tgt_v_f = s.create_numeric(hf, 'tgt_indices', 'int64')
+            ops.streaming_sort_merge(src_i_f, src_v_f, tgt_i_f, tgt_v_f,
+                                     segment_length, chunk_length)
+
+            print(np.sort(src_values[:]))
+            print(np.argsort(src_values))
+

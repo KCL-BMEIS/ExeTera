@@ -25,7 +25,7 @@ class TestSessionMerge(unittest.TestCase):
 
         ts1 = datetime(2020, 8, 1).timestamp()
         ts2 = datetime(2020, 9, 1).timestamp()
-        tsf = ops.MAX_TIMESTAMP
+        tsf = ops.MAX_DATETIME.timestamp()
 
         d1_id = np.chararray(9)
         d1_id[:] = np.asarray(['a', 'a', 'b', 'b', 'c', 'e', 'e', 'e', 'g'])
