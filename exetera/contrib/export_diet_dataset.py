@@ -1,19 +1,11 @@
 #!/usr/bin/env python
 
-from collections import defaultdict
-from datetime import datetime, timezone
-from dateutil.relativedelta import relativedelta
-import time
-
 import numpy as np
 import h5py
 import pandas as pd
 
-from exetera.core import exporter, persistence, utils
-from exetera.core.persistence import DataStore
+from exetera.core import utils
 from exetera.core.session import Session
-from exetera.processing.nat_medicine_model import nature_medicine_model_1
-from exetera.processing.effective_test_date import effective_test_date
 from exetera.processing.healthy_diet_index import healthy_diet_index
 from exetera.core import fields
 
@@ -46,23 +38,6 @@ def export_diet_dataset(s, src_data, dest_data):
 
     print(p_filter.sum(), len(p_filter))
     print(len(s.apply_filter(p_filter, p_ids)))
-
-
-    # print("= patients =")
-    # for k in src_ptnts.keys():
-    #     print(k)
-    #
-    # print("= assessments =")
-    # for k in src_data['assessments'].keys():
-    #     print(k)
-    #
-    # print("= tests =")
-    # for k in src_data['tests'].keys():
-    #     print(k)
-    #
-    # print("= diet =")
-    # for k in src_data['diet'].keys():
-    #     print(k)
 
 
     patient_fields = ('110_to_220_cm', '15_to_55_bmi', '16_to_90_years', '40_to_200_kg',
@@ -151,12 +126,6 @@ def export_diet_dataset(s, src_data, dest_data):
             if isinstance(r, fields.IndexedStringField):
                 print(len(w.data))
 
-    # print("checking weight / height fields from patients")
-    # for k in src_ptnts.keys():
-    #     if "weight" in k or "height" in k:
-    #         print(k)
-
-    diet_keys = [''] # src_diet.keys()
     p_dict = {'id': s.apply_filter(p_filter, p_ids)}
     for k in flt_ptnts.keys():
         if "weight" in k or "height" in k:
@@ -165,8 +134,6 @@ def export_diet_dataset(s, src_data, dest_data):
             pkey = k
         p_dict[pkey] = s.get(flt_ptnts[k]).data[:]
 
-    # p_dict.update({k if k not in diet_keys else "patient_{}".format(k): s.get(flt_ptnts[k]).data[:]
-    #                for k in patient_fields})
     for k, v in p_dict.items():
         print(k, len(v))
     pdf = pd.DataFrame(p_dict)
