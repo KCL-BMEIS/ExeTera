@@ -72,7 +72,7 @@ if 'dev' in exetera.__version__:
     print(msg.format(exetera.__version__))
 
 msg = ("Warning: the command 'h5import' is deprecated and will be removed in a future release. "
-       "Please use 'hystorex import' instead.")
+       "Please use 'exetera import' instead.")
 
 files = {}
 if args.patient_data is not None:

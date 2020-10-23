@@ -12,7 +12,7 @@ setup(
     license='http://www.apache.org/licenses/LICENSE-2.0',
     packages=['exetera', 'exetera.contrib',
               'exetera.core', 'exetera.covidspecific', 'exetera.processing'],
-    scripts=['exetera/bin/hystorex'],
+    scripts=['exetera/bin/exetera'],
     install_requires=[
         'numpy',
         'numba',

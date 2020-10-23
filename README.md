@@ -1,34 +1,30 @@
-The KCL covid19 joinzoe data preparation pipeline.
+ExeTera
+
+Welcome to the ExeTera Readme!
+This page and the accompanying github wiki show you how to make use of ExeTera to create reproducible
+analysis pipelines for large tabular datasets.
 
 # Cleaning scripts
 
-Current release version: v0.2.7.2
+Current release version: v0.3.0
 
 ---
 # Usage
-The Zoe covid data preparation pipeline has two modes.
 
-The first, and recommended, is to import CSV data into a HDF5 file, perform standard post import
-processing on it, and then use the API to carry out further analysis.
-
-The second is a legacy version of the pipeline that runs a cleaning script directly on the csv file
-and outputs a modified csv file. This is provided for existing cleaning infrastructure but will not
-be updated to match the hdf5 functionality.
- 
-## HDF5
-The HDF5 analytics tools allow you to import data from CSV sources into HDF5, a columnar data
+The ExeTera allows you to import data from CSV sources into HDF5, a columnar data
 format more suited to performing analytics. This is done in two stages:
-1. Import the data using `hystorex import`
-2. Process the data using `hystorex postprocess` to create a set of useful additional data from the base data
+1. Import the data using `exetera import`
+2. Process the data using `exetera postprocess` to create a set of useful additional data from the
+base data
 
 ### Why two stages?
 Importing from CSV is a lengthy process that you may only want to do once. Splitting the work
 between importing and processing means that the import can be done only once, and the imported file
 used as a source for processing even if the processing functionality significantly changes.
 
-### `hystorex import`
+### `exetera import`
 ```
-hystorex import
+exetera import
 -s covid/covid_schema.json \
 -i "patients:covid/patient_data.csv, assessments:covid/assessmentdata.csv, tests:covid/covid_test_data.csv, diet:covid/diet_study_data.csv" \
 -o /home/ben/covid/ds_20200901_base.hdf5
@@ -47,9 +43,9 @@ hystorex import
 
 Expect this script to take about an hour or so to execute.
 
-### `hystorex process`
+### `exetera process`
 ```
-hystorex process -i <input_hdf5> -d -o <output_hdf5>
+exetera process -i <input_hdf5> -d -o <output_hdf5>
 ```
 #### Arguments
  * `-i/--input`: The path and name of the import hdf5 file
@@ -59,74 +55,15 @@ hystorex process -i <input_hdf5> -d -o <output_hdf5>
 ## How do I work on the resulting dataset?
 See the wiki for detailed examples of how to interact with the hdf5 datastore.
 
----
-## Legacy csv
-## `csvclean`
 
-### Running the pipeline
-```
-csvclean -t <territory> -p <input patient csv> -a <input assessor csv> -po <output patient csv -ao <output assessor csv>
-```
-
-#### Arguments
- * `-t` / `--territory`: the territory to filter the dataset on (runs on all territories if not set)
- * `-p` / `--patient_data`: the location and name of the patient data csv file
- * `-a` / `--assessment_data`: the location and name of the assessment data csv file
- * `-po` / `--patient_data_out`: the location and name of the output patient data csv file
- * `-ao` / `--assessment_data_out`: the location and name of the output assessment data csv file
- * `-ps` / `--parsing_schema`: the schema number to use for parsing and cleaning data
-
-### Pipeline help
-```
-python pipeline.py --help
-```
-
-### Pipeline version
-```
-python pipeline.py --version
-```
-
-#### parsing schema
-There are currently 2 parsing schema versions:
-* 1: The baseline cleaning behaviour, intented to match the R script
-* 2 (in progress): Improved cleaning for height/weight/BMI and covid symptom progression
-
-#### Including in a script
-
-Use the function `pipeline()` from `pipeline.py`.
-
-Proper documentation and packaging to follow
-
-## `csvsplit`
-
-### Running the split script
-```
-csvsplit -t <territory> -p <input patient csv> -a <input assessor csv> -b <bucket size>
-```
-
-The output of the split script is a series of patient and assessment files with the following structure:
-```
-<filename>.csv -> <filename>_<index>.csv
-```
-where index is the padded index of the subset (0000, 0001, 0002...).
-
-#### options
- * `-p` / `--patient_data`: the location and name of the patient data csv file
- * `-a` / `--assessment_data`: the location and name of the assessment data csv file
- * `-b` / `--bucket_size`: the maximum number of patients to include in a subset
-
-### Split script help
-```
-python split.py --help
-```
-
-### Split script version
-```
-python split.py --version
-```
-
----
 ## Changes
+
+### v0.2.7 -> v0.3.0
+* Renaming of hystore to ExeTera, the project's new name!
+* Renaming of the `hystorex` command to `exetera`
+* Removal of scripts that now belong in https://github.com/KCL-BMEIS/ExeTeraCovid.git
+* Addition of snapshot journaling and extremely large sort functionality
+* Removal of the legacy csv script functionality
 
 ### v0.2.7 -> v0.2.7.3
 * Fix to covid_schema.json for numeric diet fields marked 'float' instead of 'float32'
@@ -150,7 +87,6 @@ python split.py --version
 ### v0.2.3 -> v0.2.5
 * Please note: there was no version v0.2.4; due to a numbering error when updating the version number
 * Simplifications to the API
-
 
 ### v0.2.2 -> v0.2.3
 * Data schema updated for 1.5.1

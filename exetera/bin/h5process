@@ -39,7 +39,7 @@ if __name__ == '__main__':
     timestamp = str(datetime.now(timezone.utc))
 
     msg = ("Warning: the command 'h5process' is deprecated and will be removed in a future release. "
-           "Please use 'hystorex process' instead.")
+           "Please use 'exetera process' instead.")
 
     if args.sort + args.process + args.all > 1:
         raise ValueError("At most one of '--sort', '--daily', and '--all' may be set")
