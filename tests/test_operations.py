@@ -5,11 +5,11 @@ from io import BytesIO
 
 import h5py
 
-from hystore.core import session
-from hystore.core import fields
-from hystore.core import persistence as per
-from hystore.core import operations as ops
-from hystore.core import utils
+from exetera.core import session
+from exetera.core import fields
+from exetera.core import persistence as per
+from exetera.core import operations as ops
+from exetera.core import utils
 
 
 class TestAggregation(unittest.TestCase):

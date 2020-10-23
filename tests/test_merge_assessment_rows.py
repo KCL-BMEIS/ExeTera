@@ -12,8 +12,8 @@
 import unittest
 
 
-from hystore.processing.assessment_merge import MergeAssessmentRows
-from hystore.core.utils import concatenate_maybe_strs
+from exetera.processing.assessment_merge import MergeAssessmentRows
+from exetera.core.utils import concatenate_maybe_strs
 
 
 class MockDataset:

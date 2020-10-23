@@ -5,9 +5,9 @@ from io import BytesIO
 
 import h5py
 
-from hystore.core import session
-from hystore.core import fields
-from hystore.core import persistence as per
+from exetera.core import session
+from exetera.core import fields
+from exetera.core import persistence as per
 
 
 class TestIndexedStringFields(unittest.TestCase):

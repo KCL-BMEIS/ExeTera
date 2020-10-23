@@ -5,9 +5,9 @@ from io import BytesIO
 
 import h5py
 
-from hystore.core import session
-from hystore.core import fields
-from hystore.core import persistence as per
+from exetera.core import session
+from exetera.core import fields
+from exetera.core import persistence as per
 
 
 class TestSessionMerge(unittest.TestCase):
@@ -331,9 +331,9 @@ class TestSessionAggregate(unittest.TestCase):
 class TestSessionFields(unittest.TestCase):
 
     def test_write_then_read_numeric(self):
-        from hystore.core.session import Session
-        from hystore.core import fields
-        from hystore.core.utils import Timer
+        from exetera.core.session import Session
+        from exetera.core import fields
+        from exetera.core.utils import Timer
 
         s = Session()
         bio = BytesIO()
@@ -355,9 +355,9 @@ class TestSessionFields(unittest.TestCase):
 
 
     def test_write_then_read_categorical(self):
-        from hystore.core.session import Session
-        from hystore.core import fields
-        from hystore.core.utils import Timer
+        from exetera.core.session import Session
+        from exetera.core import fields
+        from exetera.core.utils import Timer
 
         s = Session()
         bio = BytesIO()
@@ -379,9 +379,9 @@ class TestSessionFields(unittest.TestCase):
 
 
     def test_write_then_read_fixed_string(self):
-        from hystore.core.session import Session
-        from hystore.core import fields
-        from hystore.core.utils import Timer
+        from exetera.core.session import Session
+        from exetera.core import fields
+        from exetera.core.utils import Timer
 
         s = Session()
         bio = BytesIO()
@@ -403,9 +403,9 @@ class TestSessionFields(unittest.TestCase):
 
 
     def test_write_then_read_indexed_string(self):
-        from hystore.core.session import Session
-        from hystore.core import fields
-        from hystore.core.utils import Timer
+        from exetera.core.session import Session
+        from exetera.core import fields
+        from exetera.core.utils import Timer
 
         s = Session()
         bio = BytesIO()

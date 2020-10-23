@@ -13,7 +13,7 @@ import unittest
 
 import numpy as np
 
-from hystore.processing import numpy_buffer
+from exetera.processing import numpy_buffer
 
 
 class TestNumpyBuffer(unittest.TestCase):

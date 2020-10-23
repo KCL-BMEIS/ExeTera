@@ -11,7 +11,7 @@
 
 import unittest
 
-from hystore.core import filtered_field
+from exetera.core import filtered_field
 
 
 class TestFilteredIndex(unittest.TestCase):

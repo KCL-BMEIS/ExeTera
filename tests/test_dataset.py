@@ -12,7 +12,7 @@
 import unittest
 import io
 
-from hystore.core import dataset, utils
+from exetera.core import dataset, utils
 
 small_dataset = ('id,patient_id,foo,bar\n'
                  '0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,11111111111111111111111111111111,,a\n'

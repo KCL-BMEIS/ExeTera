@@ -11,7 +11,7 @@
 
 import unittest
 
-from  hystore.processing.covid_test import ValidateCovidTestResultsFacVersion2
+from  exetera.processing.covid_test import ValidateCovidTestResultsFacVersion2
 
 
 class MockDataset:

@@ -13,7 +13,7 @@ import unittest
 
 import numpy as np
 
-from hystore.processing import covid_test
+from exetera.processing import covid_test
 
 
 class TestCovidProgression1(unittest.TestCase):

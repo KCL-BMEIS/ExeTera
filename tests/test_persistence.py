@@ -7,10 +7,10 @@ from io import BytesIO
 import numpy as np
 import h5py
 
-from hystore.core import operations, persistence
-from hystore.core import readerwriter as rw
-from hystore.core import validation as val
-from hystore.core import utils
+from exetera.core import operations, persistence
+from exetera.core import readerwriter as rw
+from exetera.core import validation as val
+from exetera.core import utils
 
 
 class TestPersistence(unittest.TestCase):

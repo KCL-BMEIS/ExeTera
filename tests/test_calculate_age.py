@@ -13,8 +13,8 @@ import unittest
 
 import numpy as np
 
-from hystore.core.utils import valid_range_fac_inc
-from hystore.processing.age_from_year_of_birth import CalculateAgeFromYearOfBirth
+from exetera.core.utils import valid_range_fac_inc
+from exetera.processing.age_from_year_of_birth import CalculateAgeFromYearOfBirth
 
 
 class TestAgeFromYearOfBirth(unittest.TestCase):
