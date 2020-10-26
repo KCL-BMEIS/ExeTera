@@ -77,26 +77,10 @@ if args.command == 'import':
         if not os.path.isfile(tv):
             print("-i/--import_data - {}: '{}' must be an existing file".format(tk, tv))
             errors = True
-    # if args.patient_data is not None and not os.path.isfile(args.patient_data):
-    #     print('-p/--patient_data argument must be an existing file')
-    #     errors = True
-    # if args.assessment_data is not None and not os.path.isfile(args.assessment_data):
-    #     print('-a/--assessment_data argument must be an existing file')
-    #     errors = True
-    # if args.test_data is not None and not os.path.isfile(args.test_data):
-    #     print('-t/--test_data argument must be an existing file')
-    #     errors = True
 
     if errors:
         exit(-1)
 
-    # files = {}
-    # if args.patient_data is not None:
-    #     files['patients'] = args.patient_data
-    # if args.assessment_data is not None:
-    #     files['assessments'] = args.assessment_data
-    # if args.test_data is not None:
-    #     files['tests'] = args.test_data
     importer.import_with_schema(args.timestamp, args.output_hdf5, args.schema, tokens)
 elif args.command == 'process':
     timestamp = str(datetime.now(timezone.utc))
