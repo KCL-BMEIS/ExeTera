@@ -6,7 +6,7 @@ analysis pipelines for large tabular datasets.
 
 # Cleaning scripts
 
-Current release version: v0.3.0
+Current release version: v0.3.1
 
 ---
 # Usage
@@ -57,6 +57,9 @@ See the wiki for detailed examples of how to interact with the hdf5 datastore.
 
 
 ## Changes
+
+### v0.3.0 -> v0.3.1
+* Major performance improvement to Session.get_spans
 
 ### v0.2.7 -> v0.3.0
 * Renaming of hystore to ExeTera, the project's new name!
