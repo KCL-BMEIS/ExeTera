@@ -255,16 +255,8 @@ def temp_dataset():
         hd.close()
 
 
-@njit
-def _not_equals(a, b, c):
-    a_len = len(a)
-    for i_r in range(a_len):
-        c[i_r] = a[i_r] != b[i_r]
-
-
 def _get_spans(field, fields):
     if field is not None:
-        # return _get_spans_for_field(field)
         return _get_spans_for_field(field)
     elif len(fields) == 1:
         return _get_spans_for_field(fields[0])
@@ -284,9 +276,13 @@ def _index_spans(spans, results):
 
 
 def _get_spans_for_field(field0):
-
     results = np.zeros(len(field0) + 1, dtype=np.bool)
-    _not_equals(field0[:-1], field0[1:], results[1:])
+    if np.issubdtype(field0.dtype, np.number):
+        fn = np.not_equal
+    else:
+        fn = np.char.not_equal
+    results[1:-1] = fn(field0[:-1], field0[1:])
+
     results[0] = True
     results[-1] = True
     return np.nonzero(results)[0]

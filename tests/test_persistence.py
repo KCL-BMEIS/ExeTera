@@ -8,6 +8,7 @@ import numpy as np
 import h5py
 
 from exetera.core import operations, persistence
+from exetera.core.session import Session
 from exetera.core import readerwriter as rw
 from exetera.core import validation as val
 from exetera.core import utils
@@ -683,18 +684,58 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         print(datastore.distinct(fields=(a, b)))
 
 
-    def test_get_spans_single_field(self):
+    def test_get_spans_single_field_numeric(self):
         datastore = persistence.DataStore(10)
-        a = np.asarray([1, 2, 2, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 1])
-        print(datastore.get_spans(field=a))
-        a = np.asarray([1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 2, 2, 1])
-        print(datastore.get_spans(field=a))
-        a = np.asarray([1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1])
-        print(datastore.get_spans(field=a))
-        a = np.asarray([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
-        print(datastore.get_spans(field=a))
-        a = np.asarray([0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2])
-        print(datastore.get_spans(field=a))
+        session = Session()
+
+        for s in (datastore, session):
+
+            a = np.asarray([1, 2, 2, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 1])
+            self.assertTrue(np.array_equal(np.asarray([0, 1, 3, 6, 10, 15]), s.get_spans(field=a)))
+
+            a = np.asarray([1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 2, 2, 1])
+            self.assertTrue(np.array_equal(np.asarray([0, 5, 9, 12, 14, 15]), s.get_spans(field=a)))
+
+            a = np.asarray([1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1])
+            self.assertTrue(np.array_equal(np.asarray([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]),
+                                           s.get_spans(field=a)))
+
+            a = np.asarray([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+            self.assertTrue(np.array_equal(np.asarray([0, 15]), s.get_spans(field=a)))
+
+            a = np.asarray([0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2])
+            self.assertTrue(np.array_equal(np.asarray([0, 7, 14, 22]), s.get_spans(field=a)))
+
+
+    def test_get_spans_single_field_string(self):
+        datastore = persistence.DataStore(10)
+        session = Session()
+
+        for s in (datastore, session):
+
+            a = np.asarray([b'aa', b'ab', b'ab', b'ac', b'ac', b'ac'], dtype='S2')
+            self.assertTrue(np.array_equal(np.asarray([0, 1, 3, 6]), s.get_spans(field=a)))
+
+            a = np.asarray([b'aa', b'ba', b'ba', b'ca', b'ca', b'ca'], dtype='S2')
+            self.assertTrue(np.array_equal(np.asarray([0, 1, 3, 6]), s.get_spans(field=a)))
+
+            a = np.asarray([b'aa', b'aa', b'aa', b'ab', b'ab', b'ac'], dtype='S2')
+            self.assertTrue(np.array_equal(np.asarray([0, 3, 5, 6]), s.get_spans(field=a)))
+
+            a = np.asarray([b'aa', b'aa', b'aa', b'ba', b'ba', b'ca'], dtype='S2')
+            self.assertTrue(np.array_equal(np.asarray([0, 3, 5, 6]), s.get_spans(field=a)))
+
+            a = np.asarray([b'aa'], dtype='S2')
+            self.assertTrue(np.array_equal(np.asarray([0, 1]), s.get_spans(field=a)))
+
+            a = np.asarray([b'aa', b'aa'], dtype='S2')
+            self.assertTrue(np.array_equal(np.asarray([0, 2]), s.get_spans(field=a)))
+
+            a = np.asarray([b'aa', b'aa', b'aa'], dtype='S2')
+            self.assertTrue(np.array_equal(np.asarray([0, 3]), s.get_spans(field=a)))
+
+            a = np.asarray([b'aa', b'bb', b'cc'], dtype='S2')
+            self.assertTrue(np.array_equal(np.asarray([0, 1, 2, 3]), s.get_spans(field=a)))
 
 
     def test_apply_spans_count(self):
