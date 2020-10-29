@@ -23,7 +23,7 @@ from exetera.core import operations as ops
 from exetera.core.load_schema import load_schema
 
 
-def import_with_schema(timestamp, dest_file_name, schema_file, files):
+def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite):
     print(timestamp)
     print(schema_file)
     print(files)
@@ -38,18 +38,23 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files):
     if not any_parts_present:
         raise ValueError("none of the data sources in 'files' contain relevant data to the schema")
 
-    importer_flags = {'patients': True, 'assessments': True, 'tests': True, 'diet': True}
     stop_after = {}
     # stop_after = {'patients': 500000, 'assessments': 500000}
     reserved_column_names = ('j_valid_from', 'j_valid_to')
     datastore = per.DataStore()
-    with h5py.File(dest_file_name, 'w') as hf:
+
+    if overwrite:
+        mode = 'w'
+    else:
+        mode = 'r+'
+
+    with h5py.File(dest_file_name, mode) as hf:
         for sk in schema.keys():
             if sk in reserved_column_names:
                 msg = "{} is a reserved column name: reserved names are {}"
                 raise ValueError(msg.format(sk, reserved_column_names))
 
-            if sk not in files or importer_flags[sk] == False:
+            if sk not in files:
                 continue
 
             fields = schema[sk].fields
@@ -64,7 +69,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files):
                 # raise ValueError(msg.format(files[sk], missing_names))
 
         for sk in schema.keys():
-            if sk not in files or importer_flags[sk] == False:
+            if sk not in files:
                 continue
 
             fields = schema[sk].fields

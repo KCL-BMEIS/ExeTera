@@ -1,0 +1,63 @@
+{
+  "exetera": {
+    "version": "1.0.0"
+  },
+  "schema": {
+    "lsoa11": {
+      "primary_keys": [
+        "lsoa11cd"
+      ],
+      "fields": {
+        "lsoa11cd": {
+          "field_type": "fixed_string",
+          "length": 9
+        },
+        "lsoa11nm": {
+          "field_type": "string"
+        },
+        "imd": {
+          "field_type": "numeric",
+          "value_type": "int32"
+        },
+        "imd_decile": {
+          "field_type": "numeric",
+          "value_type": "int8"
+        },
+        "ruc11cd": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "A1": 1,
+              "B1": 2,
+              "C1": 3,
+              "C2": 4,
+              "D1": 5,
+              "D2": 6,
+              "E1": 7,
+              "E2": 8
+            }
+          }
+        },
+        "ruc11": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "Urban major conurbation": 1,
+              "Urban minor conurbation": 2,
+              "Urban city and town": 3,
+              "Urban city and town in a sparse setting": 4,
+              "Rural town and fringe": 5,
+              "Rural town and fringe in a sparse setting": 6,
+              "Rural village and dispersed": 7,
+              "Rural village and dispersed in a sparse setting": 8
+            }
+          }
+        }
+      }
+    }
+  }
+}
