@@ -25,9 +25,9 @@ used as a source for processing even if the processing functionality significant
 ### `exetera import`
 ```
 exetera import
--s covid/covid_schema.json \
--i "patients:covid/patient_data.csv, assessments:covid/assessmentdata.csv, tests:covid/covid_test_data.csv, diet:covid/diet_study_data.csv" \
--o /home/ben/covid/ds_20200901_base.hdf5
+-s path/to/covid_schema.json \
+-i "patients:path/to/patient_data.csv, assessments:path/to/assessmentdata.csv, tests:path/to/covid_test_data.csv, diet:path/to/diet_study_data.csv" \
+-o /path/to/output_dataset_name.hdf5
 ```
 
 
