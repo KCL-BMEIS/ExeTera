@@ -1,4 +1,4 @@
 
 from . import core, processing, covidspecific, contrib
 
-__version__ = '0.3.2.dev1'
+__version__ = '0.3.2'

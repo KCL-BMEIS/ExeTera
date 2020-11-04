@@ -6,7 +6,7 @@ analysis pipelines for large tabular datasets.
 
 # Cleaning scripts
 
-Current release version: v0.3.1
+Current release version: v0.3.2
 
 ---
 # Usage
@@ -40,7 +40,8 @@ exetera import
  * `-o/--output_hdf5`: The path and name to where the resulting hdf5 dataset should be written
  * `-ts/--timestamp`: An override for the timestamp to be written
    (defaults to `datetime.now(timezone.utc)`)
-
+ * `-w/--overwrite`: If set, overwrite any existing dataset with the same name; appends to existing dataset otherwise
+ 
 Expect this script to take about an hour or so to execute.
 
 ### `exetera process`
@@ -57,6 +58,13 @@ See the wiki for detailed examples of how to interact with the hdf5 datastore.
 
 
 ## Changes
+
+### v0.3.1 -> v0.3.2
+* Fixing issues with use of test_type_from_mechanism_v1
+* Adding ability to optionally import lsoa-based fields through add_imd script
+* Import now appends by default; to overwrite an existing dataset use `-w` \ `--overwrite`
+* Moved schema files to resources
+* Adding separate lsoa schema for import
 
 ### v0.3.0 -> v0.3.1
 * Major performance improvement to Session.get_spans
