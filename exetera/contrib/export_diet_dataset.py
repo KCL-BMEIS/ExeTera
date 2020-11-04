@@ -82,7 +82,7 @@ def export_diet_dataset(s, src_data, dest_data):
                       'is_smoker',
                       # 'ladcd', 'last_asked_level_of_isolation', 'last_asked_level_of_isolation_day', 'last_asked_level_of_isolation_set',
                       'last_assessment_day', 'lifestyle_version', 'limited_activity',
-                      'lsoa11cd', 'ruc11cd',
+                      'lsoa11cd', 'ruc11cd', 'tds_score', 'tds_quintile',
                       # 'lsoa11nm',
                       'max_assessment_test_result',
                       'max_test_result', 'mobility_aid',
