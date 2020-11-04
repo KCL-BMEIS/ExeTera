@@ -25,8 +25,18 @@ def test_type_from_mechanism_v1(datastore, mechanism, mechanism_free,
 
 
     r_mechanism = val.raw_array_from_parameter(datastore, 'mechanism', mechanism)
-    pcr_standard_answers.write(np.isin(r_mechanism, (1, 2, 3, 4)))
-    antibody_standard_answers.write(np.isin(r_mechanism, (5, 6, 7)))
+
+    f_pcr_cat = np.isin(r_mechanism, (1, 2, 3, 4))
+    if isinstance(pcr_standard_answers, np.ndarray):
+        pcr_standard_answers[:] = f_pcr_cat
+    else:
+        pcr_standard_answers.data.write(f_pcr_cat)
+
+    f_atb_cat = np.isin(r_mechanism, (5, 6, 7))
+    if isinstance(antibody_standard_answers, np.ndarray):
+        antibody_standard_answers[:] = f_atb_cat
+    else:
+        antibody_standard_answers.data.write(f_atb_cat)
 
     r_mechanism_free = val.raw_array_from_parameter(datastore, 'mechanism_free', mechanism_free)
 
@@ -34,25 +44,37 @@ def test_type_from_mechanism_v1(datastore, mechanism, mechanism_free,
     for p in pcr_strong:
         filt = search_for_substring(r_mechanism_free, p)
         f_pcr_strong = f_pcr_strong | filt
-    pcr_strong_inferred.write(f_pcr_strong)
+    if isinstance(pcr_strong_inferred, np.ndarray):
+        pcr_strong_inferred[:] = f_pcr_strong
+    else:
+        pcr_strong_inferred.data.write(f_pcr_strong)
 
     f_pcr_weak = np.zeros(len(r_mechanism), dtype=np.bool)
     for p in pcr_weak:
         filt = search_for_substring(r_mechanism_free, p)
         f_pcr_weak = f_pcr_weak | filt
-    pcr_weak_inferred.write(f_pcr_weak)
+    if isinstance(pcr_weak_inferred, np.ndarray):
+        pcr_weak_inferred[:] = f_pcr_weak
+    else:
+        pcr_weak_inferred.data.write(f_pcr_weak)
 
     f_antibody_strong = np.zeros(len(r_mechanism), dtype=np.bool)
     for p in antibody_strong:
         filt = search_for_substring(r_mechanism_free, p)
         f_antibody_strong = f_antibody_strong | filt
-    antibody_strong_inferred.write(f_antibody_strong)
+    if isinstance(antibody_strong_inferred, np.ndarray):
+        antibody_strong_inferred[:] = f_antibody_strong
+    else:
+        antibody_strong_inferred.data.write(f_antibody_strong)
 
     f_antibody_weak = np.zeros(len(r_mechanism), dtype=np.bool)
     for p in antibody_weak:
         filt = search_for_substring(r_mechanism_free, p)
         f_antibody_weak = f_antibody_weak | filt
-    antibody_weak_inferred.write(f_antibody_weak)
+    if isinstance(antibody_weak_inferred, np.ndarray):
+        antibody_weak_inferred[:] = f_antibody_weak
+    else:
+        antibody_weak_inferred.data.write(f_antibody_weak)
 
     # count_in_exclusion = 0
     # for r in r_mechanism_free:
