@@ -64,8 +64,7 @@
         "tds_quintile": {
           "field_type": "numeric",
           "value_type": "int8"
-        },
-
+        }
       }
     }
   }
