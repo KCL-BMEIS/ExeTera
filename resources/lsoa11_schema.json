@@ -56,7 +56,16 @@
               "Rural village and dispersed in a sparse setting": 8
             }
           }
-        }
+        },
+        "tds": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        },
+        "tds_quintile": {
+          "field_type": "numeric",
+          "value_type": "int8"
+        },
+
       }
     }
   }
