@@ -12,6 +12,51 @@ from exetera.core import operations as ops
 from exetera.core import utils
 
 
+class TestSafeMap(unittest.TestCase):
+
+    def _impl_safe_map_index_values(self, indices, values, map_indices,
+                                    expected_indices, expected_values, empty_value):
+        map_filter = map_indices != ops.INVALID_INDEX
+        actual_indices, actual_values =\
+            ops.safe_map_indexed_values(indices, values, map_indices, map_filter, empty_value)
+
+        self.assertTrue(np.array_equal(actual_indices, expected_indices))
+        self.assertTrue(np.array_equal(actual_values, expected_values))
+
+    def test_safe_map_index_values(self):
+        self._impl_safe_map_index_values(
+            np.asarray([0, 1, 3, 6, 10, 15, 15, 20, 24, 27, 29, 30], dtype=np.int32),
+            np.frombuffer(b'abbcccddddeeeeeggggghhhhiiijjk', dtype='S1'),
+            np.asarray([0, 4, 10, ops.INVALID_INDEX, 8, 2, 1, ops.INVALID_INDEX, 6, 5, 9]),
+            np.asarray([0, 1, 6, 7, 8, 11, 14, 16, 17, 22, 22, 24]),
+            np.frombuffer(b'aeeeeekxiiicccbbxgggggjj', dtype='S1'), b'x')
+
+    def test_safe_map_index_values_zero_empty(self):
+        self._impl_safe_map_index_values(
+            np.asarray([0, 1, 3, 6, 10, 15, 15, 20, 24, 27, 29, 30], dtype=np.int32),
+            np.frombuffer(b'abbcccddddeeeeeggggghhhhiiijjk', dtype='S1'),
+            np.asarray([0, 4, 10, ops.INVALID_INDEX, 8, 2, 1, ops.INVALID_INDEX, 6, 5, 9]),
+            np.asarray([0, 1, 6, 7, 7, 10, 13, 15, 15, 20, 20, 22]),
+            np.frombuffer(b'aeeeeekiiicccbbgggggjj', dtype='S1'), b'')
+
+    def _impl_safe_map_values(self, values, map_indices, expected_values, empty_value):
+        map_filter = map_indices != ops.INVALID_INDEX
+        actual_values = ops.safe_map_values(values, map_indices, map_filter, empty_value)
+
+        self.assertTrue(np.array_equal(actual_values, expected_values))
+
+    def test_safe_map_values(self):
+        self._impl_safe_map_values(
+            np.asarray([1, 3, 6, 10, 15, 21, 28, 36, 45, 55]),
+            np.asarray([1, 8, 2, 7, ops.INVALID_INDEX, 0, 9, 1, 8]),
+            np.asarray([3, 45, 6, 36, -1, 1, 55, 3, 45]), -1)
+
+    def test_safe_map_values(self):
+        self._impl_safe_map_values(
+            np.asarray([1, 3, 6, 10, 15, 21, 28, 36, 45, 55]),
+            np.asarray([1, 8, 2, 7, ops.INVALID_INDEX, 0, 9, 1, 8]),
+            np.asarray([3, 45, 6, 36, 0, 1, 55, 3, 45]), 0)
+
 class TestAggregation(unittest.TestCase):
 
     def test_non_indexed_apply_spans(self):
@@ -411,3 +456,17 @@ class TestAggregation(unittest.TestCase):
 
             self.assertTrue(np.array_equal(tgt_v_f.data[:], np.sort(src_values[:])))
             self.assertTrue(np.array_equal(tgt_i_f.data[:], np.argsort(src_values)))
+
+
+    def test_is_ordered(self):
+        arr = np.asarray([1, 2, 3, 4, 5])
+        self.assertTrue(ops.is_ordered(arr))
+
+        arr = np.asarray([5, 4, 3, 2, 1])
+        self.assertFalse(ops.is_ordered(arr))
+
+        arr = np.asarray([1, 2, 4, 3, 5])
+        self.assertFalse(ops.is_ordered(arr))
+
+        arr = np.asarray([1, 1, 1, 1, 1])
+        self.assertTrue(ops.is_ordered(arr))

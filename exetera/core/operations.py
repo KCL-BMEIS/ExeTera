@@ -5,7 +5,7 @@ import numba
 from numba.typed import List
 
 from exetera.core import validation as val
-from exetera.core import utils
+from exetera.core import fields, utils
 
 DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62
@@ -20,14 +20,60 @@ def chunks(length, chunksize=1 << 20):
         cur = next_
 
 
+def safe_map(field, map_field, map_filter, empty_value=None):
+    if isinstance(field, fields.Field):
+        if isinstance(field, fields.IndexedStringField):
+            pass
+        else:
+            return safe_map_values(field.data[:], map_field, map_filter, empty_value)
+    elif isinstance(field, np.ndarray):
+        return safe_map_values(field, map_field, map_filter, empty_value)
+
+
 @njit
-def safe_map(data_field, map_field, map_filter, empty_value):
+def safe_map_indexed_values(data_indices, data_values, map_field, map_filter, empty_value=None):
+    empty_value_len = 0 if empty_value is None else len(empty_value)
+    value_length = 0
+    for i in range(len(map_field)):
+        if map_filter[i]:
+            value_length += data_indices[map_field[i]+1] - data_indices[map_field[i]]
+        else:
+            value_length += empty_value_len
+
+    i_result = np.zeros(len(map_field) + 1, dtype=data_indices.dtype)
+    v_result = np.zeros(value_length, dtype=data_values.dtype)
+
+    offset = 0
+    i_result[0] = 0
+    for i in range(len(map_field)):
+        if map_filter[i]:
+            sst = data_indices[map_field[i]]
+            sse = data_indices[map_field[i]+1]
+            dst = offset
+            delta = sse - sst
+            dse = offset + delta
+            i_result[i+1] = dse
+            v_result[dst:dse] = data_values[sst:sse]
+            offset += delta
+        else:
+            dst = offset
+            dse = offset + empty_value_len
+            i_result[i+1] = dse
+            v_result[dst:dse] = empty_value
+            offset += dse - dst
+
+    return i_result, v_result
+
+
+@njit
+def safe_map_values(data_field, map_field, map_filter, empty_value=None):
     result = np.zeros_like(map_field, dtype=data_field.dtype)
+    empty_val = result[0] if empty_value is None else empty_value
     for i in range(len(map_field)):
         if map_filter[i]:
             result[i] = data_field[map_field[i]]
         else:
-            result[i] = empty_value
+            result[i] = empty_val
     return result
 
 
@@ -1096,3 +1142,14 @@ def streaming_sort_partial(in_chunk_indices, in_chunk_lengths,
         in_chunk_indices[min_value_index] += 1
 
     return dest_index
+
+
+def is_ordered(field):
+    if len(field) == 1:
+        return True
+
+    if np.issubdtype(field.dtype, np.number):
+        fn = np.greater
+    else:
+        fn = np.char.greater
+    return not np.any(fn(field[:-1], field[1:]))
