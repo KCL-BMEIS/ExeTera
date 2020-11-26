@@ -13,6 +13,7 @@ setup(
     packages=['exetera', 'exetera.contrib',
               'exetera.core', 'exetera.covidspecific', 'exetera.processing'],
     scripts=['exetera/bin/exetera'],
+    python_requires='>=3.7',
     install_requires=[
         'numpy',
         'numba',

@@ -4,9 +4,11 @@ Welcome to the ExeTera Readme!
 This page and the accompanying github wiki show you how to make use of ExeTera to create reproducible
 analysis pipelines for large tabular datasets.
 
-# Cleaning scripts
+# Current release and requirements
 
 Current release version: v0.3.2
+
+Requires python 3.7+
 
 ---
 # Usage
