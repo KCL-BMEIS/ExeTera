@@ -23,7 +23,8 @@ def chunks(length, chunksize=1 << 20):
 def safe_map(field, map_field, map_filter, empty_value=None):
     if isinstance(field, fields.Field):
         if isinstance(field, fields.IndexedStringField):
-            pass
+            return safe_map_indexed_values(
+                field.indices[:], field.values[:], map_field, map_filter, empty_value)
         else:
             return safe_map_values(field.data[:], map_field, map_filter, empty_value)
     elif isinstance(field, np.ndarray):

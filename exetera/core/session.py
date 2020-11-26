@@ -2,6 +2,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 import time
+import warnings
 import numpy as np
 import pandas as pd
 
@@ -39,10 +40,7 @@ from exetera.core import utils
        values are valid or whether they are a standard filtering for different
        categories (age sub-ranges, for example)
  * reader/writers
-   * should be able to read/write through the same object (they can now but not like this)
-     rw = s.get(name)
-     rw.writeable.data[:] = data
-     data = rw.data[:]
+
    * soft sorting / filtering
      rw = s.get(name)
      rw.add_transform(filter)
@@ -50,6 +48,10 @@ from exetera.core import utils
      rw.writeable[:] = data # can this be done?
      rw.clean()
      rw.write(data)
+
+    * refactor: encapsulate dataset handling into session
+      * provide group objects with api
+      * provide field objects with additional api
 """
 
 class Session:
@@ -61,6 +63,51 @@ class Session:
             raise ValueError(error_str.format(type(timestamp)))
         self.chunksize = chunksize
         self.timestamp = timestamp
+        self.datasets = dict()
+
+
+    def __enter__(self):
+        return self
+
+
+    def __exit__(self, etype, evalue, etraceback):
+        self.close()
+
+
+    def open_dataset(self, dataset_path, mode, name):
+        """
+        Open a dataset with the given access mode
+        :param dataset_path: the path to the dataset
+        :param mode: the mode in which the dataset should be opened. This is one of "r", "w" or "o".
+        :return: The top-level dataset object
+        """
+        h5py_modes = {"r": "r", "w": "r+", "o": "w"}
+        if name in self.datasets:
+            raise ValueError("A dataset with name '{}' is already open, and must be closed first.".format(name))
+
+        self.datasets[name] = h5py.File(dataset_path, h5py_modes[mode])
+        return self.datasets[name]
+
+
+    def close_dataset(self, name):
+        """
+        Close the dataset with the given name. If there is no dataset with that name, do nothing.
+        :param name: The name of the dataset to be closed
+        :return: None
+        """
+        if name in self.datasets:
+            self.datasets[name].close()
+            del self.datasets[name]
+
+
+    def close(self):
+        """
+        Close all open datasets
+        :return: None
+        """
+        for v in self.datasets.values():
+            v.close()
+        self.datasets = dict()
 
 
     def get_shared_index(self, keys):
@@ -562,6 +609,7 @@ class Session:
 
         writer.write(destination_space_values)
 
+
     def get(self, field):
         if isinstance(field, fld.Field):
             return field
@@ -730,61 +778,6 @@ class Session:
         return uid + '.hdf5'
 
 
-    def map_left(self, left_on, right_on, map_mode='both'):
-        valid_map_modes = ('map_to', 'map_from', 'both')
-
-        if map_mode not in valid_map_modes:
-            raise ValueError("'map_mode' must be one of {}".format(valid_map_modes))
-
-        l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
-        l_index = np.arange(len(l_key_raw), dtype=np.int64)
-        l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
-
-        r_key_raw = val.raw_array_from_parameter(self, 'right_on', right_on)
-        r_index = np.arange(len(r_key_raw), dtype=np.int64)
-        r_df = pd.DataFrame({'r_k': r_key_raw, 'r_index': r_index})
-
-        df = pd.merge(left=l_df, right=r_df, left_on='l_k', right_on='r_k', how='left')
-        l_to_r_map = df['l_index'].to_numpy()
-        l_to_r_filt = np.logical_not(df['l_index'].isnull())
-        r_to_l_map = df['r_index'].to_numpy(dtype=np.int64)
-        r_to_l_filt = np.logical_not(df['r_index'].isnull())
-        return l_to_r_map, l_to_r_filt, r_to_l_map, r_to_l_filt
-
-    def map_right(self, left_on, right_on, map_mode='both'):
-        l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
-        l_index = np.arange(len(l_key_raw), dtype=np.int64)
-        l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
-
-        r_key_raw = val.raw_array_from_parameter(self, 'right_on', right_on)
-        r_index = np.arange(len(r_key_raw), dtype=np.int64)
-        r_df = pd.DataFrame({'r_k': r_key_raw, 'r_index': r_index})
-
-        df = pd.merge(left=r_df, right=l_df, left_on='r_k', right_on='l_k', how='left')
-        l_to_r_map = df['r_index'].to_numpy()
-        l_to_r_filt = np.logical_not(df['r_index'].isnull())
-        r_to_l_map = df['l_index'].to_numpy(dtype=np.int64)
-        r_to_l_filt = np.logical_not(df['l_index'].isnull())
-        return l_to_r_map, l_to_r_filt, r_to_l_map, r_to_l_filt
-
-
-    def merge(self, left_on, right_on, how,
-              left_fields=None, right_fields=None,
-              left_writers=None, right_writers=None):
-        if how == 'left':
-            self.merge_left(left_on, right_on, left_fields, right_fields,
-                            left_writers, right_writers)
-        elif how == 'right':
-            self.merge_right(left_on, right_on, left_fields, right_fields,
-                             left_writers, right_writers)
-        elif how == 'inner':
-            self.merge_inner(left_on, right_on, left_fields, right_fields,
-                             left_writers, right_writers)
-        elif how == 'outer':
-            self.merge_outer(left_on, right_on, left_fields, right_fields,
-                             left_writers, right_writers)
-
-
     def merge_left(self, left_on, right_on,
                    right_fields=tuple(), right_writers=None):
         l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
@@ -802,7 +795,8 @@ class Session:
         right_results = list()
         for irf, rf in enumerate(right_fields):
             rf_raw = val.raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
-            joined_field = per._safe_map(rf_raw, r_to_l_map, r_to_l_filt)
+            joined_field = ops.safe_map(rf_raw, r_to_l_map, r_to_l_filt)
+            # joined_field = per._safe_map(rf_raw, r_to_l_map, r_to_l_filt)
             if right_writers is None:
                 right_results.append(joined_field)
             else:
@@ -828,7 +822,7 @@ class Session:
         left_results = list()
         for ilf, lf in enumerate(left_fields):
             lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
-            joined_field = per._safe_map(lf_raw, l_to_r_map, l_to_r_filt)
+            joined_field = ops.safe_map(lf_raw, l_to_r_map, l_to_r_filt)
             if left_writers is None:
                 left_results.append(joined_field)
             else:
@@ -856,7 +850,7 @@ class Session:
         left_results = list()
         for ilf, lf in enumerate(left_fields):
             lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
-            joined_field = per._safe_map(lf_raw, l_to_i_map, l_to_i_filt)
+            joined_field = ops.safe_map(lf_raw, l_to_i_map, l_to_i_filt)
             if left_writers is None:
                 left_results.append(joined_field)
             else:
@@ -865,17 +859,13 @@ class Session:
         right_results = list()
         for irf, rf in enumerate(right_fields):
             rf_raw = val.raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
-            joined_field = per._safe_map(rf_raw, r_to_i_map, r_to_i_filt)
+            joined_field = ops.safe_map(rf_raw, r_to_i_map, r_to_i_filt)
             if right_writers is None:
                 right_results.append(joined_field)
             else:
                 right_writers[irf].data.write(joined_field)
 
         return left_results, right_results
-
-
-    def merge_outer(self, left_on, left_fields, right_on, right_fields):
-        raise NotImplementedError()
 
 
     def _map_fields(self, field_map, field_sources, field_sinks):
@@ -913,24 +903,6 @@ class Session:
             src_ = val.field_from_parameter(self, 'field_sources', src)
             snk_ = val.field_from_parameter(self, 'field_sinks', snk)
             ops.ordered_map_valid_stream(src_, map_, snk_)
-
-    def ordered_merge(self, left_on, right_on, how,
-                      left_field_sources=tuple(), left_field_sinks=None,
-                      right_field_sources=tuple(), right_field_sinks=None,
-                      left_unique=False, right_unique=False):
-        if how == 'left':
-            return self.ordered_merge_left(left_on, right_on, left_field_sinks, left_unique, left_field_sources,
-                                           right_unique)
-        elif how == 'right':
-            return self.ordered_merge_left(right_on, left_on, right_field_sinks, right_unique, right_field_sources,
-                                           left_unique)
-        elif how == 'inner':
-            return self.ordered_merge_inner(left_on, right_on,
-                                            left_field_sources, left_field_sinks,
-                                            right_field_sources, right_field_sinks,
-                                            left_unique, right_unique)
-        else:
-            raise ValueError("'how' must be one of 'left', 'right' or 'inner'")
 
 
     def ordered_merge_left(self, left_on, right_on, left_field_sources=tuple(), left_field_sinks=None,
