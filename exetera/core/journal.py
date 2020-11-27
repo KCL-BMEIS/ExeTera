@@ -134,7 +134,7 @@ def journal_table(session, schema, old_src, new_src, src_pk, result):
             new_f_ = session.apply_index(new_sorted_index, new_f)
             dest_ = np.zeros(merged_length, old_f_.dtype)
             ops.merge_journalled_entries(old_map, new_map, to_keep, old_f_, new_f_, dest_)
-            dest_f = new_f_i_.create_like(result, k)
+            dest_f = new_f_.create_like(result, k)
             dest_f.data.write(dest_)
 
     print("old_count:", old_count)

@@ -397,9 +397,7 @@ def _apply_spans_min(spans, src_array, dest_array):
 
 @njit
 def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
-                        max_index_i, max_value_i, s_start):
-    separator = np.frombuffer(b',', dtype=np.uint8)[0]
-    delimiter = np.frombuffer(b'"', dtype=np.uint8)[0]
+                        max_index_i, max_value_i, s_start, separator, delimiter):
     if s_start == 0:
         index_i = np.uint32(1)
         index_v = np.int64(0)
@@ -726,7 +724,7 @@ class DataStore:
             val._check_is_appropriate_writer_if_set(self, 'writer', reader, writer)
 
             src_indices = reader.field['index'][:]
-            src_values = reader.field.get('values', np.zeros(0, dtype='S1'))[:]
+            src_values = reader.field.get('values', np.zeros(0, dtype=np.uint8))[:]
 
             indices, values = _apply_indices_to_index_values(indices_to_apply,
                                                              src_indices, src_values)
@@ -969,11 +967,20 @@ class DataStore:
 
         max_index_i = reader.chunksize
         max_value_i = reader.chunksize * 8
+
+        if src_values.dtype == 'S1':
+            separator = b','
+            delimiter = b'"'
+        elif src_values.dtype == np.uint8:
+            separator = np.frombuffer(b',', dtype='S1')[0]
+            delimiter = np.frombuffer(b'"', dtype='S1')[0]
+
         s = 0
         while s < len(spans) - 1:
             s, index_i, index_v = _apply_spans_concat(spans, src_index, src_values,
                                                       dest_index, dest_values,
-                                                      max_index_i, max_value_i, s)
+                                                      max_index_i, max_value_i, s,
+                                                      separator, delimiter)
 
             if index_i > 0 or index_v > 0:
                 writer.write_raw(dest_index[:index_i], dest_values[:index_v])

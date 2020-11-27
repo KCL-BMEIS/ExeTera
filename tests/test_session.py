@@ -272,18 +272,18 @@ class TestSessionSort(unittest.TestCase):
             s.create_numeric(hf, 'a', 'int32').data.write(va)
             s.create_numeric(hf, 'b', 'int32').data.write(vb)
 
-            ra = s.get_reader(hf['a'])
-            rb = s.get_reader(hf['b'])
-            rx = s.get_reader(hf['x'])
+            ra = s.get(hf['a'])
+            rb = s.get(hf['b'])
+            rx = s.get(hf['x'])
             sindex = s.dataset_sort_index((ra, rb), np.arange(5, dtype='uint32'))
 
-            s.apply_index(sindex, ra, ra.get_writer(hf, 'a', write_mode='overwrite'))
-            s.apply_index(sindex, rb, rb.get_writer(hf, 'b', write_mode='overwrite'))
-            s.apply_index(sindex, rx, rx.get_writer(hf, 'x', write_mode='overwrite'))
+            ra.writeable().data[:] = s.apply_index(sindex, ra)
+            rb.writeable().data[:] = s.apply_index(sindex, rb)
+            rx.writeable().data[:] = s.apply_index(sindex, rx)
 
-            self.assertListEqual([1, 1, 1, 2, 2], s.get_reader(hf['a'])[:].tolist())
-            self.assertListEqual([1, 2, 5, 3, 4], s.get_reader(hf['b'])[:].tolist())
-            self.assertListEqual([b'e', b'd', b'a', b'c', b'b'], s.get_reader(hf['x'])[:].tolist())
+            self.assertListEqual([1, 1, 1, 2, 2], s.get(hf['a']).data[:].tolist())
+            self.assertListEqual([1, 2, 5, 3, 4], s.get(hf['b']).data[:].tolist())
+            self.assertListEqual([b'e', b'd', b'a', b'c', b'b'], s.get(hf['x']).data[:].tolist())
 
 
     def test_dataset_sort_index_groups(self):
@@ -301,13 +301,13 @@ class TestSessionSort(unittest.TestCase):
 
             sindex = s.dataset_sort_index((hf['a'], hf['b']), np.arange(5, dtype='uint32'))
 
-            s.apply_index(sindex, hf['a'], hf['a'])
-            s.apply_index(sindex, hf['b'], hf['b'])
-            s.apply_index(sindex, hf['x'], hf['x'])
+            s.get(hf['a']).writeable().data[:] = s.apply_index(sindex, hf['a'])
+            s.get(hf['b']).writeable().data[:] = s.apply_index(sindex, hf['b'])
+            s.get(hf['x']).writeable().data[:] = s.apply_index(sindex, hf['x'])
 
-            self.assertListEqual([1, 1, 1, 2, 2], s.get_reader(hf['a'])[:].tolist())
-            self.assertListEqual([1, 2, 5, 3, 4], s.get_reader(hf['b'])[:].tolist())
-            self.assertListEqual([b'e', b'd', b'a', b'c', b'b'], s.get_reader(hf['x'])[:].tolist())
+            self.assertListEqual([1, 1, 1, 2, 2], s.get(hf['a']).data[:].tolist())
+            self.assertListEqual([1, 2, 5, 3, 4], s.get(hf['b']).data[:].tolist())
+            self.assertListEqual([b'e', b'd', b'a', b'c', b'b'], s.get(hf['x']).data[:].tolist())
 
 
 
@@ -455,9 +455,9 @@ class TestSessionImporters(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             values = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
                       '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
-            im = fields.FixedStringImporter(s, hf, 'x',
-                                            max(len(v.encode()) for v in values))
-            im.write(values)
+            bvalues = [v.encode() for v in values]
+            im = fields.FixedStringImporter(s, hf, 'x', max(len(b) for b in bvalues))
+            im.write(bvalues)
             f = s.get(hf['x'])
             print(f, f.data)
             print(f.data[:])

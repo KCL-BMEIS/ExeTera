@@ -27,3 +27,15 @@ class TestIndexedStringFields(unittest.TestCase):
             s.apply_filter(np.asarray([False, True, True, False]), f, f2)
             print(f2.indices[:])
             print(f2.values[:])
+
+    def test_update_legacy_indexed_string_that_has_uint_values(self):
+        bio = BytesIO()
+        with h5py.File(bio) as hf:
+            s = session.Session()
+            strings = ['a', 'bb', 'ccc', 'dddd']
+            f = fields.IndexedStringImporter(s, hf, 'foo')
+            f.write(strings)
+            values = hf['foo']['values'][:]
+            print(values)
+
+

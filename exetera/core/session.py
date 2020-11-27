@@ -178,17 +178,17 @@ class Session:
         """
         # TODO: fields is being ignored at present
 
-        readers = tuple(self.get_reader(src_group[f]) for f in keys)
+        readers = tuple(self.get(src_group[f]) for f in keys)
         t1 = time.time()
         sorted_index = self.dataset_sort_index(
-            np.arange(len(readers[0]), dtype=np.uint32), readers)
+            readers, np.arange(len(readers[0].data), dtype=np.uint32))
         print(f'sorted {keys} index in {time.time() - t1}s')
 
         t0 = time.time()
         for k in src_group.keys():
             t1 = time.time()
-            r = self.get_reader(src_group[k])
-            w = r.get_writer(dest_group, k, timestamp, write_mode=write_mode)
+            r = self.get(src_group[k])
+            w = r.create_like(dest_group, k, timestamp)
             self.apply_index(sorted_index, r, w)
             del r
             del w

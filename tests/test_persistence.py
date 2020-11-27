@@ -791,12 +791,12 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         values = np.arange(95)
 
         with h5py.File(bio, 'w') as hf:
-            persistence.NumericWriter(datastore, hf, 'foo', 'int32', ts).write(values)
+            rw.NumericWriter(datastore, hf, 'foo', 'int32', ts).write(values)
 
-            reader = persistence.NumericReader(datastore, hf['foo'])
+            reader = rw.NumericReader(datastore, hf['foo'])
             writer = reader.get_writer(hf, 'foo', ts, 'overwrite')
             writer.write(values * 2)
-            reader = persistence.NumericReader(datastore, hf['foo'])
+            reader = rw.NumericReader(datastore, hf['foo'])
             print(reader[:])
 
 
@@ -846,8 +846,8 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
             foo = rw.NumericWriter(datastore, asmts, 'foo', 'int32', ts)
             foo.write(np.arange(95, dtype='int32'))
             trash = datastore.get_trash_group(foo.field)
-            hf.move('/asmts/foo', trash.name)
-            print(hf['/trash/abcd/asmts/foo'])
+            hf.move('/asmts/foo', trash.name+'/foo')
+            print(hf[trash.name+'/foo'])
         del hf
 
         bio = BytesIO()
@@ -1077,9 +1077,9 @@ class TestPersistenceOperations(unittest.TestCase):
     def test_sort(self):
 
         datastore = persistence.DataStore(10)
-        vx = [b'a', b'b', b'c', b'd', b'e']
-        va = [1, 2, 2, 1, 1]
-        vb = [5, 4, 3, 2, 1]
+        vx = np.asarray([b'a', b'b', b'c', b'd', b'e'], dtype='S1')
+        va = np.asarray([1, 2, 2, 1, 1], dtype=np.int32)
+        vb = np.asarray([5, 4, 3, 2, 1], dtype=np.int32)
         dt = datetime.now(timezone.utc)
         ts = str(dt)
         bio = BytesIO()
@@ -1120,7 +1120,6 @@ class TestPersistenceOperations(unittest.TestCase):
         # print(np.asarray(vx)[accindex])
 
     def test_indexed_string_sort(self):
-
         datastore = persistence.DataStore(10)
         ts = str(datetime.now(timezone.utc))
         bio = BytesIO()
@@ -1152,17 +1151,22 @@ class TestPersistenceOperations(unittest.TestCase):
 
             self.assertListEqual(values, actual)
 
-        with h5py.File(bio, 'r') as hf:
+        with h5py.File(bio, 'r+') as hf:
             foo = rw.IndexedStringReader(datastore, hf['foo'])
             index = np.asarray(
                 [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21,
                  23, 25, 27, 29, 31, 33, 35, 37, 39, 41,
                  40, 38, 36, 34, 32, 30, 28, 26, 24, 22, 20,
                  18, 16, 14, 12, 10, 8, 6, 4, 2, 0], dtype=np.int64)
-            bar = foo.get_writer(hf, 'bar', ts)
+            bar = foo.get_writer(hf, 'bar')
             datastore.apply_sort(index, foo, bar)
-            print(bar)
-
+            expected = ['False', '', '', 'Stupendous', "I really don't know", 'Ambiguous',
+                        '', 'Things', 'Perspicacious', 'Fa,lse', '', '', 'Troubador',
+                        'Calisthenics', '', 'Brown', '', 'Jumped', 'Over', '', 'Dog',
+                        'Lazy', 'The', '', 'Fox', '', 'Quick', 'The', '', 'True', 'True',
+                        '', 'False', 'Zombie driver', '', '', 'True', '', 'True', 'False',
+                        '', 'True']
+            self.assertListEqual(datastore.get_reader(hf['bar'])[:], expected)
 
 
 class TestJoining(unittest.TestCase):
@@ -1358,56 +1362,56 @@ class TestDataWriter(unittest.TestCase):
             print(hf['x'])
 
 
-class TestLongPersistence(unittest.TestCase):
-
-    def test_large_dataset_chunk_settings(self):
-        import time
-        import random
-        import numpy as np
-
-        with h5py.File('covid_test.hdf5', 'w') as hf:
-            random.seed(12345678)
-            count = 1000000
-            chunk = 100000
-            data = np.zeros(count, dtype=np.uint32)
-            for i in range(count):
-                data[i] = random.randint(0, 1000)
-            ds = hf.create_dataset('foo', (count,), chunks=(chunk,), maxshape=(None,), data=data)
-            ds2 = hf.create_dataset('foo2', (count,), data=data)
-
-        with h5py.File('covid_test.hdf5', 'r') as hf:
-
-            ds = hf['foo'][()]
-            print('foo parse')
-            t0 = time.time()
-            total = 0
-            for d in ds:
-                total += d
-            print(f"{total} in {time.time() - t0}")
-
-            ds = hf['foo']
-            print('foo parse')
-            t0 = time.time()
-            total = 0
-            for d in ds:
-                total += d
-            print(f"{total} in {time.time() - t0}")
-
-            ds = hf['foo2'][()]
-            print('foo parse')
-            t0 = time.time()
-            total = 0
-            for d in ds:
-                total += d
-            print(f"{total} in {time.time() - t0}")
-
-            ds = hf['foo2']
-            print('foo parse')
-            t0 = time.time()
-            total = 0
-            for d in ds:
-                total += d
-            print(f"{total} in {time.time() - t0}")
+# class TestLongPersistence(unittest.TestCase):
+#
+#     def test_large_dataset_chunk_settings(self):
+#         import time
+#         import random
+#         import numpy as np
+#
+#         with h5py.File('covid_test.hdf5', 'w') as hf:
+#             random.seed(12345678)
+#             count = 1000000
+#             chunk = 100000
+#             data = np.zeros(count, dtype=np.uint32)
+#             for i in range(count):
+#                 data[i] = random.randint(0, 1000)
+#             ds = hf.create_dataset('foo', (count,), chunks=(chunk,), maxshape=(None,), data=data)
+#             ds2 = hf.create_dataset('foo2', (count,), data=data)
+#
+#         with h5py.File('covid_test.hdf5', 'r') as hf:
+#
+#             ds = hf['foo'][()]
+#             print('foo parse')
+#             t0 = time.time()
+#             total = 0
+#             for d in ds:
+#                 total += d
+#             print(f"{total} in {time.time() - t0}")
+#
+#             ds = hf['foo']
+#             print('foo parse')
+#             t0 = time.time()
+#             total = 0
+#             for d in ds:
+#                 total += d
+#             print(f"{total} in {time.time() - t0}")
+#
+#             ds = hf['foo2'][()]
+#             print('foo parse')
+#             t0 = time.time()
+#             total = 0
+#             for d in ds:
+#                 total += d
+#             print(f"{total} in {time.time() - t0}")
+#
+#             ds = hf['foo2']
+#             print('foo parse')
+#             t0 = time.time()
+#             total = 0
+#             for d in ds:
+#                 total += d
+#             print(f"{total} in {time.time() - t0}")
 
 
 class TestValidation(unittest.TestCase):

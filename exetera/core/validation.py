@@ -2,7 +2,6 @@ import numpy as np
 
 import h5py
 
-from exetera.core import persistence as per
 from exetera.core import fields as fld
 from exetera.core import readerwriter as rw
 
@@ -54,6 +53,8 @@ def _check_all_readers_valid_and_same_type(readers):
         expected_type = h5py.Group
     elif isinstance(readers[0], rw.Reader):
         expected_type = rw.Reader
+    elif isinstance(readers[0], fld.Field):
+        expected_type = fld.Field
     elif isinstance(readers[0], np.ndarray):
         expected_type = np.ndarray
     else:
@@ -96,7 +97,7 @@ def _reader_from_group_if_required(reader_source, name, reader):
 
 def raw_array_from_parameter(datastore, name, field):
     if isinstance(field, h5py.Group):
-        return datastore.get_reader(field)[:]
+        return datastore.get(field).data[:]
     elif isinstance(field, rw.Reader):
         return field[:]
     elif isinstance(field, fld.Field):
