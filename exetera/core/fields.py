@@ -4,7 +4,7 @@ import numpy as np
 import numba
 import h5py
 
-from exetera.core.readerwriter import DataWriter
+from exetera.core.data_writer import DataWriter
 from exetera.core import utils
 
 
@@ -626,7 +626,7 @@ class DateTimeImporter:
                  optional=False, write_days=False, timestamp=None, chunksize=None):
         chunksize = session.chunksize if chunksize is None else chunksize
         timestamp_field_constructor(session, group, name, timestamp, chunksize)
-        self._field = TimestampField(session, group, name, timestamp, write_enabled=True)
+        self._field = TimestampField(session, group, name, write_enabled=True)
         self._results = np.zeros(chunksize , dtype='float64')
         self._optional = optional
 
@@ -671,7 +671,7 @@ class DateImporter:
     def __init__(self, session, group, name,
                  optional=False, timestamp=None, chunksize=None):
         timestamp_field_constructor(session, group, name, timestamp, chunksize)
-        self._field = TimestampField(session, group, name, timestamp, write_enabled=True)
+        self._field = TimestampField(session, group, name, write_enabled=True)
         self._results = np.zeros(chunksize, dtype='float64')
 
         if optional is True:
