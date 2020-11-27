@@ -1,100 +1,11 @@
 from datetime import datetime
-from threading import Thread
 
 import h5py
 
 import numpy as np
 
-
-class DataWriter:
-
-    @staticmethod
-    def clear_dataset(parent_group, name):
-        t = Thread(target=DataWriter._clear_dataset,
-                   args=(parent_group, name))
-        t.start()
-        t.join()
-
-    @staticmethod
-    def _clear_dataset(field, name):
-        del field[name]
-
-    @staticmethod
-    def _create_group(parent_group, name, attrs):
-        group = parent_group.create_group(name)
-        for k, v in attrs:
-            try:
-                group.attrs[k] = v
-            except Exception as e:
-                print(f"Exception {e} caught while assigning attribute {k} value {v}")
-                raise
-        group.attrs['completed'] = False
-
-    @staticmethod
-    def create_group(parent_group, name, attrs):
-        t = Thread(target=DataWriter._create_group,
-                   args=(parent_group, name, attrs))
-        t.start()
-        t.join()
-
-    @staticmethod
-    def write(group, name, field, count, dtype=None):
-        if name not in group.keys():
-            DataWriter._write_first(group, name, field, count, dtype)
-        else:
-            DataWriter._write_additional(group, name, field, count)
-
-    @staticmethod
-    def _write_first(group, name, field, count, dtype=None):
-        if dtype is not None:
-            if count == len(field):
-                ds = group.create_dataset(
-                    name, (count,), maxshape=(None,), chunks=(1 << 20,), dtype=dtype)
-                ds[:] = field
-            else:
-                ds = group.create_dataset(
-                    name, (count,), maxshape=(None,), chunks=(1 << 20,), dtype=dtype)
-                ds[:] = field[:count]
-        else:
-            if count == len(field):
-                group.create_dataset(name, (count,), maxshape=(None,), chunks=(1 << 20,),
-                                     data=field)
-            else:
-                group.create_dataset(name, (count,), maxshape=(None,), chunks=(1 << 20,),
-                                     data=field[:count])
-
-    @staticmethod
-    def write_first(group, name, field, count, dtype=None):
-        t = Thread(target=DataWriter._write_first,
-                   args=(group, name, field, count, dtype))
-        t.start()
-        t.join()
-
-    @staticmethod
-    def _write_additional(group, name, field, count):
-        gv = group[name]
-        gv.resize((gv.size + count,))
-        if count == len(field):
-            gv[-count:] = field
-        else:
-            gv[-count:] = field[:count]
-
-    @staticmethod
-    def write_additional(group, name, field, count):
-        t = Thread(target=DataWriter._write_additional,
-                   args=(group, name, field, count))
-        t.start()
-        t.join()
-
-    @staticmethod
-    def _flush(group):
-        group.attrs['completed'] = True
-
-    @staticmethod
-    def flush(group):
-        t = Thread(target=DataWriter._flush, args=(group,))
-        t.start()
-        t.join()
+from exetera.core import persistence as pers
+from exetera.core.data_writer import DataWriter
 
 
 class Reader:
@@ -149,7 +60,7 @@ class IndexedStringReader(Reader):
         field_index = self.field['index'][:]
         field_values = self.field['values'][:]
         r_field_index, r_field_values =\
-            self.datastore.apply_sort_to_index_values(index, field_index, field_values)
+            pers._apply_sort_to_index_values(index, field_index, field_values)
         writer.write_raw(r_field_index, r_field_values)
 
 
@@ -298,6 +209,10 @@ class Writer:
         if self.trash_field is not None:
             del self.trash_field
 
+    @property
+    def chunksize(self):
+        return self.datastore.chunksize
+
 
 class IndexedStringWriter(Writer):
     def __init__(self, datastore, group, name,
@@ -367,8 +282,8 @@ class IndexedStringWriter(Writer):
     def write_part_raw(self, index, values):
         if index.dtype != np.int64:
             raise ValueError(f"'index' must be an ndarray of '{np.int64}'")
-        if values.dtype != np.uint8:
-            raise ValueError(f"'values' must be an ndarray of '{np.uint8}'")
+        if values.dtype not in (np.uint8, 'S1'):
+            raise ValueError(f"'values' must be an ndarray of '{np.uint8}' or 'S1'")
         DataWriter.write(self.field, 'index', index, len(index))
         DataWriter.write(self.field, 'values', values, len(values))
 
