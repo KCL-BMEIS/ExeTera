@@ -267,7 +267,7 @@ class Session:
             dest_indices, dest_values =\
                 ops.apply_filter_to_index_values(filter_to_apply_,
                                                  src_.indices[:], src_.values[:])
-            if writer_:
+            if writer_ is not None:
                 writer_.indices.write(dest_indices)
                 writer_.values.write(dest_values)
             return dest_indices, dest_values
@@ -299,7 +299,7 @@ class Session:
             dest_indices, dest_values =\
                 ops.apply_indices_to_index_values(index_to_apply_,
                                                   src_.indices[:], src_.values[:])
-            if writer_:
+            if writer_ is not None:
                 writer_.indices.write(dest_indices)
                 writer_.values.write(dest_values)
             return dest_indices, dest_values
