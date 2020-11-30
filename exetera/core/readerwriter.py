@@ -263,7 +263,7 @@ class IndexedStringWriter(Writer):
                 self.index_index = 0
 
     def flush(self):
-        if self.value_index != 0:
+        if self.value_index != 0 or 'values' not in self.field:
             DataWriter.write(self.field, 'values', self.values, self.value_index)
             self.value_index = 0
         if self.index_index != 0:
