@@ -750,13 +750,14 @@ class Session:
         print('  building patient_id index')
         t0 = time.time()
         target_lookup = dict()
-        for i, v in enumerate(target[:]):
+        target_ = val.raw_array_from_parameter(self, "target", target)
+        for i, v in enumerate(target_):
             target_lookup[v] = i
         print(f'  target lookup built in {time.time() - t0}s')
 
         print('  perform initial index')
         t0 = time.time()
-        foreign_key_elems = foreign_key[:]
+        foreign_key_elems = val.raw_array_from_parameter(self, "foreign_key", foreign_key)
         # foreign_key_index = np.asarray([target_lookup.get(i, -1) for i in foreign_key_elems],
         #                                    dtype=np.int64)
         foreign_key_index = np.zeros(len(foreign_key_elems), dtype=np.int64)
@@ -770,8 +771,11 @@ class Session:
             foreign_key_index[i_k] = index
         print(f'  initial index performed in {time.time() - t0}s')
 
-        if destination:
-            destination.write(foreign_key_index)
+        if destination is not None:
+            if val.is_field_parameter(self, "destination", destination):
+                destination.data.write(foreign_key_index)
+            else:
+                destination[:] = foreign_key_index
         else:
             return foreign_key_index
 
