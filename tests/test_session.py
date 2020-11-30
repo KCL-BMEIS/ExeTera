@@ -52,7 +52,7 @@ class TestSessionMerge(unittest.TestCase):
         print(pd.merge(left=pdf, right=ddf, left_on='id', right_on='patient_id', how='left'))
         print(s.merge_left(left_on=p_id, right_on=d_pid, right_fields=(d_counts,)))
         print(
-            s.ordered_merge_left(left_on=p_id, right_on=d_pid, left_field_sources=(d_counts,), left_to_right_map=d_to_p,
+            s.ordered_merge_left(left_on=p_id, right_on=d_pid, right_field_sources=(d_counts,), left_to_right_map=d_to_p,
                                  left_unique=True, right_unique=True))
 
     def test_merge_left_dataset(self):
@@ -100,7 +100,7 @@ class TestSessionMerge(unittest.TestCase):
             f_a_pid.data.write(a_pid)
             a_to_p = s.create_numeric(hf, 'a_to_p', 'int64')
             f_a_p_val = s.create_numeric(hf, 'a_p_val', 'int32')
-            s.ordered_merge_left(f_a_pid, f_p_id, left_field_sources=(f_p_val,), left_field_sinks=(f_a_p_val,),
+            s.ordered_merge_left(f_a_pid, f_p_id, right_field_sources=(f_p_val,), left_field_sinks=(f_a_p_val,),
                                  left_to_right_map=a_to_p, right_unique=True)
 
             p_to_a_vals_exp = np.asarray([-1, -1, -1, -2, -2, -4, -4, -4, -4, -6, -6, -6, 0, 0, -9, -9, -9], dtype=np.int32)
@@ -127,7 +127,7 @@ class TestSessionMerge(unittest.TestCase):
             a_to_p = s.create_numeric(hf, 'a_to_p', 'int64')
             f_a_p_val = s.create_numeric(hf, 'a_p_val', 'int32')
             s.ordered_merge_right(f_p_id, f_a_pid,
-                                  right_field_sources=(f_p_val,),
+                                  left_field_sources=(f_p_val,),
                                   right_field_sinks=(f_a_p_val,),
                                   right_to_left_map=a_to_p,
                                   left_unique=True)
@@ -149,11 +149,11 @@ class TestSessionMerge(unittest.TestCase):
         print(res)
 
     def test_ordered_merge_left(self):
-        l_id = np.asarray(['a', 'b', 'd', 'f', 'g', 'h'])
+        l_id = np.asarray([b'a', b'b', b'd', b'f', b'g', b'h'])
         l_vals = np.asarray([100, 200, 400, 600, 700, 800])
         l_vals_2 = np.asarray([10000, 20000, 40000, 60000, 70000, 80000])
 
-        r_id = np.asarray(['a', 'c', 'c', 'd', 'd', 'e', 'e', 'f', 'f', 'h', 'h'])
+        r_id = np.asarray([b'a', b'c', b'c', b'd', b'd', b'e', b'e', b'f', b'f', b'h', b'h'])
         r_vals = np.asarray([1000, 3000, 3001, 4000, 4001, 5000, 5001, 6000, 6001, 8000, 8001])
         r_vals_2 = np.asarray([100000, 300001, 300000, 400001, 400000,
                                500001, 50000, 600001, 600000, 800001, 800000])
@@ -164,34 +164,34 @@ class TestSessionMerge(unittest.TestCase):
 
         s = session.Session()
         l_to_r = np.zeros(len(r_id), dtype=np.int64)
-        actual = s.ordered_merge_left(r_id, l_id, left_field_sources=(l_vals,), left_to_right_map=l_to_r,
+        actual = s.ordered_merge_left(r_id, l_id, right_field_sources=(l_vals,), left_to_right_map=l_to_r,
                                       right_unique=True)
         self.assertTrue(np.array_equal(actual[0], l_vals_exp))
 
         r_to_l = np.zeros(len(l_id), dtype=np.int64)
-        actual = s.ordered_merge_right(l_id, r_id, right_field_sources=(l_vals,), right_to_left_map=r_to_l,
+        actual = s.ordered_merge_right(l_id, r_id, left_field_sources=(l_vals,), right_to_left_map=r_to_l,
                                        left_unique=True)
         self.assertTrue(np.array_equal(actual[0], l_vals_exp))
 
         l_to_r = np.zeros(len(r_id), dtype=np.int64)
-        actual = s.ordered_merge_left(r_id, l_id, left_field_sources=(l_vals, l_vals_2), left_to_right_map=l_to_r,
+        actual = s.ordered_merge_left(r_id, l_id, right_field_sources=(l_vals, l_vals_2), left_to_right_map=l_to_r,
                                       right_unique=True)
         self.assertTrue(np.array_equal(actual[0], l_vals_exp))
         self.assertTrue(np.array_equal(actual[1], l_vals_2_exp))
 
         r_to_l = np.zeros(len(l_id), dtype=np.int64)
-        actual = s.ordered_merge_right(l_id, r_id, right_field_sources=(l_vals, l_vals_2), right_to_left_map=r_to_l,
+        actual = s.ordered_merge_right(l_id, r_id, left_field_sources=(l_vals, l_vals_2), right_to_left_map=r_to_l,
                                        left_unique=True)
         self.assertTrue(np.array_equal(actual[0], l_vals_exp))
         self.assertTrue(np.array_equal(actual[1], l_vals_2_exp))
 
 
     def test_merge_inner(self):
-        l_id = np.asarray(['a', 'b', 'd', 'f', 'g', 'h'])
+        l_id = np.asarray([b'a', b'b', b'd', b'f', b'g', b'h'])
         l_vals = np.asarray([100, 200, 400, 600, 700, 800])
         l_vals_2 = np.asarray([10000, 20000, 40000, 60000, 70000, 80000])
 
-        r_id = np.asarray(['a', 'c', 'c', 'd', 'd', 'e', 'e', 'f', 'f', 'h', 'h'])
+        r_id = np.asarray([b'a', b'c', b'c', b'd', b'd', b'e', b'e', b'f', b'f', b'h', b'h'])
         r_vals = np.asarray([1000, 3000, 3001, 4000, 4001, 5000, 5001, 6000, 6001, 8000, 8001])
         r_vals_2 = np.asarray([100000, 300001, 300000, 400001, 400000,
                                500001, 50000, 600001, 600000, 800001, 800000])
@@ -212,12 +212,54 @@ class TestSessionMerge(unittest.TestCase):
         self.assertTrue(np.array_equal(actual[1][1], r_vals_2_exp))
 
 
-    def test_ordered_merge_inner(self):
-        l_id = np.asarray(['a', 'b', 'd', 'f', 'g', 'h'])
+    def test_ordered_merge_inner_fields(self):
+        l_id = np.asarray([b'a', b'b', b'd', b'f', b'g', b'h'])
         l_vals = np.asarray([100, 200, 400, 600, 700, 800])
         l_vals_2 = np.asarray([10000, 20000, 40000, 60000, 70000, 80000])
 
-        r_id = np.asarray(['a', 'c', 'c', 'd', 'd', 'e', 'e', 'f', 'f', 'h', 'h'])
+        r_id = np.asarray([b'a', b'c', b'c', b'd', b'd', b'e', b'e', b'f', b'f', b'h', b'h'])
+        r_vals = np.asarray([1000, 3000, 3001, 4000, 4001, 5000, 5001, 6000, 6001, 8000, 8001])
+        r_vals_2 = np.asarray([100000, 300001, 300000, 400001, 400000,
+                               500001, 50000, 600001, 600000, 800001, 800000])
+
+        l_vals_exp = np.asarray([100, 400, 400, 600, 600, 800, 800], dtype=np.int32)
+        l_vals_2_exp = np.asarray([10000, 40000, 40000, 60000, 60000, 80000, 80000],
+                                  dtype=np.int32)
+        r_vals_exp = np.asarray([1000, 4000, 4001, 6000, 6001, 8000, 8001], dtype=np.int32)
+        r_vals_2_exp = np.asarray([100000, 400001, 400000, 600001, 600000, 800001, 800000],
+                                  dtype=np.int32)
+
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as hf:
+            s = session.Session()
+            l_id_f = s.create_fixed_string(hf, 'l_id', 1); l_id_f.data.write(l_id)
+            l_vals_f = s.create_numeric(hf, 'l_vals_f', 'int32'); l_vals_f.data.write(l_vals)
+            l_vals_2_f = s.create_numeric(hf, 'l_vals_2_f', 'int32'); l_vals_2_f.data.write(l_vals_2)
+            r_id_f = s.create_fixed_string(hf, 'r_id', 1); r_id_f.data.write(r_id)
+            r_vals_f = s.create_numeric(hf, 'r_vals_f', 'int32'); r_vals_f.data.write(r_vals)
+            r_vals_2_f = s.create_numeric(hf, 'r_vals_2_f', 'int32'); r_vals_2_f.data.write(r_vals_2)
+            i_l_vals_f = s.create_numeric(hf, 'i_l_vals_f', 'int32')
+            i_l_vals_2_f = s.create_numeric(hf, 'i_l_vals_2_f', 'int32')
+            i_r_vals_f = s.create_numeric(hf, 'i_r_vals_f', 'int32')
+            i_r_vals_2_f = s.create_numeric(hf, 'i_r_vals_2_f', 'int32')
+            s.ordered_merge_inner(l_id_f, r_id_f,
+                                  left_field_sources=(l_vals_f, l_vals_2_f),
+                                  right_field_sources=(r_vals_f, r_vals_2_f),
+                                  left_unique=True, right_unique=False,
+                                  left_field_sinks=(i_l_vals_f, i_l_vals_2_f),
+                                  right_field_sinks=(i_r_vals_f, i_r_vals_2_f))
+            self.assertTrue(np.array_equal(i_l_vals_f.data[:], l_vals_exp))
+            self.assertTrue(np.array_equal(i_l_vals_2_f.data[:], l_vals_2_exp))
+            self.assertTrue(np.array_equal(i_r_vals_f.data[:], r_vals_exp))
+            self.assertTrue(np.array_equal(i_r_vals_2_f.data[:], r_vals_2_exp))
+
+
+    def test_ordered_merge_inner(self):
+        l_id = np.asarray([b'a', b'b', b'd', b'f', b'g', b'h'], dtype='S1')
+        l_vals = np.asarray([100, 200, 400, 600, 700, 800])
+        l_vals_2 = np.asarray([10000, 20000, 40000, 60000, 70000, 80000])
+
+        r_id = np.asarray([b'a', b'c', b'c', b'd', b'd', b'e', b'e', b'f', b'f', b'h', b'h'], dtype='S1')
         r_vals = np.asarray([1000, 3000, 3001, 4000, 4001, 5000, 5001, 6000, 6001, 8000, 8001])
         r_vals_2 = np.asarray([100000, 300001, 300000, 400001, 400000,
                                500001, 50000, 600001, 600000, 800001, 800000])

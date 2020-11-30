@@ -664,6 +664,7 @@ def ordered_inner_map_result_size(left, right):
     return result_size
 
 
+@njit
 def ordered_outer_map_result_size_both_unique(left, right):
     i = 0
     j = 0

@@ -78,10 +78,10 @@ class Session:
         """
         Open a dataset with the given access mode
         :param dataset_path: the path to the dataset
-        :param mode: the mode in which the dataset should be opened. This is one of "r", "w" or "o".
+        :param mode: the mode in which the dataset should be opened. This is one of "r", "r+" or "w".
         :return: The top-level dataset object
         """
-        h5py_modes = {"r": "r", "w": "r+", "o": "w"}
+        h5py_modes = {"r": "r", "r+": "r+", "w": "w"}
         if name in self.datasets:
             raise ValueError("A dataset with name '{}' is already open, and must be closed first.".format(name))
 
@@ -98,6 +98,14 @@ class Session:
         if name in self.datasets:
             self.datasets[name].close()
             del self.datasets[name]
+
+
+    def list_datasets(self):
+        return tuple(n for n in self.datasets.keys())
+
+
+    def get_dataset(self, name):
+        return self.datasets[name]
 
 
     def close(self):
@@ -905,7 +913,7 @@ class Session:
             ops.ordered_map_valid_stream(src_, map_, snk_)
 
 
-    def ordered_merge_left(self, left_on, right_on, left_field_sources=tuple(), left_field_sinks=None,
+    def ordered_merge_left(self, left_on, right_on, right_field_sources=tuple(), left_field_sinks=None,
                            left_to_right_map=None, left_unique=False, right_unique=False):
         """
         Generate the results of a left join apply it to the fields described in the tuple
@@ -930,19 +938,20 @@ class Session:
         :return: If left_field_sinks is not set, a tuple of the output fields is returned
         """
         if left_field_sinks is not None:
-            if len(left_field_sources) != len(left_field_sinks):
+            if len(right_field_sources) != len(left_field_sinks):
                 msg = ("{} and {} should be of the same length but are length {} and {} "
                        "respectively")
-                raise ValueError(msg.format(len(left_field_sources), len(left_field_sinks)))
-        val.all_same_basic_type('left_field_sources', left_field_sources)
+                raise ValueError(msg.format(len(right_field_sources), len(left_field_sinks)))
+        val.all_same_basic_type('left_field_sources', right_field_sources)
         if left_field_sinks and len(left_field_sinks) > 0:
             val.all_same_basic_type('left_field_sinks', left_field_sinks)
 
         streamable = val.is_field_parameter(left_on) and \
                      val.is_field_parameter(right_on) and \
-                     val.is_field_parameter(left_field_sources[0]) and \
+                     val.is_field_parameter(right_field_sources[0]) and \
                      left_field_sinks is not None and \
-                     val.is_field_parameter(left_field_sinks[0])
+                     val.is_field_parameter(left_field_sinks[0]) and \
+                     left_to_right_map is not None
 
         result = None
         has_unmapped = None
@@ -957,35 +966,31 @@ class Session:
                     result = left_to_right_map
                 else:
                     result = np.zeros(len(left_on), dtype=np.int64)
+                    left_data = val.array_from_parameter(self, "left_on", left_on)
+                    right_data = val.array_from_parameter(self, "right_on", right_on)
                     has_unmapped = \
-                        ops.ordered_map_to_right_right_unique(left_on, right_on, result)
-
+                        ops.ordered_map_to_right_right_unique(
+                            left_data, right_data, result)
         else:
             if right_unique == False:
                 raise ValueError("Right key must not have duplicates")
-                # if streamable:
-                #     has_unmapped =\
-                #         ops.ordered_map_to_right_left_unique_streamed(left_on, right_on,
-                #                                                       left_to_right_map)
-                #     result = left_to_right_map.data[:]
-                # else:
-                #     result = np.zeros(len(left_on), dtype=np.int64)
-                #     has_unmapped =\
-                #         ops.ordered_map_to_right_left_unique(left_on, right_on, result)
             else:
                 result = np.zeros(len(left_on), dtype=np.int64)
-                has_unmapped = ops.ordered_map_to_right_both_unique(left_on, right_on, result)
+                left_data = val.array_from_parameter(self, "left_on", left_on)
+                right_data = val.array_from_parameter(self, "right_on", right_on)
+                has_unmapped = ops.ordered_map_to_right_both_unique(
+                    left_data, right_data, result)
 
         if streamable:
-            self._streaming_map_fields(result, left_field_sources, left_field_sinks)
+            self._streaming_map_fields(result, right_field_sources, left_field_sinks)
             return None
         else:
-            rtn_left_sinks = self._map_fields(result, left_field_sources, left_field_sinks)
+            rtn_left_sinks = self._map_fields(result, right_field_sources, left_field_sinks)
             return rtn_left_sinks
 
 
     def ordered_merge_right(self, left_on, right_on,
-                            right_field_sources=tuple(), right_field_sinks=None,
+                            left_field_sources=tuple(), right_field_sinks=None,
                             right_to_left_map=None, left_unique=False, right_unique=False):
         """
         Generate the results of a right join apply it to the fields described in the tuple
@@ -1009,15 +1014,14 @@ class Session:
         unique values
         :return: If right_field_sinks is not set, a tuple of the output fields is returned
         """
-        return self.ordered_merge_left(right_on, left_on, right_field_sources, right_field_sinks, right_to_left_map,
-                                       right_unique, left_unique)
+        return self.ordered_merge_left(right_on, left_on, left_field_sources, right_field_sinks,
+                                       right_to_left_map, right_unique, left_unique)
 
 
     def ordered_merge_inner(self, left_on, right_on,
                             left_field_sources=tuple(), left_field_sinks=None,
                             right_field_sources=tuple(), right_field_sinks=None,
-                            left_to_inner_map=None, right_to_inner_map=None,
-                            left_unique=False, right_unique=False,):
+                            left_unique=False, right_unique=False):
 
         if left_field_sinks is not None:
             if len(left_field_sources) != len(left_field_sinks):
@@ -1037,29 +1041,24 @@ class Session:
         if right_field_sinks and len(right_field_sinks) > 0:
             val.all_same_basic_type('right_field_sinks', right_field_sinks)
 
+        left_data = val.array_from_parameter(self, 'left_on', left_on)
+        right_data = val.array_from_parameter(self, 'right_on', right_on)
+
         result = None
+        inner_length = ops.ordered_inner_map_result_size(left_data, right_data)
+
+        left_to_inner = np.zeros(inner_length, dtype=np.int64)
+        right_to_inner = np.zeros(inner_length, dtype=np.int64)
         if left_unique is False:
             if right_unique is False:
-                inner_length = ops.ordered_inner_map_result_size(left_on, right_on)
-                left_to_inner = np.zeros(inner_length, dtype=np.int64)
-                right_to_inner = np.zeros(inner_length, dtype=np.int64)
-                ops.ordered_inner_map(left_on, right_on, left_to_inner, right_to_inner)
+                ops.ordered_inner_map(left_data, right_data, left_to_inner, right_to_inner)
             else:
-                inner_length = ops.ordered_inner_map_result_size(left_on, right_on)
-                left_to_inner = np.zeros(inner_length, dtype=np.int64)
-                right_to_inner = np.zeros(inner_length, dtype=np.int64)
-                ops.ordered_inner_map_left_unique(right_on, left_on, right_to_inner, left_to_inner)
+                ops.ordered_inner_map_left_unique(right_data, left_data, right_to_inner, left_to_inner)
         else:
             if right_unique is False:
-                inner_length = ops.ordered_inner_map_result_size(left_on, right_on)
-                left_to_inner = np.zeros(inner_length, dtype=np.int64)
-                right_to_inner = np.zeros(inner_length, dtype=np.int64)
-                ops.ordered_inner_map_left_unique(left_on, right_on, left_to_inner, right_to_inner)
+                ops.ordered_inner_map_left_unique(left_data, right_data, left_to_inner, right_to_inner)
             else:
-                inner_length = ops.ordered_inner_map_result_size(left_on, right_on)
-                left_to_inner = np.zeros(inner_length, dtype=np.int64)
-                right_to_inner = np.zeros(inner_length, dtype=np.int64)
-                ops.ordered_inner_map_both_unique(left_on, right_on, left_to_inner, right_to_inner)
+                ops.ordered_inner_map_both_unique(left_data, right_data, left_to_inner, right_to_inner)
 
         rtn_left_sinks = self._map_fields(left_to_inner, left_field_sources, left_field_sinks)
         rtn_right_sinks = self._map_fields(right_to_inner, right_field_sources, right_field_sinks)

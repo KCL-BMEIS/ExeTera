@@ -355,6 +355,9 @@ class IndexedStringField(Field):
             self._value_wrapper = wrapper(self._field, 'values')
         return self._value_wrapper
 
+    def __len__(self):
+        return len(self.data)
+
 
 class FixedStringField(Field):
     def __init__(self, session, group, name=None, write_enabled=False):
@@ -378,6 +381,9 @@ class FixedStringField(Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
+    def __len__(self):
+        return len(self.data)
+
 
 class NumericField(Field):
     def __init__(self, session, group, name=None, write_enabled=False):
@@ -400,6 +406,9 @@ class NumericField(Field):
             else:
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
+
+    def __len__(self):
+        return len(self.data)
 
 
 class CategoricalField(Field):
@@ -427,6 +436,8 @@ class CategoricalField(Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
+    def __len__(self):
+        return len(self.data)
 
     # Note: key is presented as value: str, even though the dictionary must be presented
     # as str: value
@@ -458,6 +469,9 @@ class TimestampField(Field):
             else:
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
+
+    def __len__(self):
+        return len(self.data)
 
 
 class IndexedStringImporter:
