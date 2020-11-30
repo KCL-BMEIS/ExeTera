@@ -388,7 +388,162 @@ class TestSessionFilter(unittest.TestCase):
 
 class TestSessionAggregate(unittest.TestCase):
 
-    pass
+    def test_apply_spans_count(self):
+
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        bio = BytesIO()
+        with session.Session() as s:
+            spans = s.get_spans(idx)
+            results = s.apply_spans_count(spans)
+            self.assertListEqual([1, 2, 3, 4], results.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            s.apply_spans_count(spans, dest=s.create_numeric(ds, 'result', 'int32'))
+            self.assertListEqual([1, 2, 3, 4], s.get(ds['result']).data[:].tolist())
+
+    def test_apply_spans_first(self):
+
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        vals = np.asarray([0, 8, 2, 6, 4, 5, 3, 7, 1, 9], dtype=np.int64)
+        bio = BytesIO()
+        with session.Session() as s:
+            spans = s.get_spans(idx)
+            results = s.apply_spans_first(spans, vals)
+            self.assertListEqual([0, 8, 6, 3], results.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            s.apply_spans_first(spans, vals, dest=s.create_numeric(ds, 'result', 'int64'))
+            self.assertListEqual([0, 8, 6, 3], s.get(ds['result']).data[:].tolist())
+
+            s.create_numeric(ds, 'vals', 'int64').data.write(vals)
+            s.apply_spans_first(spans, s.get(ds['vals']), dest=s.create_numeric(ds, 'result2', 'int64'))
+            self.assertListEqual([0, 8, 6, 3], s.get(ds['result2']).data[:].tolist())
+
+    def test_apply_spans_last(self):
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        vals = np.asarray([0, 8, 2, 6, 4, 5, 3, 7, 1, 9], dtype=np.int64)
+        bio = BytesIO()
+        with session.Session() as s:
+            spans = s.get_spans(idx)
+            results = s.apply_spans_last(spans, vals)
+            self.assertListEqual([0, 2, 5, 9], results.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            s.apply_spans_last(spans, vals, dest=s.create_numeric(ds, 'result', 'int64'))
+            self.assertListEqual([0, 2, 5, 9], s.get(ds['result']).data[:].tolist())
+
+            s.create_numeric(ds, 'vals', 'int64').data.write(vals)
+            s.apply_spans_last(spans, s.get(ds['vals']), dest=s.create_numeric(ds, 'result2', 'int64'))
+            self.assertListEqual([0, 2, 5, 9], s.get(ds['result2']).data[:].tolist())
+
+    def test_apply_spans_min(self):
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        vals = np.asarray([0, 8, 2, 6, 4, 5, 3, 7, 1, 9], dtype=np.int64)
+        bio = BytesIO()
+        with session.Session() as s:
+            spans = s.get_spans(idx)
+            results = s.apply_spans_min(spans, vals)
+            self.assertListEqual([0, 2, 4, 1], results.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            s.apply_spans_min(spans, vals, dest=s.create_numeric(ds, 'result', 'int64'))
+            self.assertListEqual([0, 2, 4, 1], s.get(ds['result']).data[:].tolist())
+
+            s.create_numeric(ds, 'vals', 'int64').data.write(vals)
+            s.apply_spans_min(spans, s.get(ds['vals']), dest=s.create_numeric(ds, 'result2', 'int64'))
+            self.assertListEqual([0, 2, 4, 1], s.get(ds['result2']).data[:].tolist())
+
+    def test_apply_spans_max(self):
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        vals = np.asarray([0, 8, 2, 6, 4, 5, 3, 7, 1, 9], dtype=np.int64)
+        bio = BytesIO()
+        with session.Session() as s:
+            spans = s.get_spans(idx)
+            results = s.apply_spans_max(spans, vals)
+            self.assertListEqual([0, 8, 6, 9], results.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            s.apply_spans_max(spans, vals, dest=s.create_numeric(ds, 'result', 'int64'))
+            self.assertListEqual([0, 8, 6, 9], s.get(ds['result']).data[:].tolist())
+
+            s.create_numeric(ds, 'vals', 'int64').data.write(vals)
+            s.apply_spans_max(spans, s.get(ds['vals']), dest=s.create_numeric(ds, 'result2', 'int64'))
+            self.assertListEqual([0, 8, 6, 9], s.get(ds['result2']).data[:].tolist())
+
+    def test_aggregate_count(self):
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        bio = BytesIO()
+        with session.Session() as s:
+            results = s.aggregate_count(idx)
+            self.assertListEqual([1, 2, 3, 4], results.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            s.aggregate_count(idx, dest=s.create_numeric(ds, 'result', 'int32'))
+            self.assertListEqual([1, 2, 3, 4], s.get(ds['result']).data[:].tolist())
+
+    def test_aggregate_first(self):
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        vals = np.asarray([0, 8, 2, 6, 4, 5, 3, 7, 1, 9], dtype=np.int64)
+        bio = BytesIO()
+        with session.Session() as s:
+            results = s.aggregate_first(idx, vals)
+            self.assertListEqual([0, 8, 6, 3], results.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            s.aggregate_first(idx, vals, dest=s.create_numeric(ds, 'result', 'int64'))
+            self.assertListEqual([0, 8, 6, 3], s.get(ds['result']).data[:].tolist())
+
+            s.create_numeric(ds, 'vals', 'int64').data.write(vals)
+            s.aggregate_first(idx, s.get(ds['vals']), dest=s.create_numeric(ds, 'result2', 'int64'))
+            self.assertListEqual([0, 8, 6, 3], s.get(ds['result2']).data[:].tolist())
+
+    def test_aggregate_last(self):
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        vals = np.asarray([0, 8, 2, 6, 4, 5, 3, 7, 1, 9], dtype=np.int64)
+        bio = BytesIO()
+        with session.Session() as s:
+            results = s.aggregate_last(idx, vals)
+            self.assertListEqual([0, 2, 5, 9], results.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            s.aggregate_last(idx, vals, dest=s.create_numeric(ds, 'result', 'int64'))
+            self.assertListEqual([0, 2, 5, 9], s.get(ds['result']).data[:].tolist())
+
+            s.create_numeric(ds, 'vals', 'int64').data.write(vals)
+            s.aggregate_last(idx, s.get(ds['vals']), dest=s.create_numeric(ds, 'result2', 'int64'))
+            self.assertListEqual([0, 2, 5, 9], s.get(ds['result2']).data[:].tolist())
+
+    def test_aggregate_min(self):
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        vals = np.asarray([0, 8, 2, 6, 4, 5, 3, 7, 1, 9], dtype=np.int64)
+        bio = BytesIO()
+        with session.Session() as s:
+            results = s.aggregate_min(idx, vals)
+            self.assertListEqual([0, 2, 4, 1], results.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            s.aggregate_min(idx, vals, dest=s.create_numeric(ds, 'result', 'int64'))
+            self.assertListEqual([0, 2, 4, 1], s.get(ds['result']).data[:].tolist())
+
+            s.create_numeric(ds, 'vals', 'int64').data.write(vals)
+            s.aggregate_min(idx, s.get(ds['vals']), dest=s.create_numeric(ds, 'result2', 'int64'))
+            self.assertListEqual([0, 2, 4, 1], s.get(ds['result2']).data[:].tolist())
+
+    def test_aggregate_max(self):
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        vals = np.asarray([0, 8, 2, 6, 4, 5, 3, 7, 1, 9], dtype=np.int64)
+        bio = BytesIO()
+        with session.Session() as s:
+            results = s.aggregate_max(idx, vals)
+            self.assertListEqual([0, 8, 6, 9], results.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            s.aggregate_max(idx, vals, dest=s.create_numeric(ds, 'result', 'int64'))
+            self.assertListEqual([0, 8, 6, 9], s.get(ds['result']).data[:].tolist())
+
+            s.create_numeric(ds, 'vals', 'int64').data.write(vals)
+            s.aggregate_max(idx, s.get(ds['vals']), dest=s.create_numeric(ds, 'result2', 'int64'))
+            self.assertListEqual([0, 8, 6, 9], s.get(ds['result2']).data[:].tolist())
 
 
 class TestSessionFields(unittest.TestCase):

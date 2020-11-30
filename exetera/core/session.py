@@ -364,48 +364,32 @@ class Session:
         return per._get_spans(raw_field, raw_fields)
 
     def _apply_spans_no_src(self, predicate, spans, dest=None):
-        if dest:
-            if val.is_field_parameter(self, 'dest', dest):
-                dest_ = val.field_from_parameter(self, 'dest', dest)
-                results = np.zeros(len(spans) - 1, dtype=dest_.dtype)
-                predicate(spans, results)
-                dest_.data.write(results)
-                return results
-            else:
-                dest_ = val.array_from_parameter(self, 'dest', dest)
-                if len(dest_) != len(spans) - 1:
-                    error_msg = ("if 'dest' (length {}) is an ndarray, it must be one element "
-                                 "shorter than the length of 'spans' (length{})")
-                    raise ValueError(error_msg.format(len(dest_), len(spans)))
-                    predicate(spans, dest_)
-                return dest_
+        assert(dest is None or isinstance(dest, fld.Field))
+        if dest is not None:
+            dest_f = val.field_from_parameter(self, 'dest', dest)
+            results = np.zeros(len(spans) - 1, dtype=dest_f.data.dtype)
+            predicate(spans, results)
+            dest_f.data.write(results)
+            return results
         else:
             results = np.zeros(len(spans) - 1, dtype='int64')
             predicate(spans, results)
             return results
 
     def _apply_spans_src(self, predicate, spans, src, dest=None):
+        assert(dest is None or isinstance(dest, fld.Field))
         src_ = val.array_from_parameter(self, 'src', src)
         if len(src) != spans[-1]:
             error_msg = ("'src' (length {}) must be one element shorter than 'spans' "
                          "(length {})")
             raise ValueError(error_msg.format(len(src_), len(spans)))
 
-        if dest:
-            if val.is_field_parameter(self, 'dest', dest):
-                dest_ = val.field_from_parameter(self, 'dest', dest)
-                results = np.zeros(len(spans) - 1, dtype=dest_.dtype)
-                predicate(spans, results)
-                dest_.data.write(results)
-                return results
-            else:
-                dest_ = val.array_from_parameter(self, 'dest', dest)
-                if len(dest_) != len(spans) - 1:
-                    error_msg = ("if 'dest' (length {}) is an ndarray, it must be one element "
-                                 "shorter than the length of 'spans' (length{})")
-                    raise ValueError(error_msg.format(len(dest_), len(spans)))
-                    predicate(spans, src, dest_)
-                return dest_
+        if dest is not None:
+            dest_f = val.field_from_parameter(self, 'dest', dest)
+            results = np.zeros(len(spans) - 1, dtype=dest_f.data.dtype)
+            predicate(spans, src_, results)
+            dest_f.data.write(results)
+            return results
         else:
             results = np.zeros(len(spans) - 1, dtype=src_.dtype)
             predicate(spans, src, results)
@@ -423,7 +407,7 @@ class Session:
     def apply_spans_index_of_last(self, spans, dest=None):
         return self._apply_spans_no_src(ops.apply_spans_index_of_last, spans, dest)
 
-    def apply_spans_count(self, spans, dest=None):
+    def apply_spans_count(self, spans, src=None, dest=None):
         return self._apply_spans_no_src(ops.apply_spans_count, spans, dest)
 
     def apply_spans_min(self, spans, src, dest=None):
@@ -462,80 +446,49 @@ class Session:
         dest.complete()
 
 
-    def _aggregate_impl(self, predicate, fkey_indices=None, fkey_index_spans=None,
-                        src=None, dest=None, result_dtype=None):
-        if fkey_indices is None and fkey_index_spans is None:
-            raise ValueError("One of 'fkey_indices' or 'fkey_index_spans' must be set")
-        if fkey_indices is not None and fkey_index_spans is not None:
-            raise ValueError("Only one of 'fkey_indices' and 'fkey_index_spans' may be set")
+    def _aggregate_impl(self, predicate, index, src=None, dest=None):
+        index_ = val.raw_array_from_parameter(self, "index", index)
+
+        dest_field = None
         if dest is not None:
-            if not isinstance(dest, (fld.Field, np.ndarray)):
-                raise ValueError("'writer' must be either a Writer or an ndarray instance")
+            dest_field = val.field_from_parameter(self, "dest", dest)
 
-        if fkey_index_spans is None:
-            fkey_index_spans = self.get_spans(field=fkey_indices)
-
-        if isinstance(dest, np.ndarray):
-            if len(dest) != len(fkey_index_spans) - 1:
-                error = "'writer': ndarray must be of length {} but is of length {}"
-                raise ValueError(error.format(len(fkey_index_spans) - 1), len(dest))
-            elif dest.dtype != result_dtype:
-                raise ValueError(f"'writer' dtype must be {result_dtype} but is {dest.dtype}")
-
-        if isinstance(dest, fld.Field) or dest is None:
-            results = np.zeros(len(fkey_index_spans) - 1, dtype=result_dtype)
-        else:
-            results = dest
+        fkey_index_spans = self.get_spans(field=index)
 
         # execute the predicate (note that not every predicate requires a reader)
-        predicate(fkey_index_spans, src, results)
-
-        if isinstance(dest, fld.Field):
-            dest.data.write(results)
+        results = predicate(fkey_index_spans, src, dest_field)
 
         return dest if dest is not None else results
 
 
-    def aggregate_count(self, fkey_indices=None, fkey_index_spans=None,
-                        src=None, dest=None):
-        return per._aggregate_impl(self.apply_spans_count, fkey_indices, fkey_index_spans,
-                                   src, dest, np.uint32)
+    def aggregate_count(self, index=None, src=None, dest=None):
+        return self._aggregate_impl(self.apply_spans_count, index, src, dest)
 
 
-    def aggregate_first(self, fkey_indices=None, fkey_index_spans=None,
-                        src=None, dest=None):
-        return self.aggregate_custom(self.apply_spans_first, fkey_indices, fkey_index_spans,
-                                     src, dest)
+    def aggregate_first(self, index, src=None, dest=None):
+        return self.aggregate_custom(self.apply_spans_first, index, src, dest)
 
 
-    def aggregate_last(self, fkey_indices=None, fkey_index_spans=None,
-                       src=None, dest=None):
-        return self.aggregate_custom(self.apply_spans_last, fkey_indices, fkey_index_spans,
-                                     src, dest)
+    def aggregate_last(self, index, src=None, dest=None):
+        return self.aggregate_custom(self.apply_spans_last, index, src, dest)
 
 
-    def aggregate_min(self, fkey_indices=None, fkey_index_spans=None,
-                      src=None, dest=None):
-        return self.aggregate_custom(self.apply_spans_min, fkey_indices, fkey_index_spans,
-                                     src, dest)
+    def aggregate_min(self, index, src=None, dest=None):
+        return self.aggregate_custom(self.apply_spans_min, index, src, dest)
 
 
-    def aggregate_max(self, fkey_indices=None, fkey_index_spans=None,
-                      src=None, dest=None):
-        return self.aggregate_custom(self.apply_spans_max, fkey_indices, fkey_index_spans,
-                                     src, dest)
+    def aggregate_max(self, index, src=None, dest=None):
+        return self.aggregate_custom(self.apply_spans_max, index, src, dest)
 
 
-    def aggregate_custom(self,
-                         predicate, fkey_indices=None, fkey_index_spans=None,
-                         src=None, dest=None):
+    def aggregate_custom(self, predicate, index, src=None, dest=None):
         if src is None:
-            raise ValueError("'reader' must not be None")
-        if not isinstance(src, (rw.Reader, np.ndarray)):
-            raise ValueError(f"'reader' must be a Reader or an ndarray but is {type(src)}")
-        required_dtype = src.dtype
-        return per._aggregate_impl(predicate, fkey_indices, fkey_index_spans,
-                                   src, dest, required_dtype)
+            raise ValueError("'src' must not be None")
+        val.ensure_valid_field_like("src", src)
+        if dest is not None:
+            val.ensure_valid_field("dest", dest)
+
+        return self._aggregate_impl(predicate, index, src, dest)
 
 
     def join(self,

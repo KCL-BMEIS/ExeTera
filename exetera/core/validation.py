@@ -95,6 +95,16 @@ def _reader_from_group_if_required(reader_source, name, reader):
     return reader
 
 
+def ensure_valid_field(name, field):
+    if not isinstance(field, fld.Field):
+        raise ValueError("'{}' is not of type '{}'; expected Field".format(name, type(field)))
+
+
+def ensure_valid_field_like(name, field):
+    if not isinstance(field, (h5py.Group, fld.Field, np.ndarray)):
+        raise ValueError("'{}' is of type '{}'; expected Group, Field or ndarray".format(name, type(field)))
+
+
 def raw_array_from_parameter(datastore, name, field):
     if isinstance(field, h5py.Group):
         return datastore.get(field).data[:]
