@@ -772,7 +772,7 @@ class Session:
         print(f'  initial index performed in {time.time() - t0}s')
 
         if destination is not None:
-            if val.is_field_parameter(self, "destination", destination):
+            if val.is_field_parameter(destination):
                 destination.data.write(foreign_key_index)
             else:
                 destination[:] = foreign_key_index
