@@ -195,11 +195,21 @@ class Session:
         t0 = time.time()
         for k in src_group.keys():
             t1 = time.time()
-            r = self.get(src_group[k])
-            w = r.create_like(dest_group, k, timestamp)
-            self.apply_index(sorted_index, r, w)
-            del r
-            del w
+            if src_group != dest_group:
+                r = self.get(src_group[k])
+                w = r.create_like(dest_group, k, timestamp)
+                self.apply_index(sorted_index, r, w)
+                del r
+                del w
+            else:
+                r = self.get(src_group[k]).writeable()
+                if isinstance(r, fld.IndexedStringField):
+                    i, v = self.apply_index(sorted_index, r)
+                    r.indices[:] = i
+                    r.values[:] = v
+                else:
+                    r.data[:] = self.apply_index(sorted_index, r)
+                del r
             print(f"  '{k}' reordered in {time.time() - t1}s")
         print(f"fields reordered in {time.time() - t0}s")
 

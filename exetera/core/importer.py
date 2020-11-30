@@ -39,7 +39,6 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite)
         raise ValueError("none of the data sources in 'files' contain relevant data to the schema")
 
     stop_after = {}
-    # stop_after = {'patients': 500000, 'assessments': 500000}
     reserved_column_names = ('j_valid_from', 'j_valid_to')
     datastore = per.DataStore()
 

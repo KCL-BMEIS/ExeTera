@@ -352,6 +352,27 @@ class TestSessionSort(unittest.TestCase):
             self.assertListEqual([b'e', b'd', b'a', b'c', b'b'], s.get(hf['x']).data[:].tolist())
 
 
+    def test_sort_on(self):
+
+        idx = np.asarray([b'a', b'e', b'b', b'd', b'c'], dtype='S1')
+        val = np.asarray([10, 20, 30, 40, 50], dtype=np.int32)
+        val2 = ['a', 'ee', 'bbb', 'dddd', 'ccccc']
+
+        bio = BytesIO()
+        with session.Session(10) as s:
+            src = s.open_dataset(bio, "w", "src")
+            idx_f = s.create_fixed_string(src, "idx", 1)
+            val_f = s.create_numeric(src, "val", "int32")
+            val2_f = s.create_indexed_string(src, "val2", 5)
+            idx_f.data.write(idx)
+            val_f.data.write(val)
+            val2_f.data.write(val2)
+            s.sort_on(src, src, ("idx",))
+
+            self.assertListEqual([b'a', b'b', b'c', b'd', b'e'], idx_f.data[:].tolist())
+            self.assertListEqual([10, 30, 50, 40, 20], val_f.data[:].tolist())
+            self.assertListEqual(['a', 'bbb', 'ccccc', 'dddd', 'ee'], val2_f.data[:])
+
 
 class TestSessionFilter(unittest.TestCase):
 

@@ -6,7 +6,7 @@ analysis pipelines for large tabular datasets.
 
 # Current release and requirements
 
-Current release version: v0.3.2
+Current release version: v0.4.0
 
 Requires python 3.7+
 
@@ -60,6 +60,14 @@ See the wiki for detailed examples of how to interact with the hdf5 datastore.
 
 
 ## Changes
+
+### v0.3.2 -> v0.4
+
+* Separation of all covid-specific functionality out to [https://github.com/KCL-BMEIS/ExeTeraCovid.git](https://github.com/KCL-BMEIS/ExeTeraCovid.git)
+* Renaming of some of the `ordered_merge_*` functionality parameters for clarity
+* Addition of `open/close/list/get_dataset` functionality to `Session`
+* Made `Session` 'withable'
+* Improved performance of `Session.get_spans`
 
 ### v0.3.1 -> v0.3.2
 * Fixing issues with use of test_type_from_mechanism_v1
