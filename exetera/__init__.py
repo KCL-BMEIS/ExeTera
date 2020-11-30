@@ -1,4 +1,4 @@
 
 from . import core, processing
 
-__version__ = '0.4.0dev4'
+__version__ = '0.4.0dev5'
