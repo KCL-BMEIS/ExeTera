@@ -392,7 +392,7 @@ class Session:
             return results
         else:
             results = np.zeros(len(spans) - 1, dtype=src_.dtype)
-            predicate(spans, src, results)
+            predicate(spans, src_, results)
             return results
 
     def apply_spans_index_of_min(self, spans, src, dest=None):
@@ -494,28 +494,26 @@ class Session:
     def join(self,
              destination_pkey, fkey_indices, values_to_join,
              writer=None, fkey_index_spans=None):
-        if fkey_indices is not None:
-            if not isinstance(fkey_indices, (rw.Reader, np.ndarray)):
-                raise ValueError(f"'fkey_indices' must be a type of Reader or an ndarray")
-        if values_to_join is not None:
-            if not isinstance(values_to_join, (rw.Reader, np.ndarray)):
-                raise ValueError(f"'values_to_join' must be a type of Reader but is {type(values_to_join)}")
-            if isinstance(values_to_join, rw.IndexedStringReader):
-                raise ValueError(f"Joins on indexed string fields are not supported")
 
-        if isinstance(values_to_join, rw.Reader):
-            raw_values_to_join = values_to_join[:]
-        else:
-            raw_values_to_join = values_to_join
+        if isinstance(destination_pkey, fld.IndexedStringField):
+            raise ValueError("'destination_pkey' must not be an indexed string field")
+        if isinstance(fkey_indices, fld.IndexedStringField):
+            raise ValueError("'fkey_indices' must not be an indexed string field")
+        if isinstance(values_to_join, rw.IndexedStringReader):
+            raise ValueError("Joins on indexed string fields are not supported")
+
+        raw_fkey_indices = val.raw_array_from_parameter(self, "fkey_indices", fkey_indices)
+
+        raw_values_to_join = val.raw_array_from_parameter(self, "values_to_join", values_to_join)
 
         # generate spans for the sorted key indices if not provided
         if fkey_index_spans is None:
-            fkey_index_spans = self.get_spans(field=fkey_indices)
+            fkey_index_spans = self.get_spans(field=raw_fkey_indices)
 
         # select the foreign keys from the start of each span to get an ordered list
         # of unique id indices in the destination space that the results of the predicate
         # execution are mapped to
-        unique_fkey_indices = fkey_indices[:][fkey_index_spans[:-1]]
+        unique_fkey_indices = raw_fkey_indices[fkey_index_spans[:-1]]
 
         # generate a filter to remove invalid foreign key indices (where values in the
         # foreign key don't map to any values in the destination space

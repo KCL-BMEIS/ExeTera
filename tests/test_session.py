@@ -281,6 +281,17 @@ class TestSessionMerge(unittest.TestCase):
         self.assertTrue(np.array_equal(actual[1][1], r_vals_2_exp))
 
 
+class TestSessionJoin(unittest.TestCase):
+
+    def test_session_join(self):
+
+        pk = np.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9], dtype=np.int32)
+        vals = np.asarray([10, 20, 30, 40, 50, 60, 70, 80, 90], dtype=np.int64)
+        fki = np.asarray([0, 1, 1, 2, 4, 5, 5, 6, 7, 8, 8, 9], dtype=np.int32)
+        s = session.Session()
+        print(s.join(pk, fki, vals))
+
+
 class TestSessionSort(unittest.TestCase):
 
     def test_dataset_sort_index_ndarray(self):
