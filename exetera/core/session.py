@@ -525,13 +525,15 @@ class Session:
         safe_values_to_join = raw_values_to_join[invalid_filter]
 
         # now get the memory that the results will be mapped to
-        destination_space_values = writer.chunk_factory(len(destination_pkey))
+        #destination_space_values = writer.chunk_factory(len(destination_pkey))
+        destination_space_values = np.zeros(len(destination_pkey), dtype=raw_values_to_join.dtype)
+
 
         # finally, map the results from the source space to the destination space
         destination_space_values[safe_unique_fkey_indices] = safe_values_to_join
 
         if writer is not None:
-            writer.write(destination_space_values)
+            writer.data.write(destination_space_values)
         else:
             return destination_space_values
 
