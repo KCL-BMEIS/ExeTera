@@ -397,6 +397,21 @@ class TestSessionFilter(unittest.TestCase):
         self.assertListEqual([1, 2, 5, 7], result.tolist())
 
 
+class TestSessionGetSpans(unittest.TestCase):
+
+    def test_get_spans(self):
+
+        vals = np.asarray([0, 1, 1, 3, 3, 6, 5, 5, 5], dtype=np.int32)
+        bio = BytesIO()
+        with session.Session() as s:
+            self.assertListEqual([0, 1, 3, 5, 6, 9], s.get_spans(vals).tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            vals_f = s.create_numeric(ds, "vals", "int32")
+            vals_f.data.write(vals)
+            self.assertListEqual([0, 1, 3, 5, 6, 9], s.get_spans(s.get(ds['vals'])).tolist())
+
+
 class TestSessionAggregate(unittest.TestCase):
 
     def test_apply_spans_count(self):

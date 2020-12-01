@@ -354,14 +354,14 @@ class Session:
         raw_field = None
         raw_fields = None
         if field is not None:
-            val._check_is_reader_or_ndarray('field', field)
-            raw_field = field[:] if isinstance(field, rw.Reader) else field
-        else:
-            raw_fields = []
-            for f in fields:
-                val._check_is_reader_or_ndarray('elements of tuple/list fields', f)
-                raw_fields.append(f[:] if isinstance(f, rw.Reader) else f)
+            raw_field = val.array_from_parameter(self, 'field', field)
+
+        raw_fields = []
+        if fields is not None:
+            for i_f, f in enumerate(fields):
+                raw_fields.append(val.array_from_parameter(self, "'fields[{}]'".format(i_f), f))
         return per._get_spans(raw_field, raw_fields)
+
 
     def _apply_spans_no_src(self, predicate, spans, dest=None):
         assert(dest is None or isinstance(dest, fld.Field))
