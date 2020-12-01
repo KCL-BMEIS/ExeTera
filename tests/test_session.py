@@ -285,9 +285,9 @@ class TestSessionJoin(unittest.TestCase):
 
     def test_session_join(self):
 
-        pk = np.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9], dtype=np.int32)
-        vals = np.asarray([10, 20, 30, 40, 50, 60, 70, 80, 90], dtype=np.int64)
-        fki = np.asarray([0, 1, 1, 2, 4, 5, 5, 6, 7, 8, 8, 9], dtype=np.int32)
+        pk = np.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], dtype=np.int32)
+        fki = np.asarray([0, 1, 1, 2, 4, 5, 5, 6, 8, 9, 9, 10], dtype=np.int32)
+        vals = np.asarray([1, 2, 1, 1, 2, 1, 1, 2, 1], dtype=np.int64)
         s = session.Session()
         print(s.join(pk, fki, vals))
 
