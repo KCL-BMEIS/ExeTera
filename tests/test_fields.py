@@ -10,6 +10,22 @@ from exetera.core import fields
 from exetera.core import persistence as per
 
 
+class TestFieldExistence(unittest.TestCase):
+
+    def test_field_truthness(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, "w", "src")
+            f = s.create_indexed_string(src, "a")
+            self.assertTrue(bool(f))
+            f = s.create_fixed_string(src, "b", 5)
+            self.assertTrue(bool(f))
+            f = s.create_numeric(src, "c", "int32")
+            self.assertTrue(bool(f))
+            f = s.create_categorical(src, "d", {"no": 0, "yes": 1}, "int8")
+            self.assertTrue(bool(f))
+
+
 class TestIndexedStringFields(unittest.TestCase):
 
     def test_create_indexed_string(self):
@@ -27,6 +43,9 @@ class TestIndexedStringFields(unittest.TestCase):
             s.apply_filter(np.asarray([False, True, True, False]), f, f2)
             print(f2.indices[:])
             print(f2.values[:])
+            print(f2.data[:])
+            print(f2.data[0])
+            print(f2.data[1])
 
     def test_update_legacy_indexed_string_that_has_uint_values(self):
         bio = BytesIO()

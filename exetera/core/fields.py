@@ -52,6 +52,13 @@ class Field:
     def chunksize(self):
         return self._field.attrs['chunksize']
 
+    def __bool__(self):
+        # this method is required to prevent __len__ being called on derived methods when fields are queried as
+        #   if f:
+        # rather than
+        #   if f is not None:
+        return True
+
 
 class ReadOnlyFieldArray:
     def __init__(self, field, dataset_name):
@@ -132,7 +139,9 @@ class ReadOnlyIndexedFieldArray:
         self._values_dataset = field[values_name]
 
     def __len__(self):
-        return len(self._index_dataset)-1
+        # TODO: this occurs because of the initialized state of an indexed string. It would be better for the
+        # index to be initialised as [0]
+        return max(len(self._index_dataset)-1, 0)
 
     def __getitem__(self, item):
         try:
@@ -150,6 +159,14 @@ class ReadOnlyIndexedFieldArray:
                         bytestr[index[ir]-np.int64(startindex):
                                 index[ir+1]-np.int64(startindex)].tobytes().decode()
                 return results
+            elif isinstance(item, int):
+                if item >= len(self._index_dataset) - 1:
+                    raise ValueError("index is out of range")
+                start, stop = self._index_dataset[item:item + 2]
+                if start == stop:
+                    return ''
+                value = self._values_dataset[start:stop].tobytes().decode()
+                return value
         except Exception as e:
             print("{}: unexpected exception {}".format(self._field.name, e))
             raise
@@ -210,6 +227,14 @@ class WriteableIndexedFieldArray:
                     rstr = rbytes.decode()
                     results[ir] = rstr
                 return results
+            elif isinstance(item, int):
+                if item >= len(self._index_dataset) - 1:
+                    raise ValueError("index is out of range")
+                start, stop = self._index_dataset[item:item + 2]
+                if start == stop:
+                    return ''
+                value = self._values_dataset[start:stop].tobytes().decode()
+                return value
         except Exception as e:
             print("{}: unexpected exception {}".format(self._field.name, e))
             raise
