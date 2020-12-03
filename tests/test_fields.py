@@ -22,7 +22,7 @@ class TestFieldExistence(unittest.TestCase):
             self.assertTrue(bool(f))
             f = s.create_numeric(src, "c", "int32")
             self.assertTrue(bool(f))
-            f = s.create_categorical(src, "d", {"no": 0, "yes": 1}, "int8")
+            f = s.create_categorical(src, "d", "int8", {"no": 0, "yes": 1})
             self.assertTrue(bool(f))
 
 
