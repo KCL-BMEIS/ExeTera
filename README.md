@@ -14,15 +14,8 @@ Requires python 3.7+
 # Usage
 
 The ExeTera allows you to import data from CSV sources into HDF5, a columnar data
-format more suited to performing analytics. This is done in two stages:
-1. Import the data using `exetera import`
-2. Process the data using `exetera postprocess` to create a set of useful additional data from the
-base data
+format more suited to performing analytics. This is done through `exetera import`.
 
-### Why two stages?
-Importing from CSV is a lengthy process that you may only want to do once. Splitting the work
-between importing and processing means that the import can be done only once, and the imported file
-used as a source for processing even if the processing functionality significantly changes.
 
 ### `exetera import`
 ```
@@ -44,18 +37,23 @@ exetera import
    (defaults to `datetime.now(timezone.utc)`)
  * `-w/--overwrite`: If set, overwrite any existing dataset with the same name; appends to existing dataset otherwise
  
-Expect this script to take about an hour or so to execute.
+Expect this script to take about an hour or more to execute on very large datasets.
 
-### `exetera process`
-```
-exetera process -i <input_hdf5> -d -o <output_hdf5>
-```
-#### Arguments
- * `-i/--input`: The path and name of the import hdf5 file
- * `-o/--output`: The path and name of the processed hdf5 file
- * `-d/--daily`: A flag to indicate whether to generate daily assessments
 
 ## How do I work on the resulting dataset?
+This is done through the python `exetera` API.
+
+```python
+from exetera.core.session import Session
+
+with Session() as s:
+    src = s.open_dataset('/path/to/my/source/dataset', 'r', 'src')
+    dest = s.open_dataset('/path/to/my/result/dataset', 'w', 'dest')
+
+    # code...
+```
+
+
 See the wiki for detailed examples of how to interact with the hdf5 datastore.
 
 
@@ -64,10 +62,17 @@ See the wiki for detailed examples of how to interact with the hdf5 datastore.
 ### v0.3.2 -> v0.4
 
 * Separation of all covid-specific functionality out to [https://github.com/KCL-BMEIS/ExeTeraCovid.git](https://github.com/KCL-BMEIS/ExeTeraCovid.git)
+* Removal of legacy csv pipeline code
 * Renaming of some of the `ordered_merge_*` functionality parameters for clarity
 * Addition of `open/close/list/get_dataset` functionality to `Session`
 * Made `Session` 'withable'
 * Improved performance of `Session.get_spans`
+* Bug fixes for Session API
+  * apply_spans / aggregation issues
+* Bug fixes for Field API
+  * provided `__bool__` so that `if field:` works as expected
+  * provided single element read for `IndexedStringField`
+
 
 ### v0.3.1 -> v0.3.2
 * Fixing issues with use of test_type_from_mechanism_v1
