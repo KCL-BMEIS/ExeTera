@@ -10,8 +10,7 @@ setup(
     author='Ben Murray',
     author_email='benjamin.murray@kcl.ac.uk',
     license='http://www.apache.org/licenses/LICENSE-2.0',
-    packages=['exetera', 'exetera.contrib',
-              'exetera.core', 'exetera.covidspecific', 'exetera.processing'],
+    packages=['exetera', 'exetera.core', 'exetera.processing'],
     scripts=['exetera/bin/exetera'],
     python_requires='>=3.7',
     install_requires=[
