@@ -416,7 +416,7 @@ def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
         dest_index[index_i] = next_src_i
         index_i += 1
 
-        if next_src_i - cur_src_i > 1:
+        if next_src_i - cur_src_i > 0:
             if next - cur == 1:
                 # only one entry to be copied, so commas not required
                 next_index_v = next_src_i - cur_src_i + np.int64(index_v)
@@ -972,8 +972,8 @@ class DataStore:
             separator = b','
             delimiter = b'"'
         elif src_values.dtype == np.uint8:
-            separator = np.frombuffer(b',', dtype='S1')[0]
-            delimiter = np.frombuffer(b'"', dtype='S1')[0]
+            separator = np.frombuffer(b',', dtype='S1')[0][0]
+            delimiter = np.frombuffer(b'"', dtype='S1')[0][0]
 
         s = 0
         while s < len(spans) - 1:

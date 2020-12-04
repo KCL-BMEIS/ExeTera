@@ -400,7 +400,7 @@ class TestSessionFilter(unittest.TestCase):
 
 class TestSessionGetSpans(unittest.TestCase):
 
-    def test_get_spans(self):
+    def test_get_spans_one_field(self):
 
         vals = np.asarray([0, 1, 1, 3, 3, 6, 5, 5, 5], dtype=np.int32)
         bio = BytesIO()
@@ -411,6 +411,21 @@ class TestSessionGetSpans(unittest.TestCase):
             vals_f = s.create_numeric(ds, "vals", "int32")
             vals_f.data.write(vals)
             self.assertListEqual([0, 1, 3, 5, 6, 9], s.get_spans(s.get(ds['vals'])).tolist())
+
+    def test_get_spans_two_fields(self):
+
+        vals_1 = np.asarray(['a', 'a', 'a', 'b', 'b', 'b', 'b', 'b', 'c', 'c', 'c', 'c'], dtype='S1')
+        vals_2 = np.asarray([5, 5, 6, 2, 2, 3, 4, 4, 7, 7, 7, 7], dtype=np.int32)
+        bio = BytesIO()
+        with session.Session() as s:
+            self.assertListEqual([0, 2, 3, 5, 6, 8, 12], s.get_spans(fields=(vals_1, vals_2)).tolist())
+
+            ds = s.open_dataset(bio, 'w', 'ds')
+            vals_1_f = s.create_fixed_string(ds, 'vals_1', 1)
+            vals_1_f.data.write(vals_1)
+            vals_2_f = s.create_numeric(ds, 'vals_2', 'int32')
+            vals_2_f.data.write(vals_2)
+            self.assertListEqual([0, 2, 3, 5, 6, 8, 12], s.get_spans(fields=(vals_1, vals_2)).tolist())
 
 
 class TestSessionAggregate(unittest.TestCase):
@@ -496,6 +511,23 @@ class TestSessionAggregate(unittest.TestCase):
             s.create_numeric(ds, 'vals', 'int64').data.write(vals)
             s.apply_spans_max(spans, s.get(ds['vals']), dest=s.create_numeric(ds, 'result2', 'int64'))
             self.assertListEqual([0, 8, 6, 9], s.get(ds['result2']).data[:].tolist())
+
+    def test_apply_spans_concat(self):
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        vals = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b']
+        bio = BytesIO()
+        with session.Session() as s:
+            spans = s.get_spans(idx)
+            # results = s.apply_spans_concat(spans, vals)
+            # self.assertListEqual([0, 8, 6, 9], results.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            # s.apply_spans_concat(spans, vals, dest=s.create_indexed_string(ds, 'result'))
+            # self.assertListEqual([0, 8, 6, 9], s.get(ds['result']).data[:].tolist())
+
+            s.create_indexed_string(ds, 'vals').data.write(vals)
+            s.apply_spans_concat(spans, s.get(ds['vals']), dest=s.create_indexed_string(ds, 'result2'))
+            self.assertListEqual(['b', 'ab', 'aba', 'bab'], s.get(ds['result2']).data[:])
 
     def test_aggregate_count(self):
         idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)

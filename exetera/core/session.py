@@ -435,15 +435,28 @@ class Session:
 
         max_index_i = src.chunksize
         max_value_i = dest.chunksize * 8
+
+        if src_values.dtype == 'S1':
+            separator = b','
+            delimiter = b'"'
+        elif src_values.dtype == np.uint8:
+            separator = np.frombuffer(b',', dtype='S1')[0][0]
+            delimiter = np.frombuffer(b'"', dtype='S1')[0][0]
+
         s = 0
         while s < len(spans) - 1:
             s, index_i, index_v = per._apply_spans_concat(spans, src_index, src_values,
                                                           dest_index, dest_values,
-                                                          max_index_i, max_value_i, s)
+                                                          max_index_i, max_value_i, s,
+                                                          separator, delimiter)
 
             if index_i > 0 or index_v > 0:
-                dest.write_raw(dest_index[:index_i], dest_values[:index_v])
-        dest.complete()
+                dest.indices.write_part(dest_index[:index_i])
+                dest.values.write_part(dest_values[:index_v])
+        dest.indices.complete()
+        dest.values.complete()
+        #         dest.write_raw(dest_index[:index_i], dest_values[:index_v])
+        # dest.complete()
 
 
     def _aggregate_impl(self, predicate, index, src=None, dest=None):

@@ -607,6 +607,40 @@ class TestPersistence(unittest.TestCase):
 
 class TestPersistenceConcat(unittest.TestCase):
 
+    def test_apply_spans_concat_bug_len_1_entry(self):
+        spans = np.asarray([0, 1, 2, 3, 4], dtype=np.int32)
+        indices = np.asarray([0, 1, 2, 3, 4], dtype=np.int32)
+        values = np.frombuffer(b'abcd', dtype=np.uint8)
+        d_indices = np.zeros(100, dtype=np.int32)
+        d_values = np.zeros(100, dtype=np.int32)
+        s, ii, iv = 0, 0, 0
+        separator = np.frombuffer(b',', dtype='S1')[0][0]
+        delimiter = np.frombuffer(b'"', dtype='S1')[0][0]
+        while s < len(spans) - 1:
+            s, ii, iv = persistence._apply_spans_concat(spans, indices, values,
+                                                        d_indices, d_values,
+                                                        100, 100, s,
+                                                        separator, delimiter)
+        print(d_indices[:ii])
+        print(d_values[:iv])
+
+    def test_apply_spans_concat_bug_len_1_entry_bstr(self):
+        spans = np.asarray([0, 1, 2, 3, 4], dtype=np.int32)
+        indices = np.asarray([0, 1, 2, 3, 4], dtype=np.int32)
+        values = np.frombuffer(b'abcd', dtype='S1')
+        d_indices = np.zeros(100, dtype=np.int32)
+        d_values = np.zeros(100, dtype='S1')
+        s, ii, iv = 0, 0, 0
+        separator = b','
+        delimiter = b'"'
+        while s < len(spans) - 1:
+            s, ii, iv = persistence._apply_spans_concat(spans, indices, values,
+                                                        d_indices, d_values,
+                                                        100, 100, s,
+                                                        separator, delimiter)
+        print(d_indices[:ii])
+        print(d_values[:iv])
+
     def test_apply_spans_concat_fast(self):
 
         datastore = persistence.DataStore(10)
@@ -616,7 +650,7 @@ class TestPersistenceConcat(unittest.TestCase):
 
         src_spans = np.asarray([0, 2, 3, 4, 6, 8], dtype=np.int64)
         src_indices = np.asarray([0, 2, 6, 10, 12, 16, 18, 22, 24], dtype=np.int64)
-        src_values = np.frombuffer(b'aabbbbccccddeeeeffgggghh', dtype='S1')
+        src_values = np.frombuffer(b'aabbbbccccddeeeeffgggghh', dtype=np.uint8)
 
         with h5py.File(bio, 'w') as hf:
             foo = rw.IndexedStringWriter(datastore, hf, 'foo', ts)
@@ -626,6 +660,7 @@ class TestPersistenceConcat(unittest.TestCase):
 
             expected = ['aabbbb', 'cccc', 'dd', 'eeeeff', 'gggghh']
             actual = datastore.get_reader(hf['concatfoo'])[:]
+            print(actual)
             self.assertListEqual(expected, actual)
 
 
