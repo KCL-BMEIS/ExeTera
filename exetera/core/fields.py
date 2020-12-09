@@ -6,6 +6,7 @@ import h5py
 
 from exetera.core.data_writer import DataWriter
 from exetera.core import utils
+from exetera.core import operations as ops
 
 
 # def test_field_iterator(data):
@@ -517,6 +518,14 @@ class IndexedStringImporter:
         self.write_part(values)
         self.complete()
 
+    def pandas_write_part(self, values):
+        with utils.Timer("writing {}".format(self._field.name)):
+            self._field.data.write_part(values)
+
+    def pandas_write(self, values):
+        self.pandas_write_part(values)
+        self.complete()
+
 
 class FixedStringImporter:
     def __init__(self, session, group, name, length, timestamp=None, chunksize=None):
@@ -534,6 +543,15 @@ class FixedStringImporter:
 
     def write(self, values):
         self.write_part(values)
+        self.complete()
+
+    def pandas_write_part(self, values):
+        with utils.Timer("writing {}".format(self._field.name)):
+            self._field.data.write_part(
+                values.to_numpy('S{}'.format(self._field._field.attrs['strlen'])))
+
+    def pandas_write(self, values):
+        self.pandas_write_part(values)
         self.complete()
 
 
@@ -573,6 +591,14 @@ class NumericImporter:
         self.write_part(values)
         self.complete()
 
+    def pandas_write_part(self, values):
+        with utils.Timer("writing {}".format(self._field.name)):
+            self._field.data.write_part(values)
+
+    def pandas_write(self, values):
+        self.pandas_write_part(values)
+        self.complete()
+
 
 class CategoricalImporter:
     def __init__(self, session, group, name, value_type, keys, timestamp=None, chunksize=None):
@@ -596,6 +622,16 @@ class CategoricalImporter:
 
     def write(self, values):
         self.write_part(values)
+        self.complete()
+
+    def pandas_write_part(self, values):
+        with utils.Timer("writing {}".format(self._field.name)):
+            data = np.asarray(len(values), dtype=self._key_type)
+            ops.fast_categorical_map(self._keys, values, data)
+            self._field.data.write_part(data)
+
+    def pandas_write(self, values):
+        self.pandas_write_part(values)
         self.complete()
 
 
@@ -649,6 +685,31 @@ class LeakyCategoricalImporter:
         self.write_part(values)
         self.complete()
 
+    def pandas_write_part(self, values):
+        with utils.Timer("writing {}".format(self._field.name)):
+            keys = self._keys
+            results = self._results
+            strresults = self._strresult
+            for i in range(len(values)):
+                value = keys.get(values[i], -1)
+                if value == -1:
+                    strresults[i] = values[i]
+                else:
+                    strresults[i] = ''
+                results[i] = value
+                # results = keys[values[i]]
+            if len(values) != len(results):
+                self._field.data.write_part(results[:len(values)])
+                self._str_field.data.write_part(strresults[:len(values)])
+            else:
+                self._field.data.write_part(results)
+                self._str_field.data.write_part(strresults)
+
+
+    def pandas_write(self, values):
+        self.pandas_write_part(values)
+        self.complete()
+
 
 class DateTimeImporter:
     def __init__(self, session, group, name,
@@ -694,6 +755,30 @@ class DateTimeImporter:
         self.write_part(values)
         self.complete()
 
+    def pandas_write_part(self, values):
+        with utils.Timer("writing {}".format(self._field.name)):
+            results = self._results
+
+            for i, v in enumerate(values):
+                if len(v) == 32:
+                    ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S.%f%z')
+                    results[i] = ts.timestamp()
+                elif len(v) == 25:
+                    ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S%z')
+                    results[i] = ts.timestamp()
+                else:
+                    if self._optional is True and len(v) == 0:
+                        results[i] = np.nan
+                    else:
+                        msg = "Date field '{}' has unexpected format '{}'"
+                        raise ValueError(msg.format(self._field, v))
+
+            self._field.data.write_part(results)
+
+    def pandas_write(self, values):
+        self.pandas_write_part(values)
+        self.complete()
+
 
 class DateImporter:
     def __init__(self, session, group, name,
@@ -727,4 +812,20 @@ class DateImporter:
 
     def write(self, values):
         self.write_part(values)
+        self.complete()
+
+    def pandas_write_part(self, values):
+        with utils.Timer("writing {}".format(self._field.name)):
+            timestamps = np.zeros(len(values), dtype=np.float64)
+            for i in range(len(values)):
+                value = values[i]
+                if value == '':
+                    timestamps[i] = np.nan
+                else:
+                    ts = datetime.strptime(value, '%Y-%m-%d')
+                    timestamps[i] = ts.timestamp()
+            self._field.data.write_part(timestamps)
+
+    def pandas_write(self, values):
+        self.pandas_write_part(values)
         self.complete()

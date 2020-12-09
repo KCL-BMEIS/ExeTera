@@ -14,10 +14,12 @@ from datetime import datetime, MAXYEAR
 import time
 
 import numpy as np
+import pandas as pd
 import h5py
 
 from exetera.core import dataset as dataset
 from exetera.core import persistence as per
+from exetera.core import fields as fld
 from exetera.core import utils
 from exetera.core import operations as ops
 from exetera.core.load_schema import load_schema
@@ -79,7 +81,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite)
             names = set(ds.names_)
             missing_names = names.difference(fields.keys())
 
-            DatasetImporter(datastore, files[sk], hf, sk, schema[sk], timestamp,
+            PandasDatasetImporter(datastore, files[sk], hf, sk, schema[sk], timestamp,
                             stop_after=stop_after.get(sk, None),
                             show_progress_every=show_every)
 
@@ -208,3 +210,105 @@ class DatasetImporter:
 
             print(f"{i_r} rows parsed in {time.time() - time0}s")
 
+
+
+
+class PandasDatasetImporter:
+    def __init__(self, datastore, source, hf, space, schema, timestamp,
+                 keys=None,
+                 stop_after=None, show_progress_every=None, filter_fn=None,
+                 early_filter=None, chunk_size=1 << 18):
+        self.index_ = None
+
+        time0 = time.time()
+
+        if space not in hf.keys():
+            hf.create_group(space)
+        group = hf[space]
+
+        with open(source) as sf:
+            pdf = pd.read_csv(sf, chunksize=chunk_size)
+
+            first = True
+            available_keys = None
+            new_fields = dict()
+            new_field_list = list()
+            field_chunk_list = list()
+            categorical_map_list = list()
+            try:
+                for chunk in pdf:
+                    print(len(chunk))
+                    if first:
+                        available_keys = [k for k in chunk.columns if k in schema.fields]
+
+                        if not keys:
+                            fields_to_use = available_keys
+                        else:
+                            for k in keys:
+                                if k not in available_keys:
+                                    raise ValueError(f"key '{k}' isn't in the available keys ({keys})")
+                            fields_to_use = keys
+                        index_map = [chunk.columns.get_loc(k) for k in fields_to_use]
+
+                        early_key_index = None
+                        if early_filter is not None:
+                            if early_filter[0] not in available_keys:
+                                raise ValueError(
+                                    f"'early_filter': tuple element zero must be a key that is in the dataset")
+                            early_key_index = available_keys.index(early_filter[0])
+
+                        # TODO: categorical writers should use the datatype specified in the schema
+                        for i_n in range(len(fields_to_use)):
+                            field_name = fields_to_use[i_n]
+                            sch = schema.fields[field_name]
+                            writer = sch.importer(datastore, group, field_name, timestamp)
+                            # TODO: this list is required because we convert the categorical values to
+                            # numerical values ahead of adding them. We could use importers that handle
+                            # that transform internally instead
+                            categorical_map_list.append(
+                                sch.strings_to_values if sch.out_of_range_label is None else None)
+                            new_fields[field_name] = writer
+                            new_field_list.append(writer)
+                            field_chunk_list.append(writer.chunk_factory(chunk_size))
+
+                    # for i_df, i_f in enumerate(index_map):
+                    for i_df, k in enumerate(available_keys):
+                        new_field_list[i_df].pandas_write_part(chunk[k])
+
+                        # if early_filter is not None:
+                        #     if not early_filter[1](row[early_key_index]):
+                        #         continue
+                        #
+                        # if i_r == stop_after:
+                        #     break
+
+                        # if not filter_fn or filter_fn(i_r):
+                        #     for i_df, i_f in enumerate(index_map):
+                        #         f = row[i_f]
+                        #         categorical_map = categorical_map_list[i_df]
+                        #         if categorical_map is not None:
+                        #             if f not in categorical_map:
+                        #                 error = "'{}' not valid: must be one of {} for field '{}'"
+                        #                 raise KeyError(
+                        #                     error.format(f, categorical_map, available_keys[i_f]))
+                        #             f = categorical_map[f]
+                        #         field_chunk_list[i_df][chunk_index] = f
+                        #     chunk_index += 1
+                        #     if chunk_index == chunk_size:
+                        #         for i_df in range(len(index_map)):
+                        #             # with utils.Timer("writing to {}".format(self.names_[i_df])):
+                        #             #     new_field_list[i_df].write_part(field_chunk_list[i_df])
+                        #             new_field_list[i_df].write_part(field_chunk_list[i_df])
+                        #         chunk_index = 0
+            except Exception:
+                # msg = "row {}: caught exception {}\nprevious row {}"
+                # print(msg.format(i_r + 1, e, row))
+                raise
+
+            # if chunk_index != 0:
+            #     for i_df in range(len(index_map)):
+            #         new_field_list[i_df].write_part(field_chunk_list[i_df][:chunk_index])
+
+            for i_df in range(len(index_map)):
+                new_field_list[i_df].flush()
+            # print(f"{i_r} rows parsed in {time.time() - time0}s")

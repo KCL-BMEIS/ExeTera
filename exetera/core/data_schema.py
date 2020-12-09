@@ -1,6 +1,6 @@
 import exetera
 from exetera.core import readerwriter as rw
-
+from exetera.core import fields as fld
 
 # field_writers = {
 #     'idtype': lambda g, cs, n, ts: rw.FixedStringWriter(g, cs, n, 32, ts),
@@ -62,9 +62,7 @@ from exetera.core import readerwriter as rw
 #     'geocodetype': lambda s, g, n, ts=None, cs=None:
 #     fields.FixedStringImporter(s, g, n, 9, ts, cs)
 # }
-
-
-new_field_importers = {
+writer_importers = {
     'string': lambda:
         lambda ds, g, n, ts: rw.IndexedStringWriter(ds, g, n, ts),
     'fixed_string': lambda strlen:
@@ -78,6 +76,23 @@ new_field_importers = {
     'categorical': lambda stv, oor=None:
         lambda ds, g, n, ts: rw.CategoricalWriter(ds, g, n, stv, ts) if oor is None else
         rw.LeakyCategoricalImporter(ds, g, n, stv, oor, ts)
+}
+
+
+new_field_importers = {
+    'string': lambda:
+        lambda ds, g, n, ts: fld.IndexedStringImporter(ds, g, n, ts),
+    'fixed_string': lambda strlen:
+        lambda ds, g, n, ts: fld.FixedStringImporter(ds, g, n, strlen, ts),
+    'datetime': lambda optional:
+        lambda ds, g, n, ts: fld.DateTimeImporter(ds, g, n, optional, ts),
+    'date': lambda optional:
+        lambda ds, g, n, ts: fld.OptionalDateImporter(ds, g, n, optional, ts),
+    'numeric': lambda typestr, parser:
+        lambda ds, g, n, ts: fld.NumericImporter(ds, g, n, typestr, parser, ts),
+    'categorical': lambda stv, oor=None:
+        lambda ds, g, n, ts: fld.CategoricalImporter(ds, g, n, 'int8', stv, ts) if oor is None else
+        rw.LeakyCategoricalImporter(ds, g, n, 'int8', stv, oor, ts)
 }
 
 
