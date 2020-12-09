@@ -7,7 +7,6 @@ import h5py
 
 from exetera.core.session import Session
 from exetera.core import operations as ops
-# from exetera.core.operations import ordered_map_to_right_left_unique
 from exetera.core import fields as flds
 from exetera.core import utils as utils
 
@@ -171,7 +170,7 @@ def new_hs_test(vcount):
             print(b_ids_f.data[:100])
             print(all_a_val_fields[0].data[:100])
             s.ordered_merge_left(a_ids_f, b_ids_f, left_to_right_map=a_to_b, right_unique=True,
-                                 left_field_sources=tuple(all_a_val_fields),
+                                 right_field_sources=tuple(all_a_val_fields),
                                  left_field_sinks=tuple(all_b_val_fields))
             print(a_to_b.data[:100])
             results = s.merge_left(a_ids_f, b_ids_f, right_fields=tuple(all_a_val_fields))
@@ -249,8 +248,9 @@ def hs_test_1(length, val_column_count):
             #                      left_field_sources=(a_vals_f,), left_field_sinks=(b_vals_f,))
             print(b_ids_f.data[:100])
             print(a_ids_f.data[:100])
-            s.ordered_merge_left(b_ids_f, a_ids_f, left_field_sources=tuple(all_a_val_fields),
-                                 left_field_sinks=tuple(all_b_val_fields), left_to_right_map=a_to_b, right_unique=True)
+            s.ordered_merge_left(b_ids_f, a_ids_f, right_field_sources=tuple(all_a_val_fields),
+                                 left_field_sinks=tuple(all_b_val_fields), left_to_right_map=a_to_b,
+                                 right_unique=True)
             print(a_to_b.data[:100])
             results = s.merge_left(b_ids_f, a_ids_f, right_fields=tuple(all_a_val_fields))
             elapsed = time.time() - t0
