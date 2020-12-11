@@ -14,6 +14,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import time
+from distutils.util import strtobool
 
 import h5py
 import numpy as np
@@ -97,6 +98,14 @@ def try_str_to_float_to_int(value, invalid=0):
 def try_str_to_int(value, invalid=0):
     try:
         v = int(value)
+        return True, v
+    except ValueError:
+        return False, invalid
+
+
+def try_str_to_bool(value, invalid=0):
+    try:
+        v = bool(strtobool(value))
         return True, v
     except ValueError:
         return False, invalid

@@ -93,8 +93,14 @@ class NewDataSchema:
                         raise ValueError(msg.format(fk, value_type, permitted_numeric_types))
                     if value_type in ('float', 'float32', 'float64'):
                         converter = per.try_str_to_float
-                    else:
+                    elif value_type == 'bool':
+                        converter = per.try_str_to_bool
+                    elif value_type in ('int', 'int8', 'int16', 'int32', 'int64',
+                                        'uint8', 'uint16', 'uint32', 'uint64'):
                         converter = per.try_str_to_int
+                    else:
+                        msg = "Unrecognised value_type '{}' in field '{}'"
+                        raise ValueError(msg.format(value_type, fk))
 
                 importer = data_schema.new_field_importers[field_type](value_type, converter)
 

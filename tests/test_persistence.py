@@ -1388,6 +1388,15 @@ class TestJittingSort(unittest.TestCase):
             s_index = sorted(index, key=predicate)
 
 
+class TestConverters(unittest.TestCase):
+
+    def test_str_to_bool(self):
+        self.assertTupleEqual((True, True), persistence.try_str_to_bool('True', 0))
+        self.assertTupleEqual((True, False), persistence.try_str_to_bool('False', 0))
+        self.assertTupleEqual((False, 0), persistence.try_str_to_bool('Foo', 0))
+        self.assertTupleEqual((False, None), persistence.try_str_to_bool('Foo', None))
+
+
 class TestDataWriter(unittest.TestCase):
 
     def test_data_writer(self):
