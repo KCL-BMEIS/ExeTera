@@ -37,15 +37,21 @@ class TestIndexedStringFields(unittest.TestCase):
             f.write(strings)
             f = s.get(hf['foo'])
             # f = s.create_indexed_string(hf, 'foo')
-            print("f.indices:", f.indices[:])
+            self.assertListEqual([0, 1, 3, 6, 10], f.indices[:].tolist())
 
             f2 = s.create_indexed_string(hf, 'bar')
             s.apply_filter(np.asarray([False, True, True, False]), f, f2)
-            print(f2.indices[:])
-            print(f2.values[:])
-            print(f2.data[:])
-            print(f2.data[0])
-            print(f2.data[1])
+            # print(f2.indices[:])
+            self.assertListEqual([0, 2, 5], f2.indices[:].tolist())
+            # print(f2.values[:])
+            self.assertListEqual([98, 98, 99, 99, 99], f2.values[:].tolist())
+            # print(f2.data[:])
+            self.assertListEqual(['bb', 'ccc'], f2.data[:])
+            # print(f2.data[0])
+            self.assertEqual('bb', f2.data[0])
+            # print(f2.data[1])
+            self.assertEqual('ccc', f2.data[1])
+
 
     def test_update_legacy_indexed_string_that_has_uint_values(self):
         bio = BytesIO()
@@ -55,6 +61,6 @@ class TestIndexedStringFields(unittest.TestCase):
             f = fields.IndexedStringImporter(s, hf, 'foo')
             f.write(strings)
             values = hf['foo']['values'][:]
-            print(values)
+            self.assertListEqual([97, 98, 98, 99, 99, 99, 100, 100, 100, 100], values.tolist())
 
 
