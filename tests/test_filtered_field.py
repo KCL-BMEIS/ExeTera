@@ -33,5 +33,6 @@ class TestFilteredIndex(unittest.TestCase):
         filter = [1, 3, 4, 7, 8, 9]
 
         ff = filtered_field.FilteredField(field, filter)
+        expected = [8, 6, 5, 2, 1, 0]
         for i in range(len(ff)):
-            print(i, ff[i])
+            self.assertEqual(expected[i], ff[i])
