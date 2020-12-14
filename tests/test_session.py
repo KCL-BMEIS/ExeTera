@@ -779,8 +779,12 @@ class TestSessionImporters(unittest.TestCase):
             im = fields.NumericImporter(s, hf, 'x', 'float32', per.try_str_to_float)
             im.write(values)
             f = s.get(hf['x'])
-            # print(f, f.data)
-            print(f.data[:].tolist())
+            expected = [0.0, 0.0, 2.0, 3.0, 40.0, 5.21e-2, 0.0, -6.0, -7.0, -80.0, -9.21e-2,
+                        0.0, 0.0, 2.0, 3.0, 40.0, 5.21e-2, 0.0, -6.0, -7.0, -80.0, -9.21e-2]
+            actual = f.data[:].tolist()
+            self.assertEqual(len(expected), len(actual))
+            for i, j in zip(expected, actual):
+                self.assertAlmostEqual(i, j)
 
 
 

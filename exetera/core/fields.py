@@ -542,13 +542,14 @@ class FixedStringImporter:
 
 class NumericImporter:
     def __init__(self, session, group, name, dtype, parser, timestamp=None, chunksize=None):
+        filter_name = '{}_valid'.format(name)
         numeric_field_constructor(session, group, name, dtype, timestamp, chunksize)
-        numeric_field_constructor(session, group, '{}_valid'.format(name), 'bool',
+        numeric_field_constructor(session, group, filter_name, 'bool',
                                   timestamp, chunksize)
 
         chunksize = session.chunksize if chunksize is None else chunksize
         self._field = NumericField(session, group, name, write_enabled=True)
-        self._filter_field = NumericField(session, group, name, write_enabled=True)
+        self._filter_field = NumericField(session, group, filter_name, write_enabled=True)
 
         self._parser = parser
         self._values = np.zeros(chunksize, dtype=self._field.data.dtype)
@@ -565,8 +566,8 @@ class NumericImporter:
                 valid, value = self._parser(values[i])
                 self._values[i] = value
                 self._filter_values[i] = valid
-            self._field.data.write_part(self._values, len(values))
-            self._filter_field.data.write_part(self._filter_values, len(values))
+            self._field.data.write_part(self._values[:len(values)])
+            self._filter_field.data.write_part(self._filter_values[:len(values)])
 
     def complete(self):
         self._field.data.complete()
