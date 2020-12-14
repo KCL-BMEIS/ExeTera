@@ -565,8 +565,8 @@ class NumericImporter:
                 valid, value = self._parser(values[i])
                 self._values[i] = value
                 self._filter_values[i] = valid
-            self._field.data.write_part(self._values)
-            self._filter_field.data.write_part(self._filter_values)
+            self._field.data.write_part(self._values, len(values))
+            self._filter_field.data.write_part(self._filter_values, len(values))
 
     def complete(self):
         self._field.data.complete()
