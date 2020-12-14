@@ -508,8 +508,7 @@ class IndexedStringImporter:
         return [None] * length
 
     def write_part(self, values):
-        with utils.Timer("writing {}".format(self._field.name)):
-            self._field.data.write_part(values)
+        self._field.data.write_part(values)
 
     def complete(self):
         self._field.data.complete()
@@ -528,9 +527,7 @@ class FixedStringImporter:
         return np.zeros(length, dtype=self._field.data.dtype)
 
     def write_part(self, values):
-        with utils.Timer("writing {}".format(self._field.name)):
-            # self._field.data.write_part([v.encode() for v in values])
-            self._field.data.write_part(values)
+        self._field.data.write_part(values)
 
     def complete(self):
         self._field.data.complete()
@@ -561,13 +558,12 @@ class NumericImporter:
         return [None] * length
 
     def write_part(self, values):
-        with utils.Timer("writing {}".format(self._field.name)):
-            for i in range(len(values)):
-                valid, value = self._parser(values[i])
-                self._values[i] = value
-                self._filter_values[i] = valid
-            self._field.data.write_part(self._values[:len(values)])
-            self._filter_field.data.write_part(self._filter_values[:len(values)])
+        for i in range(len(values)):
+            valid, value = self._parser(values[i])
+            self._values[i] = value
+            self._filter_values[i] = valid
+        self._field.data.write_part(self._values[:len(values)])
+        self._filter_field.data.write_part(self._filter_values[:len(values)])
 
     def complete(self):
         self._field.data.complete()
@@ -593,13 +589,7 @@ class CategoricalImporter:
         return np.zeros(length, dtype=self._dtype)
 
     def write_part(self, values):
-        with utils.Timer("writing {}".format(self._field.name)):
-            keys = self._keys
-            # results = self._results
-            # for i in range(len(values)):
-            #     results = keys[values[i]]
-            # self._field.data.write_part(results)
-            self._field.data.write_part(values)
+        self._field.data.write_part(values)
 
     def complete(self):
         self._field.data.complete()
@@ -633,24 +623,23 @@ class LeakyCategoricalImporter:
         return [None] * length
 
     def write_part(self, values):
-        with utils.Timer("writing {}".format(self._field.name)):
-            keys = self._keys
-            results = self._results
-            strresults = self._strresult
-            for i in range(len(values)):
-                value = keys.get(values[i], -1)
-                if value == -1:
-                    strresults[i] = values[i]
-                else:
-                    strresults[i] = ''
-                results[i] = value
-                # results = keys[values[i]]
-            if len(values) != len(results):
-                self._field.data.write_part(results[:len(values)])
-                self._str_field.data.write_part(strresults[:len(values)])
+        keys = self._keys
+        results = self._results
+        strresults = self._strresult
+        for i in range(len(values)):
+            value = keys.get(values[i], -1)
+            if value == -1:
+                strresults[i] = values[i]
             else:
-                self._field.data.write_part(results)
-                self._str_field.data.write_part(strresults)
+                strresults[i] = ''
+            results[i] = value
+            # results = keys[values[i]]
+        if len(values) != len(results):
+            self._field.data.write_part(results[:len(values)])
+            self._str_field.data.write_part(strresults[:len(values)])
+        else:
+            self._field.data.write_part(results)
+            self._str_field.data.write_part(strresults)
 
     def complete(self):
         self._field.data.complete()
@@ -680,24 +669,23 @@ class DateTimeImporter:
         return np.zeros(length, dtype='U32')
 
     def write_part(self, values):
-        with utils.Timer("writing {}".format(self._field.name)):
-            results = self._results
+        results = self._results
 
-            for i, v in enumerate(values):
-                if len(v) == 32:
-                    ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S.%f%z')
-                    results[i] = ts.timestamp()
-                elif len(v) == 25:
-                    ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S%z')
-                    results[i] = ts.timestamp()
+        for i, v in enumerate(values):
+            if len(v) == 32:
+                ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S.%f%z')
+                results[i] = ts.timestamp()
+            elif len(v) == 25:
+                ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S%z')
+                results[i] = ts.timestamp()
+            else:
+                if self._optional is True and len(v) == 0:
+                    results[i] = np.nan
                 else:
-                    if self._optional is True and len(v) == 0:
-                        results[i] = np.nan
-                    else:
-                        msg = "Date field '{}' has unexpected format '{}'"
-                        raise ValueError(msg.format(self._field, v))
+                    msg = "Date field '{}' has unexpected format '{}'"
+                    raise ValueError(msg.format(self._field, v))
 
-            self._field.data.write_part(results)
+        self._field.data.write_part(results)
 
     def complete(self):
         self._field.data.complete()
@@ -724,16 +712,15 @@ class DateImporter:
         return np.zeros(length, dtype='U10')
 
     def write_part(self, values):
-        with utils.Timer("writing {}".format(self._field.name)):
-            timestamps = np.zeros(len(values), dtype=np.float64)
-            for i in range(len(values)):
-                value = values[i]
-                if value == '':
-                    timestamps[i] = np.nan
-                else:
-                    ts = datetime.strptime(value, '%Y-%m-%d')
-                    timestamps[i] = ts.timestamp()
-            self._field.data.write_part(timestamps)
+        timestamps = np.zeros(len(values), dtype=np.float64)
+        for i in range(len(values)):
+            value = values[i]
+            if value == '':
+                timestamps[i] = np.nan
+            else:
+                ts = datetime.strptime(value, '%Y-%m-%d')
+                timestamps[i] = ts.timestamp()
+        self._field.data.write_part(timestamps)
 
     def complete(self):
         self._field.data.complete()
