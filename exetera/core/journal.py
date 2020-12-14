@@ -125,16 +125,16 @@ def journal_table(session, schema, old_src, new_src, src_pk, result):
             ops.merge_indexed_journalled_entries(old_map, new_map, to_keep,
                                                  old_f_i_, old_f_v_, new_f_i_, new_f_v_,
                                                  dest_i_, dest_v_)
-            dest_f = new_f_i_.create_like(result, k)
+            dest_f = new_f.create_like(result, k)
             dest_f.indices.write(dest_i_)
             dest_f.values.write(dest_v_)
 
         else:
-            old_f_ = session.apply_index(old_sorted_index, old_f)
-            new_f_ = session.apply_index(new_sorted_index, new_f)
-            dest_ = np.zeros(merged_length, old_f_.dtype)
-            ops.merge_journalled_entries(old_map, new_map, to_keep, old_f_, new_f_, dest_)
-            dest_f = new_f_.create_like(result, k)
+            old_f_v_ = session.apply_index(old_sorted_index, old_f)
+            new_f_v_ = session.apply_index(new_sorted_index, new_f)
+            dest_ = np.zeros(merged_length, old_f_v_.dtype)
+            ops.merge_journalled_entries(old_map, new_map, to_keep, old_f_v_, new_f_v_, dest_)
+            dest_f = new_f.create_like(result, k)
             dest_f.data.write(dest_)
 
     print("old_count:", old_count)
@@ -163,7 +163,6 @@ def journal_test_harness(session, schema, old_file, new_file, dest_file):
                     raise ValueError(msg.format(old_tables, new_tables))
 
                 tables = [k for k in schema.keys() if k in old_tables]
-                # tables = ['diet']
                 for t in tables:
                     print("journaling {}".format(t))
                     t0 = time.time()
