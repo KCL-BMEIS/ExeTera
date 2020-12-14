@@ -32,11 +32,12 @@ sorting_dataset = ('id,patient_id,created_at,updated_at\n'
                    'a_10,p_2,104,105\n'
                    'a_11,p_1,104,104\n')
 
+
 class TestDataset(unittest.TestCase):
 
     def test_construction(self):
         s = io.StringIO(small_dataset)
-        ds = dataset.Dataset(s)
+        ds = dataset.Dataset(s, verbose=False)
 
         # field names and fields must match in length
         self.assertEqual(len(ds.names_), len(ds.fields_))
@@ -61,10 +62,9 @@ class TestDataset(unittest.TestCase):
             for row in range(len(expected_values)):
                 self.assertEqual(ds.value_from_fieldname(row, n), expected_values[row][1][index])
 
-
     def test_construction_with_early_filter(self):
         s = io.StringIO(small_dataset)
-        ds = dataset.Dataset(s, early_filter=('bar', lambda x: x in ('a',)))
+        ds = dataset.Dataset(s, early_filter=('bar', lambda x: x in ('a',)), verbose=False)
 
         # field names and fields must match in length
         self.assertEqual(len(ds.names_), len(ds.fields_))
@@ -88,14 +88,12 @@ class TestDataset(unittest.TestCase):
             for row in range(len(expected_values)):
                 self.assertEqual(ds.value_from_fieldname(row, n), expected_values[row][1][index])
 
-
     def test_sort(self):
         s = io.StringIO(small_dataset)
-        ds = dataset.Dataset(s)
+        ds = dataset.Dataset(s, verbose=False)
 
         ds.sort(('patient_id', 'id'))
         row_permutations = [2, 0, 1]
-
 
     def test_apply_permutation(self):
         permutation = [2, 0, 1]
@@ -120,8 +118,7 @@ class TestDataset(unittest.TestCase):
             while pi < i:
                 pi = permutation[pi]
             values[i], values[pi] = values[pi], values[i]
-
-        print(values)
+        self.assertListEqual(['c', 'a', 'b'], values)
 
     def test_single_key_sorts(self):
         ds1 = dataset.Dataset(io.StringIO(sorting_dataset), verbose=False)
@@ -153,7 +150,7 @@ class TestDataset(unittest.TestCase):
         # for i in range(ds1.row_count()):
         #     utils.print_diagnostic_row("{}".format(i), ds1, i, ds1.names_)
 
-        ds2 = dataset.Dataset(io.StringIO(sorting_dataset))
+        ds2 = dataset.Dataset(io.StringIO(sorting_dataset), verbose=False)
         ds2.sort(('patient_id', 'created_at'))
         self.assertListEqual([0, 1, 3, 5, 7, 10, 2, 4, 6, 8, 9], ds2.index_)
         self.assertListEqual(expected_ids, ds1.field_by_name('id'))
