@@ -762,7 +762,8 @@ class DataStore:
             return ValueError("Only one of 'field' and 'fields' may be set")
 
         if field is not None:
-            return np.unique(field)
+            field_ = val.raw_array_from_parameter(self, 'field', field)
+            return np.unique(field_)
 
         entries = [(f'{i}', f.dtype) for i, f in enumerate(fields)]
         unified = np.empty_like(fields[0], dtype=np.dtype(entries))
