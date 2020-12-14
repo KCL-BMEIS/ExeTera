@@ -69,7 +69,7 @@ class TestDataset(unittest.TestCase):
         # field names and fields must match in length
         self.assertEqual(len(ds.names_), len(ds.fields_))
 
-        self.assertEqual(ds.row_count(), 3)
+        self.assertEqual(ds.row_count(), 2)
 
         self.assertEqual(ds.names_, ['id', 'patient_id', 'foo', 'bar'])
 
@@ -124,25 +124,41 @@ class TestDataset(unittest.TestCase):
         print(values)
 
     def test_single_key_sorts(self):
-        ds1 = dataset.Dataset(io.StringIO(sorting_dataset))
+        ds1 = dataset.Dataset(io.StringIO(sorting_dataset), verbose=False)
         ds1.sort('patient_id')
-        print(ds1.index_)
+        self.assertListEqual([0, 1, 3, 5, 7, 10, 2, 4, 6, 8, 9], ds1.index_)
 
-        ds2 = dataset.Dataset(io.StringIO(sorting_dataset))
+        ds2 = dataset.Dataset(io.StringIO(sorting_dataset), verbose=False)
         ds2.sort(('patient_id',))
-        print(ds2.index_)
+        self.assertListEqual([0, 1, 3, 5, 7, 10, 2, 4, 6, 8, 9], ds2.index_)
 
     def test_multi_key_sorts(self):
-        ds1 = dataset.Dataset(io.StringIO(sorting_dataset))
+        expected_ids =\
+            ['a_1', 'a_2', 'a_4', 'a_6', 'a_8', 'a_11', 'a_3', 'a_5', 'a_7', 'a_9', 'a_10']
+        expected_pids =\
+            ['p_1', 'p_1', 'p_1', 'p_1', 'p_1', 'p_1', 'p_2', 'p_2', 'p_2', 'p_2', 'p_2']
+        expected_vals1 =\
+            ['100', '101', '101', '102', '102', '104', '101', '102', '102', '103', '104']
+        expected_vals2 =\
+            ['100', '102', '101', '102', '104', '104', '101', '102', '103', '105', '105']
+
+        ds1 = dataset.Dataset(io.StringIO(sorting_dataset), verbose=False)
         ds1.sort('created_at')
         ds1.sort('patient_id')
-        print(ds1.index_)
-        for i in range(ds1.row_count()):
-            utils.print_diagnostic_row(f"i", ds1, i, ds1.names_)
+        self.assertListEqual([0, 1, 3, 5, 7, 10, 2, 4, 6, 8, 9], ds1.index_)
+        self.assertListEqual(expected_ids, ds1.field_by_name('id'))
+        self.assertListEqual(expected_pids, ds1.field_by_name('patient_id'))
+        self.assertListEqual(expected_vals1, ds1.field_by_name('created_at'))
+        self.assertListEqual(expected_vals2, ds1.field_by_name('updated_at'))
+        # for i in range(ds1.row_count()):
+        #     utils.print_diagnostic_row("{}".format(i), ds1, i, ds1.names_)
 
         ds2 = dataset.Dataset(io.StringIO(sorting_dataset))
         ds2.sort(('patient_id', 'created_at'))
-        # ds2.sort(('created_at', 'patient_id'))
-        print(ds2.index_)
-        for i in range(ds2.row_count()):
-            utils.print_diagnostic_row(f"i", ds2, i, ds2.names_)
+        self.assertListEqual([0, 1, 3, 5, 7, 10, 2, 4, 6, 8, 9], ds2.index_)
+        self.assertListEqual(expected_ids, ds1.field_by_name('id'))
+        self.assertListEqual(expected_pids, ds1.field_by_name('patient_id'))
+        self.assertListEqual(expected_vals1, ds1.field_by_name('created_at'))
+        self.assertListEqual(expected_vals2, ds1.field_by_name('updated_at'))
+        # for i in range(ds2.row_count()):
+        #     utils.print_diagnostic_row("{}".format(i), ds2, i, ds2.names_)

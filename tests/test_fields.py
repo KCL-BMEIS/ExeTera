@@ -30,7 +30,7 @@ class TestIndexedStringFields(unittest.TestCase):
 
     def test_create_indexed_string(self):
         bio = BytesIO()
-        with h5py.File(bio) as hf:
+        with h5py.File(bio, 'r+') as hf:
             s = session.Session()
             strings = ['a', 'bb', 'ccc', 'dddd']
             f = fields.IndexedStringImporter(s, hf, 'foo')
@@ -49,7 +49,7 @@ class TestIndexedStringFields(unittest.TestCase):
 
     def test_update_legacy_indexed_string_that_has_uint_values(self):
         bio = BytesIO()
-        with h5py.File(bio) as hf:
+        with h5py.File(bio, 'r+') as hf:
             s = session.Session()
             strings = ['a', 'bb', 'ccc', 'dddd']
             f = fields.IndexedStringImporter(s, hf, 'foo')

@@ -20,12 +20,18 @@ class TestSessionMerge(unittest.TestCase):
         r_vals = np.asarray([1000, 2000, 2001, 3000, 3001, 4000, 4001, 5000, 5001, 6000, 6001])
 
         s = session.Session()
-        print(s.merge_left(l_id, r_id, right_fields=(r_vals,)))
+        actual = s.merge_left(l_id, r_id, right_fields=(r_vals,))
+
+        self.assertListEqual(
+            [1000, 0, 3000, 3001, 5000, 5001, 0, 6000, 6001], actual[0].tolist())
 
         r_vals2 = np.asarray(['a0', 'c0', 'c1', 'd0', 'd1', 'e0', 'e1', 'f0', 'f1', 'h0', 'h1'])
 
         s = session.Session()
-        print(s.merge_left(l_id, r_id, right_fields=(r_vals2,)))
+        actual = s.merge_left(l_id, r_id, right_fields=(r_vals2,))
+
+        self.assertListEqual(
+            ['a0', '', 'd0', 'd1', 'f0', 'f1', '', 'h0', 'h1'], actual[0].tolist())
 
 
     def test_merge_left_2(self):
@@ -37,8 +43,11 @@ class TestSessionMerge(unittest.TestCase):
         a_val = np.array([10, 11, 12, 23, 22, 40, 43, 42, 41, 60,
                           61, 63, 71, 71, 94, 93, 92])
 
-        print(s.merge_left(p_id, a_pid, right_fields=(a_val,)))
+        actual = s.merge_left(p_id, a_pid, right_fields=(a_val,))
 
+        self.assertListEqual(
+            [10, 11, 12, 23, 22, 0, 40, 43, 42, 41, 0, 60, 61, 63, 0, 94, 93, 92],
+            actual[0].tolist())
 
     def test_merge_left_3(self):
         s = session.Session()
@@ -49,11 +58,17 @@ class TestSessionMerge(unittest.TestCase):
         import pandas as pd
         pdf = pd.DataFrame({'id': p_id})
         ddf = pd.DataFrame({'patient_id': d_pid, 'd_counts': d_counts})
-        print(pd.merge(left=pdf, right=ddf, left_on='id', right_on='patient_id', how='left'))
-        print(s.merge_left(left_on=p_id, right_on=d_pid, right_fields=(d_counts,)))
-        print(
-            s.ordered_merge_left(left_on=p_id, right_on=d_pid, right_field_sources=(d_counts,), left_to_right_map=d_to_p,
-                                 left_unique=True, right_unique=True))
+
+        expected = [2, 0, 1, 2, 0, 3, 0, 2]
+
+        actual = s.merge_left(left_on=p_id, right_on=d_pid, right_fields=(d_counts,))
+        self.assertListEqual(expected, actual[0].tolist())
+
+        actual = s.ordered_merge_left(left_on=p_id, right_on=d_pid,
+                                      right_field_sources=(d_counts,), left_to_right_map=d_to_p,
+                                      left_unique=True, right_unique=True)
+        self.assertListEqual(expected, actual[0].tolist())
+
 
     def test_merge_left_dataset(self):
         bio1 = BytesIO()
@@ -78,9 +93,10 @@ class TestSessionMerge(unittest.TestCase):
                              right_fields=(s.get(src['p']['val']),),
                              right_writers=(s.create_numeric(snk, 'val', 'int32'),)
                              )
+                expected = [-1, -1, -1, -2, -2, -4, -4, -4, -4, -6, -6, -6, 0, 0, -9, -9, -9]
+                actual = s.get(snk['val']).data[:]
+                self.assertListEqual(expected, actual.data[:].tolist())
 
-                print(snk.keys())
-                print(s.get(snk['val']).data[:])
 
     def test_ordered_merge_left_2(self):
         bio = BytesIO()
@@ -146,7 +162,8 @@ class TestSessionMerge(unittest.TestCase):
 
         s = session.Session()
         res = s.merge_right(l_id, r_id, left_fields=(l_vals,))
-        print(res)
+        self.assertListEqual([100,   0,   0, 300, 300,   0,   0, 400, 400, 600, 600],
+                             res[0].tolist())
 
 
     def test_ordered_merge_left(self):
@@ -290,7 +307,8 @@ class TestSessionJoin(unittest.TestCase):
         fki = np.asarray([0, 1, 1, 2, 4, 5, 5, 6, 8, 9, 9, 10], dtype=np.int32)
         vals = np.asarray([1, 2, 1, 1, 2, 1, 1, 2, 1], dtype=np.int64)
         s = session.Session()
-        print(s.join(pk, fki, vals))
+        self.assertListEqual([1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0],
+                             s.join(pk, fki, vals).tolist())
 
 
 class TestSessionSort(unittest.TestCase):
@@ -379,7 +397,7 @@ class TestSessionSort(unittest.TestCase):
             idx_f.data.write(idx)
             val_f.data.write(val)
             val2_f.data.write(val2)
-            s.sort_on(src, src, ("idx",))
+            s.sort_on(src, src, ("idx",), verbose=False)
 
             self.assertListEqual([b'a', b'b', b'c', b'd', b'e'], idx_f.data[:].tolist())
             self.assertListEqual([10, 30, 50, 40, 20], val_f.data[:].tolist())
@@ -527,7 +545,7 @@ class TestSessionAggregate(unittest.TestCase):
 
             s.create_indexed_string(ds, 'vals').data.write(vals)
             s.apply_spans_concat(spans, s.get(ds['vals']), dest=s.create_indexed_string(ds, 'result2'))
-            self.assertListEqual(['b', 'ab', 'aba', 'bab'], s.get(ds['result2']).data[:])
+            self.assertListEqual(['a', 'ba', 'bab', 'abab'], s.get(ds['result2']).data[:])
 
     def test_aggregate_count(self):
         idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
@@ -621,15 +639,12 @@ class TestSessionFields(unittest.TestCase):
             a = fields.NumericField(s, hf['a'], write_enabled=True)
             a.data.write(values)
 
-            with Timer("array"):
-                total = np.sum(a.data[:])
-            print(total)
+            total = np.sum(a.data[:])
+            self.assertEqual(49997540637149, total)
 
-            with Timer("* 2"):
-                a.data[:] = a.data[:] * 2
-                total = np.sum(a.data[:])
-            print(total)
-
+            a.data[:] = a.data[:] * 2
+            total = np.sum(a.data[:])
+            self.assertEqual(99995081274298, total)
 
     def test_write_then_read_categorical(self):
         from exetera.core.session import Session
@@ -641,19 +656,13 @@ class TestSessionFields(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             np.random.seed(12345678)
             values = np.random.randint(low=0, high=3, size=100000000)
-            print(values.min(), values.max())
             fields.categorical_field_constructor(s, hf, 'a', 'int8',
                                                  {'foo': 0, 'bar': 1, 'boo': 2})
             a = fields.CategoricalField(s, hf['a'], write_enabled=True)
             a.data.write(values)
 
-            with Timer("array"):
-                total = np.sum(a.data[:])
-            print(total)
-
-            d = a.data[:]
-            a.data[:] = np.where(d == 2, 1, d)
-
+            total = np.sum(a.data[:])
+            self.assertEqual(99987985, total)
 
     def test_write_then_read_fixed_string(self):
         from exetera.core.session import Session
@@ -670,13 +679,13 @@ class TestSessionFields(unittest.TestCase):
             a = fields.FixedStringField(s, hf['a'], write_enabled=True)
             a.data.write(svalues)
 
-            with Timer("array"):
-                total = np.unique(a.data[:])
-            print(total)
+            total = np.unique(a.data[:])
+            self.assertListEqual([b'', b'x', b'xx', b'xxx'], total.tolist())
 
-            with Timer("* 2"):
-                a.data[:] = np.core.defchararray.add(a.data[:], b'y')
-            print(a.data[:10])
+            a.data[:] = np.core.defchararray.add(a.data[:], b'y')
+            self.assertListEqual(
+                [b'xxxy', b'xxy', b'xxxy', b'y', b'xy', b'y', b'xxxy', b'xxxy', b'xy', b'y'],
+                a.data[:10].tolist())
 
 
     def test_write_then_read_indexed_string(self):
@@ -694,25 +703,31 @@ class TestSessionFields(unittest.TestCase):
             a = fields.IndexedStringField(s, hf['a'], write_enabled=True)
             a.data.write(svalues)
 
-            with Timer("array"):
-                total = np.unique(a.data[:])
-            print(total)
+            total = np.unique(a.data[:])
+            self.assertListEqual(['', 'x', 'xx', 'xxx'], total.tolist())
 
-            with Timer("* 2"):
-                strs = a.data[:]
-                strs = [s+'y' for s in strs]
-                a.data.clear()
-                a.data.write(strs)
-            print(strs[:10])
-            print(a.indices[:10])
-            print(a.values[:10])
-            print(a.data[:10])
+            strs = a.data[:]
+            strs = [s+'y' for s in strs]
+            a.data.clear()
+            a.data.write(strs)
+
+            # print(strs[:10])
+            self.assertListEqual(
+                ['xxxy', 'xxy', 'xxxy', 'y', 'xy', 'y', 'xxxy', 'xxxy', 'xy', 'y'], strs[:10])
+            # print(a.indices[:10])
+            self.assertListEqual([0, 4, 7, 11, 12, 14, 15, 19, 23, 25],
+                                 a.indices[:10].tolist())
+            # print(a.values[:10])
+            self.assertListEqual(
+                [120, 120, 120, 121, 120, 120, 121, 120, 120, 120], a.values[:10].tolist())
+            # print(a.data[:10])
+            self.assertListEqual(
+                ['xxxy', 'xxy', 'xxxy', 'y', 'xy', 'y', 'xxxy', 'xxxy', 'xy', 'y'], a.data[:10])
 
 
 class TestSessionImporters(unittest.TestCase):
 
     def test_indexed_string_importer(self):
-
         s = session.Session()
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
@@ -721,10 +736,21 @@ class TestSessionImporters(unittest.TestCase):
             im = fields.IndexedStringImporter(s, hf, 'x')
             im.write(values)
             f = s.get(hf['x'])
-            print(f, f.data)
-            print(f.data[:])
-            print(f.indices[:])
-            print(f.values[:])
+
+            expected = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
+             '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
+            self.assertListEqual(expected, f.data[:])
+
+            expected = [0, 0, 0, 5, 5, 11, 16, 21, 26, 26, 26, 31, 36, 36, 41, 47, 52, 52]
+            self.assertListEqual(expected, f.indices[:].tolist())
+
+            expected = [49, 46, 48, 46, 48, 49, 46, 48, 46, 195,
+                        164, 49, 46, 48, 46, 48, 49, 46, 48, 46,
+                        48, 49, 46, 48, 46, 48, 49, 46, 48, 46,
+                        48, 49, 46, 48, 46, 48, 49, 46, 48, 46,
+                        48, 49, 46, 48, 46, 195, 164, 49, 46, 48,
+                        46, 48]
+            self.assertListEqual(expected, f.values[:].tolist())
 
     def test_fixed_string_importer(self):
         s = session.Session()
@@ -736,11 +762,15 @@ class TestSessionImporters(unittest.TestCase):
             im = fields.FixedStringImporter(s, hf, 'x', max(len(b) for b in bvalues))
             im.write(bvalues)
             f = s.get(hf['x'])
-            print(f, f.data)
-            print(f.data[:])
+            # print(f, f.data)
+            # print(f.data[:])
+            expected = [b'', b'', b'1.0.0', b'', b'1.0.\xc3\xa4', b'1.0.0', b'1.0.0',
+                        b'1.0.0', b'', b'', b'1.0.0', b'1.0.0', b'', b'1.0.0',
+                        b'1.0.\xc3\xa4', b'1.0.0', b'']
+
+            self.assertListEqual(expected, f.data[:].tolist())
 
     def test_numeric_importer(self):
-        from datetime import datetime
         s = session.Session()
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
@@ -749,8 +779,10 @@ class TestSessionImporters(unittest.TestCase):
             im = fields.NumericImporter(s, hf, 'x', 'float32', per.try_str_to_float)
             im.write(values)
             f = s.get(hf['x'])
-            print(f, f.data)
-            print(f.data[:])
+            # print(f, f.data)
+            print(f.data[:].tolist())
+
+
 
     def test_date_importer(self):
         from datetime import datetime

@@ -24,7 +24,13 @@ class Dataset:
           should be put. Leaving this blankloads all of the keys in csv column order
     """
     def __init__(self, source, field_descriptors=None, keys=None, filter_fn=None,
-                 show_progress_every=False, start_from=None, stop_after=None, early_filter=None):
+                 show_progress_every=False, start_from=None, stop_after=None, early_filter=None,
+                 verbose=True):
+
+        def print_if_verbose(*args):
+            if verbose:
+                print(*args)
+
         self.names_ = list()
         self.fields_ = list()
         self.names_ = list()
@@ -80,9 +86,9 @@ class Dataset:
             if show_progress_every:
                 if i_r % show_progress_every == 0:
                     if filtered_count == i_r:
-                        print(i_r)
+                        print_if_verbose(i_r)
                     else:
-                        print(f"{i_r} ({filtered_count})")
+                        print_if_verbose(f"{i_r} ({filtered_count})")
 
             if start_from is not None and i_r < start_from:
                 del row
@@ -103,14 +109,14 @@ class Dataset:
                         new_fields[i_df].append(f if not t else t.strings_to_values[f])
                     except Exception as e:
                         msg = "{}: key error for value {} (permitted values are {}"
-                        print(msg.format(fields_to_use[i_f], f, t.strings_to_values))
+                        print_if_verbose(msg.format(fields_to_use[i_f], f, t.strings_to_values))
                 del row
                 filtered_count += 1
                 if stop_after and i_r >= stop_after:
                     break
 
         if show_progress_every:
-            print(f"{i_r} ({filtered_count})")
+            print_if_verbose(f"{i_r} ({filtered_count})")
 
         # assign the built sequences to fields_
         for i_f, f in enumerate(new_fields):
@@ -120,7 +126,7 @@ class Dataset:
                 self.fields_.append(f.finalise())
         self.index_ = np.asarray([i for i in range(len(self.fields_[0]))], dtype=np.uint32)
         self.names_ = fields_to_use
-        print('loading took', time.time() - tstart, "seconds")
+        print_if_verbose('loading took', time.time() - tstart, "seconds")
 
         #     if i > 0 and i % lines_per_dot == 0:
         #         if i % (lines_per_dot * newline_at) == 0:

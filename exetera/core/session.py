@@ -171,7 +171,7 @@ class Session:
 
 
     def sort_on(self, src_group, dest_group, keys,
-                timestamp=datetime.now(timezone.utc), write_mode='write'):
+                timestamp=datetime.now(timezone.utc), write_mode='write', verbose=True):
         """
         Sort a group (src_group) of fields by the specified set of keys, and write the
         sorted fields to dest_group.
@@ -185,12 +185,15 @@ class Session:
         :return: None
         """
         # TODO: fields is being ignored at present
+        def print_if_verbose(*args):
+            if verbose:
+                print(*args)
 
         readers = tuple(self.get(src_group[f]) for f in keys)
         t1 = time.time()
         sorted_index = self.dataset_sort_index(
             readers, np.arange(len(readers[0].data), dtype=np.uint32))
-        print(f'sorted {keys} index in {time.time() - t1}s')
+        print_if_verbose(f'sorted {keys} index in {time.time() - t1}s')
 
         t0 = time.time()
         for k in src_group.keys():
@@ -210,8 +213,8 @@ class Session:
                 else:
                     r.data[:] = self.apply_index(sorted_index, r)
                 del r
-            print(f"  '{k}' reordered in {time.time() - t1}s")
-        print(f"fields reordered in {time.time() - t0}s")
+                print_if_verbose(f"  '{k}' reordered in {time.time() - t1}s")
+        print_if_verbose(f"fields reordered in {time.time() - t0}s")
 
 
 
