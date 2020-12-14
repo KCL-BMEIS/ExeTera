@@ -22,8 +22,9 @@ class TestFilteredIndex(unittest.TestCase):
 
         filter = [1, 3, 4, 7, 8, 9]
 
-        for f in filtered_field.filtered_field(field, filter):
-            print(f)
+        expected = [8, 6, 5, 2, 1, 0]
+        for i, f in enumerate(filtered_field.filtered_field(field, filter)):
+            self.assertEqual(expected[i], f)
 
     def test_filtered_field_class(self):
 
