@@ -440,22 +440,11 @@ class TestPersistence(unittest.TestCase):
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
             values = ['', 'True', 'False', 'False', '', '', 'True', 'False', 'True', '']
-            # ds = hf.create_dataset('foo', (10,), dtype=h5py.string_dtype(encoding='utf-8'))
-            # ds[:] = values
-            # print(ds)
             foo = rw.CategoricalImporter(datastore, hf, 'foo',
                                                   {'': 0, 'False': 1, 'True': 2}, ts)
             foo.write(values)
-            print('fieldtype:', hf['foo'].attrs['fieldtype'])
-            print('timestamp:', hf['foo'].attrs['timestamp'])
-            print('completed:', hf['foo'].attrs['completed'])
-
-        with h5py.File(bio, 'r') as hf:
-            print(hf['foo'].keys())
-            print(hf['foo']['values'])
-            print(hf['foo']['key_values'])
-            print(hf['foo']['key_names'])
-
+            self.assertListEqual([0, 2, 1, 1, 0, 0, 2, 1, 2, 0],
+                                 datastore.get_reader(hf['foo'])[:].tolist())
 
     # def test_categorical_string_writer_with_string_data(self):
     #     datastore = persistence.DataStore(10)
@@ -606,10 +595,11 @@ class TestPersistence(unittest.TestCase):
         values = ['a', 'b', 'b', 'c', 'd', 'd', 'd', 'e', 'f']
         a = np.asarray(values, dtype='S1')
         f = persistence.filter_duplicate_fields(a)
-        print(f)
+        self.assertListEqual([True, True, False, True, True, False, False, True, True],
+                             f.tolist())
         ds = persistence.DataStore()
         g = ds.apply_filter(f, a)
-        print(g)
+        self.assertListEqual([b'a', b'b', b'c', b'd', b'e', b'f'], g.tolist())
 
 
 class TestPersistenceConcat(unittest.TestCase):
@@ -628,8 +618,8 @@ class TestPersistenceConcat(unittest.TestCase):
                                                         d_indices, d_values,
                                                         100, 100, s,
                                                         separator, delimiter)
-        print(d_indices[:ii])
-        print(d_values[:iv])
+        self.assertListEqual([0, 1, 2, 3, 4], d_indices[:ii].tolist())
+        self.assertListEqual([97, 98, 99, 100], d_values[:iv].tolist())
 
     def test_apply_spans_concat_bug_len_1_entry_bstr(self):
         spans = np.asarray([0, 1, 2, 3, 4], dtype=np.int32)
@@ -645,8 +635,8 @@ class TestPersistenceConcat(unittest.TestCase):
                                                         d_indices, d_values,
                                                         100, 100, s,
                                                         separator, delimiter)
-        print(d_indices[:ii])
-        print(d_values[:iv])
+        self.assertListEqual([0, 1, 2, 3, 4], d_indices[:ii].tolist())
+        self.assertListEqual([b'a', b'b', b'c', b'd'], d_values[:iv].tolist())
 
     def test_apply_spans_concat_fast(self):
 
@@ -667,9 +657,7 @@ class TestPersistenceConcat(unittest.TestCase):
 
             expected = ['aabbbb', 'cccc', 'dd', 'eeeeff', 'gggghh']
             actual = datastore.get_reader(hf['concatfoo'])[:]
-            print(actual)
             self.assertListEqual(expected, actual)
-
 
     def test_apply_spans_concat_fast_value_flush_length_is_0(self):
 
@@ -723,7 +711,9 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         datastore = persistence.DataStore(10)
         a = np.asarray([1, 2, 1, 1, 2, 2, 1, 3, 2, 1])
         b = np.asarray(['a', 'a', 'b', 'a', 'b', 'a', 'd', 'c', 'a', 'b'])
-        print(datastore.distinct(fields=(a, b)))
+        results = datastore.distinct(fields=(a, b))
+        self.assertListEqual([1, 1, 1, 2, 2, 3], results[0].tolist())
+        self.assertListEqual(['a', 'b', 'd', 'a', 'b', 'c'], results[1].tolist())
 
 
     def test_get_spans_single_field_numeric(self):
@@ -784,7 +774,7 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         spans = np.asarray([0, 1, 3, 4, 7, 8, 12, 14])
         results = np.zeros(len(spans)-1, dtype=np.int64)
         persistence._apply_spans_count(spans, results)
-        print(results)
+        self.assertListEqual([1, 2, 1, 3, 1, 4, 2], results.tolist())
 
 
     def test_apply_spans_first(self):
@@ -792,7 +782,7 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         values = np.arange(14)
         results = np.zeros(len(spans)-1, dtype=np.int64)
         persistence._apply_spans_first(spans, values, results)
-        print(results)
+        self.assertListEqual([0, 1, 3, 4, 7, 8, 12], results.tolist())
 
 
     def test_apply_spans_last(self):
@@ -800,13 +790,13 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         values = np.arange(14)
         results = np.zeros(len(spans)-1, dtype=np.int64)
         persistence._apply_spans_last(spans, values, results)
-        print(results)
+        self.assertListEqual([0, 2, 3, 6, 7, 11, 13], results.tolist())
 
         spans = np.asarray([0, 20, 40])
         values = np.arange(40)
         results = np.zeros(len(spans)-1, dtype=np.int64)
         persistence._apply_spans_last(spans, values, results)
-        print(results)
+        self.assertListEqual([19, 39], results.tolist())
 
 
     def test_apply_spans_max(self):
@@ -839,8 +829,7 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
             writer = reader.get_writer(hf, 'foo', ts, 'overwrite')
             writer.write(values * 2)
             reader = rw.NumericReader(datastore, hf['foo'])
-            print(reader[:])
-
+            self.assertListEqual((values * 2).tolist(), reader[:].tolist())
 
     def test_try_create_group(self):
         datastore = persistence.DataStore(10)
@@ -850,17 +839,14 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
             b = datastore.get_or_create_group(hf, 'a')
             self.assertEqual(a, b)
 
-
     def test_get_trash_folder(self):
         datastore = persistence.DataStore(10)
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
             a = hf.create_group('a')
             b = a.create_group('b')
-            print(datastore.get_trash_group(b))
-            print(datastore.get_trash_group(a))
-            print(datastore.get_trash_group(hf))
-
+            self.assertIsNotNone(datastore.get_trash_group(a))
+            self.assertIsNotNone(datastore.get_trash_group(b))
 
     def test_move_group(self):
         datastore = persistence.DataStore(10)
@@ -872,14 +858,15 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
             b = hf.create_group('b')
             x = a.create_dataset('x', data=np.asarray([1, 2, 3, 4, 5]))
             a.move('x', '/b/y')
-            print(b['y'].name)
+            self.assertEqual('/b/y', b['y'].name)
             x = a.create_dataset('x', data=np.asarray([6, 7, 8, 9, 10]))
             try:
                 a.move('x', '/b/y')
             except Exception as e:
                 print(e)
-                print(x[:])
-            print(hf['b/y'][:])
+                self.assertEqual(
+                    "Unable to move link (an object with that name already exists)", str(e))
+            self.assertListEqual([1, 2, 3, 4, 5], hf['/b/y'][:].tolist())
 
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
@@ -889,15 +876,7 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
             foo.write(np.arange(95, dtype='int32'))
             trash = datastore.get_trash_group(foo.field)
             hf.move('/asmts/foo', trash.name+'/foo')
-            print(hf[trash.name+'/foo'])
         del hf
-
-        bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
-            a = hf.create_group('a')
-            b = a.create_group('/b')
-            print(hf.keys())
-
 
     def test_copy_group(self):
         bio1 = BytesIO()
@@ -942,26 +921,11 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
             for i, j in zip(foo[:], footwo[:]):
                 self.assertTrue(j == i*2)
 
-
-    def test_raw_performance(self):
-        import time
-
-        testsize = 1 << 20
-        a = np.random.randint(low=0, high=1000, size=testsize, dtype=np.uint32)
-        b = np.random.randint(low=0, high=1000, size=testsize, dtype=np.uint32)
-
-        t0 = time.time()
-        c = a + b
-        print(time.time() - t0)
-        print(np.sum(c))
-
-
     def test_index_spans(self):
-        spans = np.asarray([0,2,2,4,5,8,8,10], dtype='int32')
+        spans = np.asarray([0, 2, 2, 4, 5, 8, 8, 10], dtype='int32')
         results = np.zeros(10, dtype='int32')
         persistence._index_spans(spans, results)
-        print(results)
-
+        self.assertListEqual([0, 0, 2, 2, 3, 4, 4, 4, 6, 6], results.tolist())
 
     def test_get_shared_index(self):
         datastore = persistence.DataStore(10)
@@ -970,9 +934,10 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
         c = np.asarray(['b', 'c', 'e', 'e', 'e', 'f', 'f', 'i', 'j'])
 
         x, y, z = datastore.get_shared_index((a, b, c))
-        print(x)
-        print(y)
-        print(z)
+        self.assertListEqual([0, 0, 2, 2, 3, 5, 5, 6, 8], x.tolist())
+        self.assertListEqual([0, 1, 1, 2, 5, 6, 7, 7], y.tolist())
+        self.assertListEqual([1, 2, 4, 4, 4, 5, 5, 8, 9], z.tolist())
+
 
 class TestPersistenceOperations(unittest.TestCase):
 
@@ -980,21 +945,18 @@ class TestPersistenceOperations(unittest.TestCase):
         pks = np.asarray([1, 2, 4, 5, 7, 8])
         fks = np.asarray([1, 1, 1, 3, 3, 4, 4, 5, 6, 6, 8, 8])
         results = persistence.foreign_key_is_in_primary_key(pks, fks)
-        print(results)
-
+        self.assertListEqual(
+            [True, True, True, False, False, True, True, True, False, False, True, True],
+            results.tolist())
 
     def test_filter(self):
 
         def filter_framework(name, raw_indices, raw_values, the_filter, expected):
             dest_indices, dest_values =\
                 persistence._apply_filter_to_index_values(the_filter, raw_indices, raw_values)
-            print(dest_indices)
-            print(dest_values)
             w = rw.IndexedStringWriter(datastore, hf, name, ts)
             w.write_raw(dest_indices, dest_values)
             r = datastore.get_reader(hf[name])
-            print(r[:])
-
             self.assertListEqual(r[:], expected)
 
         datastore = persistence.DataStore(10)
@@ -1047,12 +1009,9 @@ class TestPersistenceOperations(unittest.TestCase):
         def index_framework(name, raw_indices, raw_values, the_indices, expected):
             dest_indices, dest_values = \
                 persistence._apply_indices_to_index_values(the_indices, raw_indices, raw_values)
-            print(dest_indices)
-            print(dest_values)
             w = rw.IndexedStringWriter(datastore, hf, name, ts)
             w.write_raw(dest_indices, dest_values)
             r = datastore.get_reader(hf[name])
-            print(r[:])
 
             self.assertListEqual(r[:], expected)
 
@@ -1103,7 +1062,6 @@ class TestPersistenceOperations(unittest.TestCase):
             index_framework('all_false_filter', raw_indices, raw_values,
                             no_indices, expected)
 
-
     def test_apply_spans_index_of_max(self):
         datastore = persistence.DataStore(10)
         ids = np.asarray(['a', 'a', 'b', 'b', 'b', 'c'], dtype='S1')
@@ -1111,13 +1069,9 @@ class TestPersistenceOperations(unittest.TestCase):
         spans = persistence._get_spans_for_field(ids)
         results = np.zeros(len(spans)-1, dtype=np.int64)
         persistence._apply_spans_index_of_max(spans, vals, results)
-        print(results)
-
-
-
+        self.assertListEqual([1, 2, 5], results.tolist())
 
     def test_sort(self):
-
         datastore = persistence.DataStore(10)
         vx = np.asarray([b'a', b'b', b'c', b'd', b'e'], dtype='S1')
         va = np.asarray([1, 2, 2, 1, 1], dtype=np.int32)
@@ -1146,21 +1100,6 @@ class TestPersistenceOperations(unittest.TestCase):
             self.assertListEqual([1, 2, 5, 3, 4], avb.tolist())
             self.assertListEqual([b'e', b'd', b'a', b'c', b'b'], avx.tolist())
 
-        # sindex = np.argsort(vb, kind='stable')
-        # #sindex = sorted(np.arange(len(vb)), key=lambda x: vb[x])
-        # print(np.asarray(va)[sindex])
-        # print(np.asarray(vb)[sindex])
-        # print(np.asarray(vx)[sindex])
-        # accindex = np.asarray(sindex)
-        # sva = np.asarray(va)[sindex]
-        # sindex = np.argsort(sva, kind='stable')
-        # #sindex = np.asarray(sorted(np.arange(len(va)), key=lambda x: sva[x]))
-        # accindex = accindex[sindex]
-        # print(accindex)
-        # print(np.asarray(va)[accindex])
-        # print(np.asarray(vb)[accindex])
-        # print(np.asarray(vx)[accindex])
-
     def test_indexed_string_sort(self):
         datastore = persistence.DataStore(10)
         ts = str(datetime.now(timezone.utc))
@@ -1182,14 +1121,12 @@ class TestPersistenceOperations(unittest.TestCase):
             foo.write_part(values[30:40])
             foo.write_part(values[40:42])
             foo.flush()
-            print(hf['foo']['index'][()])
 
             index = hf['foo']['index'][()]
 
             actual = list()
             for i in range(index.size - 1):
                 actual.append(hf['foo']['values'][index[i]:index[i+1]].tobytes().decode())
-            print(len(datastore.get_reader(hf['foo'])))
 
             self.assertListEqual(values, actual)
 
@@ -1222,19 +1159,26 @@ class TestJoining(unittest.TestCase):
         a_val = np.array([10, 11, 12, 23, 22, 43, 40, 41, 41, 60,
                           63, 62, 71, 71, 92, 92, 92])
         index = ds.get_index(p_id, a_pid)
-        print(index)
-        print(persistence._map_valid_indices(p_val, index, 0))
+        ivld = 4611686018427387904
+        self.assertListEqual(
+            [0, 0, 0, 1, 1, 3, 3, 3, 3, 5, 5, 5, ivld, ivld, 7, 7, 7], index.tolist())
+        self.assertListEqual(
+            [-1, -1, -1, -2, -2, -4, -4, -4, -4, -6, -6, -6, 0, 0, -9, -9, -9],
+            persistence._map_valid_indices(p_val, index, 0).tolist())
         index = ds.get_index(a_pid, p_id)
-        print(index)
-        print(persistence._map_valid_indices(a_val, index, 0))
+        self.assertListEqual(
+            [2, 4, ivld, 8, ivld+1, 11, ivld+2, 16], index.tolist())
+        self.assertListEqual(
+            [12, 22, 0, 41, 0, 62, 0, 92],
+            persistence._map_valid_indices(a_val, index, 0).tolist())
 
     def test_join_pk_to_fk(self):
         ds = persistence.DataStore(10)
         p_id = np.array([b'a', b'b', b'c', b'd', b'e'], dtype='S1')
         t_pid = np.array([b'a', b'c', b'd'], dtype='S1')
         index = ds.get_index(t_pid, p_id)
-        print(index)
-
+        ivld = 4611686018427387904
+        self.assertListEqual([0, ivld, 1, 2, ivld+1], index.tolist())
 
     def test_fk_in_pk(self):
         ds = persistence.DataStore(10)
@@ -1242,7 +1186,10 @@ class TestJoining(unittest.TestCase):
         a_pid = np.array([100, 100, 100, 200, 200, 400, 400, 400, 400, 600,
                           600, 600, 700, 700, 900, 900, 900])
         fk_in_pk = persistence.foreign_key_is_in_primary_key(p_id, a_pid)
-        print(fk_in_pk)
+        self.assertListEqual(
+            [True, True, True, True, True, True, True, True, True, True, True, True,
+             False, False, True, True, True],
+            fk_in_pk.tolist())
 
     def test_failure_case_from_supplements(self):
         ds = persistence.DataStore(10)
@@ -1312,20 +1259,23 @@ class TestJoining(unittest.TestCase):
                 ds.get_reader(p['id']),
                 ds.get_numeric_writer(p, 'pid_to_apid', 'int64', ts),
             )
-            print(ds.get_reader(p['pid_to_apid'])[:])
+            r = ds.get_reader(p['pid_to_apid'])[:]
+            self.assertListEqual([2, 7, 4611686018427387904, 8], r.tolist())
             ds.get_index(
                 ds.get_reader(p['id']),
                 ds.get_reader(a['pid']),
                 ds.get_numeric_writer(a, 'apid_to_pid', 'int64', ts),
             )
-            print('fkey:', ds.get_reader(a['apid_to_pid'])[:])
+            r = ds.get_reader(a['apid_to_pid'])[:]
+            ivld = 4611686018427387904
+            self.assertListEqual([0, 0, 0, ivld, ivld, ivld, 1, 1, 3], r.tolist())
 
             # print(ds.get_reader(p['age'])[:][ds.get_reader(a['apid_to_pid'])[:]])
 
             result = persistence._map_valid_indices(ds.get_reader(p['age'])[:],
                                                     ds.get_reader(a['apid_to_pid'])[:],
                                                     -100)
-            print(result)
+            self.assertListEqual([18, 18, 18, -100, -100, -100, 90, 90, 60], result.tolist())
             # TODO: appears to be a bug in h5py that doesn't allow complex numpy indexing
             # print(ds.get_reader(p['age'])[ds.get_reader(a['apid_to_pid'])[:]])
 
