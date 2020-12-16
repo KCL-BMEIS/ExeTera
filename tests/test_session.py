@@ -762,8 +762,6 @@ class TestSessionImporters(unittest.TestCase):
             im = fields.FixedStringImporter(s, hf, 'x', max(len(b) for b in bvalues))
             im.write(bvalues)
             f = s.get(hf['x'])
-            # print(f, f.data)
-            # print(f.data[:])
             expected = [b'', b'', b'1.0.0', b'', b'1.0.\xc3\xa4', b'1.0.0', b'1.0.0',
                         b'1.0.0', b'', b'', b'1.0.0', b'1.0.0', b'', b'1.0.0',
                         b'1.0.\xc3\xa4', b'1.0.0', b'']
@@ -786,8 +784,6 @@ class TestSessionImporters(unittest.TestCase):
             for i, j in zip(expected, actual):
                 self.assertAlmostEqual(i, j)
 
-
-
     def test_date_importer(self):
         from datetime import datetime
         s = session.Session()
@@ -797,5 +793,7 @@ class TestSessionImporters(unittest.TestCase):
             im = fields.DateImporter(s, hf, 'x')
             im.write(values)
             f = s.get(hf['x'])
-            print(f, f.data)
-            print([datetime.fromtimestamp(d) for d in f.data[:]])
+            self.assertListEqual(
+                [datetime(year=int(v[0:4]), month=int(v[5:7]), day=int(v[8:10])
+                          ).timestamp() for v in values],
+                f.data[:].tolist())
