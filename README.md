@@ -7,7 +7,11 @@ analysis pipelines for large tabular datasets.
 # Current release and requirements
 
 Current release version: v0.4.0
-
+<p>
+   <a href="https://pypi.org/project/torchio/">
+     <img src="https://img.shields.io/pypi/v/exetera?label=PyPI%20version&logo=python&logoColor=white" alt="PyPI version">
+   </a>
+</p>
 Requires python 3.7+
 
 ---
