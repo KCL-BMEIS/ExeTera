@@ -81,10 +81,12 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite)
             names = set(ds.names_)
             missing_names = names.difference(fields.keys())
 
+            # DatasetImporter(datastore, files[sk], hf, sk, schema[sk], timestamp,
+            #                 stop_after=stop_after.get(sk, None),
+            #                 show_progress_every=show_every)
             PandasDatasetImporter(datastore, files[sk], hf, sk, schema[sk], timestamp,
-                            stop_after=stop_after.get(sk, None),
-                            show_progress_every=show_every)
-
+                                  stop_after=stop_after.get(sk, None),
+                                  show_progress_every=show_every, chunk_size=1<<16)
             print(sk, hf.keys())
             table = hf[sk]
             ids = datastore.get_reader(table[list(table.keys())[0]])
@@ -217,7 +219,8 @@ class PandasDatasetImporter:
     def __init__(self, datastore, source, hf, space, schema, timestamp,
                  keys=None,
                  stop_after=None, show_progress_every=None, filter_fn=None,
-                 early_filter=None, chunk_size=1 << 18):
+                 early_filter=None, chunk_size=1<<18):
+        print("pandas-based import!")
         self.index_ = None
 
         time0 = time.time()
