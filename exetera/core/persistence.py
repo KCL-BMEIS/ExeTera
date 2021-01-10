@@ -403,6 +403,111 @@ def _apply_spans_min(spans, src_array, dest_array):
 #             #     print(dest_values[i])
 #     return dest_values
 
+@njit
+def _apply_spans_concat_2(spans, src_index, src_values, dest_index, dest_values,
+                          max_index_i, max_value_i, separator, delimiter, sp_start, dest_start_v):
+
+
+    if sp_start == 0:
+        d_index_i = np.int64(1)
+        d_index_v = np.int64(0)
+    else:
+        d_index_i = np.int64(0)
+        d_index_v = np.int64(0)
+
+    sp_end = len(spans)-1
+    for s in range(sp_start, sp_end):
+        sp_cur = spans[s]
+        sp_next = spans[s+1]
+        cur_src_i = src_index[sp_cur]
+        next_src_i = src_index[sp_next]
+
+        non_empties = 0
+        if sp_next - sp_cur == 1:
+            # at most one entry to be copied so no decoration required
+            if next_src_i - cur_src_i > 0:
+                non_empties = 1
+        elif sp_next - sp_cur > 1:
+            for e in range(sp_cur, sp_next):
+                e_start = src_index[e]
+                e_end = src_index[e+1]
+                if e_end - e_start > 0:
+                    non_empties += 1
+
+        delta = 0
+        if non_empties == 1:
+            # single entry
+            comma = False
+            quotes = False
+            for i_c in range(cur_src_i, next_src_i):
+                if src_values[i_c] == separator:
+                    comma = True
+                elif src_values[i_c] == delimiter:
+                    quotes = True
+
+            if comma or quotes:
+                dest_values[d_index_v + delta] = delimiter
+                delta += 1
+
+            for i_c in range(cur_src_i, next_src_i):
+                if src_values[i_c] == delimiter:
+                    dest_values[d_index_v + delta] = delimiter
+                    delta += 1
+                dest_values[d_index_v + delta] = src_values[i_c]
+                delta += 1
+
+            if comma or quotes:
+                dest_values[d_index_v + delta] = delimiter
+                delta += 1
+
+        elif non_empties > 1:
+            # multiple entries so find out whether there are multiple entries with values
+            prev_empty = True
+            for e in range(sp_cur, sp_next):
+                src_start = src_index[e]
+                src_end = src_index[e + 1]
+                comma = False
+                quotes = False
+                cur_empty = src_end == src_start
+                for i_c in range(src_start, src_end):
+                    if src_values[i_c] == separator:
+                        comma = True
+                    elif src_values[i_c] == delimiter:
+                        quotes = True
+
+                if prev_empty == False and cur_empty == False:
+                    if e > sp_cur:
+                        dest_values[d_index_v + delta] = separator
+                        delta += 1
+                # `prev_empty`, once set to False, can't become True again.
+                # this line ensures that, once we have encountered our first
+                # non-empty entry, any following non-empty entry will get a separator,
+                # even if there are empty-entries in-between.
+                prev_empty = cur_empty if cur_empty == False else prev_empty
+
+                if comma or quotes:
+                    dest_values[d_index_v + delta] = delimiter
+                    delta += 1
+
+                for i_c in range(src_start, src_end):
+                    if src_values[i_c] == delimiter:
+                        dest_values[d_index_v + delta] = delimiter
+                        delta += 1
+                    dest_values[d_index_v + delta] = src_values[i_c]
+                    delta += 1
+
+                if comma or quotes:
+                    dest_values[d_index_v + delta] = delimiter
+                    delta += 1
+
+        d_index_v += delta
+        dest_index[d_index_i] = d_index_v + dest_start_v
+        d_index_i += 1
+
+        if d_index_i >= max_index_i or d_index_v >= max_value_i:
+            break
+    return s + 1, d_index_i, d_index_v
+
 
 @njit
 def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
@@ -438,7 +543,9 @@ def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
                 for e in range(cur, next):
                    if src_index[e] < src_index[e+1]:
                        non_empties += 1
-                if non_empties == 1:
+                if non_empties == 0:
+                    raise NotImplementedError()
+                elif non_empties == 1:
                     # only one non-empty entry to be copied, so commas not required
                     next_index_v = next_src_i - cur_src_i + np.int64(index_v)
                     dest_values[index_v:next_index_v] = src_values[cur_src_i:next_src_i]
@@ -991,7 +1098,6 @@ class DataStore:
                                                       dest_index, dest_values,
                                                       max_index_i, max_value_i, s,
                                                       separator, delimiter)
-
             if index_i > 0 or index_v > 0:
                 writer.write_raw(dest_index[:index_i], dest_values[:index_v])
         writer.flush()

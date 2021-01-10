@@ -425,19 +425,25 @@ class Session:
     def apply_spans_last(self, spans, src, dest=None):
         return self._apply_spans_src(ops.apply_spans_last, spans, src, dest)
 
-    def apply_spans_concat(self, spans, src, dest):
+    def apply_spans_concat(self, spans, src, dest,
+                           src_chunksize=None, dest_chunksize=None, chunksize_mult=None):
         if not isinstance(src, fld.IndexedStringField):
             raise ValueError(f"'src' must be one of 'IndexedStringField' but is {type(src)}")
         if not isinstance(dest, fld.IndexedStringField):
             raise ValueError(f"'dest' must be one of 'IndexedStringField' but is {type(dest)}")
 
+        src_chunksize = src.chunksize if src_chunksize is None else src_chunksize
+        dest_chunksize = dest.chunksize if dest_chunksize is None else dest_chunksize
+        chunksize_mult = 16 if chunksize_mult is None else chunksize_mult
+
+
         src_index = src.indices[:]
         src_values = src.values[:]
-        dest_index = np.zeros(src.chunksize, src_index.dtype)
-        dest_values = np.zeros(dest.chunksize * 16, src_values.dtype)
+        dest_index = np.zeros(src_chunksize, src_index.dtype)
+        dest_values = np.zeros(dest_chunksize * chunksize_mult, src_values.dtype)
 
-        max_index_i = src.chunksize
-        max_value_i = dest.chunksize * 8
+        max_index_i = src_chunksize
+        max_value_i = dest_chunksize * chunksize_mult // 2
 
         if src_values.dtype == 'S1':
             separator = b','
@@ -447,11 +453,16 @@ class Session:
             delimiter = np.frombuffer(b'"', dtype='S1')[0][0]
 
         s = 0
+        index_v = 0
         while s < len(spans) - 1:
-            s, index_i, index_v = per._apply_spans_concat(spans, src_index, src_values,
-                                                          dest_index, dest_values,
-                                                          max_index_i, max_value_i, s,
-                                                          separator, delimiter)
+            # s, index_i, index_v = per._apply_spans_concat(spans, src_index, src_values,
+            #                                               dest_index, dest_values,
+            #                                               max_index_i, max_value_i, s,
+            #                                               separator, delimiter)
+            s, index_i, index_v = per._apply_spans_concat_2(spans, src_index, src_values,
+                                                            dest_index, dest_values,
+                                                            max_index_i, max_value_i,
+                                                            separator, delimiter, s, index_v)
 
             if index_i > 0 or index_v > 0:
                 dest.indices.write_part(dest_index[:index_i])

@@ -536,6 +536,39 @@ class TestSessionAggregate(unittest.TestCase):
         bio = BytesIO()
         with session.Session() as s:
             spans = s.get_spans(idx)
+            self.assertListEqual([0, 1, 3, 6, 10], spans.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            s.create_indexed_string(ds, 'vals').data.write(vals)
+            s.apply_spans_concat(spans, s.get(ds['vals']), dest=s.create_indexed_string(ds, 'result'))
+            self.assertListEqual([0, 1, 4, 9, 16], s.get(ds['result']).indices[:].tolist())
+            self.assertListEqual(['a', 'b,a', 'b,a,b', 'a,b,a,b'], s.get(ds['result']).data[:])
+
+    def test_apply_spans_concat_2(self):
+        idx = np.asarray([0, 0, 1, 2, 2, 3, 4, 4, 4, 4], dtype=np.int32)
+        vals = ['a', 'b,c', 'd', 'e,f', 'g', 'h,i', 'j', 'k,l', 'm', 'n,o']
+        bio = BytesIO()
+        with session.Session() as s:
+            spans = s.get_spans(idx)
+            self.assertListEqual([0, 2, 3, 5, 6, 10], spans.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            s.create_indexed_string(ds, 'vals').data.write(vals)
+            s.apply_spans_concat(spans, s.get(ds['vals']), dest=s.create_indexed_string(ds, 'result'))
+            self.assertListEqual([0, 7, 8, 15, 20, 35], s.get(ds['result']).indices[:].tolist())
+            self.assertListEqual(['a,"b,c"', 'd', '"e,f",g', '"h,i"', 'j,"k,l",m,"n,o"'],
+                                 s.get(ds['result']).data[:])
+
+    def test_apply_spans_concat_field(self):
+        idx = np.asarray([0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2], dtype=np.int32)
+        vals = ['a', "'b'", 'what', 'some, information', 'x',
+               '', 'foo', 'flop',
+               "'dun'", "'mun'", "'race, track?'", '', "for, too", 'z', 'now!']
+
+        # vals = ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b']
+        bio = BytesIO()
+        with session.Session() as s:
+            spans = s.get_spans(idx)
             # results = s.apply_spans_concat(spans, vals)
             # self.assertListEqual([0, 8, 6, 9], results.tolist())
 
@@ -544,8 +577,49 @@ class TestSessionAggregate(unittest.TestCase):
             # self.assertListEqual([0, 8, 6, 9], s.get(ds['result']).data[:].tolist())
 
             s.create_indexed_string(ds, 'vals').data.write(vals)
-            s.apply_spans_concat(spans, s.get(ds['vals']), dest=s.create_indexed_string(ds, 'result2'))
-            self.assertListEqual(['a', 'ba', 'bab', 'abab'], s.get(ds['result2']).data[:])
+            s.apply_spans_concat(spans, s.get(ds['vals']), dest=s.create_indexed_string(ds, 'result'))
+            self.assertListEqual(['a,\'b\',what,"some, information",x', 'foo,flop',
+                                  '\'dun\',\'mun\',"\'race, track?\'","for, too",z,now!'],
+                                 s.get(ds['result']).data[:])
+
+    def test_apply_spans_concat_small_chunk_size(self):
+        idx = np.asarray([0, 0, 0, 1, 1, 2, 2, 2, 3, 3,
+                          4, 4, 4, 5, 5, 6, 6, 6, 7, 7,
+                          8, 8, 8, 9, 9, 10, 10, 10, 11, 11,
+                          12, 12, 12, 13, 13, 14, 14, 14, 15, 15,
+                          16, 16, 16, 17, 17, 18, 18, 18, 19, 19])
+        vals = ['a', 'b,c', '', 'd', 'e,f', '', 'g', 'h,i', '', 'j',
+                'k,l', '', 'm', 'n,o', '', 'p', 'q,r', '', 's', 't,u',
+                '', 'v', 'w,x', '', 'y', 'z,aa', '', 'ab', 'ac,ad', '',
+                'ae', 'af,ag', '', 'ah', 'ai,aj', '', 'ak', 'al,am', '', 'an',
+                'ao,ap', '', 'aq', 'ar,as', '', 'at', 'au,av', '', 'aw', 'ax,ay']
+
+        bio = BytesIO()
+        with session.Session() as s:
+            spans = s.get_spans(idx)
+            self.assertListEqual([0, 3, 5, 8, 10, 13, 15, 18, 20, 23, 25, 28,
+                                  30, 33, 35, 38, 40, 43, 45, 48, 50], spans.tolist())
+
+            ds = s.open_dataset(bio, "w", "ds")
+            s.create_indexed_string(ds, 'vals').data.write(vals)
+
+            expected_indices = [0,
+                                7, 14, 21, 22, 29, 34, 41, 48, 55, 56,
+                                65, 72, 82, 92, 102, 104, 114, 121, 131, 141]
+            expected_data = ['a,"b,c"', 'd,"e,f"', 'g,"h,i"', 'j', '"k,l",m',
+                             '"n,o"', 'p,"q,r"', 's,"t,u"', 'v,"w,x"', 'y',
+                             '"z,aa",ab', '"ac,ad"', 'ae,"af,ag"', 'ah,"ai,aj"', 'ak,"al,am"',
+                             'an', '"ao,ap",aq', '"ar,as"', 'at,"au,av"', 'aw,"ax,ay"']
+
+            s.apply_spans_concat(spans, s.get(ds['vals']), dest=s.create_indexed_string(ds, 'result'))
+            self.assertListEqual(expected_indices, s.get(ds['result']).indices[:].tolist())
+            self.assertListEqual(expected_data, s.get(ds['result']).data[:])
+
+            s.apply_spans_concat(spans, s.get(ds['vals']), dest=s.create_indexed_string(ds, 'result2'),
+                                 src_chunksize=16, dest_chunksize=16)
+            self.assertListEqual(expected_indices, s.get(ds['result2']).indices[:].tolist())
+            self.assertListEqual(expected_data, s.get(ds['result2']).data[:])
+
 
     def test_aggregate_count(self):
         idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
