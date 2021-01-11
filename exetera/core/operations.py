@@ -19,9 +19,9 @@ def chunks(length, chunksize=1 << 20):
         yield cur, next_
         cur = next_
 
-@njit
-def fast_categorical_map(categories, data, output):
-    for i in range(len(data)):
+#@jit
+def fast_categorical_map(categories, data, output, len_data):
+    for i in range(len_data):
         output[i] = categories[data[i]]
 
 def safe_map(field, map_field, map_filter, empty_value=None):

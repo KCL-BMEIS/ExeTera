@@ -230,7 +230,7 @@ class PandasDatasetImporter:
         group = hf[space]
 
         with open(source) as sf:
-            pdf = pd.read_csv(sf, chunksize=chunk_size)
+            pdf = pd.read_csv(sf, chunksize=chunk_size, keep_default_na=False, dtype=str)
 
             first = True
             available_keys = None
@@ -238,10 +238,12 @@ class PandasDatasetImporter:
             new_field_list = list()
             field_chunk_list = list()
             categorical_map_list = list()
+            rows = 0
             try:
+                t0 = time.time()
                 for chunk in pdf:
-                    print(len(chunk))
                     if first:
+                        first = False
                         available_keys = [k for k in chunk.columns if k in schema.fields]
 
                         if not keys:
@@ -276,8 +278,11 @@ class PandasDatasetImporter:
 
                     # for i_df, i_f in enumerate(index_map):
                     for i_df, k in enumerate(available_keys):
-                        new_field_list[i_df].pandas_write_part(chunk[k])
+                        new_field_list[i_df].pandas_write_part(chunk[k].values)
 
+                    t1 = time.time()
+                    rows += len(chunk)
+                    print("{} rows parsed in {} seconds".format(rows, t1 - t0))
                         # if early_filter is not None:
                         #     if not early_filter[1](row[early_key_index]):
                         #         continue

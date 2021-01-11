@@ -414,6 +414,7 @@ class FixedStringField(Field):
 class NumericField(Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
+        self._nformat = self._field.attrs['nformat']
 
     def writeable(self):
         return NumericField(self._session, self._field, write_enabled=True)
@@ -547,8 +548,10 @@ class FixedStringImporter:
 
     def pandas_write_part(self, values):
         with utils.Timer("writing {}".format(self._field.name)):
+            # self._field.data.write_part(
+            #     values.to_numpy())
             self._field.data.write_part(
-                values.to_numpy('S{}'.format(self._field._field.attrs['strlen'])))
+                np.asarray(values, dtype='S{}'.format(self._field._field.attrs['strlen'])))
 
     def pandas_write(self, values):
         self.pandas_write_part(values)
@@ -592,8 +595,16 @@ class NumericImporter:
         self.complete()
 
     def pandas_write_part(self, values):
+        elements = np.zeros(len(values), dtype=self._field._nformat)
+        validity = np.zeros(len(values), dtype='bool')
+        for i in range(len(values)):
+            valid, value = self._parser(values[i])
+            elements[i] = value
+            validity[i] = valid
         with utils.Timer("writing {}".format(self._field.name)):
-            self._field.data.write_part(values)
+            self._field.data.write_part(elements)
+        with utils.Timer("writing {}".format(self._field.name)):
+            self._filter_field.data.write_part(validity)
 
     def pandas_write(self, values):
         self.pandas_write_part(values)
@@ -626,8 +637,9 @@ class CategoricalImporter:
 
     def pandas_write_part(self, values):
         with utils.Timer("writing {}".format(self._field.name)):
-            data = np.asarray(len(values), dtype=self._key_type)
-            ops.fast_categorical_map(self._keys, values, data)
+            data = np.zeros(len(values), dtype=self._dtype)
+            values = values.tolist()
+            ops.fast_categorical_map(self._keys, values, data, len(values))
             self._field.data.write_part(data)
 
     def pandas_write(self, values):
@@ -717,7 +729,7 @@ class DateTimeImporter:
         chunksize = session.chunksize if chunksize is None else chunksize
         timestamp_field_constructor(session, group, name, timestamp, chunksize)
         self._field = TimestampField(session, group, name, write_enabled=True)
-        self._results = np.zeros(chunksize , dtype='float64')
+        self._results = np.zeros(chunksize, dtype='float64')
         self._optional = optional
 
         if optional is True:
@@ -740,7 +752,9 @@ class DateTimeImporter:
                 ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S%z')
                 results[i] = ts.timestamp()
             else:
-                if self._optional is True and len(v) == 0:
+                # TODO: 'True' and 'False' should be parsed from the schema description rather than
+                # make it through to here as strings
+                if self._optional is 'True' and len(v) == 0:
                     results[i] = np.nan
                 else:
                     msg = "Date field '{}' has unexpected format '{}'"
@@ -760,18 +774,39 @@ class DateTimeImporter:
             results = self._results
 
             for i, v in enumerate(values):
-                if len(v) == 32:
-                    ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S.%f%z')
-                    results[i] = ts.timestamp()
-                elif len(v) == 25:
-                    ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S%z')
-                    results[i] = ts.timestamp()
+                # if len(v) == 32:
+                #     ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S.%f%z')
+                #     results[i] = ts.timestamp()
+                # elif len(v) == 25:
+                #     ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S%z')
+                #     results[i] = ts.timestamp()
+                # else:
+                #     # TODO: 'True' and 'False' should be parsed from the schema description rather than
+                #     # make it through to here as strings
+                #     if self._optional == 'True' and len(v) == 0:
+                #         results[i] = np.nan
+                #     else:
+                #         msg = "Date field '{}' has unexpected format '{}'"
+                #         raise ValueError(msg.format(self._field, v))
+                len_v = len(v)
+                if len_v == 0:
+                    results[i] = 0
                 else:
-                    if self._optional is True and len(v) == 0:
-                        results[i] = np.nan
+                    if len(v) == 32:
+                        # ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S.%f%z')
+                        ts = datetime(int(v[0:4]), int(v[5:7]), int(v[8:10]),
+                                      int(v[11:13]), int(v[14:16]), int(v[17:19]),
+                                      int(v[20:26]))
+                    elif len(v) == 25:
+                        # ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S%z')
+                        ts = datetime(int(v[0:4]), int(v[5:7]), int(v[8:10]),
+                                      int(v[11:13]), int(v[14:16]), int(v[17:19]))
+                    elif len(v) == 19:
+                        ts = datetime(int(v[0:4]), int(v[5:7]), int(v[8:10]),
+                                      int(v[11:13]), int(v[14:16]), int(v[17:19]))
                     else:
-                        msg = "Date field '{}' has unexpected format '{}'"
-                        raise ValueError(msg.format(self._field, v))
+                        raise ValueError(f"Date field '{self._field}' has unexpected format '{v}'")
+                    results[i] = ts.timestamp()
 
             self._field.data.write_part(results)
 
