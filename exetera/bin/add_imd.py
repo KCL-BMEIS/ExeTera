@@ -1,16 +1,12 @@
 #!/usr/bin/env python
 
+# TODO: Deprecated: due for removal
+import argparse
 from collections import defaultdict
-from datetime import datetime, timezone
-import time
-
 import numpy as np
 import h5py
-import pandas as pd
 
-from exetera.core import exporter, persistence, utils
 from exetera.core.persistence import DataStore
-from exetera.processing.nat_medicine_model import nature_medicine_model_1
 from exetera.core.dataset import Dataset
 
 # England
@@ -108,12 +104,17 @@ def incorporate_imd_data(ds, src, imd_src):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--source', required=True,
+                        help='The source file into which goe data should be added')
+    parser.add_argument('-g', '--geodata', required=True,
+                        help="The geo data that should be added to 'source'")
+    args = parser.parse_args()
+
     datastore = DataStore()
-    src_file = '/home/ben/covid/ds_20201014_full.hdf5'
-    src_imd_file = '/home/ben/covid/EW_lsoa11cd_imd_ruc_tds.csv'
-    with open(src_imd_file) as f:
+    with open(args.geodata) as f:
         dset = Dataset(f)
 
-    with h5py.File(src_file, 'r+') as src_data:
+    with h5py.File(args.source, 'r+') as src_data:
         incorporate_imd_data(datastore, src_data, dset)
 
