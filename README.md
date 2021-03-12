@@ -1,8 +1,10 @@
-ExeTera
+# ExeTera
 
 Welcome to the ExeTera Readme!
 This page and the accompanying github wiki show you how to make use of ExeTera to create reproducible
 analysis pipelines for large tabular datasets.
+
+Please take a moment to read this page, and also take a look at the [https://github.com/KCL-BMEIS/ExeTera/Wiki](Wiki), which contains in-depth documentation on the concepts behind this software, usage examples, and developer resources such as the roadmap for future releases.
 
 # Current release and requirements
 
