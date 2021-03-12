@@ -27,7 +27,7 @@ exetera import
 -s path/to/covid_schema.json \
 -i "patients:path/to/patient_data.csv, assessments:path/to/assessmentdata.csv, tests:path/to/covid_test_data.csv, diet:path/to/diet_study_data.csv" \
 -o /path/to/output_dataset_name.hdf5
---include "patients:id,country_code,blood_group | assessments:id,patient_id,chest_pain"
+--include "patients:(id,country_code,blood_group), assessments:(id,patient_id,chest_pain)"
 ```
 
 
