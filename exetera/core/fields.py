@@ -1,9 +1,12 @@
+
+from typing import Union
 from datetime import datetime, timezone
 
 import numpy as np
 import numba
 import h5py
 
+from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
 from exetera.core import utils
 
@@ -25,8 +28,10 @@ from exetera.core import utils
 #     return total
 
 
-class Field:
+class HDF5Field(Field):
     def __init__(self, session, group, name=None, write_enabled=False):
+        super().__init__()
+
         # if name is None, the group is an existing field
         # if name is set but group[name] doesn't exist, then create the field
         if name is None:
@@ -52,12 +57,22 @@ class Field:
     def chunksize(self):
         return self._field.attrs['chunksize']
 
+    @property
+    def data(self):
+        raise NotImplementedError()
+
+    def is_sorted(self):
+        raise NotImplementedError()
+
     def __bool__(self):
         # this method is required to prevent __len__ being called on derived methods when fields are queried as
         #   if f:
         # rather than
         #   if f is not None:
         return True
+
+    def __len__(self):
+        raise NotImplementedError()
 
 
 class ReadOnlyFieldArray:
@@ -75,6 +90,9 @@ class ReadOnlyFieldArray:
 
     def __getitem__(self, item):
         return self._dataset[item]
+
+    def get_range(self, start=0, end=None):
+        return self[slice(start, end)]
 
     def __setitem__(self, key, value):
         raise PermissionError("This field was created read-only; call <field>.writeable() "
@@ -115,6 +133,12 @@ class WriteableFieldArray:
 
     def __setitem__(self, key, value):
         self._dataset[key] = value
+
+    def get_range(self, start=0, end=None):
+        return self[slice(start, end)]
+
+    def set_range(self, value, start=0, end=None):
+        self[slice(start, end)] = value
 
     def clear(self):
         DataWriter._clear_dataset(self._field, self._name)
@@ -174,6 +198,9 @@ class ReadOnlyIndexedFieldArray:
     def __setitem__(self, key, value):
         raise PermissionError("This field was created read-only; call <field>.writeable() "
                               "for a writeable copy of the field")
+
+    def get_range(self, start=0, end=None):
+        return self[slice(start, end)]
 
     def clear(self):
         raise PermissionError("This field was created read-only; call <field>.writeable() "
@@ -242,6 +269,9 @@ class WriteableIndexedFieldArray:
     def __setitem__(self, key, value):
         raise PermissionError("IndexedStringField instances cannot be edited via array syntax;"
                               "use clear and then write/write_part or write_raw/write_part_raw")
+
+    def get_range(self, start=0, end=None):
+        return self[slice(start, end)]
 
     def clear(self):
         self._accumulated = 0
@@ -342,7 +372,7 @@ def timestamp_field_constructor(session, group, name, timestamp=None, chunksize=
     DataWriter.write(field, 'values', [], 0, 'float64')
 
 
-class IndexedStringField(Field):
+class IndexedStringField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
         self._session = session
@@ -380,11 +410,22 @@ class IndexedStringField(Field):
             self._value_wrapper = wrapper(self._field, 'values')
         return self._value_wrapper
 
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+
+        indices = self.indices[:]
+        values = self.values[:]
+        for i in range(len(indices)-2):
+            if values[indices[i]:indices[i+1]] > values[indices[i+1]:indices[i+2]]:
+                return False
+        return True
+
     def __len__(self):
         return len(self.data)
 
 
-class FixedStringField(Field):
+class FixedStringField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
@@ -406,11 +447,17 @@ class FixedStringField(Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return np.any(np.char.compare_chararrays(data[:-1], data[1:], ">"))
+
     def __len__(self):
         return len(self.data)
 
 
-class NumericField(Field):
+class NumericField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
@@ -432,11 +479,17 @@ class NumericField(Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return data[:-1] > data[1:]
+
     def __len__(self):
         return len(self.data)
 
 
-class CategoricalField(Field):
+class CategoricalField(HDF5Field):
     def __init__(self, session, group,
                  name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
@@ -461,6 +514,12 @@ class CategoricalField(Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return data[:-1] > data[1:]
+
     def __len__(self):
         return len(self.data)
 
@@ -474,7 +533,7 @@ class CategoricalField(Field):
         return keys
 
 
-class TimestampField(Field):
+class TimestampField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
@@ -494,6 +553,12 @@ class TimestampField(Field):
             else:
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
+
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return data[:-1] > data[1:]
 
     def __len__(self):
         return len(self.data)
