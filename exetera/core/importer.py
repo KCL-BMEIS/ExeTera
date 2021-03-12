@@ -23,7 +23,7 @@ from exetera.core import operations as ops
 from exetera.core.load_schema import load_schema
 
 
-def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite, include_fields, exclude_fields):
+def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite, include, exclude):
 
     print(timestamp)
     print(schema_file)
@@ -38,6 +38,17 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
             any_parts_present = True
     if not any_parts_present:
         raise ValueError("none of the data sources in 'files' contain relevant data to the schema")
+
+    # check if there's any table from the include/exclude doesn't exist in the input files
+    intput_file_tables = set(files.keys())
+    include_tables, exclude_tables = set(include.keys()), set(exclude.keys())
+    if include_tables and not include_tables.issubset(intput_file_tables):
+        extra_tables = include_tables.difference(intput_file_tables)
+        raise ValueError("--include: the following include table(s) are not part of any input files: {}".format(extra_tables))
+
+    if exclude_tables and not exclude_tables.issubset(intput_file_tables):
+        extra_tables = exclude_tables.difference(intput_file_tables)
+        raise ValueError("--exclude: the following exclude table(s) are not part of any input files: {}".format(extra_tables))
 
     stop_after = {}
     reserved_column_names = ('j_valid_from', 'j_valid_to')
@@ -68,13 +79,13 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
                 print("Warning:", msg.format(files[sk], missing_names))
                 # raise ValueError(msg.format(files[sk], missing_names))
 
-            include_missing_names = set(include_fields).difference(names)
-
+            # check if included/exclude fields are in the file  
+            include_missing_names = set(include.get(sk, [])).difference(names)
             if len(include_missing_names) > 0:
                 msg = "The following include fields are not part of the {}: {}"
                 raise ValueError(msg.format(files[sk], include_missing_names))
 
-            exclude_missing_names = set(exclude_fields).difference(names)
+            exclude_missing_names = set(exclude.get(sk, [])).difference(names)
             if len(exclude_missing_names) > 0:
                 msg = "The following exclude fields are not part of the {}: {}"
                 raise ValueError(msg.format(files[sk], exclude_missing_names))
@@ -88,7 +99,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
             show_every = 100000
 
             DatasetImporter(datastore, files[sk], hf, sk, schema[sk], timestamp,
-                            include_fields=include_fields, exclude_fields=exclude_fields,
+                            include=include, exclude=exclude,
                             stop_after=stop_after.get(sk, None),
                             show_progress_every=show_every)
 
@@ -108,7 +119,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
 
 class DatasetImporter:
     def __init__(self, datastore, source, hf, space, schema, timestamp, 
-                 include_fields=None, exclude_fields=None,
+                 include=None, exclude=None,
                  keys=None,
                  stop_after=None, show_progress_every=None, filter_fn=None,
                  early_filter=None):
@@ -128,10 +139,10 @@ class DatasetImporter:
             # self.names_ = csvf.fieldnames
 
             available_keys = [k.strip() for k in csvf.fieldnames if k.strip() in schema.fields]
-            if len(include_fields) > 0:
-                available_keys = include_fields
-            if len(exclude_fields) > 0:
-                available_keys = [k for k in available_keys if k not in exclude_fields]
+            if space in include and len(include[space]) > 0:
+                available_keys = include[space]
+            if space in exclude and len(exclude[space]) > 0:
+                available_keys = [k for k in available_keys if k not in exclude[space]]
 
             # available_keys = csvf.fieldnames
 

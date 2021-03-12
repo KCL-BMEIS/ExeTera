@@ -85,18 +85,24 @@ if args.command == 'import':
             print("-i/--import_data - {}: '{}' must be an existing file".format(tk, tv))
             errors = True
 
-    include_fields, exclude_fields = [],[]
+    include, exclude = {},{}
     if args.include:
-        include_fields = [k.strip() for k in args.include.split(',')]
-        print('include_fields: {}'.format(include_fields))
+        tables = [k.strip() for k in args.include.split('|')]
+        if any(':' not in t for t in tables):
+            raise ValueError("'--include': must be composed of a pipe-separated list of name:field1,field2,field3")        
+        include = {t[0]: [i.strip() for i in t[1].split(',')] for t in (t.split(':', 1) for t in tables)}
+        print(include)
+        
     if args.exclude:
-        exclude_fields = [k.strip() for k in args.exclude.split(',')]
-        print('exclude_fields: {}'.format(exclude_fields))
+        tables = [k.strip() for k in args.exclude.split('|')]
+        if any(':' not in t for t in tables):
+            raise ValueError("'--exclude': must be composed of a pipe-separated list of name:field1,field2,field3")        
+        exclude = {t[0]: [i.strip() for i in t[1].split(',')] for t in (t.split(':', 1) for t in tables)}
         
     if errors:
         exit(-1)
 
-    importer.import_with_schema(args.timestamp, args.output_hdf5, args.schema, tokens, args.overwrite, tuple(include_fields), tuple(exclude_fields))
+    importer.import_with_schema(args.timestamp, args.output_hdf5, args.schema, tokens, args.overwrite, include, exclude)
     
 # elif args.command == 'process':
 #     timestamp = str(datetime.now(timezone.utc))
