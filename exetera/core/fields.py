@@ -6,6 +6,7 @@ import h5py
 
 from exetera.core.data_writer import DataWriter
 from exetera.core import utils
+from exetera.core import persistence as per
 
 
 # def test_field_iterator(data):
@@ -27,10 +28,7 @@ from exetera.core import utils
 
 class Field:
     def __init__(self, session, group, name=None, write_enabled=False):
-        # if name is None, the group is an existing field
-        # if name is set but group[name] doesn't exist, then create the field
         if name is None:
-            # the group is an existing field
             field = group
         else:
             field = group[name]
@@ -58,6 +56,10 @@ class Field:
         # rather than
         #   if f is not None:
         return True
+
+    def get_spans(self):
+        return per._get_spans(self._value_wrapper[:], None)
+
 
 
 class ReadOnlyFieldArray:
@@ -117,6 +119,9 @@ class WriteableFieldArray:
         self._dataset[key] = value
 
     def clear(self):
+        """
+        TODO: unlink the dataset
+        """
         DataWriter._clear_dataset(self._field, self._name)
 
     def write_part(self, part):
@@ -292,7 +297,12 @@ class WriteableIndexedFieldArray:
             self._index_index = 0
 
 
+
 def base_field_contructor(session, group, name, timestamp=None, chunksize=None):
+    """
+    Constructor are for 1)create the field (hdf5 group), 2)add basic attributes like chunksize,
+    timestamp, field type, and 3)add the dataset to the field (hdf5 group) under the name 'values'
+    """
     if name in group:
         msg = "Field '{}' already exists in group '{}'"
         raise ValueError(msg.format(name, group))
