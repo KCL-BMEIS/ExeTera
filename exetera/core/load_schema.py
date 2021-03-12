@@ -124,6 +124,23 @@ def load_schema(source, verbosity=0):
     d = json.load(source)
     if verbosity > 1:
         print(d.keys())
+
+    valid_versions = ('1.0.0', '1.1.0')
+
+    if 'hystore' not in d.keys() and 'exetera' not in d.keys():
+        raise ValueError("'{}' is not a valid ExeTera schema file".format(source))
+    if 'hystore' in d.keys():
+        if 'version' not in d['hystore']:
+            raise ValueError("'version' field missing from 'hystore' top-level tag")
+        elif d['hystore']['version'] != '1.0.0':
+            raise ValueError("If the obsolete 'hystore' key is used, the version must be '1.0.0'")
+    elif 'exetera' in d:
+        if 'version' not in d['exetera']:
+            raise ValueError("'version' field missing from 'exetera' top-level tag")
+        elif d['exetera']['version'] not in valid_versions:
+            msg = "The version number '{}' is not valid; it must be one of '{}'"
+            raise ValueError(msg.format(d['exetera']['version'], valid_versions))
+
     fields = d['schema']
     spaces = dict()
     for fk, fv in fields.items():
