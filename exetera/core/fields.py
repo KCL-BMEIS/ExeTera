@@ -27,20 +27,16 @@ from exetera.core import persistence as per
 
 
 class Field:
-    #the argument 'group' is a h5py group object
     def __init__(self, session, group, name=None, write_enabled=False):
-        # if name is None, the group is an existing field
-        # if name is set but group[name] doesn't exist, then create the field
         if name is None:
-            # the group is an existing field
             field = group
         else:
             field = group[name]
         self._session = session
-        self._field = field #name of the upper group of h5py 'dataset'
+        self._field = field
         self._fieldtype = self._field.attrs['fieldtype']
         self._write_enabled = write_enabled
-        self._value_wrapper = None #wrap the h5py 'dataset' which under the 'values' section
+        self._value_wrapper = None
 
     @property
     def name(self):
@@ -68,9 +64,9 @@ class Field:
 
 class ReadOnlyFieldArray:
     def __init__(self, field, dataset_name):
-        self._field = field #upper h5py group object
-        self._name = dataset_name #dataset name, always be 'values'
-        self._dataset = field[dataset_name] #h5py dataset object
+        self._field = field
+        self._name = dataset_name
+        self._dataset = field[dataset_name]
 
     def __len__(self):
         return len(self._dataset)
@@ -79,7 +75,7 @@ class ReadOnlyFieldArray:
     def dtype(self):
         return self._dataset.dtype
 
-    def __getitem__(self, item): #rewrite the [] operator
+    def __getitem__(self, item):
         return self._dataset[item]
 
     def __setitem__(self, key, value):
@@ -105,9 +101,9 @@ class ReadOnlyFieldArray:
 
 class WriteableFieldArray:
     def __init__(self, field, dataset_name):
-        self._field = field  # upper h5py group object
-        self._name = dataset_name  # dataset name, always be 'values'
-        self._dataset = field[dataset_name] #h5py dataset object
+        self._field = field
+        self._name = dataset_name
+        self._dataset = field[dataset_name]
 
     def __len__(self):
         return len(self._dataset)
@@ -116,7 +112,7 @@ class WriteableFieldArray:
     def dtype(self):
         return self._dataset.dtype
 
-    def __getitem__(self, item): #rewrite the [] operator
+    def __getitem__(self, item):
         return self._dataset[item]
 
     def __setitem__(self, key, value):
@@ -124,7 +120,7 @@ class WriteableFieldArray:
 
     def clear(self):
         """
-        TODO: the name for clear is not corrent,
+        TODO: unlink the dataset
         """
         DataWriter._clear_dataset(self._field, self._name)
 
@@ -141,18 +137,18 @@ class WriteableFieldArray:
 
 class ReadOnlyIndexedFieldArray:
     def __init__(self, field, index_name, values_name):
-        self._field = field #h5py group object
-        self._index_name = index_name #'index'
-        self._index_dataset = field[index_name] #h5py dataset object
-        self._values_name = values_name #'value
-        self._values_dataset = field[values_name] #h5py dataset object
+        self._field = field
+        self._index_name = index_name
+        self._index_dataset = field[index_name]
+        self._values_name = values_name
+        self._values_dataset = field[values_name]
 
     def __len__(self):
         # TODO: this occurs because of the initialized state of an indexed string. It would be better for the
         # index to be initialised as [0]
         return max(len(self._index_dataset)-1, 0)
 
-    def __getitem__(self, item):  #rewrite the [] operator
+    def __getitem__(self, item):
         try:
             if isinstance(item, slice):
                 start = item.start if item.start is not None else 0
@@ -218,7 +214,7 @@ class WriteableIndexedFieldArray:
     def __len__(self):
         return len(self._index_dataset) - 1
 
-    def __getitem__(self, item): #rewrite the [] operator
+    def __getitem__(self, item):
         try:
             if isinstance(item, slice):
                 start = item.start if item.start is not None else 0
@@ -301,7 +297,12 @@ class WriteableIndexedFieldArray:
             self._index_index = 0
 
 
+
 def base_field_contructor(session, group, name, timestamp=None, chunksize=None):
+    """
+    Constructor are for 1)create the field (hdf5 group), 2)add basic attributes like chunksize,
+    timestamp, field type, and 3)add the dataset to the field (hdf5 group) under the name 'values'
+    """
     if name in group:
         msg = "Field '{}' already exists in group '{}'"
         raise ValueError(msg.format(name, group))
@@ -420,7 +421,6 @@ class FixedStringField(Field):
 
 
 class NumericField(Field):
-    # Argument group is the hdf5 group name
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
@@ -434,7 +434,7 @@ class NumericField(Field):
         return NumericField(self._session, group, name, write_enabled=True)
 
     @property
-    def data(self):  #return the dataset as FieldArray
+    def data(self):
         if self._value_wrapper is None:
             if self._write_enabled:
                 self._value_wrapper = WriteableFieldArray(self._field, 'values')
