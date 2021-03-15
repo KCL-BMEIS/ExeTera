@@ -8,7 +8,7 @@ analysis pipelines for large tabular datasets.
 
 
 <p>
-[![Documentation Status](https://readthedocs.org/projects/exetera/badge/?version=latest)](https://exetera.readthedocs.io/en/latest/?badge=latest)
+[Documentation Status](https://readthedocs.org/projects/exetera/badge/?version=latest)
 
    <a href="https://pypi.org/project/exetera/">
      <img src="https://img.shields.io/pypi/v/exetera?label=PyPI%20version&logo=python&logoColor=white" alt="PyPI version">
