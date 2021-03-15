@@ -28,6 +28,7 @@ exetera import
 -i "patients:path/to/patient_data.csv, assessments:path/to/assessmentdata.csv, tests:path/to/covid_test_data.csv, diet:path/to/diet_study_data.csv" \
 -o /path/to/output_dataset_name.hdf5
 --include "patients:(id,country_code,blood_group), assessments:(id,patient_id,chest_pain)"
+--exclude "tests:(country_code)"
 ```
 
 
@@ -41,7 +42,7 @@ exetera import
  * `-ts/--timestamp`: An override for the timestamp to be written
    (defaults to `datetime.now(timezone.utc)`)
  * `-w/--overwrite`: If set, overwrite any existing dataset with the same name; appends to existing dataset otherwise
- * `--include`: --include and --exclude are mutually exclusive optional flags. If set, filters out all fields apart from those in the list.
+ * `--include`: If set, filters out all fields apart from those in the list.
  * `--exclude`: If set, filters out the fields in this list.
  
 Expect this script to take about an hour or more to execute on very large datasets.

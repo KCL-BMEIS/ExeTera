@@ -49,10 +49,10 @@ def main():
                             help="If set, overwrites an existing project rather than appending to it")
     parser_import.add_argument('-ts', '--timestamp', default=str(datetime.now(timezone.utc)),
                             help='Override for the import datetime (the current time is selected otherwise)')
-
-    group = parser_import.add_mutually_exclusive_group()
-    group.add_argument('--include', help='filters out all fields apart from those in the list')
-    group.add_argument('--exclude', help='filters out the fields in this list')
+    parser_import.add_argument('--include', 
+                            help='filters out all fields apart from those in the list')
+    parser_import.add_argument('--exclude', 
+                            help='filters out the fields in this list')
 
 
     # parser_postprocess = subparsers.add_parser('process')
@@ -87,17 +87,24 @@ def main():
                 print("-i/--import_data - {}: '{}' must be an existing file".format(tk, tv))
                 errors = True
 
-        include, exclude = {},{}
+        include, exclude, include_table_names, exclude_table_names = {},{}, set(), set()     
         err_msg = "'{}': must be composed of a comma-separated list of name:(field1,field2,field3)"
         if args.include:
-            isValid, include = validate_and_extract_arg_include_exclude(args.include) 
+            isValid, include, include_table_names = validate_and_extract_arg_include_exclude(args.include) 
             if not isValid:
                 raise ValueError(err_msg.format('--include'))        
 
         if args.exclude:
-            isValid, exclude = validate_and_extract_arg_include_exclude(args.exclude) 
+            isValid, exclude, exclude_table_names = validate_and_extract_arg_include_exclude(args.exclude) 
             if not isValid:
-                raise ValueError(err_msg.format('--exclude'))     
+                raise ValueError(err_msg.format('--exclude'))    
+
+        if args.include and args.exclude:
+            table_appear_twice = include_table_names & exclude_table_names
+            if len(table_appear_twice) > 0:
+                raise ValueError("'--include, --exclude': the following tables shouldn't listed both in --include and --exlude: {}"
+                                    .format(table_appear_twice))
+
 
         if errors:
             exit(-1)
@@ -124,7 +131,8 @@ def validate_and_extract_arg_include_exclude(fields):
         if len(group) == count:
             isValid = True
             result = {table_name: [i.strip() for i in table_fields.split(',')] for table_name, table_fields in group}
-    return isValid, result
+            table_names = set([table_name for table_name, _ in group])
+    return isValid, result, table_names
 
     
 if __name__ == "__main__":
