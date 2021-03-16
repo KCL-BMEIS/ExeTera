@@ -265,6 +265,7 @@ def temp_dataset():
 
 
 def _get_spans(field, fields):
+
     if field is not None:
         return _get_spans_for_field(field)
     elif len(fields) == 1:
@@ -296,6 +297,22 @@ def _get_spans_for_field(field0):
     results[-1] = True
     return np.nonzero(results)[0]
 
+def _get_spans_for_index_string_field(indices,values):
+    result = []
+    result.append(0)
+    for i in range(1, len(indices) - 1):
+        last = indices[i - 1]
+        current = indices[i]
+        next = indices[i + 1]
+        if next - current != current - last:
+            result.append(i)
+            continue  # compare size first
+        if np.array_equal(values[last:current], values[current:next]):
+            pass
+        else:
+            result.append(i)
+    result.append(len(indices) - 1)  # total number of elements
+    return result
 
 @njit
 def _get_spans_for_2_fields(field0, field1):
@@ -716,7 +733,9 @@ def _aggregate_impl(predicate, fkey_indices=None, fkey_index_spans=None,
 
 
 class DataStore:
-
+    '''
+    DataStore is replaced by Session
+    '''
     def __init__(self, chunksize=DEFAULT_CHUNKSIZE,
                  timestamp=str(datetime.now(timezone.utc))):
         if not isinstance(timestamp, str):

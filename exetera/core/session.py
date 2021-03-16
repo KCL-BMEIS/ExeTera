@@ -256,7 +256,7 @@ class Session:
         and returned from the function call. If the field is an IndexedStringField, the
         indices and values are returned separately.
 
-        :param filter_to_apply: the filter to be applied to the source field
+        :param filter_to_apply: the filter to be applied to the source field, an array of boolean
         :param src: the field to be filtered
         :param dest: optional - a field to write the filtered data to
         :return: the filtered values
@@ -352,18 +352,21 @@ class Session:
         """
         if field is None and fields is None:
             raise ValueError("One of 'field' and 'fields' must be set")
-        if field is not None and fields is not None:
+        elif field is not None and fields is not None:
             raise ValueError("Only one of 'field' and 'fields' may be set")
-        raw_field = None
-        raw_fields = None
-        if field is not None:
-            raw_field = val.array_from_parameter(self, 'field', field)
-
-        raw_fields = []
-        if fields is not None:
+        elif field is not None:
+            if isinstance(field,fld.IndexedStringField):
+                indices,values = val.array_from_parameter(self, 'field',field)
+                return per._get_spans_for_index_string_field(indices,values)
+            else:
+                raw_field = None
+                raw_field = val.array_from_parameter(self, 'field', field)
+                return per._get_spans(raw_field,None)
+        elif fields is not None:
+            raw_fields = []
             for i_f, f in enumerate(fields):
                 raw_fields.append(val.array_from_parameter(self, "'fields[{}]'".format(i_f), f))
-        return per._get_spans(raw_field, raw_fields)
+            return per._get_spans(None, raw_fields)
 
 
     def _apply_spans_no_src(self, predicate, spans, dest=None):
@@ -607,7 +610,8 @@ class Session:
 
         writer.write(destination_space_values)
 
-
+    #the field is a hdf5 group that contains attribute 'fieldtype'
+    #return a exetera Field according to the filetype
     def get(self, field):
         if isinstance(field, fld.Field):
             return field
@@ -643,8 +647,8 @@ class Session:
 
 
     def create_indexed_string(self, group, name, timestamp=None, chunksize=None):
-        fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
-        return fld.IndexedStringField(self, group[name], write_enabled=True)
+        fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize) #create the hdf5 object
+        return fld.IndexedStringField(self, group[name], write_enabled=True) #return the field wrapper
 
 
     def create_fixed_string(self, group, name, length, timestamp=None, chunksize=None):
