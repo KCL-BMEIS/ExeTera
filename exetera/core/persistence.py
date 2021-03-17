@@ -304,12 +304,10 @@ def _get_spans_for_index_string_field(indices,values):
         last = indices[i - 1]
         current = indices[i]
         next = indices[i + 1]
-        if next - current != current - last:
+        if next - current != current - last: # compare size first
             result.append(i)
-            continue  # compare size first
-        if np.array_equal(values[last:current], values[current:next]):
-            pass
-        else:
+            continue
+        if not np.array_equal(values[last:current], values[current:next]):
             result.append(i)
     result.append(len(indices) - 1)  # total number of elements
     return result

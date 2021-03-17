@@ -445,6 +445,15 @@ class TestSessionGetSpans(unittest.TestCase):
             vals_2_f.data.write(vals_2)
             self.assertListEqual([0, 2, 3, 5, 6, 8, 12], s.get_spans(fields=(vals_1, vals_2)).tolist())
 
+    def test_get_spans_index_string_field(self):
+        bio=BytesIO()
+        with session.Session() as s:
+            ds=s.open_dataset(bio,'w','ds')
+            idx= s.create_indexed_string(ds,'idx')
+            idx.data.write(['aa','bb','bb','c','c','c','d','d','e','f','f','f'])
+            self.assertListEqual([0,1,3,6,8,9,12],s.get_spans(idx))
+
+
 
 class TestSessionAggregate(unittest.TestCase):
 

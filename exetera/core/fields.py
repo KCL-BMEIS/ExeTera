@@ -426,6 +426,9 @@ class FixedStringField(Field):
     def __len__(self):
         return len(self.data)
 
+    def get_spans(self):
+        return per._get_spans(self.data[:], None)
+
 
 class NumericField(Field):
     def __init__(self, session, group, name=None, write_enabled=False):
@@ -451,6 +454,9 @@ class NumericField(Field):
 
     def __len__(self):
         return len(self.data)
+
+    def get_spans(self):
+        return per._get_spans(self.data[:], None)
 
 
 class CategoricalField(Field):
@@ -480,6 +486,9 @@ class CategoricalField(Field):
 
     def __len__(self):
         return len(self.data)
+
+    def get_spans(self):
+        return per._get_spans(self.data[:], None)
 
     # Note: key is presented as value: str, even though the dictionary must be presented
     # as str: value
