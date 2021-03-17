@@ -49,9 +49,9 @@ def main():
                             help="If set, overwrites an existing project rather than appending to it")
     parser_import.add_argument('-ts', '--timestamp', default=str(datetime.now(timezone.utc)),
                             help='Override for the import datetime (the current time is selected otherwise)')
-    parser_import.add_argument('--include', 
+    parser_import.add_argument('-n','--include', 
                             help='filters out all fields apart from those in the list')
-    parser_import.add_argument('--exclude', 
+    parser_import.add_argument('-x','--exclude', 
                             help='filters out the fields in this list')
 
 
@@ -92,17 +92,17 @@ def main():
         if args.include:
             isValid, include, include_table_names = validate_and_extract_arg_include_exclude(args.include) 
             if not isValid:
-                raise ValueError(err_msg.format('--include'))        
+                raise ValueError(err_msg.format('-n/--include'))        
 
         if args.exclude:
             isValid, exclude, exclude_table_names = validate_and_extract_arg_include_exclude(args.exclude) 
             if not isValid:
-                raise ValueError(err_msg.format('--exclude'))    
+                raise ValueError(err_msg.format('-x/--exclude'))    
 
         if args.include and args.exclude:
             table_appear_twice = include_table_names & exclude_table_names
             if len(table_appear_twice) > 0:
-                raise ValueError("'--include, --exclude': the following tables shouldn't listed both in --include and --exlude: {}"
+                raise ValueError("'-n/--include, -x/--exclude': the following tables shouldn't listed both in -n/--include and -x/--exlude: {}"
                                     .format(table_appear_twice))
 
 

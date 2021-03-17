@@ -42,8 +42,8 @@ exetera import
  * `-ts/--timestamp`: An override for the timestamp to be written
    (defaults to `datetime.now(timezone.utc)`)
  * `-w/--overwrite`: If set, overwrite any existing dataset with the same name; appends to existing dataset otherwise
- * `--include`: If set, filters out all fields apart from those in the list.
- * `--exclude`: If set, filters out the fields in this list.
+ * `-n/--include`: If set, filters out all fields apart from those in the list.
+ * `-x/--exclude`: If set, filters out the fields in this list.
  
 Expect this script to take about an hour or more to execute on very large datasets.
 

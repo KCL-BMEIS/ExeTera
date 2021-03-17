@@ -76,7 +76,7 @@ class TestImporter(unittest.TestCase):
         try:
             importer.import_with_schema(ts, dest_file_name, self.schema_file_name, self.files, False, include, exclude)
         except Exception as e:
-            self.assertEqual(str(e), "--include: the following include table(s) are not part of any input files: {'schema_wrong_key'}")
+            self.assertEqual(str(e), "-n/--include: the following include table(s) are not part of any input files: {'schema_wrong_key'}")
         finally:
             os.close(fd_dest)
             

@@ -40,15 +40,15 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
         raise ValueError("none of the data sources in 'files' contain relevant data to the schema")
 
     # check if there's any table from the include/exclude doesn't exist in the input files
-    intput_file_tables = set(files.keys())
+    input_file_tables = set(files.keys())
     include_tables, exclude_tables = set(include.keys()), set(exclude.keys())
-    if include_tables and not include_tables.issubset(intput_file_tables):
-        extra_tables = include_tables.difference(intput_file_tables)
-        raise ValueError("--include: the following include table(s) are not part of any input files: {}".format(extra_tables))
+    if include_tables and not include_tables.issubset(input_file_tables):
+        extra_tables = include_tables.difference(input_file_tables)
+        raise ValueError("-n/--include: the following include table(s) are not part of any input files: {}".format(extra_tables))
 
-    if exclude_tables and not exclude_tables.issubset(intput_file_tables):
-        extra_tables = exclude_tables.difference(intput_file_tables)
-        raise ValueError("--exclude: the following exclude table(s) are not part of any input files: {}".format(extra_tables))
+    if exclude_tables and not exclude_tables.issubset(input_file_tables):
+        extra_tables = exclude_tables.difference(input_file_tables)
+        raise ValueError("-x/--exclude: the following exclude table(s) are not part of any input files: {}".format(extra_tables))
 
     stop_after = {}
     reserved_column_names = ('j_valid_from', 'j_valid_to')
