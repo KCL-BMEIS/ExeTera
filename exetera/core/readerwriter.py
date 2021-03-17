@@ -409,7 +409,7 @@ class CategoricalWriter(Writer):
 
 
 class NumericImporter:
-    def __init__(self, datastore, group, name, nformat, parser,
+    def __init__(self, datastore, group, name, nformat, default, parser,
                  timestamp=None, write_mode='write'):
         if timestamp is None:
             timestamp = datastore.timestamp
@@ -418,6 +418,7 @@ class NumericImporter:
         self.flag_writer = NumericWriter(datastore, group, f"{name}_valid",
                                          'bool', timestamp, write_mode)
         self.parser = parser
+        self.default = default
 
     def chunk_factory(self, length):
         return [None] * length
@@ -434,8 +435,12 @@ class NumericImporter:
         validity = np.zeros(len(values), dtype='bool')
         for i in range(len(values)):
             valid, value = self.parser(values[i])
+            if not valid and self.default:
+                value = self.default
+                valid = True
             elements[i] = value
             validity[i] = valid
+
         self.data_writer.write_part(elements)
         self.flag_writer.write_part(validity)
 
