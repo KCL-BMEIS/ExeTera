@@ -434,10 +434,12 @@ class NumericImporter:
         elements = np.zeros(len(values), dtype=self.data_writer.nformat)
         validity = np.zeros(len(values), dtype='bool')
         for i in range(len(values)):
-            valid, value = self.parser(values[i])
-            if not valid and self.default:
+            if not values[i] and self.default:
                 value = self.default
                 valid = True
+            else:
+                valid, value = self.parser(values[i])
+
             elements[i] = value
             validity[i] = valid
 
