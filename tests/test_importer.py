@@ -81,7 +81,7 @@ class TestImporter(unittest.TestCase):
         try:
             importer.import_with_schema(ts, dest_file_name, self.schema_file_name, self.files, False, include, exclude)
         except Exception as e:
-            self.assertEqual(str(e), "--include: the following include table(s) are not part of any input files: {'schema_wrong_key'}")
+            self.assertEqual(str(e), "-n/--include: the following include table(s) are not part of any input files: {'schema_wrong_key'}")
         finally:
             os.close(fd_dest)
             
@@ -111,7 +111,7 @@ class TestImporter(unittest.TestCase):
             f = h5py.File(dest_file_name, 'r')
             self.assertListEqual(list(f.keys()), ['schema_key'])
             self.assertEqual(f['schema_key']['height']['values'].shape[0], 3)
-            self.assertEqual(f['schema_key']['height']['values'][2:3], 160.5)
+            self.assertEqual(f['schema_key']['height']['values'][2], 160.5)
         finally:
             os.close(fd_dest)
 
