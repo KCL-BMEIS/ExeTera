@@ -409,7 +409,7 @@ class CategoricalWriter(Writer):
 
 
 class NumericImporter:
-    def __init__(self, datastore, group, name, nformat, default, parser,
+    def __init__(self, datastore, group, name, nformat, parser, default='',
                  timestamp=None, write_mode='write'):
         if timestamp is None:
             timestamp = datastore.timestamp
@@ -435,7 +435,7 @@ class NumericImporter:
         validity = np.zeros(len(values), dtype='bool')
         for i in range(len(values)):
             valid, value = self.parser(values[i])
-            if values[i].strip() == '' and self.default:
+            if type(values[i]) == str and values[i].strip() == '' and self.default:
                 value = self.default
                 valid = True
             else:

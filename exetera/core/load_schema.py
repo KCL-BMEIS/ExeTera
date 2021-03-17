@@ -103,7 +103,7 @@ class NewDataSchema:
                         raise ValueError(msg.format(value_type, fk))
 
                 default = fv.get('default', '')
-                importer = data_schema.new_field_importers[field_type](value_type, default, converter)
+                importer = data_schema.new_field_importers[field_type](value_type, converter, default)
 
             elif field_type in ('datetime', 'date'):
                 optional = fv.get('optional', False)
