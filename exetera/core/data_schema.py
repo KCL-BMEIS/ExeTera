@@ -73,8 +73,8 @@ new_field_importers = {
         lambda ds, g, n, ts: rw.DateTimeImporter(ds, g, n, optional, ts),
     'date': lambda optional:
         lambda ds, g, n, ts: rw.OptionalDateImporter(ds, g, n, optional, ts),
-    'numeric': lambda typestr, parser:
-        lambda ds, g, n, ts: rw.NumericImporter(ds, g, n, typestr, parser, ts),
+    'numeric': lambda typestr, default, parser:
+        lambda ds, g, n, ts: rw.NumericImporter(ds, g, n, typestr, default, parser, ts),
     'categorical': lambda stv, oor=None:
         lambda ds, g, n, ts: rw.CategoricalWriter(ds, g, n, stv, ts) if oor is None else
         rw.LeakyCategoricalImporter(ds, g, n, stv, oor, ts)
