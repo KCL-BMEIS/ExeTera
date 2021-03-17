@@ -102,8 +102,8 @@ def main():
         if args.include and args.exclude:
             table_appear_twice = include_table_names & exclude_table_names
             if len(table_appear_twice) > 0:
-                raise ValueError("'-n/--include, -x/--exclude': the following tables shouldn't listed both in -n/--include and -x/--exlude: {}"
-                                    .format(table_appear_twice))
+                raise ValueError("'-n/--include, -x/--exclude': tables cannot be in {} and {} simultaneously. Please check the following tables: {}"
+                                    .format(args.include, args.exclude, table_appear_twice))
 
 
         if errors:
