@@ -24,7 +24,7 @@ TEST_SCHEMA = json.dumps({
                 'height': {
                     'field_type': 'numeric',
                     'value_type': 'float32',
-                    'default'   : '160.5'
+                    'invalid_value' : 160.5
                 },
                 'timestamp':{
                     'field_type': 'datetime'
