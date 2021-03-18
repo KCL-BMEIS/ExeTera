@@ -3,7 +3,7 @@ import json
 
 from exetera.core import data_schema
 from exetera.core import persistence as per
-
+from ctypes import sizeof, c_float, c_double, c_int8, c_uint8, c_int16, c_uint16, c_int32, c_uint32, c_int64
 
 class NewDataSchema:
     def __init__(self, name, schema_dict, verbosity=0):
@@ -101,8 +101,20 @@ class NewDataSchema:
                     else:
                         msg = "Unrecognised value_type '{}' in field '{}'"
                         raise ValueError(msg.format(value_type, fk))
-
-                invalid_value = fv.get('invalid_value', 0)
+            
+                # default value for invalid numeric value
+                invalid_value = 0
+                if 'invalid_value' in fv:
+                    invalid_value = fv['invalid_value']
+                    if type(invalid_value) == str and invalid_value.strip() in ('min', 'max'):
+                        if value_type == 'bool':
+                            raise ValueError('Field {} is bool type. It should not have min/max as default value')
+                        else:
+                            mapping = {'float32': c_float, 'float64': c_double, 'int8': c_int8, 'uint8': c_uint8, 
+                                       'int16': c_int16, 'uint16': c_uint16, 'int32': c_int32, 'uint32': c_uint32, 'int64': c_int64}
+                            (min_value, max_value) = NewDataSchema._get_min_max(mapping[value_type])
+                            invalid_value = min_value if invalid_value.strip() == 'min' else max_value
+                            
                 importer = data_schema.new_field_importers[field_type](value_type, converter, invalid_value)
 
             elif field_type in ('datetime', 'date'):
@@ -119,6 +131,13 @@ class NewDataSchema:
             entries[fk] = fd
 
         return entries
+
+    @staticmethod
+    def _get_min_max(c_type):
+        signed = c_type(-1).value < c_type(0).value
+        bit_size = sizeof(c_type) * 8
+        signed_limit = 2 ** (bit_size - 1)
+        return (-signed_limit, signed_limit - 1) if signed else (0, 2 * signed_limit - 1)
 
 
 def load_schema(source, verbosity=0):
