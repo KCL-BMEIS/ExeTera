@@ -6,7 +6,6 @@ import h5py
 from datetime import datetime, timezone
 from exetera.core import importer
 from exetera.core.load_schema import NewDataSchema
-from ctypes import c_float
 
 TEST_SCHEMA = json.dumps({
     'schema': {
@@ -130,7 +129,7 @@ class TestImporter(unittest.TestCase):
             f = h5py.File(dest_file_name, 'r')
             self.assertListEqual(list(f.keys()), ['schema_key'])
             self.assertEqual(f['schema_key']['weight_change']['values'].shape[0], 3)
-            self.assertEqual(f['schema_key']['weight_change']['values'][1], NewDataSchema._get_min_max(c_float)[0])
+            self.assertEqual(f['schema_key']['weight_change']['values'][1], NewDataSchema._get_min_max('float32')[0])
         finally:
             os.close(fd_dest)
 

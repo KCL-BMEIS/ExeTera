@@ -110,9 +110,7 @@ class NewDataSchema:
                         if value_type == 'bool':
                             raise ValueError('Field {} is bool type. It should not have min/max as default value')
                         else:
-                            mapping = {'float32': c_float, 'float64': c_double, 'int8': c_int8, 'uint8': c_uint8, 
-                                       'int16': c_int16, 'uint16': c_uint16, 'int32': c_int32, 'uint32': c_uint32, 'int64': c_int64}
-                            (min_value, max_value) = NewDataSchema._get_min_max(mapping[value_type])
+                            (min_value, max_value) = NewDataSchema._get_min_max(value_type)
                             invalid_value = min_value if invalid_value.strip() == 'min' else max_value
                             
                 importer = data_schema.new_field_importers[field_type](value_type, converter, invalid_value)
@@ -133,7 +131,11 @@ class NewDataSchema:
         return entries
 
     @staticmethod
-    def _get_min_max(c_type):
+    def _get_min_max(value_type):
+        mapping = {'float32': c_float, 'float64': c_double, 'int8': c_int8, 'uint8': c_uint8, 
+                                       'int16': c_int16, 'uint16': c_uint16, 'int32': c_int32, 'uint32': c_uint32, 'int64': c_int64}
+        c_type = mapping[value_type]
+
         signed = c_type(-1).value < c_type(0).value
         bit_size = sizeof(c_type) * 8
         signed_limit = 2 ** (bit_size - 1)
