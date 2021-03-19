@@ -120,8 +120,9 @@ class NewDataSchema:
                 importer = data_schema.new_field_importers[field_type](value_type, converter, invalid_value, validation_mode, create_flag_field, flag_field_suffix)
 
             elif field_type in ('datetime', 'date'):
+                create_day_field = fv.get('create_day_field', False)
                 optional = fv.get('optional', False)
-                importer = data_schema.new_field_importers[field_type](optional)
+                importer = data_schema.new_field_importers[field_type](create_day_field, optional)
             else:
                 msg = "'{}' is an unsupported field type (For field '{}')."
                 raise ValueError(msg.format(field_type, fk))

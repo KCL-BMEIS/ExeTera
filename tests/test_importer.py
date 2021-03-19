@@ -42,7 +42,14 @@ TEST_SCHEMA = json.dumps({
                 'BMI': {
                     'field_type': 'numeric',
                     'value_type': 'float64',
-                    'validation_mode': 'relaxed',
+                    'validation_mode': 'relaxed'
+                },
+                'updated_at':{
+                    'field_type': 'datetime',
+                    'create_day_field': True
+                },
+                'birthday':{
+                    'field_type':'date',
                 }
             }
         }
@@ -50,11 +57,12 @@ TEST_SCHEMA = json.dumps({
 })
 
 
+
 TEST_CSV_CONTENTS = '\n'.join((
-    'name, id, age, height, weight_change, BMI',
-    'a,     1, 20, 170.9,    21.2, 20.5',
-    'b,     2, 30, 180.2,        , 25.4',
-    'c,     3, 40,      ,   -17.5, 27.2'
+    'name, id, age,birthday,  height, weight_change, BMI,  updated_at',
+    'a,     1, 30,1990-01-01, 170.9,    21.2,        20.5, 2020-05-12 07:00:00',
+    'b,     2, 40,1980-03-04, 180.2,        ,        25.4, 2020-05-13 01:00:00',
+    'c,     3, 50,1970-04-05,      ,   -17.5,        27.2, 2020-05-14 03:00:00'
 ))
 
 class TestImporter(unittest.TestCase):
@@ -102,16 +110,44 @@ class TestImporter(unittest.TestCase):
     def test_importer_with_arg_exclude(self):
         ts = str(datetime.now(timezone.utc))
         fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
-        include, exclude = {}, {'schema_key':['name']}
+        include, exclude = {}, {'schema_key':['updated_at']}
 
         try:
             importer.import_with_schema(ts, dest_file_name, self.schema_file_name, self.files, False, include, exclude)
             f = h5py.File(dest_file_name, 'r')
             self.assertListEqual(list(f.keys()), ['schema_key'])
-            self.assertTrue(set(['name']) not in set(f['schema_key'].keys()))
+            self.assertTrue('updated_at' not in set(f['schema_key'].keys()))
             self.assertEqual(f['schema_key']['id']['values'].shape[0], 3)
         finally:
             os.close(fd_dest)       
+
+    def test_importer_without_create_day_field(self):
+        ts = str(datetime.now(timezone.utc))
+        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+
+        try:
+            importer.import_with_schema(ts, dest_file_name, self.schema_file_name, self.files, False, {}, {})
+            f = h5py.File(dest_file_name, 'r')
+            self.assertListEqual(list(f.keys()), ['schema_key'])
+            self.assertTrue('birthday' in set(f['schema_key'].keys()))            
+            self.assertTrue('birthday_day' not in set(f['schema_key'].keys()))            
+
+        finally:
+            os.close(fd_dest)  
+
+    def test_importer_with_create_day_field_True(self):
+        ts = str(datetime.now(timezone.utc))
+        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+
+        try:
+            importer.import_with_schema(ts, dest_file_name, self.schema_file_name, self.files, False, {}, {})
+            f = h5py.File(dest_file_name, 'r')
+            self.assertListEqual(list(f.keys()), ['schema_key'])
+            self.assertTrue('updated_at' in set(f['schema_key'].keys()))            
+            self.assertTrue('updated_at_day' in set(f['schema_key'].keys()))            
+
+        finally:
+            os.close(fd_dest)  
 
 
     def test_numeric_importer_with_default_value(self):

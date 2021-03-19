@@ -69,17 +69,16 @@ new_field_importers = {
         lambda ds, g, n, ts: rw.IndexedStringWriter(ds, g, n, ts),
     'fixed_string': lambda strlen:
         lambda ds, g, n, ts: rw.FixedStringWriter(ds, g, n, strlen, ts),
-    'datetime': lambda optional:
-        lambda ds, g, n, ts: rw.DateTimeImporter(ds, g, n, optional, ts),
-    'date': lambda optional:
-        lambda ds, g, n, ts: rw.OptionalDateImporter(ds, g, n, optional, ts),
+    'datetime': lambda is_day, optional:
+        lambda ds, g, n, ts: rw.DateTimeImporter(ds, g, n, is_day, optional, ts),
+    'date': lambda is_day, optional:
+        lambda ds, g, n, ts: rw.OptionalDateImporter(ds, g, n, is_day, optional, ts),
     'numeric': lambda typestr, parser, default, vmode, is_flag, flag_suffix:
         lambda ds, g, n, ts: rw.NumericImporter(ds, g, n, typestr, parser, default, vmode, is_flag, flag_suffix, ts),
     'categorical': lambda stv, oor=None:
         lambda ds, g, n, ts: rw.CategoricalWriter(ds, g, n, stv, ts) if oor is None else
         rw.LeakyCategoricalImporter(ds, g, n, stv, oor, ts)
 }
-
 
 class FieldDesc:
     def __init__(self, field, importer, strings_to_values, values_to_strings, to_datatype,
