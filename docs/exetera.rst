@@ -6,7 +6,7 @@ Subpackages
 
 .. toctree::
    :maxdepth: 4
-
+   
    exetera.core
    exetera.processing
 
