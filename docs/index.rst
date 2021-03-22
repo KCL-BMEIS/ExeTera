@@ -10,7 +10,7 @@ Welcome to ExeTera's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-
+   exetera
 
 Indices and tables
 ==================
