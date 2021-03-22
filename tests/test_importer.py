@@ -5,7 +5,7 @@ import os
 import h5py
 from datetime import datetime, timezone
 from exetera.core import importer
-
+from exetera.core.load_schema import NewDataSchema
 
 TEST_SCHEMA = json.dumps({
     'schema': {
@@ -21,6 +21,16 @@ TEST_SCHEMA = json.dumps({
                     'field_type': 'numeric',
                     'value_type': 'int32'
                 },
+                'height': {
+                    'field_type': 'numeric',
+                    'value_type': 'float32',
+                    'invalid_value' : 160.5
+                },
+                'weight_change': {
+                    'field_type': 'numeric',
+                    'value_type': 'float32',
+                    'invalid_value' : 'min'
+                },
                 'timestamp':{
                     'field_type': 'datetime'
                 }
@@ -31,10 +41,10 @@ TEST_SCHEMA = json.dumps({
 
 
 TEST_CSV_CONTENTS = '\n'.join((
-    'name, id, timestamp',
-    'a, 1, 2020-05-15:00-00-00',
-    'b, 2, ',
-    'c, 3, 2021-01-01:12-00-00'
+    'name, id, height, weight_change',
+    'a,     1, 170.9,    21.2',
+    'b,     2, 180.2,        ',
+    'c,     3,      ,   -17.5'
 ))
 
 
@@ -84,19 +94,46 @@ class TestImporter(unittest.TestCase):
     def test_importer_with_arg_exclude(self):
         ts = str(datetime.now(timezone.utc))
         fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
-        include, exclude = {}, {'schema_key':['timestamp']}
+        include, exclude = {}, {'schema_key':['name']}
 
         try:
             importer.import_with_schema(ts, dest_file_name, self.schema_file_name, self.files, False, include, exclude)
             f = h5py.File(dest_file_name, 'r')
             self.assertListEqual(list(f.keys()), ['schema_key'])
-            self.assertTrue(set(['timestamp']) not in set(f['schema_key'].keys()))
+            self.assertTrue(set(['name']) not in set(f['schema_key'].keys()))
             self.assertEqual(f['schema_key']['id']['values'].shape[0], 3)
 
         finally:
             os.close(fd_dest)       
 
 
+    def test_importer_with_numeric_default_value(self):
+        ts = str(datetime.now(timezone.utc))
+        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+
+        try:
+            importer.import_with_schema(ts, dest_file_name, self.schema_file_name, self.files, False, {}, {})
+            f = h5py.File(dest_file_name, 'r')
+            self.assertListEqual(list(f.keys()), ['schema_key'])
+            self.assertEqual(f['schema_key']['height']['values'].shape[0], 3)
+            self.assertEqual(f['schema_key']['height']['values'][2], 160.5)
+        finally:
+            os.close(fd_dest)
+
+    def test_importer_with_min_default_value(self):
+        ts = str(datetime.now(timezone.utc))
+        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+
+        try:
+            importer.import_with_schema(ts, dest_file_name, self.schema_file_name, self.files, False, {}, {})
+            f = h5py.File(dest_file_name, 'r')
+            self.assertListEqual(list(f.keys()), ['schema_key'])
+            self.assertEqual(f['schema_key']['weight_change']['values'].shape[0], 3)
+            self.assertEqual(f['schema_key']['weight_change']['values'][1], NewDataSchema._get_min_max('float32')[0])
+        finally:
+            os.close(fd_dest)
+
     def tearDown(self):
         os.close(self.fd_schema)
         os.close(self.fd_csv)
+
