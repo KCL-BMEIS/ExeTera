@@ -116,3 +116,5 @@ class DataFrame():
     def sort_on(self,dest_group, keys,
                 timestamp=datetime.now(timezone.utc), write_mode='write', verbose=True):
         pass
+
+    '''other span operations???'''
