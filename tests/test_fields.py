@@ -130,5 +130,3 @@ class TestFieldArray(unittest.TestCase):
         num.data.write_part(np.arange(10))
         num.data.clear()
         self.assertListEqual([], list(num.data[:]))
-
-
