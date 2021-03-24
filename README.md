@@ -6,12 +6,11 @@ analysis pipelines for large tabular datasets.
 
 # Current release and requirements
 
-<p>
-   <a href="https://pypi.org/project/exetera/">
-     <img src="https://img.shields.io/pypi/v/exetera?label=PyPI%20version&logo=python&logoColor=white" alt="PyPI version">
-   </a>
-   <img src = "https://github.com/KCL-BMEIS/ExeTera/workflows/Unittests/badge.svg">
-</p>
+[![Documentation Status](https://readthedocs.org/projects/exetera/badge/?version=latest)](https://exetera.readthedocs.io/en/latest/?badge=latest)
+[![PyPI Version](https://img.shields.io/pypi/v/exetera?label=PyPI%20version&logo=python&logoColor=white)](https://pypi.org/project/exetera/)
+[![Testing](https://github.com/KCL-BMEIS/ExeTera/workflows/Unittests/badge.svg)](https://github.com/KCL-BMEIS/ExeTera/actions)
+
+
 Requires python 3.7+
 
 ---
