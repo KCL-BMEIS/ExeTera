@@ -880,3 +880,7 @@ class TestSessionImporters(unittest.TestCase):
                 [datetime(year=int(v[0:4]), month=int(v[5:7]), day=int(v[8:10])
                           ).timestamp() for v in values],
                 f.data[:].tolist())
+
+
+if __name__ == '__main__':
+    a=TestSessionSort().test_dataset_sort_index_ndarray()
