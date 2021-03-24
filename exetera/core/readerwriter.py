@@ -410,15 +410,21 @@ class CategoricalWriter(Writer):
 
 class NumericImporter:
     def __init__(self, datastore, group, name, nformat, parser, invalid_value=0,
+                 validation_mode='allow_empty', create_flag_field=True, flag_field_suffix='_valid',
                  timestamp=None, write_mode='write'):
         if timestamp is None:
             timestamp = datastore.timestamp
         self.data_writer = NumericWriter(datastore, group, name,
                                          nformat, timestamp, write_mode)
-        self.flag_writer = NumericWriter(datastore, group, f"{name}_valid",
-                                         'bool', timestamp, write_mode)
+        
+        self.flag_writer = NumericWriter(datastore, group, f"{name}{flag_field_suffix}",
+                                                        'bool', timestamp, write_mode) \
+                            if create_flag_field else None
+
+        self.field_name = name
         self.parser = parser
         self.invalid_value = invalid_value
+        self.validation_mode = validation_mode
 
     def chunk_factory(self, length):
         return [None] * length
@@ -438,14 +444,27 @@ class NumericImporter:
 
             elements[i] = value
             validity[i] = valid
+            
+            if self.validation_mode == 'strict' and not valid: 
+                if self._is_blank_str(values[i]):
+                    raise ValueError(f"numeric value in the field '{self.field_name}' can not be empty in strict mode")  
+                else:        
+                    raise ValueError(f"the following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
+
+            if self.validation_mode == 'allow_empty' and not self._is_blank_str(values[i]) and not valid:
+                raise ValueError(f"the following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
 
         self.data_writer.write_part(elements)
-        self.flag_writer.write_part(validity)
+        if self.flag_writer is not None:
+            self.flag_writer.write_part(validity)
 
+    def _is_blank_str(self, value):
+        return type(value) == str and value.strip() == ''
 
     def flush(self):
         self.data_writer.flush()
-        self.flag_writer.flush()
+        if self.flag_writer is not None:
+            self.flag_writer.flush()
 
     def write(self, values):
         self.write_part(values)
