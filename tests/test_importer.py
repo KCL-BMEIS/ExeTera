@@ -160,7 +160,7 @@ class TestImporter(unittest.TestCase):
         try:
             importer.import_with_schema(ts, dest_file_name, self.schema_file_name, files, False, {}, {})
         except Exception as e:
-            self.assertEqual(str(e), "numeric value in the field 'id' can not be empty in strict mode")
+            self.assertEqual(str(e), "Numeric value in the field 'id' can not be empty in strict mode")
         finally:
             os.close(fd_dest)
         
@@ -183,7 +183,7 @@ class TestImporter(unittest.TestCase):
         try:
             importer.import_with_schema(ts, dest_file_name, self.schema_file_name, files, False, {}, {})
         except Exception as e:
-            self.assertEqual(str(e), "the following numeric value in the field 'id' can not be parsed:5@")
+            self.assertEqual(str(e), "The following numeric value in the field 'id' can not be parsed:5@")
         finally:
             os.close(fd_dest)
 

@@ -416,11 +416,10 @@ class NumericImporter:
             timestamp = datastore.timestamp
         self.data_writer = NumericWriter(datastore, group, name,
                                          nformat, timestamp, write_mode)
-        
-        self.flag_writer = NumericWriter(datastore, group, f"{name}{flag_field_suffix}",
-                                                        'bool', timestamp, write_mode) \
-                            if create_flag_field else None
-
+        self.flag_writer = None
+        if create_flag_field:
+            self.flag_writer = NumericWriter(datastore, group, f"{name}{flag_field_suffix}",
+                                                            'bool', timestamp, write_mode)
         self.field_name = name
         self.parser = parser
         self.invalid_value = invalid_value
@@ -447,12 +446,12 @@ class NumericImporter:
             
             if self.validation_mode == 'strict' and not valid: 
                 if self._is_blank_str(values[i]):
-                    raise ValueError(f"numeric value in the field '{self.field_name}' can not be empty in strict mode")  
+                    raise ValueError(f"Numeric value in the field '{self.field_name}' can not be empty in strict mode")  
                 else:        
-                    raise ValueError(f"the following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
+                    raise ValueError(f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
 
             if self.validation_mode == 'allow_empty' and not self._is_blank_str(values[i]) and not valid:
-                raise ValueError(f"the following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
+                raise ValueError(f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
 
         self.data_writer.write_part(elements)
         if self.flag_writer is not None:
