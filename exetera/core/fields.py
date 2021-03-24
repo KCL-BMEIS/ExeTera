@@ -59,7 +59,7 @@ class Field:
         return True
 
     def get_spans(self):
-        return per._get_spans(self._value_wrapper[:], None)
+        pass
 
 
 
@@ -393,6 +393,9 @@ class IndexedStringField(Field):
 
     def __len__(self):
         return len(self.data)
+
+    def get_spans(self):
+
 
 
     def get_spans(self):
