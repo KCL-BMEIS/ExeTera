@@ -8,6 +8,7 @@ import h5py
 from exetera.core.data_writer import DataWriter
 from exetera.core import utils
 from exetera.core import persistence as per
+from exetera.core import operations as ops
 
 
 # def test_field_iterator(data):
@@ -399,7 +400,7 @@ class IndexedStringField(Field):
 
 
     def get_spans(self):
-        return per._get_spans_for_index_string_field(self.indices[:], self.values[:])
+        return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
 
 
 
@@ -430,7 +431,7 @@ class FixedStringField(Field):
         return len(self.data)
 
     def get_spans(self):
-        return per._get_spans(self.data[:], None)
+        return ops._get_spans_for_field(self.data[:])
 
 
 class NumericField(Field):
@@ -459,7 +460,7 @@ class NumericField(Field):
         return len(self.data)
 
     def get_spans(self):
-        return per._get_spans(self.data[:], None)
+        return ops._get_spans_for_field(self.data[:])
 
 
 class CategoricalField(Field):
@@ -491,7 +492,7 @@ class CategoricalField(Field):
         return len(self.data)
 
     def get_spans(self):
-        return per._get_spans(self.data[:], None)
+        return ops._get_spans_for_field(self.data[:])
 
     # Note: key is presented as value: str, even though the dictionary must be presented
     # as str: value
@@ -526,6 +527,9 @@ class TimestampField(Field):
 
     def __len__(self):
         return len(self.data)
+
+    def get_span(self):
+        return ops._get_spans_for_field(self.data[:])
 
 
 class IndexedStringImporter:

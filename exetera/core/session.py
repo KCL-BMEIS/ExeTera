@@ -354,14 +354,11 @@ class Session:
             raise ValueError("One of 'field' and 'fields' must be set")
         elif field is not None and fields is not None:
             raise ValueError("Only one of 'field' and 'fields' may be set")
+        elif field is not None and isinstance(field,fld.Field):
+            return field.get_spans()
         elif field is not None:
-            if isinstance(field,fld.IndexedStringField):
-                indices,values = val.array_from_parameter(self, 'field',field)
-                return per._get_spans_for_index_string_field(indices,values)
-            else:
-                raw_field = None
-                raw_field = val.array_from_parameter(self, 'field', field)
-                return per._get_spans(raw_field,None)
+            raw_field = val.array_from_parameter(self, 'field', field)
+            return per._get_spans(raw_field,None)
         elif fields is not None:
             raw_fields = []
             for i_f, f in enumerate(fields):

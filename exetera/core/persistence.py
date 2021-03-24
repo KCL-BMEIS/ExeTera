@@ -297,22 +297,10 @@ def _get_spans_for_field(field0):
     results[-1] = True
     return np.nonzero(results)[0]
 
-def _get_spans_for_index_string_field(indices,values):
-    result = []
-    result.append(0)
-    for i in range(1, len(indices) - 1):
-        last = indices[i - 1]
-        current = indices[i]
-        next = indices[i + 1]
-        if next - current != current - last: # compare size first
-            result.append(i)
-            continue
-        if not np.array_equal(values[last:current], values[current:next]):
-            result.append(i)
-    result.append(len(indices) - 1)  # total number of elements
-    return result
 
-@njit
+
+
+
 def _get_spans_for_2_fields(field0, field1):
     count = 0
     spans = np.zeros(len(field0)+1, dtype=np.uint32)
