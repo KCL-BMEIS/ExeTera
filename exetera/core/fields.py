@@ -50,6 +50,9 @@ class Field:
     def chunksize(self):
         return self._field.attrs['chunksize']
 
+    def is_sorted(self):
+        raise NotImplementedError()
+
     def __bool__(self):
         # this method is required to prevent __len__ being called on derived methods when fields are queried as
         #   if f:
@@ -376,6 +379,17 @@ class IndexedStringField(Field):
             self._data_wrapper = wrapper(self._field, 'index', 'values')
         return self._data_wrapper
 
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+
+        indices = self.indices[:]
+        values = self.values[:]
+        for i in range(len(indices)-2):
+            if values[indices[i]:indices[i+1]] > values[indices[i+1]:indices[i+2]]:
+                return False
+        return True
+
     @property
     def indices(self):
         if self._index_wrapper is None:
@@ -416,6 +430,12 @@ class FixedStringField(Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return np.any(np.char.compare_chararrays(data[:-1], data[1:], ">"))
+
     def __len__(self):
         return len(self.data)
 
@@ -441,6 +461,12 @@ class NumericField(Field):
             else:
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
+
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return data[:-1] > data[1:]
 
     def __len__(self):
         return len(self.data)
@@ -470,6 +496,12 @@ class CategoricalField(Field):
             else:
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
+
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return data[:-1] > data[1:]
 
     def __len__(self):
         return len(self.data)
@@ -504,6 +536,12 @@ class TimestampField(Field):
             else:
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
+
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return data[:-1] > data[1:]
 
     def __len__(self):
         return len(self.data)
