@@ -3,7 +3,7 @@ import json
 
 from exetera.core import data_schema
 from exetera.core import persistence as per
-
+from ctypes import sizeof, c_float, c_double, c_int8, c_uint8, c_int16, c_uint16, c_int32, c_uint32, c_int64
 
 class NewDataSchema:
     def __init__(self, name, schema_dict, verbosity=0):
@@ -101,12 +101,28 @@ class NewDataSchema:
                     else:
                         msg = "Unrecognised value_type '{}' in field '{}'"
                         raise ValueError(msg.format(value_type, fk))
+            
+                # default value for invalid numeric value
+                invalid_value = 0
+                if 'invalid_value' in fv:
+                    invalid_value = fv['invalid_value']
+                    if type(invalid_value) == str and invalid_value.strip() in ('min', 'max'):
+                        if value_type == 'bool':
+                            raise ValueError('Field {} is bool type. It should not have min/max as default value')
+                        else:
+                            (min_value, max_value) = NewDataSchema._get_min_max(value_type)
+                            invalid_value = min_value if invalid_value.strip() == 'min' else max_value
+                
+                validation_mode = fv.get('validation_mode', 'allow_empty')
+                create_flag_field = fv.get('create_flag_field', True) if validation_mode in ('allow_empty', 'relaxed') else False
+                flag_field_suffix = fv.get('flag_field_name', '_valid') if create_flag_field else ''
 
-                importer = data_schema.new_field_importers[field_type](value_type, converter)
+                importer = data_schema.new_field_importers[field_type](value_type, converter, invalid_value, validation_mode, create_flag_field, flag_field_suffix)
 
             elif field_type in ('datetime', 'date'):
+                create_day_field = fv.get('create_day_field', False)
                 optional = fv.get('optional', False)
-                importer = data_schema.new_field_importers[field_type](optional)
+                importer = data_schema.new_field_importers[field_type](create_day_field, optional)
             else:
                 msg = "'{}' is an unsupported field type (For field '{}')."
                 raise ValueError(msg.format(field_type, fk))
@@ -118,6 +134,17 @@ class NewDataSchema:
             entries[fk] = fd
 
         return entries
+
+    @staticmethod
+    def _get_min_max(value_type):
+        mapping = {'float32': c_float, 'float64': c_double, 'int8': c_int8, 'uint8': c_uint8, 
+                                       'int16': c_int16, 'uint16': c_uint16, 'int32': c_int32, 'uint32': c_uint32, 'int64': c_int64}
+        c_type = mapping[value_type]
+
+        signed = c_type(-1).value < c_type(0).value
+        bit_size = sizeof(c_type) * 8
+        signed_limit = 2 ** (bit_size - 1)
+        return (-signed_limit, signed_limit - 1) if signed else (0, 2 * signed_limit - 1)
 
 
 def load_schema(source, verbosity=0):

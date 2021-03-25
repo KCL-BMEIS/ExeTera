@@ -6,12 +6,11 @@ analysis pipelines for large tabular datasets.
 
 # Current release and requirements
 
-<p>
-   <a href="https://pypi.org/project/exetera/">
-     <img src="https://img.shields.io/pypi/v/exetera?label=PyPI%20version&logo=python&logoColor=white" alt="PyPI version">
-   </a>
-   <img src = "https://github.com/KCL-BMEIS/ExeTera/workflows/Unittests/badge.svg">
-</p>
+[![Documentation Status](https://readthedocs.org/projects/exetera/badge/?version=latest)](https://exetera.readthedocs.io/en/latest/?badge=latest)
+[![PyPI Version](https://img.shields.io/pypi/v/exetera?label=PyPI%20version&logo=python&logoColor=white)](https://pypi.org/project/exetera/)
+[![Testing](https://github.com/KCL-BMEIS/ExeTera/workflows/Unittests/badge.svg)](https://github.com/KCL-BMEIS/ExeTera/actions)
+
+
 Requires python 3.7+
 
 ---
@@ -27,6 +26,8 @@ exetera import
 -s path/to/covid_schema.json \
 -i "patients:path/to/patient_data.csv, assessments:path/to/assessmentdata.csv, tests:path/to/covid_test_data.csv, diet:path/to/diet_study_data.csv" \
 -o /path/to/output_dataset_name.hdf5
+--include "patients:(id,country_code,blood_group), assessments:(id,patient_id,chest_pain)"
+--exclude "tests:(country_code)"
 ```
 
 
@@ -40,6 +41,8 @@ exetera import
  * `-ts/--timestamp`: An override for the timestamp to be written
    (defaults to `datetime.now(timezone.utc)`)
  * `-w/--overwrite`: If set, overwrite any existing dataset with the same name; appends to existing dataset otherwise
+ * `-n/--include`: If set, filters out all fields apart from those in the list.
+ * `-x/--exclude`: If set, filters out the fields in this list.
  
 Expect this script to take about an hour or more to execute on very large datasets.
 
