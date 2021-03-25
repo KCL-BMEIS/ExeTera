@@ -350,20 +350,16 @@ class Session:
             field: [1, 2, 2, 1, 1, 1, 3, 4, 4, 4, 2, 2, 2, 2, 2]
             result: [0, 1, 3, 6, 7, 10, 15]
         """
-        if field is None and fields is None:
-            raise ValueError("One of 'field' and 'fields' must be set")
-        elif field is not None and fields is not None:
-            raise ValueError("Only one of 'field' and 'fields' may be set")
-        elif field is not None and isinstance(field,fld.Field):
-            return field.get_spans()
-        elif field is not None:
-            raw_field = val.array_from_parameter(self, 'field', field)
-            return per._get_spans(raw_field,None)
-        elif fields is not None:
-            raw_fields = []
-            for i_f, f in enumerate(fields):
-                raw_fields.append(val.array_from_parameter(self, "'fields[{}]'".format(i_f), f))
-            return per._get_spans(None, raw_fields)
+        if fields is not None:
+            if isinstance(fields[0],fld.Field):
+                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(),fields[1].get_spans())
+            if isinstance(fields[0],np.ndarray):
+                return ops._get_spans_for_2_fields(fields[0],fields[1])
+        else:
+            if isinstance(field,fld.Field):
+                return field.get_spans()
+            if isinstance(field,np.ndarray):
+                return ops._get_spans_for_field(field)
 
 
     def _apply_spans_no_src(self, predicate, spans, dest=None):
