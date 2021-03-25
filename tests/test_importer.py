@@ -19,20 +19,30 @@ TEST_SCHEMA = json.dumps({
                 },
                 'id': {
                     'field_type': 'numeric',
-                    'value_type': 'int32'
+                    'value_type': 'int32',
+                    'validation_mode': 'strict'
+                },
+                'age': {
+                    'field_type': 'numeric',
+                    'value_type': 'int32',                  
                 },
                 'height': {
                     'field_type': 'numeric',
                     'value_type': 'float32',
-                    'invalid_value' : 160.5
+                    'invalid_value' : 160.5,
+                    'validation_mode': 'relaxed',
+                    'flag_field_name': '_valid_test'
                 },
                 'weight_change': {
                     'field_type': 'numeric',
                     'value_type': 'float32',
-                    'invalid_value' : 'min'
+                    'invalid_value' : 'min',
+                    'create_flag_field': False,
                 },
-                'timestamp':{
-                    'field_type': 'datetime'
+                'BMI': {
+                    'field_type': 'numeric',
+                    'value_type': 'float64',
+                    'validation_mode': 'relaxed',
                 }
             }
         }
@@ -41,12 +51,11 @@ TEST_SCHEMA = json.dumps({
 
 
 TEST_CSV_CONTENTS = '\n'.join((
-    'name, id, height, weight_change',
-    'a,     1, 170.9,    21.2',
-    'b,     2, 180.2,        ',
-    'c,     3,      ,   -17.5'
+    'name, id, age, height, weight_change, BMI',
+    'a,     1, 20, 170.9,    21.2, 20.5',
+    'b,     2, 30, 180.2,        , 25.4',
+    'c,     3, 40,      ,   -17.5, 27.2'
 ))
-
 
 class TestImporter(unittest.TestCase):
     def setUp(self):
@@ -73,7 +82,6 @@ class TestImporter(unittest.TestCase):
             self.assertListEqual(list(f.keys()), ['schema_key'])
             self.assertTrue(set(f['schema_key'].keys()) >= set(['id', 'name']))
             self.assertEqual(f['schema_key']['id']['values'].shape[0], 3)
-
         finally:
             os.close(fd_dest)
 
@@ -102,12 +110,11 @@ class TestImporter(unittest.TestCase):
             self.assertListEqual(list(f.keys()), ['schema_key'])
             self.assertTrue(set(['name']) not in set(f['schema_key'].keys()))
             self.assertEqual(f['schema_key']['id']['values'].shape[0], 3)
-
         finally:
             os.close(fd_dest)       
 
 
-    def test_importer_with_numeric_default_value(self):
+    def test_numeric_importer_with_default_value(self):
         ts = str(datetime.now(timezone.utc))
         fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
 
@@ -120,7 +127,7 @@ class TestImporter(unittest.TestCase):
         finally:
             os.close(fd_dest)
 
-    def test_importer_with_min_default_value(self):
+    def test_numeric_importer_with_min_default_value(self):
         ts = str(datetime.now(timezone.utc))
         fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
 
@@ -130,6 +137,97 @@ class TestImporter(unittest.TestCase):
             self.assertListEqual(list(f.keys()), ['schema_key'])
             self.assertEqual(f['schema_key']['weight_change']['values'].shape[0], 3)
             self.assertEqual(f['schema_key']['weight_change']['values'][1], NewDataSchema._get_min_max('float32')[0])
+        finally:
+            os.close(fd_dest)
+
+
+    def test_numeric_importer_with_empty_value_in_strict_mode(self):
+        TEST_CSV_CONTENTS_EMPTY_VALUE = '\n'.join((
+            'name, id',
+            'a,     1',
+            'c,     '
+        ))
+
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+        with open(csv_file_name, 'w') as fcsv:
+            fcsv.write(TEST_CSV_CONTENTS_EMPTY_VALUE)
+
+        files = {'schema_key': csv_file_name}
+
+        ts = str(datetime.now(timezone.utc))
+        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+        
+        try:
+            importer.import_with_schema(ts, dest_file_name, self.schema_file_name, files, False, {}, {})
+        except Exception as e:
+            self.assertEqual(str(e), "Numeric value in the field 'id' can not be empty in strict mode")
+        finally:
+            os.close(fd_dest)
+        
+    def test_numeric_importer_with_non_numeric_value_in_strict_mode(self):
+        TEST_CSV_CONTENTS_EMPTY_VALUE = '\n'.join((
+            'name, id',
+            'a,     1',
+            'c,     5@'
+        ))
+
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+        with open(csv_file_name, 'w') as fcsv:
+            fcsv.write(TEST_CSV_CONTENTS_EMPTY_VALUE)
+
+        files = {'schema_key': csv_file_name}
+
+        ts = str(datetime.now(timezone.utc))
+        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+        
+        try:
+            importer.import_with_schema(ts, dest_file_name, self.schema_file_name, files, False, {}, {})
+        except Exception as e:
+            self.assertEqual(str(e), "The following numeric value in the field 'id' can not be parsed:5@")
+        finally:
+            os.close(fd_dest)
+
+    def test_numeric_importer_with_non_empty_valid_value_in_strict_mode(self):
+        ts = str(datetime.now(timezone.utc))
+        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+
+        try:
+            importer.import_with_schema(ts, dest_file_name, self.schema_file_name, self.files, False, {}, {})
+            f = h5py.File(dest_file_name, 'r')
+            self.assertListEqual(list(f.keys()), ['schema_key'])
+            self.assertTrue('id' in set(f['schema_key'].keys()))
+            self.assertTrue('id_valid' not in set(f['schema_key'].keys()))
+        finally:
+            os.close(fd_dest)
+
+    def test_numeric_importer_in_allow_empty_mode(self):
+        ts = str(datetime.now(timezone.utc))
+        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+
+        try:
+            importer.import_with_schema(ts, dest_file_name, self.schema_file_name, self.files, False, {}, {})
+            f = h5py.File(dest_file_name, 'r')
+            self.assertListEqual(list(f.keys()), ['schema_key'])
+            self.assertTrue('age' in set(f['schema_key'].keys()))
+            self.assertTrue('age_valid' in set(f['schema_key'].keys()))
+            self.assertTrue('weight_change' in set(f['schema_key'].keys()))
+            self.assertTrue('weight_change_valid' not in set(f['schema_key'].keys()))            
+        finally:
+            os.close(fd_dest)
+
+    def test_numeric_importer_in_relaxed_mode(self):
+        ts = str(datetime.now(timezone.utc))
+        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+
+        try:
+            importer.import_with_schema(ts, dest_file_name, self.schema_file_name, self.files, False, {}, {})
+            f = h5py.File(dest_file_name, 'r')
+            self.assertListEqual(list(f.keys()), ['schema_key'])
+            self.assertTrue('height' in set(f['schema_key'].keys()))
+            self.assertTrue('height_valid' not in set(f['schema_key'].keys()))
+            self.assertTrue('height_valid_test' in set(f['schema_key'].keys()))
+            self.assertTrue('BMI' in set(f['schema_key'].keys()))
+            self.assertTrue('BMI_valid' in set(f['schema_key'].keys()))
         finally:
             os.close(fd_dest)
 

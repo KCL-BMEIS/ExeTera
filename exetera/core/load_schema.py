@@ -112,8 +112,12 @@ class NewDataSchema:
                         else:
                             (min_value, max_value) = NewDataSchema._get_min_max(value_type)
                             invalid_value = min_value if invalid_value.strip() == 'min' else max_value
-                            
-                importer = data_schema.new_field_importers[field_type](value_type, converter, invalid_value)
+                
+                validation_mode = fv.get('validation_mode', 'allow_empty')
+                create_flag_field = fv.get('create_flag_field', True) if validation_mode in ('allow_empty', 'relaxed') else False
+                flag_field_suffix = fv.get('flag_field_name', '_valid') if create_flag_field else ''
+
+                importer = data_schema.new_field_importers[field_type](value_type, converter, invalid_value, validation_mode, create_flag_field, flag_field_suffix)
 
             elif field_type in ('datetime', 'date'):
                 optional = fv.get('optional', False)

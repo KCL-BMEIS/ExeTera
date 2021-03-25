@@ -261,7 +261,7 @@ class TestPersistence(unittest.TestCase):
             values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
             foo = rw.NumericImporter(datastore, hf, 'foo', 'float32',
-                                              persistence.try_str_to_float, timestamp=ts)
+                                              persistence.try_str_to_float, validation_mode='relaxed',timestamp=ts)
             foo.write(values)
 
             r = rw.NumericReader(datastore, hf['foo'])[:]
@@ -286,7 +286,7 @@ class TestPersistence(unittest.TestCase):
                   '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
         with h5py.File(bio, 'w') as hf:
             foo = rw.NumericImporter(datastore, hf, 'foo', 'float32',
-                                              persistence.try_str_to_float, timestamp=ts)
+                                              persistence.try_str_to_float, validation_mode='relaxed', timestamp=ts)
 
             foo.write(values)
 
@@ -371,7 +371,7 @@ class TestPersistence(unittest.TestCase):
             values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
             foo = rw.NumericImporter(datastore, hf, 'foo', 'int32',
-                                              persistence.try_str_to_int, timestamp=ts).write(values)
+                                              persistence.try_str_to_int, validation_mode='relaxed', timestamp=ts).write(values)
 
             expected = [0, 0, 2, 0, 0, 0, 0, -6, 0, 0, 0,
                         0, 0, 2, 0, 0, 0, 0, -6, 0, 0, 0]
@@ -392,7 +392,7 @@ class TestPersistence(unittest.TestCase):
             values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       0, 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
             foo = rw.NumericImporter(datastore, hf, 'foo', 'int32',
-                                              persistence.try_str_to_float_to_int, timestamp=ts)
+                                              persistence.try_str_to_float_to_int, validation_mode='relaxed', timestamp=ts)
             foo.write_part(values[0:10])
             foo.write_part(values[10:20])
             foo.write_part(values[20:22])
@@ -421,7 +421,7 @@ class TestPersistence(unittest.TestCase):
             values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
             foo = rw.NumericImporter(datastore, hf, 'foo', 'uint32',
-                                              persistence.try_str_to_int, timestamp=ts).write(values)
+                                              persistence.try_str_to_int, validation_mode='relaxed', timestamp=ts).write(values)
 
             expected = [0, 0, 2, 0, 0, 0, 0, 4294967290, 0, 0, 0,
                         0, 0, 2, 0, 0, 0, 0, 4294967290, 0, 0, 0]
