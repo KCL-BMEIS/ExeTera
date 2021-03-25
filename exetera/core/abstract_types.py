@@ -46,3 +46,6 @@ class Field(ABC):
     def __len__(self):
         raise NotImplementedError()
 
+    @abstractmethod
+    def get_spans(self):
+        raise NotImplementedError()
