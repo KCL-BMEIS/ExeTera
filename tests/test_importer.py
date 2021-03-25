@@ -8,6 +8,9 @@ from exetera.core import importer
 from exetera.core.load_schema import NewDataSchema
 
 TEST_SCHEMA = json.dumps({
+    "exetera": {
+      "version": "1.1.0"
+    },
     'schema': {
         'schema_key': {
             "primary_keys": [
