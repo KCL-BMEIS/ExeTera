@@ -35,10 +35,6 @@ class Field(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def is_sorted(self):
-        raise NotImplementedError()
-
-    @abstractmethod
     def __bool__(self):
         raise NotImplementedError()
 
