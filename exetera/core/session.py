@@ -603,8 +603,7 @@ class Session:
 
         writer.write(destination_space_values)
 
-    #the field is a hdf5 group that contains attribute 'fieldtype'
-    #return a exetera Field according to the filetype
+
     def get(self, field):
         if isinstance(field, fld.Field):
             return field

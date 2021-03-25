@@ -715,9 +715,7 @@ def _aggregate_impl(predicate, fkey_indices=None, fkey_index_spans=None,
 
 
 class DataStore:
-    '''
-    DataStore is replaced by Session
-    '''
+
     def __init__(self, chunksize=DEFAULT_CHUNKSIZE,
                  timestamp=str(datetime.now(timezone.utc))):
         if not isinstance(timestamp, str):

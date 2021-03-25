@@ -107,6 +107,12 @@ class DataFrame():
     def __len__(self):
         return len(self.data)
 
+    def get_spans(self):
+        spans=[]
+        for field in self.data.values():
+            spans.append(field.get_spans())
+        return spans
+
     def apply_filter(self,filter_to_apply,dst):
         pass
 
@@ -117,4 +123,3 @@ class DataFrame():
                 timestamp=datetime.now(timezone.utc), write_mode='write', verbose=True):
         pass
 
-    '''other span operations???'''
