@@ -409,15 +409,21 @@ class CategoricalWriter(Writer):
 
 
 class NumericImporter:
-    def __init__(self, datastore, group, name, nformat, parser,
+    def __init__(self, datastore, group, name, nformat, parser, invalid_value=0,
+                 validation_mode='allow_empty', create_flag_field=True, flag_field_suffix='_valid',
                  timestamp=None, write_mode='write'):
         if timestamp is None:
             timestamp = datastore.timestamp
         self.data_writer = NumericWriter(datastore, group, name,
                                          nformat, timestamp, write_mode)
-        self.flag_writer = NumericWriter(datastore, group, f"{name}_valid",
-                                         'bool', timestamp, write_mode)
+        self.flag_writer = None
+        if create_flag_field:
+            self.flag_writer = NumericWriter(datastore, group, f"{name}{flag_field_suffix}",
+                                                            'bool', timestamp, write_mode)
+        self.field_name = name
         self.parser = parser
+        self.invalid_value = invalid_value
+        self.validation_mode = validation_mode
 
     def chunk_factory(self, length):
         return [None] * length
@@ -433,15 +439,31 @@ class NumericImporter:
         elements = np.zeros(len(values), dtype=self.data_writer.nformat)
         validity = np.zeros(len(values), dtype='bool')
         for i in range(len(values)):
-            valid, value = self.parser(values[i])
+            valid, value = self.parser(values[i], self.invalid_value)
+
             elements[i] = value
             validity[i] = valid
+            
+            if self.validation_mode == 'strict' and not valid: 
+                if self._is_blank_str(values[i]):
+                    raise ValueError(f"Numeric value in the field '{self.field_name}' can not be empty in strict mode")  
+                else:        
+                    raise ValueError(f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
+
+            if self.validation_mode == 'allow_empty' and not self._is_blank_str(values[i]) and not valid:
+                raise ValueError(f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
+
         self.data_writer.write_part(elements)
-        self.flag_writer.write_part(validity)
+        if self.flag_writer is not None:
+            self.flag_writer.write_part(validity)
+
+    def _is_blank_str(self, value):
+        return type(value) == str and value.strip() == ''
 
     def flush(self):
         self.data_writer.flush()
-        self.flag_writer.flush()
+        if self.flag_writer is not None:
+            self.flag_writer.flush()
 
     def write(self, values):
         self.write_part(values)
@@ -518,14 +540,17 @@ class FixedStringWriter(Writer):
 
 
 class DateTimeImporter:
-    def __init__(self, datastore, group, name,
+    def __init__(self, datastore, group, name, create_day_field=False,
                  optional=True, timestamp=None, write_mode='write'):
         if timestamp is None:
             timestamp = datastore.timestamp
         self.datetime = DateTimeWriter(datastore, group, name,
                                        timestamp, write_mode)
-        self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
-                                         '10', timestamp, write_mode)
+
+        self.create_day_field = create_day_field
+        if create_day_field:
+            self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
+                                            '10', timestamp, write_mode)
         self.datetimeset = None
         if optional:
             self.datetimeset = NumericWriter(datastore, group, f"{name}_set",
@@ -536,26 +561,32 @@ class DateTimeImporter:
 
     def write_part(self, values):
         # TODO: use a timestamp writer instead of a datetime writer and do the conversion here
-
-        days = self.datestr.chunk_factory(len(values))
-        flags = None
-        if self.datetimeset is not None:
-            flags = self.datetimeset.chunk_factory(len(values))
-            for i in range(len(values)):
-                flags[i] = values[i] != b''
-                days[i] = values[i][:10]
-        else:
-            for i in range(len(values)):
-                days[i] = values[i][:10]
-
         self.datetime.write_part(values)
-        self.datestr.write_part(days)
+
+        if self.create_day_field:
+            days=self._get_days(values)
+            self.datestr.write_part(days)
+
         if self.datetimeset is not None:
+            flags=self._get_flags(values)
             self.datetimeset.write_part(flags)
+
+    def _get_days(self, values):
+        days = self.datestr.chunk_factory(len(values))
+        for i in range(len(values)):
+            days[i] = values[i][:10]
+        return days
+
+    def _get_flags(self, values):
+        flags = self.datetimeset.chunk_factory(len(values))
+        for i in range(len(values)):
+            flags[i] = values[i] != b''
+        return flags
 
     def flush(self):
         self.datetime.flush()
-        self.datestr.flush()
+        if self.create_day_field:
+            self.datestr.flush()
         if self.datetimeset is not None:
             self.datetimeset.flush()
 
@@ -584,7 +615,7 @@ class DateTimeWriter(Writer):
     def write_part(self, values):
         timestamps = np.zeros(len(values), dtype=np.float64)
         for i in range(len(values)):
-            value = values[i]
+            value = values[i].strip()
             if value == b'':
                 timestamps[i] = 0
             else:
@@ -689,13 +720,16 @@ class TimestampWriter(Writer):
 
 
 class OptionalDateImporter:
-    def __init__(self, datastore, group, name,
+    def __init__(self, datastore, group, name, create_day_field=False,
                  optional=True, timestamp=None, write_mode='write'):
         if timestamp is None:
             timestamp = datastore.timestamp
         self.date = DateWriter(datastore, group, name, timestamp, write_mode)
-        self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
-                                         '10', timestamp, write_mode)
+
+        self.create_day_field = create_day_field
+        if create_day_field:
+            self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
+                                            '10', timestamp, write_mode)
         self.dateset = None
         if optional:
             self.dateset =\
@@ -706,25 +740,30 @@ class OptionalDateImporter:
 
     def write_part(self, values):
         # TODO: use a timestamp writer instead of a datetime writer and do the conversion here
-        days = self.datestr.chunk_factory(len(values))
-        flags = None
-        if self.dateset is not None:
-            flags = self.dateset.chunk_factory(len(values))
-            for i in range(len(values)):
-                flags[i] = values[i] != b''
-                days[i] = values[i][:10]
-        else:
-            for i in range(len(values)):
-                days[i] = values[i][:10]
-
         self.date.write_part(values)
-        self.datestr.write_part(days)
+        if self.create_day_field:
+            days=self._get_days(values)
+            self.datestr.write_part(days)
         if self.dateset is not None:
+            flags=self._get_flags(values)
             self.dateset.write_part(flags)
+
+    def _get_days(self, values):
+        days = self.datestr.chunk_factory(len(values))
+        for i in range(len(values)):
+            days[i] = values[i][:10]
+        return days
+
+    def _get_flags(self, values):
+        flags = self.datetimeset.chunk_factory(len(values))
+        for i in range(len(values)):
+            flags[i] = values[i] != b''
+        return flags
 
     def flush(self):
         self.date.flush()
-        self.datestr.flush()
+        if self.create_day_field:
+            self.datestr.flush()
         if self.dateset is not None:
             self.dateset.flush()
 

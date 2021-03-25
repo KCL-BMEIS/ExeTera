@@ -144,10 +144,10 @@ class WriteableFieldArray:
         self[slice(start, end)] = value
 
     def clear(self):
-        """
-        TODO: unlink the dataset
-        """
+        nformat = self._dataset.dtype
         DataWriter._clear_dataset(self._field, self._name)
+        DataWriter.write(self._field, 'values', [], 0, nformat)
+        self._dataset = self._field[self._name]
 
     def write_part(self, part):
         DataWriter.write(self._field, self._name, part, len(part), dtype=self._dataset.dtype)
