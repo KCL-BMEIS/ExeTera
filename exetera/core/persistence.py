@@ -24,6 +24,8 @@ import pandas as pd
 
 from exetera.core import validation as val
 from exetera.core import readerwriter as rw
+from exetera.core import fields as fld
+from exetera.core import operations as ops
 from exetera.core.operations import INVALID_INDEX, DEFAULT_CHUNKSIZE
 
 # TODO: rename this persistence file to hdf5persistence
@@ -715,9 +717,7 @@ def _aggregate_impl(predicate, fkey_indices=None, fkey_index_spans=None,
 
 
 class DataStore:
-    '''
-    DataStore is replaced by Session
-    '''
+
     def __init__(self, chunksize=DEFAULT_CHUNKSIZE,
                  timestamp=str(datetime.now(timezone.utc))):
         if not isinstance(timestamp, str):
@@ -884,21 +884,16 @@ class DataStore:
 
 
     def get_spans(self, field=None, fields=None):
-        if field is None and fields is None:
-            raise ValueError("One of 'field' and 'fields' must be set")
-        if field is not None and fields is not None:
-            raise ValueError("Only one of 'field' and 'fields' may be set")
-        raw_field = None
-        raw_fields = None
-        if field is not None:
-            val._check_is_reader_or_ndarray('field', field)
-            raw_field = field[:] if isinstance(field, rw.Reader) else field
+        if fields is not None:
+            if isinstance(fields[0], fld.Field):
+                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(), fields[1].get_spans())
+            if isinstance(fields[0], np.ndarray):
+                return ops._get_spans_for_2_fields(fields[0], fields[1])
         else:
-            raw_fields = []
-            for f in fields:
-                val._check_is_reader_or_ndarray('elements of tuple/list fields', f)
-                raw_fields.append(f[:] if isinstance(f, rw.Reader) else f)
-        return _get_spans(raw_field, raw_fields)
+            if isinstance(field, fld.Field):
+                return field.get_spans()
+            if isinstance(field, np.ndarray):
+                return ops._get_spans_for_field(field)
 
 
     def index_spans(self, spans):

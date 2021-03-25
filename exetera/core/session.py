@@ -288,7 +288,7 @@ class Session:
         and returned from the function call. If the field is an IndexedStringField, the
         indices and values are returned separately.
 
-        :param index_to_apply: the index to be applied to the source field
+        :param index_to_apply: the index to be applied to the source field, must be one of Group, Field, or ndarray
         :param src: the field to be index
         :param dest: optional - a field to write the indexed data to
         :return: the indexed values
@@ -603,8 +603,7 @@ class Session:
 
         writer.write(destination_space_values)
 
-    #the field is a hdf5 group that contains attribute 'fieldtype'
-    #return a exetera Field according to the filetype
+
     def get(self, field):
         if isinstance(field, fld.Field):
             return field

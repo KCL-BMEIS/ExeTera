@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 
 import numpy as np
 import numba
-from numba import jit, njit
 import h5py
 
 from exetera.core.data_writer import DataWriter
@@ -394,7 +393,6 @@ class IndexedStringField(Field):
 
     def __len__(self):
         return len(self.data)
-
 
     def get_spans(self):
         return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
