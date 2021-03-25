@@ -8,6 +8,7 @@ import pandas as pd
 
 import h5py
 
+from exetera.core.abstract_types import Field
 from exetera.core import operations
 from exetera.core import persistence as per
 from exetera.core import fields as fld
@@ -367,7 +368,7 @@ class Session:
 
 
     def _apply_spans_no_src(self, predicate, spans, dest=None):
-        assert(dest is None or isinstance(dest, fld.Field))
+        assert(dest is None or isinstance(dest, Field))
         if dest is not None:
             dest_f = val.field_from_parameter(self, 'dest', dest)
             results = np.zeros(len(spans) - 1, dtype=dest_f.data.dtype)
@@ -380,7 +381,7 @@ class Session:
             return results
 
     def _apply_spans_src(self, predicate, spans, src, dest=None):
-        assert(dest is None or isinstance(dest, fld.Field))
+        assert(dest is None or isinstance(dest, Field))
         src_ = val.array_from_parameter(self, 'src', src)
         if len(src) != spans[-1]:
             error_msg = ("'src' (length {}) must be one element shorter than 'spans' "
@@ -609,7 +610,7 @@ class Session:
 
 
     def get(self, field):
-        if isinstance(field, fld.Field):
+        if isinstance(field, Field):
             return field
 
         if 'fieldtype' not in field.attrs.keys():
@@ -636,7 +637,7 @@ class Session:
                 raise ValueError("{} is not a well-formed field".format(field))
             f = self.get(field)
             return f.create_like(dest_group, dest_name)
-        elif isinstance(field, field.Field):
+        elif isinstance(field, Field):
             return field.create_like(dest_group, dest_name)
         else:
             raise ValueError("'field' must be either a Field or a h5py.Group, but is {}".format(type(field)))

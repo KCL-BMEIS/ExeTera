@@ -1,33 +1,23 @@
+
+from typing import Union
 from datetime import datetime, timezone
 
 import numpy as np
 import numba
 import h5py
 
+from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
 from exetera.core import utils
 from exetera.core import persistence as per
 
 
-# def test_field_iterator(data):
-#     @numba.njit
-#     def _inner():
-#         for d in data:
-#             yield d
-#     return _inner()
-#
-# iterator_type = numba.from_dtype(test_field_iterator)
-#
-# @numba.jit
-# def sum_iterator(iter_):
-#     total = np.int64(0)
-#     for i in iter_:
-#         total += i
-#     return total
-
-
-class Field:
+class HDF5Field(Field):
     def __init__(self, session, group, name=None, write_enabled=False):
+        super().__init__()
+
+        # if name is None, the group is an existing field
+        # if name is set but group[name] doesn't exist, then create the field
         if name is None:
             field = group
         else:
@@ -50,6 +40,10 @@ class Field:
     def chunksize(self):
         return self._field.attrs['chunksize']
 
+    @property
+    def data(self):
+        raise NotImplementedError()
+
     def __bool__(self):
         # this method is required to prevent __len__ being called on derived methods when fields are queried as
         #   if f:
@@ -57,9 +51,11 @@ class Field:
         #   if f is not None:
         return True
 
+    def __len__(self):
+        raise NotImplementedError()
+
     def get_spans(self):
         return per._get_spans(self._value_wrapper[:], None)
-
 
 
 class ReadOnlyFieldArray:
@@ -352,7 +348,7 @@ def timestamp_field_constructor(session, group, name, timestamp=None, chunksize=
     DataWriter.write(field, 'values', [], 0, 'float64')
 
 
-class IndexedStringField(Field):
+class IndexedStringField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
         self._session = session
@@ -394,7 +390,7 @@ class IndexedStringField(Field):
         return len(self.data)
 
 
-class FixedStringField(Field):
+class FixedStringField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
@@ -420,7 +416,7 @@ class FixedStringField(Field):
         return len(self.data)
 
 
-class NumericField(Field):
+class NumericField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
@@ -446,7 +442,7 @@ class NumericField(Field):
         return len(self.data)
 
 
-class CategoricalField(Field):
+class CategoricalField(HDF5Field):
     def __init__(self, session, group,
                  name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
@@ -484,7 +480,7 @@ class CategoricalField(Field):
         return keys
 
 
-class TimestampField(Field):
+class TimestampField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
