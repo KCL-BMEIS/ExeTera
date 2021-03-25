@@ -217,18 +217,16 @@ def _get_spans_for_field(ndarray):
     results[-1] = True
     return np.nonzero(results)[0]
 
-def _get_spans_for_2_fields_by_spans(ndarray0, ndarray1):
-    count = 0
+def _get_spans_for_2_fields_by_spans(span0, span1):
     spans = []
-    span0 = _get_spans_for_field(ndarray0)
-    span1 = _get_spans_for_field(ndarray1)
     j=0
     for i in range(len(span0)):
-        while j<len(span1) and span1[j]<span0[i] :
-            spans.append(span1[j])
-            j+=1
-        if j<len(span1) and span1[j]==span0[i]:
-            j+=1
+        if j<len(span1):
+            while span1[j] < span0[i]:
+                spans.append(span1[j])
+                j += 1
+            if span1[j] == span0[i]:
+                j += 1
         spans.append(span0[i])
     if j<len(span1): #if two ndarray are not equally sized
         spans.extend(span1[j:])
