@@ -1,3 +1,4 @@
+from typing import Tuple, Union
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -6,13 +7,21 @@ from exetera.core.utils import SECONDS_PER_DAY
 
 
 
-def get_periods(start_date, end_date, period, delta=1):
+def get_periods(
+        start_date: datetime,
+        end_date: datetime,
+        period: str,
+        delta: int = 1):
     """
-    Generate a set of periods by which data can be quantised.
+    Generate a set of periods into which timestamped data can be grouped.
+    Delta controls whether the sequence of periods is generated from an start point
+    or an end point. When delta is positive, the sequence is generated forwards in time.
+    When delta is negative, the sequence is generate backwards in time.
     :param start_date: a datetime.datetime object for the starting period
-    :param end_date:
-    :param period:
-    :param delta:
+    :param end_date: a datetime.datetime object for tne ending period, exclusive
+    :param period: a string representing the unit in which the delta is calculated
+    ('day', 'days', 'week', 'weeks')
+    :param delta: an integer representing the delta.
     :return:
     """
 
@@ -50,13 +59,37 @@ def get_periods(start_date, end_date, period, delta=1):
         while cur_date >= end_date:
             dates.append(cur_date)
             cur_date += tdelta
-        # dates.reverse()
     return dates
 
 
-def get_days(date_field, date_filter=None, start_date=None, end_date=None):
+def get_days(date_field: np.array,
+             date_filter: np.array = None,
+             start_date: np.float64 = None,
+             end_date: np.float64 = None)\
+        -> Union[Tuple[np.array, None], Tuple[np.array, np.array]]:
+    """
+    get_days converts a field of timestamps into a field of relative elapsed days.
+    The precise behaviour depends on the optional parameters but essentially, the lowest
+    valid day is taken as day 0, and all other timestamps are converted to whole numbers
+    of days elapsed since this timestamp:
+    * If start_date is set, the start_date is used as the zero-date
+    * If start_date is not set:
+      * If date_filter is not set, the lowest timestamp is used as the zero-date
+      * If date_filter is set, the lowest unfiltered timestamp is used as the zero-date
+
+    As well as returning the elapsed days, this method can also return a filter for which
+    elapsed dates are valid. This is determined as follows:
+    * If date_filter, start_date and end_date are None, None is returned
+    * otherwise:
+      * If date_filter is not provided, the filter represents all dates that are out
+        of range with respect to the start_date and end_date parameters
+      * If date_filter is provided, the filter is all dates out of range with respect to
+        the start_date and end_date parameters unioned with the date_filter that was
+        passed in
+
+    """
     if start_date is None and end_date is None and date_filter is None:
-        min_date = np.min(date_field // SECONDS_PER_DAY * SECONDS_PER_DAY)
+        min_date = date_field.min()
         days = np.floor((date_field - min_date) / SECONDS_PER_DAY).astype(np.int32)
         return days, None
     else:
@@ -68,7 +101,7 @@ def get_days(date_field, date_filter=None, start_date=None, end_date=None):
             min_date = np.min(date_field if date_filter is None else date_field[date_filter])
         if end_date is not None:
             in_range = in_range & (date_field < end_date)
-        days = np.where(in_range, np.floor((date_field - min_date) / 86400).astype(np.int32), 0)
+        days = np.floor((date_field - min_date) / SECONDS_PER_DAY).astype(np.int32)
         return days, in_range
 
 

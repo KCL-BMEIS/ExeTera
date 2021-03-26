@@ -16,7 +16,6 @@ class S:
         self.message = message
 
 
-
 class TestDateTimeHelpers(unittest.TestCase):
 
     def _do_scenario_test(self, scenarios, period, count):
@@ -145,12 +144,30 @@ class TestDateTimeHelpers(unittest.TestCase):
 
 class TestGetDays(unittest.TestCase):
 
+    def _setup_timestamps(self, start, delta, count):
+
+        return np.asarray([(start + T(seconds=delta * i)).timestamp()
+                         for i in range(count)], dtype=np.float64)
+
+    def _get_expected(self, timestamps, filter_field=None):
+        if filter_field is not None:
+            timestamps =\
+                ((timestamps - timestamps[np.argmax(filter_field)]) // 86400).astype(np.int32)
+            # timestamps = np.where(filter_field != 0, timestamps, 0)
+        else:
+            timestamps = ((timestamps - timestamps.min()) // 86400).astype(np.int32)
+        return timestamps
+
     def test_get_days(self):
-        dt = D(2020, 5, 10, 23, 55, 0, 123400)
-        print(dt, dt.timestamp())
-        tss =\
-            np.asarray([(dt + T(seconds=30000 * i)).timestamp() for i in range(11)],
-                       dtype=np.float64)
-        expected = (tss // 86400).tolist()
+        tss = self._setup_timestamps(D(2020, 5, 10, 23, 55, 0, 123500), 30000, 11)
         actual = dth.get_days(tss)
+        expected = self._get_expected(tss).tolist()
         self.assertListEqual(expected, actual[0].tolist())
+
+    def test_get_days_filtered(self):
+        tss = self._setup_timestamps(D(2020, 5, 10, 23, 55, 0, 123500), 30000, 11)
+        filter_field = np.asarray([0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0], dtype=bool)
+        actual = dth.get_days(tss, filter_field)
+        expected = self._get_expected(tss, filter_field).tolist()
+        self.assertListEqual(expected, actual[0].tolist())
+
