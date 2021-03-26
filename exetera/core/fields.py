@@ -60,6 +60,11 @@ class Field:
     def get_spans(self):
         raise NotImplementedError("Please use get_spans() on specific fields, not the field base class.")
 
+    def apply_filter(self, filter_to_apply, dstfld=None):
+        raise NotImplementedError("Please use apply_filter() on specific fields, not the field base class.")
+
+    def apply_index(self, index_to_apply, dstfld=None):
+        raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
 
 
 
@@ -398,13 +403,22 @@ class IndexedStringField(Field):
     def get_spans(self):
         return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
 
-    def apply_filter(self,filter_to_apply):
-        pass
+    def apply_filter(self,filter_to_apply,detfld=None):
+        dest_indices, dest_values = \
+            ops.apply_filter_to_index_values(filter_to_apply,
+                                             self.indices[:], self.values[:])
+        if detfld is not None:
+            detfld.indices.write(dest_indices)
+            detfld.values.write(dest_values)
+        return dest_indices, dest_values
 
-    def apply_index(self,index_to_apply):
+    def apply_index(self,index_to_apply,detfld=None):
         dest_indices, dest_values = \
             ops.apply_indices_to_index_values(index_to_apply,
                                               self.indices[:], self.values[:])
+        if detfld is not None:
+            detfld.indices.write(dest_indices)
+            detfld.values.write(dest_values)
         return dest_indices, dest_values
 
 
@@ -437,6 +451,20 @@ class FixedStringField(Field):
     def get_spans(self):
         return ops._get_spans_for_field(self.data[:])
 
+    def apply_filter(self, filter_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[filter_to_apply]
+        if dstfld is not None:
+            dstfld.data.write(result)
+        return result
+
+    def apply_index(self, index_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[index_to_apply]
+        if dstfld is not None:
+            dstfld.data.write(result)
+        return result
+
 
 class NumericField(Field):
     def __init__(self, session, group, name=None, write_enabled=False):
@@ -466,6 +494,19 @@ class NumericField(Field):
     def get_spans(self):
         return ops._get_spans_for_field(self.data[:])
 
+    def apply_filter(self,filter_to_apply,dstfld=None):
+        array = self.data[:]
+        result = array[filter_to_apply]
+        if dstfld is not None:
+            dstfld.data.write(result)
+        return result
+
+    def apply_index(self,index_to_apply,dstfld=None):
+        array = self.data[:]
+        result = array[index_to_apply]
+        if dstfld is not None:
+            dstfld.data.write(result)
+        return result
 
 class CategoricalField(Field):
     def __init__(self, session, group,
@@ -495,9 +536,6 @@ class CategoricalField(Field):
     def __len__(self):
         return len(self.data)
 
-    def get_spans(self):
-        return ops._get_spans_for_field(self.data[:])
-
     # Note: key is presented as value: str, even though the dictionary must be presented
     # as str: value
     @property
@@ -507,6 +545,22 @@ class CategoricalField(Field):
         keys = dict(zip(kv, kn))
         return keys
 
+    def get_spans(self):
+        return ops._get_spans_for_field(self.data[:])
+
+    def apply_filter(self, filter_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[filter_to_apply]
+        if dstfld is not None:
+            dstfld.data.write(result)
+        return result
+
+    def apply_index(self, index_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[index_to_apply]
+        if dstfld is not None:
+            dstfld.data.write(result)
+        return result
 
 class TimestampField(Field):
     def __init__(self, session, group, name=None, write_enabled=False):
@@ -534,6 +588,20 @@ class TimestampField(Field):
 
     def get_span(self):
         return ops._get_spans_for_field(self.data[:])
+
+    def apply_filter(self, filter_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[filter_to_apply]
+        if dstfld is not None:
+            dstfld.data.write(result)
+        return result
+
+    def apply_index(self, index_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[index_to_apply]
+        if dstfld is not None:
+            dstfld.data.write(result)
+        return result
 
 
 class IndexedStringImporter:
