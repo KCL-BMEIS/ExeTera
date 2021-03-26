@@ -470,3 +470,17 @@ class TestAggregation(unittest.TestCase):
 
         arr = np.asarray([1, 1, 1, 1, 1])
         self.assertTrue(ops.is_ordered(arr))
+
+class TestGetSpans(unittest.TestCase):
+
+    def test_get_spans_two_field(self):
+
+        spans=ops._get_spans_for_2_fields(np.array([1,2,2,3,3,3,4,4,5,6,7,8,9,10]),np.array([1,1,2,2,2,3,3,3,3,4,4,4,4,5]))
+        self.assertEqual([0,1,2,3,5,6,8,9,10,11,12,13,14],list(spans))
+
+        spans1=ops.get_spans_for_field(np.array([1, 2, 2, 3, 3, 3, 4, 4, 5, 6, 7, 8, 9, 10]))
+        spans2=ops.get_spans_for_field(np.array([1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5]))
+        spans3= ops._get_spans_for_2_fields_by_spans(spans1,spans2)
+        self.assertTrue(list(spans), list(spans3))
+
+

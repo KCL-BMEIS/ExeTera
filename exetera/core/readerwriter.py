@@ -98,8 +98,8 @@ class CategoricalReader(Reader):
         if 'fieldtype' not in field.attrs.keys():
             error = "{} must have 'fieldtype' in its attrs property"
             raise ValueError(error.format(field))
-        fieldtype = field.attrs['fieldtype']
-        if fieldtype != 'categorical':
+        fieldtype = field.attrs['fieldtype'].split(',')
+        if fieldtype[0] != 'categorical':
             error = "'fieldtype of '{} should be 'categorical' but is {}"
             raise ValueError(error.format(field, fieldtype))
         self.chunksize = field.attrs['chunksize']
