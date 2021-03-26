@@ -11,24 +11,6 @@ from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
 from exetera.core import validation as val
 
-
-# def test_field_iterator(data):
-#     @numba.njit
-#     def _inner():
-#         for d in data:
-#             yield d
-#     return _inner()
-#
-# iterator_type = numba.from_dtype(test_field_iterator)
-#
-# @numba.jit
-# def sum_iterator(iter_):
-#     total = np.int64(0)
-#     for i in iter_:
-#         total += i
-#     return total
-
-
 class HDF5Field(Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__()
@@ -630,6 +612,9 @@ class TimestampField(HDF5Field):
 
     def __len__(self):
         return len(self.data)
+
+    def get_spans(self):
+        return ops.get_spans_for_field(self.data[:])
 
     def apply_filter(self, filter_to_apply, dstfld=None):
         array = self.data[:]
