@@ -360,7 +360,7 @@ class Session:
             if isinstance(field,fld.Field):
                 return field.get_spans()
             if isinstance(field,np.ndarray):
-                return ops._get_spans_for_field(field)
+                return ops.get_spans_for_field(field)
 
 
     def _apply_spans_no_src(self, predicate, spans, dest=None):

@@ -893,7 +893,7 @@ class DataStore:
             if isinstance(field, fld.Field):
                 return field.get_spans()
             if isinstance(field, np.ndarray):
-                return ops._get_spans_for_field(field)
+                return ops.get_spans_for_field(field)
 
 
     def index_spans(self, spans):

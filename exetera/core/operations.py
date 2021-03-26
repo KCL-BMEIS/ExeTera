@@ -206,7 +206,7 @@ def apply_indices_to_index_values(indices_to_apply, indices, values):
     return dest_indices, dest_values
 
 
-def _get_spans_for_field(ndarray):
+def get_spans_for_field(ndarray):
     results = np.zeros(len(ndarray) + 1, dtype=np.bool)
     if np.issubdtype(ndarray.dtype, np.number):
         fn = np.not_equal

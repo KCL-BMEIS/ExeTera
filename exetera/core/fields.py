@@ -402,10 +402,13 @@ class IndexedStringField(HDF5Field):
     def get_spans(self):
         return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
 
-    def apply_filter(self,filter_to_apply):
-        pass
+    def apply_filter(self, filter_to_apply):
+        dest_indices, dest_values = \
+            ops.apply_filter_to_index_values(filter_to_apply,
+                                             self.indices[:], self.values[:])
+        return dest_indices, dest_values
 
-    def apply_index(self,index_to_apply):
+    def apply_index(self, index_to_apply):
         dest_indices, dest_values = \
             ops.apply_indices_to_index_values(index_to_apply,
                                               self.indices[:], self.values[:])
@@ -438,7 +441,7 @@ class FixedStringField(HDF5Field):
         return len(self.data)
 
     def get_spans(self):
-        return ops._get_spans_for_field(self.data[:])
+        return ops.get_spans_for_field(self.data[:])
 
 
 class NumericField(HDF5Field):
@@ -467,7 +470,7 @@ class NumericField(HDF5Field):
         return len(self.data)
 
     def get_spans(self):
-        return ops._get_spans_for_field(self.data[:])
+        return ops.get_spans_for_field(self.data[:])
 
 
 class CategoricalField(HDF5Field):
@@ -499,7 +502,7 @@ class CategoricalField(HDF5Field):
         return len(self.data)
 
     def get_spans(self):
-        return ops._get_spans_for_field(self.data[:])
+        return ops.get_spans_for_field(self.data[:])
 
     # Note: key is presented as value: str, even though the dictionary must be presented
     # as str: value
@@ -536,7 +539,7 @@ class TimestampField(HDF5Field):
         return len(self.data)
 
     def get_spans(self):
-        return ops._get_spans_for_field(self.data[:])
+        return ops.get_spans_for_field(self.data[:])
 
 
 class IndexedStringImporter:
