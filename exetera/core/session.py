@@ -298,17 +298,17 @@ class Session:
         if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
         if isinstance(src, fld.IndexedStringField):
-            dest_indices, dest_values = src.apply_index(index_to_apply_)
+            src_ = val.field_from_parameter(self, 'reader', src)
+            dest_indices, dest_values = \
+                ops.apply_indices_to_index_values(index_to_apply_,
+                                                  src_.indices[:], src_.values[:])
             if writer_ is not None:
                 writer_.indices.write(dest_indices)
                 writer_.values.write(dest_values)
             return dest_indices, dest_values
-
-        elif isinstance(src,fld.Field):
-            src.app
-        elif isinstance(src,np.ndarray):
-            #reader_ = val.array_from_parameter(self, 'reader', src)
-            result = src[index_to_apply]
+        else:
+            reader_ = val.array_from_parameter(self, 'reader', src)
+            result = reader_[index_to_apply]
             if writer_:
                 writer_.data.write(result)
             return result
