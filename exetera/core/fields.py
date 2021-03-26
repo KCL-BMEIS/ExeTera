@@ -144,7 +144,7 @@ class WriteableFieldArray:
     def clear(self):
         nformat = self._dataset.dtype
         DataWriter._clear_dataset(self._field, self._name)
-        DataWriter.write(self._field, 'values', [], 0, nformat)
+        DataWriter.write(self._field, self._name, [], 0, nformat)
         self._dataset = self._field[self._name]
 
     def write_part(self, part):
@@ -423,23 +423,33 @@ class IndexedStringField(HDF5Field):
     def get_spans(self):
         return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
 
-    def apply_filter(self,filter_to_apply,detfld=None):
+    def apply_filter(self,filter_to_apply,dstfld=None):
+        """
+        Apply a filter (array of boolean) to the field, return itself if destination field (detfld) is not set.
+        """
         dest_indices, dest_values = \
             ops.apply_filter_to_index_values(filter_to_apply,
                                              self.indices[:], self.values[:])
-        if detfld is not None:
-            detfld.indices.write(dest_indices)
-            detfld.values.write(dest_values)
-        return dest_indices, dest_values
+        newfld = dstfld if dstfld is not None else self
+        newfld.indices.clear()
+        newfld.indices.write(dest_indices)
+        newfld.values.clear()
+        newfld.values.write(dest_values)
+        return newfld
 
-    def apply_index(self,index_to_apply,detfld=None):
+    def apply_index(self,index_to_apply,dstfld=None):
+        """
+        Reindex the current field, return itself if destination field is not set.
+        """
         dest_indices, dest_values = \
             ops.apply_indices_to_index_values(index_to_apply,
                                               self.indices[:], self.values[:])
-        if detfld is not None:
-            detfld.indices.write(dest_indices)
-            detfld.values.write(dest_values)
-        return dest_indices, dest_values
+        newfld = dstfld if dstfld is not None else self
+        newfld.indices.clear()
+        newfld.indices.write(dest_indices)
+        newfld.values.clear()
+        newfld.values.write(dest_values)
+        return newfld
 
 
 class FixedStringField(HDF5Field):
@@ -473,16 +483,20 @@ class FixedStringField(HDF5Field):
     def apply_filter(self, filter_to_apply, dstfld=None):
         array = self.data[:]
         result = array[filter_to_apply]
-        if dstfld is not None:
-            dstfld.data.write(result)
-        return result
+        newfld = dstfld if dstfld is not None else self
+        if newfld._write_enabled == False:
+            newfld = newfld.writeable()
+        newfld.data[:] = result
+        return newfld
 
     def apply_index(self, index_to_apply, dstfld=None):
         array = self.data[:]
         result = array[index_to_apply]
-        if dstfld is not None:
-            dstfld.data.write(result)
-        return result
+        newfld = dstfld if dstfld is not None else self
+        if newfld._write_enabled == False:
+            newfld = newfld.writeable()
+        newfld.data[:] = result
+        return newfld
 
 
 class NumericField(HDF5Field):
@@ -513,19 +527,23 @@ class NumericField(HDF5Field):
     def get_spans(self):
         return ops.get_spans_for_field(self.data[:])
 
-    def apply_filter(self,filter_to_apply,dstfld=None):
+    def apply_filter(self, filter_to_apply, dstfld=None):
         array = self.data[:]
         result = array[filter_to_apply]
-        if dstfld is not None:
-            dstfld.data.write(result)
-        return result
+        newfld = dstfld if dstfld is not None else self
+        if newfld._write_enabled == False:
+            newfld = newfld.writeable()
+        newfld.data[:] = result
+        return newfld
 
-    def apply_index(self,index_to_apply,dstfld=None):
+    def apply_index(self, index_to_apply, dstfld=None):
         array = self.data[:]
         result = array[index_to_apply]
-        if dstfld is not None:
-            dstfld.data.write(result)
-        return result
+        newfld = dstfld if dstfld is not None else self
+        if newfld._write_enabled == False:
+            newfld = newfld.writeable()
+        newfld.data[:] = result
+        return newfld
 
 
 class CategoricalField(HDF5Field):
@@ -574,16 +592,20 @@ class CategoricalField(HDF5Field):
     def apply_filter(self, filter_to_apply, dstfld=None):
         array = self.data[:]
         result = array[filter_to_apply]
-        if dstfld is not None:
-            dstfld.data.write(result)
-        return result
+        newfld = dstfld if dstfld is not None else self
+        if newfld._write_enabled == False:
+            newfld = newfld.writeable()
+        newfld.data[:] = result
+        return newfld
 
     def apply_index(self, index_to_apply, dstfld=None):
         array = self.data[:]
         result = array[index_to_apply]
-        if dstfld is not None:
-            dstfld.data.write(result)
-        return result
+        newfld = dstfld if dstfld is not None else self
+        if newfld._write_enabled == False:
+            newfld = newfld.writeable()
+        newfld.data[:] = result
+        return newfld
 
 class TimestampField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
@@ -612,16 +634,20 @@ class TimestampField(HDF5Field):
     def apply_filter(self, filter_to_apply, dstfld=None):
         array = self.data[:]
         result = array[filter_to_apply]
-        if dstfld is not None:
-            dstfld.data.write(result)
-        return result
+        newfld = dstfld if dstfld is not None else self
+        if newfld._write_enabled == False:
+            newfld = newfld.writeable()
+        newfld.data[:] = result
+        return newfld
 
     def apply_index(self, index_to_apply, dstfld=None):
         array = self.data[:]
         result = array[index_to_apply]
-        if dstfld is not None:
-            dstfld.data.write(result)
-        return result
+        newfld = dstfld if dstfld is not None else self
+        if newfld._write_enabled == False:
+            newfld = newfld.writeable()
+        newfld.data[:] = result
+        return newfld
 
 
 
