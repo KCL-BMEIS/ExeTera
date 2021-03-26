@@ -617,8 +617,11 @@ class Session:
 
         fkey_index_spans = self.get_spans(field=index)
 
-        # execute the predicate (note that not every predicate requires a reader)
-        results = predicate(fkey_index_spans, target, dest_field)
+        # execute the predicate (note that not every predicate requires a target)
+        if target is None:
+            results = predicate(fkey_index_spans, dest_field)
+        else:
+            results = predicate(fkey_index_spans, target, dest_field)
 
         return dest if dest is not None else results
 
