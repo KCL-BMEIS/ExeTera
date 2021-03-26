@@ -443,7 +443,7 @@ class FixedStringField(HDF5Field):
         if len(self) < 2:
             return True
         data = self.data[:]
-        return np.any(np.char.compare_chararrays(data[:-1], data[1:], ">"))
+        return np.all(np.char.compare_chararrays(data[:-1], data[1:], "<=", False))
 
     def __len__(self):
         return len(self.data)
@@ -478,7 +478,7 @@ class NumericField(HDF5Field):
         if len(self) < 2:
             return True
         data = self.data[:]
-        return data[:-1] > data[1:]
+        return np.all(data[:-1] <= data[1:])
 
     def __len__(self):
         return len(self.data)
@@ -516,7 +516,7 @@ class CategoricalField(HDF5Field):
         if len(self) < 2:
             return True
         data = self.data[:]
-        return data[:-1] > data[1:]
+        return np.all(data[:-1] <= data[1:])
 
     def __len__(self):
         return len(self.data)
@@ -559,7 +559,7 @@ class TimestampField(HDF5Field):
         if len(self) < 2:
             return True
         data = self.data[:]
-        return data[:-1] > data[1:]
+        return np.all(data[:-1] <= data[1:])
 
     def __len__(self):
         return len(self.data)
