@@ -412,12 +412,20 @@ class IndexedStringField(HDF5Field):
         dest_indices, dest_values = \
             ops.apply_filter_to_index_values(filter_to_apply,
                                              self.indices[:], self.values[:])
-        newfld = dstfld if dstfld is not None else self
-        newfld.indices.clear()
-        newfld.indices.write(dest_indices)
-        newfld.values.clear()
-        newfld.values.write(dest_values)
-        return newfld
+
+        if dstfld is not None:
+            if not dstfld._write_enabled:
+                dstfld=dstfld.writeable()
+            dstfld.indices.write(dest_indices)
+            dstfld.values.write(dest_values)
+        else:
+            if not self._write_enabled:
+                dstfld=self.writeable()
+            else:
+                dstfld=self
+            dstfld.indices[:] = dest_indices
+            dstfld.values[:] = dest_values
+        return dstfld
 
     def apply_index(self,index_to_apply,dstfld=None):
         """
@@ -426,12 +434,19 @@ class IndexedStringField(HDF5Field):
         dest_indices, dest_values = \
             ops.apply_indices_to_index_values(index_to_apply,
                                               self.indices[:], self.values[:])
-        newfld = dstfld if dstfld is not None else self
-        newfld.indices.clear()
-        newfld.indices.write(dest_indices)
-        newfld.values.clear()
-        newfld.values.write(dest_values)
-        return newfld
+        if dstfld is not None:
+            if not dstfld._write_enabled:
+                dstfld = dstfld.writeable()
+            dstfld.indices.write(dest_indices)
+            dstfld.values.write(dest_values)
+        else:
+            if not self._write_enabled:
+                dstfld = self.writeable()
+            else:
+                dstfld = self
+            dstfld.indices[:] = dest_indices
+            dstfld.values[:] = dest_values
+        return dstfld
 
 
 class FixedStringField(HDF5Field):
@@ -465,20 +480,32 @@ class FixedStringField(HDF5Field):
     def apply_filter(self, filter_to_apply, dstfld=None):
         array = self.data[:]
         result = array[filter_to_apply]
-        newfld = dstfld if dstfld is not None else self
-        if newfld._write_enabled == False:
-            newfld = newfld.writeable()
-        newfld.data[:] = result
-        return newfld
+        if dstfld is not None:
+            if not dstfld._write_enabled:
+                dstfld=dstfld.writeable()
+            dstfld.data.write(result)
+        else:
+            if not self._write_enabled:
+                dstfld=self.writeable()
+            else:
+                dstfld=self
+            dstfld.data[:] = result
+        return dstfld
 
     def apply_index(self, index_to_apply, dstfld=None):
         array = self.data[:]
         result = array[index_to_apply]
-        newfld = dstfld if dstfld is not None else self
-        if newfld._write_enabled == False:
-            newfld = newfld.writeable()
-        newfld.data[:] = result
-        return newfld
+        if dstfld is not None:
+            if not dstfld._write_enabled:
+                dstfld = dstfld.writeable()
+            dstfld.data.write(result)
+        else:
+            if not self._write_enabled:
+                dstfld = self.writeable()
+            else:
+                dstfld = self
+            dstfld.data[:] = result
+        return dstfld
 
 
 class NumericField(HDF5Field):
@@ -512,21 +539,32 @@ class NumericField(HDF5Field):
     def apply_filter(self, filter_to_apply, dstfld=None):
         array = self.data[:]
         result = array[filter_to_apply]
-        newfld = dstfld if dstfld is not None else self
-        if newfld._write_enabled == False:
-            newfld = newfld.writeable()
-        newfld.data[:] = result
-        return newfld
+        if dstfld is not None:
+            if not dstfld._write_enabled:
+                dstfld = dstfld.writeable()
+            dstfld.data.write(result)
+        else:
+            if not self._write_enabled:
+                dstfld = self.writeable()
+            else:
+                dstfld = self
+            dstfld.data[:] = result
+        return dstfld
 
     def apply_index(self, index_to_apply, dstfld=None):
         array = self.data[:]
         result = array[index_to_apply]
-        newfld = dstfld if dstfld is not None else self
-        if newfld._write_enabled == False:
-            newfld = newfld.writeable()
-        newfld.data[:] = result
-        return newfld
-
+        if dstfld is not None:
+            if not dstfld._write_enabled:
+                dstfld = dstfld.writeable()
+            dstfld.data.write(result)
+        else:
+            if not self._write_enabled:
+                dstfld = self.writeable()
+            else:
+                dstfld = self
+            dstfld.data[:] = result
+        return dstfld
 
 class CategoricalField(HDF5Field):
     def __init__(self, session, group,
@@ -574,20 +612,32 @@ class CategoricalField(HDF5Field):
     def apply_filter(self, filter_to_apply, dstfld=None):
         array = self.data[:]
         result = array[filter_to_apply]
-        newfld = dstfld if dstfld is not None else self
-        if newfld._write_enabled == False:
-            newfld = newfld.writeable()
-        newfld.data[:] = result
-        return newfld
+        if dstfld is not None:
+            if not dstfld._write_enabled:
+                dstfld = dstfld.writeable()
+            dstfld.data.write(result)
+        else:
+            if not self._write_enabled:
+                dstfld = self.writeable()
+            else:
+                dstfld = self
+            dstfld.data[:] = result
+        return dstfld
 
     def apply_index(self, index_to_apply, dstfld=None):
         array = self.data[:]
         result = array[index_to_apply]
-        newfld = dstfld if dstfld is not None else self
-        if newfld._write_enabled == False:
-            newfld = newfld.writeable()
-        newfld.data[:] = result
-        return newfld
+        if dstfld is not None:
+            if not dstfld._write_enabled:
+                dstfld = dstfld.writeable()
+            dstfld.data.write(result)
+        else:
+            if not self._write_enabled:
+                dstfld = self.writeable()
+            else:
+                dstfld = self
+            dstfld.data[:] = result
+        return dstfld
 
 class TimestampField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
@@ -619,20 +669,32 @@ class TimestampField(HDF5Field):
     def apply_filter(self, filter_to_apply, dstfld=None):
         array = self.data[:]
         result = array[filter_to_apply]
-        newfld = dstfld if dstfld is not None else self
-        if newfld._write_enabled == False:
-            newfld = newfld.writeable()
-        newfld.data[:] = result
-        return newfld
+        if dstfld is not None:
+            if not dstfld._write_enabled:
+                dstfld = dstfld.writeable()
+            dstfld.data.write(result)
+        else:
+            if not self._write_enabled:
+                dstfld = self.writeable()
+            else:
+                dstfld = self
+            dstfld.data[:] = result
+        return dstfld
 
     def apply_index(self, index_to_apply, dstfld=None):
         array = self.data[:]
         result = array[index_to_apply]
-        newfld = dstfld if dstfld is not None else self
-        if newfld._write_enabled == False:
-            newfld = newfld.writeable()
-        newfld.data[:] = result
-        return newfld
+        if dstfld is not None:
+            if not dstfld._write_enabled:
+                dstfld = dstfld.writeable()
+            dstfld.data.write(result)
+        else:
+            if not self._write_enabled:
+                dstfld = self.writeable()
+            else:
+                dstfld = self
+            dstfld.data[:] = result
+        return dstfld
 
 
 
