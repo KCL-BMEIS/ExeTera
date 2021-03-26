@@ -1,3 +1,4 @@
+from typing import Callable, Tuple, Union
 import os
 import uuid
 from datetime import datetime, timezone
@@ -17,47 +18,20 @@ from exetera.core import operations as ops
 from exetera.core import utils
 
 
-# TODO:
-"""
- * joins: get mapping and map multiple fields using mapping
-   * can use pandas for initial functionality and then improve
-   * mark fields has having sorted order if they are sorted
-     * would have to check field
-   * for sorted, can use fast
-   * aggregation
-     * aggregate and join / join and aggregate
-       * if they resolve to being the same thing, best to aggregate first
- * everything can accept groups
- * groups are registered and given names
- * indices can be built from merging pk and fks and mapping to values
- * everything can accept tuples instead of groups and operate on all of them
- * advanced sorting / filtering
-   * FilteredReader / FilteredWriter for applying filters without copying data
-   * SortedReader / SortedWriter for applying sorts without copying data
-   * Filters corresponding to the presence or absence of elements of a maybe field
-     * should be marked indicating that they are related to that field. This allows
-       a user to query all the filters generated for different fields, whether the
-       values are valid or whether they are a standard filtering for different
-       categories (age sub-ranges, for example)
- * reader/writers
-
-   * soft sorting / filtering
-     rw = s.get(name)
-     rw.add_transform(filter)
-     rw.add_transform(sort)
-     rw.writeable[:] = data # can this be done?
-     rw.clean()
-     rw.write(data)
-
-    * refactor: encapsulate dataset handling into session
-      * provide group objects with api
-      * provide field objects with additional api
-"""
-
 class Session:
 
-    def __init__(self, chunksize=ops.DEFAULT_CHUNKSIZE,
-                 timestamp=str(datetime.now(timezone.utc))):
+    def __init__(self,
+                 chunksize: int = ops.DEFAULT_CHUNKSIZE,
+                 timestamp: str = str(datetime.now(timezone.utc))):
+        """
+        Create a new Session object.
+        :param chunksize: Change the default chunksize that fields created with this dataset use.
+        Note this is a hint parameter and future versions of Session may choose to ignore it if it
+        is no longer required. In general, it should only be changed for testing.
+        :param timestamp: Set the official timestamp for the Session's creation rather than taking
+        the current date/time.
+        :return A newly created Session object
+        """
         if not isinstance(timestamp, str):
             error_str = "'timestamp' must be a string but is of type {}"
             raise ValueError(error_str.format(type(timestamp)))
@@ -67,18 +41,25 @@ class Session:
 
 
     def __enter__(self):
+        """Context manager enter."""
         return self
 
 
     def __exit__(self, etype, evalue, etraceback):
+        """Context manager exit closes any open datasets."""
         self.close()
 
 
-    def open_dataset(self, dataset_path, mode, name):
+    def open_dataset(self,
+                     dataset_path: str,
+                     mode: str,
+                     name: str):
         """
         Open a dataset with the given access mode
         :param dataset_path: the path to the dataset
         :param mode: the mode in which the dataset should be opened. This is one of "r", "r+" or "w".
+        :param name: the name that is associated with this dataset. This can be used to retrieve the dataset when
+        calling :py:meth:`~session.Session.get_dataset`.
         :return: The top-level dataset object
         """
         h5py_modes = {"r": "r", "r+": "r+", "w": "w"}
@@ -89,7 +70,8 @@ class Session:
         return self.datasets[name]
 
 
-    def close_dataset(self, name):
+    def close_dataset(self,
+                      name: str):
         """
         Close the dataset with the given name. If there is no dataset with that name, do nothing.
         :param name: The name of the dataset to be closed
@@ -101,10 +83,28 @@ class Session:
 
 
     def list_datasets(self):
+        """
+        List the open datasets for this Session object. This is returned as a tuple of strings
+        rather than the datasets themselves. The individual datasets can be fetched using
+        :py:meth:`~session.Session.get_dataset`.
+        ```
+        names = s.list_datasets()
+        datasets = [s.open_dataset(n) for n in names]
+        :return: A tuple containing the names of the currently open datasets for this Session
+        object
+        """
         return tuple(n for n in self.datasets.keys())
 
 
-    def get_dataset(self, name):
+    def get_dataset(self,
+                    name: str):
+        """
+        Get the dataset with the given name. If there is no dataset with that name, raise a KeyError
+        indicating that the dataset with that name is not present.
+        :param name: the name of the dataset to be fetched. This is the name that was given to it
+        when it was opened through :py:meth:`~session.Session.open_dataset`.
+        :return: The dataset with that name.
+        """
         return self.datasets[name]
 
 
@@ -118,9 +118,10 @@ class Session:
         self.datasets = dict()
 
 
-    def get_shared_index(self, keys):
+    def get_shared_index(self,
+                         keys: Tuple[np.array]):
         """
-        Create a shared index based on a tuple numpy arrays containing keys.
+        Create a shared index based on a tuple of numpy arrays containing keys.
         This function generates the sorted union of a tuple of key fields and
         then maps the individual arrays to their corresponding indices in the
         sorted union.
@@ -155,12 +156,13 @@ class Session:
         return tuple(np.searchsorted(concatted, k) for k in raw_keys)
 
 
-    def set_timestamp(self, timestamp=str(datetime.now(timezone.utc))):
+    def set_timestamp(self,
+                      timestamp: str = str(datetime.now(timezone.utc))):
         """
-        Set the default timestamp to be used when creating fields without an explicit
-        timestamp specified.
+        Set the default timestamp to be used when creating fields without specifying
+        an explicit timestamp.
 
-        :param timestamp a string representing a valid Datetime
+        :param timestamp: a string representing a valid Datetime
         :return: None
         """
         if not isinstance(timestamp, str):
@@ -170,7 +172,10 @@ class Session:
 
 
 
-    def sort_on(self, src_group, dest_group, keys,
+    def sort_on(self,
+                src_group: h5py.Group,
+                dest_group: h5py.Group,
+                keys: Union[tuple, list],
                 timestamp=datetime.now(timezone.utc), write_mode='write', verbose=True):
         """
         Sort a group (src_group) of fields by the specified set of keys, and write the
@@ -314,8 +319,8 @@ class Session:
             return result
 
 
-    # TODO: write distinct with new readers / writers rather than deleting this
     def distinct(self, field=None, fields=None, filter=None):
+
         if field is None and fields is None:
             return ValueError("One of 'field' and 'fields' must be set")
         if field is not None and fields is not None:
@@ -334,7 +339,9 @@ class Session:
         return results
 
 
-    def get_spans(self, field=None, fields=None):
+    def get_spans(self,
+                  field: Union[fld.Field, np.array] = None,
+                  fields: Union[Tuple[fld.Field], Tuple[np.array]] = None):
         """
         Calculate a set of spans that indicate contiguous equal values.
         The entries in the result array correspond to the inclusive start and
@@ -349,13 +356,16 @@ class Session:
         Example:
             field: [1, 2, 2, 1, 1, 1, 3, 4, 4, 4, 2, 2, 2, 2, 2]
             result: [0, 1, 3, 6, 7, 10, 15]
+
+        :param field: A Field or numpy array to be evaluated for spans
+        :param fields: A tuple of Fields or tuple of numpy arrays to be evaluated for spans
+        :return: The resulting set of spans as a numpy array
         """
         if field is None and fields is None:
             raise ValueError("One of 'field' and 'fields' must be set")
         if field is not None and fields is not None:
             raise ValueError("Only one of 'field' and 'fields' may be set")
         raw_field = None
-        raw_fields = None
         if field is not None:
             raw_field = val.array_from_parameter(self, 'field', field)
 
@@ -366,7 +376,18 @@ class Session:
         return per._get_spans(raw_field, raw_fields)
 
 
-    def _apply_spans_no_src(self, predicate, spans, dest=None):
+    def _apply_spans_no_src(self,
+                            predicate: Callable[[np.array, np.array], None],
+                            spans: np.array,
+                            dest: fld.Field = None) -> np.array:
+        """
+        An implementation method for span applications that are carried out on the spans themselves rather than a target
+        field.
+        :params predicate: a predicate function that carries out the operation on the spans and produces the result
+        :params spans: the numpy array of spans to be applied
+        :params dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
         assert(dest is None or isinstance(dest, fld.Field))
         if dest is not None:
             dest_f = val.field_from_parameter(self, 'dest', dest)
@@ -379,54 +400,156 @@ class Session:
             predicate(spans, results)
             return results
 
-    def _apply_spans_src(self, predicate, spans, src, dest=None):
+    def _apply_spans_src(self,
+                         predicate: Callable[[np.array, np.array, np.array], None],
+                         spans: np.array,
+                         target: np.array,
+                         dest: fld.Field = None) -> np.array:
+        """
+        An implementation method for span applications that are carried out on a target field.
+        :params predicate: a predicate function that carries out the operation on the spans and a target field, and
+        produces the result
+        :params spans: the numpy array of spans to be applied
+        :params target: the field to which the spans and predicate are applied
+        :params dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
         assert(dest is None or isinstance(dest, fld.Field))
-        src_ = val.array_from_parameter(self, 'src', src)
-        if len(src) != spans[-1]:
-            error_msg = ("'src' (length {}) must be one element shorter than 'spans' "
+        target_ = val.array_from_parameter(self, 'target', target)
+        if len(target) != spans[-1]:
+            error_msg = ("'target' (length {}) must be one element shorter than 'spans' "
                          "(length {})")
-            raise ValueError(error_msg.format(len(src_), len(spans)))
+            raise ValueError(error_msg.format(len(target_), len(spans)))
 
         if dest is not None:
             dest_f = val.field_from_parameter(self, 'dest', dest)
             results = np.zeros(len(spans) - 1, dtype=dest_f.data.dtype)
-            predicate(spans, src_, results)
+            predicate(spans, target_, results)
             dest_f.data.write(results)
             return results
         else:
-            results = np.zeros(len(spans) - 1, dtype=src_.dtype)
-            predicate(spans, src_, results)
+            results = np.zeros(len(spans) - 1, dtype=target_.dtype)
+            predicate(spans, target_, results)
             return results
 
-    def apply_spans_index_of_min(self, spans, src, dest=None):
-        return self._apply_spans_src(ops.apply_spans_index_of_min, spans, src, dest)
+    def apply_spans_index_of_min(self,
+                                 spans: np.array,
+                                 target: np.array,
+                                 dest: fld.Field = None):
+        """
+        Finds the index of the minimum value within each span on a target field
+        :params spans: the numpy array of spans to be applied
+        :params target: the field to which the spans are applied
+        :params dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self._apply_spans_src(ops.apply_spans_index_of_min, spans, target, dest)
 
-    def apply_spans_index_of_max(self, spans, src, dest=None):
-        return self._apply_spans_src(ops.apply_spans_index_of_max, spans, src, dest)
+    def apply_spans_index_of_max(self,
+                                 spans: np.array,
+                                 target: np.array,
+                                 dest: fld.Field = None):
+        """
+        Finds the index of the maximum value within each span on a target field
+        :params spans: the numpy array of spans to be applied
+        :params target: the field to which the spans are applied
+        :params dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self._apply_spans_src(ops.apply_spans_index_of_max, spans, target, dest)
 
-    def apply_spans_index_of_first(self, spans, dest=None):
+    def apply_spans_index_of_first(self,
+                                   spans: np.array,
+                                   dest: fld.Field = None):
+        """
+        Finds the index of the first entry within each span
+        :params spans: the numpy array of spans to be applied
+        :params dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
         return self._apply_spans_no_src(ops.apply_spans_index_of_first, spans, dest)
 
-    def apply_spans_index_of_last(self, spans, dest=None):
+    def apply_spans_index_of_last(self,
+                                  spans: np.array,
+                                  dest: fld.Field = None):
+        """
+        Finds the index of the last entry within each span
+        :params spans: the numpy array of spans to be applied
+        :params dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
         return self._apply_spans_no_src(ops.apply_spans_index_of_last, spans, dest)
 
-    def apply_spans_count(self, spans, src=None, dest=None):
+    def apply_spans_count(self,
+                          spans: np.array,
+                          dest: fld.Field = None):
+        """
+        Finds the number of entries within each span
+        :params spans: the numpy array of spans to be applied
+        :params dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
         return self._apply_spans_no_src(ops.apply_spans_count, spans, dest)
 
-    def apply_spans_min(self, spans, src, dest=None):
-        return self._apply_spans_src(ops.apply_spans_min, spans, src, dest)
+    def apply_spans_min(self,
+                        spans: np.array,
+                        target: np.array,
+                        dest: fld.Field = None):
+        """
+        Finds the minimum value within span on a target field
+        :params spans: the numpy array of spans to be applied
+        :params target: the field to which the spans are applied
+        :params dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self._apply_spans_src(ops.apply_spans_min, spans, target, dest)
 
-    def apply_spans_max(self, spans, src, dest=None):
-        return self._apply_spans_src(ops.apply_spans_max, spans, src, dest)
+    def apply_spans_max(self,
+                        spans: np.array,
+                        target: np.array,
+                        dest: fld.Field = None):
+        """
+        Finds the maximum value within each span on a target field
+        :params spans: the numpy array of spans to be applied
+        :params target: the field to which the spans are applied
+        :params dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self._apply_spans_src(ops.apply_spans_max, spans, target, dest)
 
-    def apply_spans_first(self, spans, src, dest=None):
-        return self._apply_spans_src(ops.apply_spans_first, spans, src, dest)
+    def apply_spans_first(self,
+                          spans: np.array,
+                          target: np.array,
+                          dest: fld.Field = None):
+        """
+        Finds the first entry within each span on a target field
+        :params spans: the numpy array of spans to be applied
+        :params target: the field to which the spans are applied
+        :params dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self._apply_spans_src(ops.apply_spans_first, spans, target, dest)
 
-    def apply_spans_last(self, spans, src, dest=None):
-        return self._apply_spans_src(ops.apply_spans_last, spans, src, dest)
+    def apply_spans_last(self,
+                         spans: np.array,
+                         target: np.array,
+                         dest: fld.Field = None):
+        """
+        Finds the last entry within each span on a target field
+        :params spans: the numpy array of spans to be applied
+        :params target: the field to which the spans are applied
+        :params dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self._apply_spans_src(ops.apply_spans_last, spans, target, dest)
 
-    def apply_spans_concat(self, spans, src, dest,
-                           src_chunksize=None, dest_chunksize=None, chunksize_mult=None):
+    def apply_spans_concat(self,
+                           spans,
+                           src,
+                           dest,
+                           src_chunksize=None,
+                           dest_chunksize=None,
+                           chunksize_mult=None):
         if not isinstance(src, fld.IndexedStringField):
             raise ValueError(f"'src' must be one of 'IndexedStringField' but is {type(src)}")
         if not isinstance(dest, fld.IndexedStringField):
@@ -473,7 +596,19 @@ class Session:
         # dest.complete()
 
 
-    def _aggregate_impl(self, predicate, index, src=None, dest=None):
+    def _aggregate_impl(self, predicate, index, target=None, dest=None):
+        """
+        An implementation method for aggregation of fields via various predicates. This method takes a predicate that
+        defines an operation to be carried out, an 'index' array or field that determines the groupings over which the
+        predicate applies, and a 'target' array or field that the operation is carried out upon, should a target be
+        needed. If a 'dest' Field is supplied, the results will be written to it.
+        :params predicate: a predicate function that carries out the operation on the spans and produces the result
+        :params index: A numpy array or field representing the sub-ranges that can be aggregated
+        :params target: A numpy array upon which the operation is required. This only needs to be set for certain
+        operations.
+        :params dest: If set, the Field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
         index_ = val.raw_array_from_parameter(self, "index", index)
 
         dest_field = None
@@ -483,28 +618,91 @@ class Session:
         fkey_index_spans = self.get_spans(field=index)
 
         # execute the predicate (note that not every predicate requires a reader)
-        results = predicate(fkey_index_spans, src, dest_field)
+        results = predicate(fkey_index_spans, target, dest_field)
 
         return dest if dest is not None else results
 
 
-    def aggregate_count(self, index=None, src=None, dest=None):
-        return self._aggregate_impl(self.apply_spans_count, index, src, dest)
+    def aggregate_count(self, index, dest=None):
+        """
+         Finds the number of entries within each sub-group of index.
+         Example:
+         ```
+         Index:  a a a b b x a c c d d d
+         Result: 3     2   1 1 2   3
+         ```
+         :params index: A numpy array or Field containing the index that defines the ranges over which count is applied.
+         :params dest: If set, a Field to which the resulting counts are written
+         :returns: A numpy array containing the resulting values
+         """
+        return self._aggregate_impl(self.apply_spans_count, index, None, dest)
 
 
-    def aggregate_first(self, index, src=None, dest=None):
-        return self.aggregate_custom(self.apply_spans_first, index, src, dest)
+    def aggregate_first(self, index, target, dest=None):
+        """
+        Finds the first entries within each sub-group of index.
+        Example:
+        ```
+        Index:  a a a b b x a c c d d d
+        Target: 1 2 3 4 5 6 7 8 9 0 1 2
+        Result: 1     4   6 7 8   0
+        ```
+        :params index: A numpy array or Field containing the index that defines the ranges over which count is applied.
+        :params target: A numpy array to which the index and predicate are applied
+        :params dest: If set, a Field to which the resulting counts are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self.aggregate_custom(self.apply_spans_first, index, target, dest)
 
 
-    def aggregate_last(self, index, src=None, dest=None):
-        return self.aggregate_custom(self.apply_spans_last, index, src, dest)
+    def aggregate_last(self, index, target=None, dest=None):
+        """
+        Finds the first entries within each sub-group of index.
+        Example:
+        ```
+        Index:  a a a b b x a c c d d d
+        Target: 1 2 3 4 5 6 7 8 9 0 1 2
+        Result: 3     5   6 7 9   2
+        ```
+        :params index: A numpy array or Field containing the index that defines the ranges over which count is applied.
+        :params target: A numpy array to which the index and predicate are applied
+        :params dest: If set, a Field to which the resulting counts are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self.aggregate_custom(self.apply_spans_last, index, target, dest)
 
 
     def aggregate_min(self, index, src=None, dest=None):
+        """
+        Finds the minimum value within each sub-group of index.
+        Example:
+        ```
+        Index:  a a a b b x a c c d d d
+        Target: 1 2 3 5 4 6 7 8 9 2 1 0
+        Result: 1     4   6 7 8   0
+        ```
+        :params index: A numpy array or Field containing the index that defines the ranges over which min is applied.
+        :params target: A numpy array to which the index and predicate are applied
+        :params dest: If set, a Field to which the resulting counts are written
+        :returns: A numpy array containing the resulting values
+        """
         return self.aggregate_custom(self.apply_spans_min, index, src, dest)
 
 
     def aggregate_max(self, index, src=None, dest=None):
+        """
+        Finds the maximum value within each sub-group of index.
+        Example:
+        ```
+        Index:  a a a b b x a c c d d d
+        Target: 1 2 3 5 4 6 7 8 9 2 1 0
+        Result: 3     5   6 7 9   2
+        ```
+        :params index: A numpy array or Field containing the index that defines the ranges over which max is applied.
+        :params target: A numpy array to which the index and predicate are applied
+        :params dest: If set, a Field to which the resulting counts are written
+        :returns: A numpy array containing the resulting values
+        """
         return self.aggregate_custom(self.apply_spans_max, index, src, dest)
 
 
@@ -521,6 +719,10 @@ class Session:
     def join(self,
              destination_pkey, fkey_indices, values_to_join,
              writer=None, fkey_index_spans=None):
+        """
+        This method is due for removal and should not be moved.
+        Please use the merge or ordered_merge functions instead.
+        """
 
         if isinstance(destination_pkey, fld.IndexedStringField):
             raise ValueError("'destination_pkey' must not be an indexed string field")
@@ -568,6 +770,10 @@ class Session:
     def predicate_and_join(self,
                            predicate, destination_pkey, fkey_indices,
                            reader=None, writer=None, fkey_index_spans=None):
+        """
+        This method is due for removal and should not be moved.
+        Please use the merge or ordered_merge functions instead.
+        """
         if reader is not None:
             if not isinstance(reader, rw.Reader):
                 raise ValueError(f"'reader' must be a type of Reader but is {type(reader)}")
@@ -608,7 +814,24 @@ class Session:
         writer.write(destination_space_values)
 
 
-    def get(self, field):
+    def get(self,
+            field: Union[fld.Field, h5py.Group]):
+        """
+        Get a Field from a h5py Group.
+        Example:
+        ```
+        # this code for context
+        with Session() as s:
+
+          # open a dataset about wildlife
+          src = s.open_dataset("/my/wildlife/dataset.hdf5", "r", "src")
+
+          # fetch the group containing bird data
+          birds = src['birds']
+
+          # get the bird decibel field
+          bird_decibels = s.get(birds['decibels'])
+        """
         if isinstance(field, fld.Field):
             return field
 
@@ -631,6 +854,21 @@ class Session:
 
 
     def create_like(self, field, dest_group, dest_name, timestamp=None, chunksize=None):
+        """
+        Create a field of the same type as an existing field, in the location and with the name provided.
+        Example:
+        ```
+        with Session as s:
+          ...
+          a = s.get(table_1['a'])
+          b = s.create_like(a, table_2, 'a_times_2')
+          b.data.write(a.data[:] * 2)
+        ```
+
+        :params field: The Field whose type is to be copied
+        :params dest_group: The group in which the new field should be created
+        :params dest_name: The name of the new field
+        """
         if isinstance(field, h5py.Group):
             if 'fieldtype' not in field.attrs.keys():
                 raise ValueError("{} is not a well-formed field".format(field))
@@ -643,23 +881,72 @@ class Session:
 
 
     def create_indexed_string(self, group, name, timestamp=None, chunksize=None):
+        """
+        Create an indexed string field in the given group with the given name.
+
+        :params group: The group in which the new field should be created
+        :params name: The name of the new field
+        :params timestamp: If set, the timestamp that should be given to the new field. If not set
+        datetime.now() is used.
+        :params chunksize: If set, the chunksize that should be used to create the new field. In general, this should
+        not be set unless you are writing unit tests.
+        """
         fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
         return fld.IndexedStringField(self, group[name], write_enabled=True)
 
 
     def create_fixed_string(self, group, name, length, timestamp=None, chunksize=None):
+        """
+        Create an fixed string field in the given group with the given name, with the given max string length per entry.
+
+        :params group: The group in which the new field should be created
+        :params name: The name of the new field
+        :params length: The maximum length in bytes that each entry can have.
+        :params timestamp: If set, the timestamp that should be given to the new field. If not set
+        datetime.now() is used.
+        :params chunksize: If set, the chunksize that should be used to create the new field. In general, this should
+        not be set unless you are writing unit tests.
+        """
         fld.fixed_string_field_constructor(self, group, name, length, timestamp, chunksize)
         return fld.FixedStringField(self, group[name], write_enabled=True)
 
 
     def create_categorical(self, group, name, nformat, key,
                            timestamp=None, chunksize=None):
+        """
+        Create a categorical field in the given group with the given name. This function also takes a numerical format
+        for the numeric representation of the categories, and a key that maps numeric values to their string
+        string descriptions.
+
+        :params group: The group in which the new field should be created
+        :params name: The name of the new field
+        :params nformat: A numerical type in the set (int8, uint8, int16, uint18, int32, uint32, int64). It is
+        recommended to use 'int8'.
+        :params key: A dictionary that maps numerical values to their string representations
+        :params timestamp: If set, the timestamp that should be given to the new field. If not set
+        datetime.now() is used.
+        :params chunksize: If set, the chunksize that should be used to create the new field. In general, this should
+        not be set unless you are writing unit tests.
+        """
         fld.categorical_field_constructor(self, group, name, nformat, key,
                                           timestamp, chunksize)
         return fld.CategoricalField(self, group[name], write_enabled=True)
 
 
     def create_numeric(self, group, name, nformat, timestamp=None, chunksize=None):
+        """
+        Create a numeric field in the given group with the given name.
+
+        :params group: The group in which the new field should be created
+        :params name: The name of the new field
+        :params nformat: A numerical type in the set (int8, uint8, int16, uint18, int32, uint32, int64, uint64,
+        float32, float64). It is recommended to avoid uint64 as certain operations in numpy cause conversions to
+        floating point values.
+        :params timestamp: If set, the timestamp that should be given to the new field. If not set
+        datetime.now() is used.
+        :params chunksize: If set, the chunksize that should be used to create the new field. In general, this should
+        not be set unless you are writing unit tests.
+        """
         fld.numeric_field_constructor(self, group, name, nformat, timestamp, chunksize)
         return fld.NumericField(self, group[name], write_enabled=True)
 
