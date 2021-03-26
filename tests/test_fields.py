@@ -76,6 +76,7 @@ class TestIndexedStringFields(unittest.TestCase):
 
 
     def test_update_legacy_indexed_string_that_has_uint_values(self):
+
         bio = BytesIO()
         with h5py.File(bio, 'r+') as hf:
             s = session.Session()
@@ -84,6 +85,7 @@ class TestIndexedStringFields(unittest.TestCase):
             f.write(strings)
             values = hf['foo']['values'][:]
             self.assertListEqual([97, 98, 98, 99, 99, 99, 100, 100, 100, 100], values.tolist())
+
     def test_index_string_field_get_span(self):
         bio = BytesIO()
         with session.Session() as s:
@@ -94,6 +96,7 @@ class TestIndexedStringFields(unittest.TestCase):
 
 
 class TestFieldArray(unittest.TestCase):
+
     def test_write_part(self):
         bio = BytesIO()
         s = session.Session()
@@ -114,6 +117,7 @@ class TestFieldArray(unittest.TestCase):
 
 
 class TestFieldArray(unittest.TestCase):
+
     def test_write_part(self):
         bio = BytesIO()
         s = session.Session()

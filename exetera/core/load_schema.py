@@ -120,8 +120,9 @@ class NewDataSchema:
                 importer = data_schema.new_field_importers[field_type](value_type, converter, invalid_value, validation_mode, create_flag_field, flag_field_suffix)
 
             elif field_type in ('datetime', 'date'):
+                create_day_field = fv.get('create_day_field', False)
                 optional = fv.get('optional', False)
-                importer = data_schema.new_field_importers[field_type](optional)
+                importer = data_schema.new_field_importers[field_type](create_day_field, optional)
             else:
                 msg = "'{}' is an unsupported field type (For field '{}')."
                 raise ValueError(msg.format(field_type, fk))
@@ -150,6 +151,27 @@ def load_schema(source, verbosity=0):
     d = json.load(source)
     if verbosity > 1:
         print(d.keys())
+
+
+    valid_versions = ('1.0.0', '1.1.0')
+
+    if 'hystore' not in d.keys() and 'exetera' not in d.keys():
+        raise ValueError("'{}' is not a valid ExeTera schema file".format(source))
+    if 'hystore' in d.keys():
+        if 'version' not in d['hystore']:
+            raise ValueError("'version' field missing from 'hystore' top-level tag")
+        elif d['hystore']['version'] != '1.0.0':
+            raise ValueError("If the obsolete 'hystore' key is used, the version must be '1.0.0'")
+    elif 'exetera' in d:
+        if 'version' not in d['exetera']:
+            raise ValueError("'version' field missing from 'exetera' top-level tag")
+        elif d['exetera']['version'] not in valid_versions:
+            msg = "The version number '{}' is not valid; it must be one of '{}'"
+            raise ValueError(msg.format(d['exetera']['version'], valid_versions))
+
+    if 'schema' not in d.keys():
+        raise ValueError("'schema' top-level tag is missing from the schema file")
+
     fields = d['schema']
     spaces = dict()
     for fk, fv in fields.items():

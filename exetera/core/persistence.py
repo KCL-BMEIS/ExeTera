@@ -693,7 +693,7 @@ def _aggregate_impl(predicate, fkey_indices=None, fkey_index_spans=None,
             raise ValueError("'writer' must be either a Writer or an ndarray instance")
 
     if fkey_index_spans is None:
-        fkey_index_spans = _get_spans(field=fkey_indices)
+        fkey_index_spans = ops.get_spans_for_field(fkey_indices)
 
     if isinstance(writer, np.ndarray):
         if len(writer) != len(fkey_index_spans) - 1:
@@ -809,8 +809,8 @@ class DataStore:
             src_indices = reader.field['index'][:]
             src_values = reader.field.get('values', np.zeros(0, dtype=np.uint8))[:]
             if len(src_indices) != len(filter_to_apply) + 1:
-                raise ValueError(f"'indices' (length {len(indices)}) must be one longer than "
-                                 f"'index_filter' (length {len(index_filter)})")
+                raise ValueError(f"'indices' (length {len(src_indices)}) must be one longer than "
+                                 f"'index_filter' (length {len(filter_to_apply)})")
 
             indices, values = _apply_filter_to_index_values(filter_to_apply,
                                                             src_indices, src_values)
@@ -893,7 +893,8 @@ class DataStore:
             if isinstance(field, fld.Field):
                 return field.get_spans()
             if isinstance(field, np.ndarray):
-                return ops._get_spans_for_field(field)
+                return ops.get_spans_for_field(field)
+
 
 
     def index_spans(self, spans):
@@ -1236,7 +1237,7 @@ class DataStore:
 
     def get_reader(self, field):
         if 'fieldtype' not in field.attrs.keys():
-            raise ValueError(f"'{field_name}' is not a well-formed field")
+            raise ValueError(f"'{field.name}' is not a well-formed field")
 
         fieldtype_map = {
             'indexedstring': rw.IndexedStringReader,
@@ -1255,7 +1256,7 @@ class DataStore:
 
     def get_existing_writer(self, field, timestamp=None):
         if 'fieldtype' not in field.attrs.keys():
-            raise ValueError(f"'{field_name}' is not a well-formed field")
+            raise ValueError(f"'{field.name}' is not a well-formed field")
 
         fieldtype_map = {
             'indexedstring': rw.IndexedStringReader,

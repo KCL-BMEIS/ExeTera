@@ -5,6 +5,7 @@ import numba
 from numba.typed import List
 
 from exetera.core import validation as val
+from exetera.core.abstract_types import Field
 from exetera.core import fields, utils
 
 DEFAULT_CHUNKSIZE = 1 << 20
@@ -21,7 +22,7 @@ def chunks(length, chunksize=1 << 20):
 
 
 def safe_map(field, map_field, map_filter, empty_value=None):
-    if isinstance(field, fields.Field):
+    if isinstance(field, Field):
         if isinstance(field, fields.IndexedStringField):
             return safe_map_indexed_values(
                 field.indices[:], field.values[:], map_field, map_filter, empty_value)
@@ -205,7 +206,8 @@ def apply_indices_to_index_values(indices_to_apply, indices, values):
     return dest_indices, dest_values
 
 
-def _get_spans_for_field(ndarray):
+
+def get_spans_for_field(ndarray):
     results = np.zeros(len(ndarray) + 1, dtype=np.bool)
     if np.issubdtype(ndarray.dtype, np.number):
         fn = np.not_equal
