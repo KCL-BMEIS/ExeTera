@@ -535,7 +535,7 @@ class TimestampField(HDF5Field):
     def __len__(self):
         return len(self.data)
 
-    def get_span(self):
+    def get_spans(self):
         return ops._get_spans_for_field(self.data[:])
 
 
