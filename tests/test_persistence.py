@@ -1066,7 +1066,7 @@ class TestPersistenceOperations(unittest.TestCase):
         datastore = persistence.DataStore(10)
         ids = np.asarray(['a', 'a', 'b', 'b', 'b', 'c'], dtype='S1')
         vals = np.asarray([1, 2, 2, 1, 2, 1])
-        spans = persistence._get_spans_for_field(ids)
+        spans = datastore.get_spans(ids)
         results = np.zeros(len(spans)-1, dtype=np.int64)
         persistence._apply_spans_index_of_max(spans, vals, results)
         self.assertListEqual([1, 2, 5], results.tolist())

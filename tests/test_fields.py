@@ -26,6 +26,10 @@ class TestFieldExistence(unittest.TestCase):
             self.assertTrue(bool(f))
 
     def test_get_spans(self):
+        '''
+        Here test only the numeric field, categorical field and fixed string field.
+        Indexed string see TestIndexedStringFields below
+        '''
         vals = np.asarray([0, 1, 1, 3, 3, 6, 5, 5, 5], dtype=np.int32)
         bio = BytesIO()
         with session.Session() as s:
@@ -36,7 +40,13 @@ class TestFieldExistence(unittest.TestCase):
             vals_f.data.write(vals)
             self.assertListEqual([0, 1, 3, 5, 6, 9], vals_f.get_spans().tolist())
 
+            fxdstr = s.create_fixed_string(ds, 'fxdstr', 2)
+            fxdstr.data.write(np.asarray(['aa', 'bb', 'bb', 'cc', 'cc', 'dd', 'dd', 'dd', 'ee'], dtype='S2'))
+            self.assertListEqual([0,1,3,5,8,9],list(fxdstr.get_spans()))
 
+            cat = s.create_categorical(ds, 'cat', 'int8', {'a': 1, 'b': 2})
+            cat.data.write([1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 1, 2, 1, 2])
+            self.assertListEqual([0,2,4,7,10,11,12,13,14],list(cat.get_spans()))
 
 class TestIndexedStringFields(unittest.TestCase):
 
@@ -74,7 +84,13 @@ class TestIndexedStringFields(unittest.TestCase):
             f.write(strings)
             values = hf['foo']['values'][:]
             self.assertListEqual([97, 98, 98, 99, 99, 99, 100, 100, 100, 100], values.tolist())
-
+    def test_index_string_field_get_span(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            idx = s.create_indexed_string(ds, 'idx')
+            idx.data.write(['aa', 'bb', 'bb', 'c', 'c', 'c', 'ddd', 'ddd', 'e', 'f', 'f', 'f'])
+            self.assertListEqual([0, 1, 3, 6, 8, 9, 12], s.get_spans(idx))
 
 
 class TestFieldArray(unittest.TestCase):
@@ -96,3 +112,21 @@ class TestFieldArray(unittest.TestCase):
         self.assertListEqual([], list(num.data[:]))
 
 
+
+class TestFieldArray(unittest.TestCase):
+    def test_write_part(self):
+        bio = BytesIO()
+        s = session.Session()
+        dst = s.open_dataset(bio, 'w', 'dst')
+        num = s.create_numeric(dst, 'num', 'int32')
+        num.data.write_part(np.arange(10))
+        self.assertListEqual([0,1,2,3,4,5,6,7,8,9],list(num.data[:]))
+
+    def test_clear(self):
+        bio = BytesIO()
+        s = session.Session()
+        dst = s.open_dataset(bio, 'w', 'dst')
+        num = s.create_numeric(dst, 'num', 'int32')
+        num.data.write_part(np.arange(10))
+        num.data.clear()
+        self.assertListEqual([], list(num.data[:]))
