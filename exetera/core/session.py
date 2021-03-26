@@ -298,17 +298,17 @@ class Session:
         if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
         if isinstance(src, fld.IndexedStringField):
-            src_ = val.field_from_parameter(self, 'reader', src)
-            dest_indices, dest_values =\
-                ops.apply_indices_to_index_values(index_to_apply_,
-                                                  src_.indices[:], src_.values[:])
+            dest_indices, dest_values = src.apply_index(index_to_apply_)
             if writer_ is not None:
                 writer_.indices.write(dest_indices)
                 writer_.values.write(dest_values)
             return dest_indices, dest_values
-        else:
-            reader_ = val.array_from_parameter(self, 'reader', src)
-            result = reader_[index_to_apply]
+
+        elif isinstance(src,fld.Field):
+            src.app
+        elif isinstance(src,np.ndarray):
+            #reader_ = val.array_from_parameter(self, 'reader', src)
+            result = src[index_to_apply]
             if writer_:
                 writer_.data.write(result)
             return result
@@ -639,8 +639,8 @@ class Session:
 
 
     def create_indexed_string(self, group, name, timestamp=None, chunksize=None):
-        fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize) #create the hdf5 object
-        return fld.IndexedStringField(self, group[name], write_enabled=True) #return the field wrapper
+        fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
+        return fld.IndexedStringField(self, group[name], write_enabled=True)
 
 
     def create_fixed_string(self, group, name, length, timestamp=None, chunksize=None):

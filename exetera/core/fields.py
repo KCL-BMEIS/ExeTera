@@ -5,9 +5,8 @@ import numba
 import h5py
 
 from exetera.core.data_writer import DataWriter
-from exetera.core import utils
-from exetera.core import persistence as per
 from exetera.core import operations as ops
+from exetera.core import validation as val
 
 
 # def test_field_iterator(data):
@@ -59,7 +58,9 @@ class Field:
         return True
 
     def get_spans(self):
-        pass
+        raise NotImplementedError("Please use get_spans() on specific fields, not the field base class.")
+
+
 
 
 
@@ -397,6 +398,14 @@ class IndexedStringField(Field):
     def get_spans(self):
         return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
 
+    def apply_filter(self,filter_to_apply):
+        pass
+
+    def apply_index(self,index_to_apply):
+        dest_indices, dest_values = \
+            ops.apply_indices_to_index_values(index_to_apply,
+                                              self.indices[:], self.values[:])
+        return dest_indices, dest_values
 
 
 
