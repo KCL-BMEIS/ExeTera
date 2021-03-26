@@ -257,7 +257,7 @@ class Session:
         and returned from the function call. If the field is an IndexedStringField, the
         indices and values are returned separately.
 
-        :param filter_to_apply: the filter to be applied to the source field
+        :param filter_to_apply: the filter to be applied to the source field, an array of boolean
         :param src: the field to be filtered
         :param dest: optional - a field to write the filtered data to
         :return: the filtered values
@@ -289,7 +289,7 @@ class Session:
         and returned from the function call. If the field is an IndexedStringField, the
         indices and values are returned separately.
 
-        :param index_to_apply: the index to be applied to the source field
+        :param index_to_apply: the index to be applied to the source field, must be one of Group, Field, or ndarray
         :param src: the field to be index
         :param dest: optional - a field to write the indexed data to
         :return: the indexed values
@@ -300,7 +300,7 @@ class Session:
             writer_ = val.field_from_parameter(self, 'writer', dest)
         if isinstance(src, fld.IndexedStringField):
             src_ = val.field_from_parameter(self, 'reader', src)
-            dest_indices, dest_values =\
+            dest_indices, dest_values = \
                 ops.apply_indices_to_index_values(index_to_apply_,
                                                   src_.indices[:], src_.values[:])
             if writer_ is not None:
@@ -351,20 +351,16 @@ class Session:
             field: [1, 2, 2, 1, 1, 1, 3, 4, 4, 4, 2, 2, 2, 2, 2]
             result: [0, 1, 3, 6, 7, 10, 15]
         """
-        if field is None and fields is None:
-            raise ValueError("One of 'field' and 'fields' must be set")
-        if field is not None and fields is not None:
-            raise ValueError("Only one of 'field' and 'fields' may be set")
-        raw_field = None
-        raw_fields = None
-        if field is not None:
-            raw_field = val.array_from_parameter(self, 'field', field)
-
-        raw_fields = []
         if fields is not None:
-            for i_f, f in enumerate(fields):
-                raw_fields.append(val.array_from_parameter(self, "'fields[{}]'".format(i_f), f))
-        return per._get_spans(raw_field, raw_fields)
+            if isinstance(fields[0],fld.Field):
+                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(),fields[1].get_spans())
+            if isinstance(fields[0],np.ndarray):
+                return ops._get_spans_for_2_fields(fields[0],fields[1])
+        else:
+            if isinstance(field,fld.Field):
+                return field.get_spans()
+            if isinstance(field,np.ndarray):
+                return ops._get_spans_for_field(field)
 
 
     def _apply_spans_no_src(self, predicate, spans, dest=None):

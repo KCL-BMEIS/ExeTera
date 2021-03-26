@@ -8,8 +8,8 @@ import h5py
 
 from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
-from exetera.core import utils
-from exetera.core import persistence as per
+from exetera.core import operations as ops
+from exetera.core import validation as val
 
 
 class HDF5Field(Field):
@@ -41,8 +41,12 @@ class HDF5Field(Field):
         return self._field.attrs['chunksize']
 
     @property
-    def data(self):
-        raise NotImplementedError()
+    def indexed(self):
+        return False
+
+    # @property
+    # def data(self):
+    #     raise NotImplementedError()
 
     def __bool__(self):
         # this method is required to prevent __len__ being called on derived methods when fields are queried as
@@ -51,11 +55,13 @@ class HDF5Field(Field):
         #   if f is not None:
         return True
 
-    def __len__(self):
-        raise NotImplementedError()
+    # def __len__(self):
+    #     raise NotImplementedError()
+    #
+    # def get_spans(self):
+    #     raise NotImplementedError("Please use get_spans() on specific fields, not the field base class.")
 
-    def get_spans(self):
-        return per._get_spans(self._value_wrapper[:], None)
+
 
 
 class ReadOnlyFieldArray:
@@ -365,6 +371,10 @@ class IndexedStringField(HDF5Field):
         return IndexedStringField(self._session, group, name, write_enabled=True)
 
     @property
+    def indexed(self):
+        return True
+
+    @property
     def data(self):
         if self._data_wrapper is None:
             wrapper =\
@@ -388,6 +398,18 @@ class IndexedStringField(HDF5Field):
 
     def __len__(self):
         return len(self.data)
+
+    def get_spans(self):
+        return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
+
+    def apply_filter(self,filter_to_apply):
+        pass
+
+    def apply_index(self,index_to_apply):
+        dest_indices, dest_values = \
+            ops.apply_indices_to_index_values(index_to_apply,
+                                              self.indices[:], self.values[:])
+        return dest_indices, dest_values
 
 
 class FixedStringField(HDF5Field):
@@ -415,6 +437,9 @@ class FixedStringField(HDF5Field):
     def __len__(self):
         return len(self.data)
 
+    def get_spans(self):
+        return ops._get_spans_for_field(self.data[:])
+
 
 class NumericField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
@@ -440,6 +465,9 @@ class NumericField(HDF5Field):
 
     def __len__(self):
         return len(self.data)
+
+    def get_spans(self):
+        return ops._get_spans_for_field(self.data[:])
 
 
 class CategoricalField(HDF5Field):
@@ -469,6 +497,9 @@ class CategoricalField(HDF5Field):
 
     def __len__(self):
         return len(self.data)
+
+    def get_spans(self):
+        return ops._get_spans_for_field(self.data[:])
 
     # Note: key is presented as value: str, even though the dictionary must be presented
     # as str: value
@@ -503,6 +534,9 @@ class TimestampField(HDF5Field):
 
     def __len__(self):
         return len(self.data)
+
+    def get_span(self):
+        return ops._get_spans_for_field(self.data[:])
 
 
 class IndexedStringImporter:

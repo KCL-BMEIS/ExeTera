@@ -31,6 +31,11 @@ class Field(ABC):
 
     @property
     @abstractmethod
+    def indexed(self):
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
     def data(self):
         raise NotImplementedError()
 
