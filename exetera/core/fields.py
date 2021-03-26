@@ -1,33 +1,23 @@
+
+from typing import Union
 from datetime import datetime, timezone
 
 import numpy as np
 import numba
 import h5py
 
+from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
 from exetera.core import validation as val
 
 
-# def test_field_iterator(data):
-#     @numba.njit
-#     def _inner():
-#         for d in data:
-#             yield d
-#     return _inner()
-#
-# iterator_type = numba.from_dtype(test_field_iterator)
-#
-# @numba.jit
-# def sum_iterator(iter_):
-#     total = np.int64(0)
-#     for i in iter_:
-#         total += i
-#     return total
-
-
-class Field:
+class HDF5Field(Field):
     def __init__(self, session, group, name=None, write_enabled=False):
+        super().__init__()
+
+        # if name is None, the group is an existing field
+        # if name is set but group[name] doesn't exist, then create the field
         if name is None:
             field = group
         else:
@@ -50,6 +40,14 @@ class Field:
     def chunksize(self):
         return self._field.attrs['chunksize']
 
+    @property
+    def indexed(self):
+        return False
+
+    # @property
+    # def data(self):
+    #     raise NotImplementedError()
+
     def __bool__(self):
         # this method is required to prevent __len__ being called on derived methods when fields are queried as
         #   if f:
@@ -57,9 +55,11 @@ class Field:
         #   if f is not None:
         return True
 
-    def get_spans(self):
-        raise NotImplementedError("Please use get_spans() on specific fields, not the field base class.")
-
+    # def __len__(self):
+    #     raise NotImplementedError()
+    #
+    # def get_spans(self):
+    #     raise NotImplementedError("Please use get_spans() on specific fields, not the field base class.")
 
 
 
@@ -354,7 +354,7 @@ def timestamp_field_constructor(session, group, name, timestamp=None, chunksize=
     DataWriter.write(field, 'values', [], 0, 'float64')
 
 
-class IndexedStringField(Field):
+class IndexedStringField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
         self._session = session
@@ -369,6 +369,10 @@ class IndexedStringField(Field):
         ts = self.timestamp if timestamp is None else timestamp
         indexed_string_field_constructor(self._session, group, name, ts, self.chunksize)
         return IndexedStringField(self._session, group, name, write_enabled=True)
+
+    @property
+    def indexed(self):
+        return True
 
     @property
     def data(self):
@@ -398,18 +402,20 @@ class IndexedStringField(Field):
     def get_spans(self):
         return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
 
-    def apply_filter(self,filter_to_apply):
-        pass
+    def apply_filter(self, filter_to_apply):
+        dest_indices, dest_values = \
+            ops.apply_filter_to_index_values(filter_to_apply,
+                                             self.indices[:], self.values[:])
+        return dest_indices, dest_values
 
-    def apply_index(self,index_to_apply):
+    def apply_index(self, index_to_apply):
         dest_indices, dest_values = \
             ops.apply_indices_to_index_values(index_to_apply,
                                               self.indices[:], self.values[:])
         return dest_indices, dest_values
 
 
-
-class FixedStringField(Field):
+class FixedStringField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
@@ -435,10 +441,10 @@ class FixedStringField(Field):
         return len(self.data)
 
     def get_spans(self):
-        return ops._get_spans_for_field(self.data[:])
+        return ops.get_spans_for_field(self.data[:])
 
 
-class NumericField(Field):
+class NumericField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
@@ -464,10 +470,10 @@ class NumericField(Field):
         return len(self.data)
 
     def get_spans(self):
-        return ops._get_spans_for_field(self.data[:])
+        return ops.get_spans_for_field(self.data[:])
 
 
-class CategoricalField(Field):
+class CategoricalField(HDF5Field):
     def __init__(self, session, group,
                  name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
@@ -496,7 +502,7 @@ class CategoricalField(Field):
         return len(self.data)
 
     def get_spans(self):
-        return ops._get_spans_for_field(self.data[:])
+        return ops.get_spans_for_field(self.data[:])
 
     # Note: key is presented as value: str, even though the dictionary must be presented
     # as str: value
@@ -508,7 +514,7 @@ class CategoricalField(Field):
         return keys
 
 
-class TimestampField(Field):
+class TimestampField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
@@ -532,8 +538,8 @@ class TimestampField(Field):
     def __len__(self):
         return len(self.data)
 
-    def get_span(self):
-        return ops._get_spans_for_field(self.data[:])
+    def get_spans(self):
+        return ops.get_spans_for_field(self.data[:])
 
 
 class IndexedStringImporter:
