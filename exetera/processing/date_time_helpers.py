@@ -89,6 +89,12 @@ def get_days(date_field: ArrayLike,
         passed in
 
     """
+    if not isinstance(date_field, np.ndarray) or date_field.dtype != np.float64:
+        raise ValueError("'date_field' must be a numpy array of type np.float64")
+    if date_filter is not None:
+        if not isinstance(date_filter, np.ndarray) or date_filter.dtype not in (bool, np.int8):
+            raise ValueError("'date_filter' must be a numpy array of type bool or np.int8")
+
     if start_date is None and end_date is None and date_filter is None:
         min_date = date_field.min()
         days = np.floor((date_field - min_date) / SECONDS_PER_DAY).astype(np.int32)
@@ -168,5 +174,12 @@ def get_period_offsets(periods_by_day: ArrayLike,
       result = get_period_offsets(generate_period_offset_map(periods), days)
 
     """
+    if not isinstance(periods_by_day, np.ndarray) and\
+            periods_by_day.dtype not in (np.int8, np.int16, np.int32, np.int64):
+        raise ValueError("'periods_by_day' must be a numpy array of a signed integer type")
+    if not isinstance(days, np.ndarray) and\
+            days.dtype not in (np.int8, np.int16, np.int32, np.int64):
+        raise ValueError("'days' must be a numpy array of a signed integer type")
+
     periods = periods_by_day[days]
     return periods

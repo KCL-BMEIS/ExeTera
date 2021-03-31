@@ -37,9 +37,7 @@ class TestDateTimeHelpers(unittest.TestCase):
         ]
         self._do_scenario_test(scenarios, 'day', 0)
 
-
-    def test_periods_day_periods(self):
-
+    def test_periods_day_positive_delta(self):
         scenarios = [
             S(D(2020, 5, 10), D(2020, 5, 9), ValueError),
             S(D(2020, 5, 10), D(2020, 5, 10), [D(2020, 5, 10)]),
@@ -48,6 +46,7 @@ class TestDateTimeHelpers(unittest.TestCase):
         self._do_scenario_test(scenarios, 'day', 1)
         self._do_scenario_test(scenarios, 'days', 1)
 
+    def test_periods_day_negative_delta(self):
         scenarios = [
             S(D(2020, 5, 10), D(2020, 5, 9), [D(2020, 5, 10), D(2020, 5, 9)]),
             S(D(2020, 5, 10), D(2020, 5, 10), [D(2020, 5, 10)]),
@@ -56,8 +55,7 @@ class TestDateTimeHelpers(unittest.TestCase):
         self._do_scenario_test(scenarios, 'day', -1)
         self._do_scenario_test(scenarios, 'days', -1)
 
-    def test_periods_multi_day_periods(self):
-
+    def test_periods_multi_day_positive_delta(self):
         scenarios = [
             S(D(2020, 5, 10), D(2020, 5, 9), ValueError),
             S(D(2020, 5, 10), D(2020, 5, 10), [D(2020, 5, 10)]),
@@ -69,6 +67,7 @@ class TestDateTimeHelpers(unittest.TestCase):
         ]
         self._do_scenario_test(scenarios, 'day', 3)
 
+    def test_periods_multi_day_negative_delta(self):
         scenarios = [
             S(D(2020, 5, 5), D(2020, 4, 25),
               [D(2020, 5, 5), D(2020, 5, 2), D(2020, 4, 29), D(2020, 4, 26)]),
@@ -80,8 +79,7 @@ class TestDateTimeHelpers(unittest.TestCase):
         ]
         self._do_scenario_test(scenarios, 'day', -3)
 
-    def test_periods_week_periods(self):
-
+    def test_periods_week_positive_delta(self):
         scenarios = [
             S(D(2020, 5, 10), D(2020, 5, 3), ValueError),
             S(D(2020, 5, 10), D(2020, 5, 9), ValueError),
@@ -96,6 +94,7 @@ class TestDateTimeHelpers(unittest.TestCase):
         self._do_scenario_test(scenarios, 'week', 1)
         self._do_scenario_test(scenarios, 'weeks', 1)
 
+    def test_periods_week_negative_delta(self):
         scenarios = [
             S(D(2020, 5, 10), D(2020, 5, 2), [D(2020, 5, 10), D(2020, 5, 3)]),
             S(D(2020, 5, 10), D(2020, 5, 3), [D(2020, 5, 10), D(2020, 5, 3)]),
@@ -111,8 +110,7 @@ class TestDateTimeHelpers(unittest.TestCase):
         self._do_scenario_test(scenarios, 'weeks', -1)
 
 
-    def test_periods_multi_week_periods(self):
-
+    def test_periods_multi_week_positive_delta(self):
         scenarios = [
             S(D(2020, 5, 10), D(2020, 5, 3), ValueError),
             S(D(2020, 5, 10), D(2020, 5, 9), ValueError),
@@ -127,6 +125,7 @@ class TestDateTimeHelpers(unittest.TestCase):
         self._do_scenario_test(scenarios, 'week', 4)
         self._do_scenario_test(scenarios, 'weeks', 4)
 
+    def test_periods_multi_week_negative_delta(self):
         scenarios = [
             S(D(2020, 5, 10), D(2020, 4, 11), [D(2020, 5, 10), D(2020, 4, 12)]),
             S(D(2020, 5, 10), D(2020, 4, 12), [D(2020, 5, 10), D(2020, 4, 12)]),
