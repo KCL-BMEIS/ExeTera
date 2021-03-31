@@ -1,4 +1,4 @@
-from typing import Sequence, Tuple, Union
+from typing import Optional, Sequence, Tuple, Union
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -65,9 +65,9 @@ def get_periods(start_date: datetime,
 
 def get_days(date_field: ArrayLike,
              date_filter: ArrayLike = None,
-             start_date: np.float64 = None,
-             end_date: np.float64 = None
-             ) -> Tuple[ArrayLike, Union[ArrayLike, None]]:
+             start_date: Optional[np.float64] = None,
+             end_date: Optional[np.float64] = None
+             ) -> Tuple[ArrayLike, Optional[ArrayLike]]:
     """
     get_days converts a field of timestamps into a field of relative elapsed days.
     The precise behaviour depends on the optional parameters but essentially, the lowest
