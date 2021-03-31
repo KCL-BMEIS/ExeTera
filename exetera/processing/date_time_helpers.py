@@ -63,11 +63,11 @@ def get_periods(start_date: datetime,
     return dates
 
 
-def get_days(date_field: ArrayLike[np.float64],
-             date_filter: ArrayLike[bool] = None,
+def get_days(date_field: ArrayLike,
+             date_filter: ArrayLike = None,
              start_date: np.float64 = None,
              end_date: np.float64 = None
-             ) -> Tuple[ArrayLike[np.int32], Union[ArrayLike[bool], None]]:
+             ) -> Tuple[ArrayLike, Union[ArrayLike, None]]:
     """
     get_days converts a field of timestamps into a field of relative elapsed days.
     The precise behaviour depends on the optional parameters but essentially, the lowest
@@ -107,7 +107,7 @@ def get_days(date_field: ArrayLike[np.float64],
 
 
 def generate_period_offset_map(periods: Sequence[datetime]
-                               ) -> ArrayLike[np.int32]:
+                               ) -> ArrayLike:
     """
     Given a list of ordered datetimes relating to period boundaries, generate a numpy
     array of days that map each day to a period.
@@ -136,9 +136,9 @@ def generate_period_offset_map(periods: Sequence[datetime]
     return period_per_day
 
 
-def get_period_offsets(periods_by_day: ArrayLike[np.int32],
-                       days: ArrayLike[np.int32]
-                       ) -> ArrayLike[np.int32]:
+def get_period_offsets(periods_by_day: ArrayLike,
+                       days: ArrayLike
+                       ) -> ArrayLike:
     """
     Given a ``periods_by_day``, a numpy array of days mapping to periods and ``days``, a numpy array of days to be mapped to
     periods, perform the mapping to generate a numpy array indicating which period a day is
