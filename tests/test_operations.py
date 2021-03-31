@@ -80,32 +80,32 @@ class TestAggregation(unittest.TestCase):
         flt = np.zeros(len(spans)-1, dtype=np.int32)
         ops.apply_spans_index_of_min_filter(spans, values, dest, flt)
         self.assertTrue(np.array_equal(dest, np.asarray([0, 5, 6, 9, 10], dtype=np.int32)))
-        self.assertTrue(np.array_equal(flt, np.asarray([1, 1, 1, 1, 1], dtype=np.bool)))
+        self.assertTrue(np.array_equal(flt, np.asarray([1, 1, 1, 1, 1], dtype=bool)))
         ops.apply_spans_index_of_max_filter(spans, values, dest, flt)
         self.assertTrue(np.array_equal(dest, np.asarray([2, 3, 7, 8, 10], dtype=np.int32)))
-        self.assertTrue(np.array_equal(flt, np.asarray([1, 1, 1, 1, 1], dtype=np.bool)))
+        self.assertTrue(np.array_equal(flt, np.asarray([1, 1, 1, 1, 1], dtype=bool)))
         ops.apply_spans_index_of_first_filter(spans, dest, flt)
         self.assertTrue(np.array_equal(dest, np.asarray([0, 3, 6, 8, 10], dtype=np.int32)))
-        self.assertTrue(np.array_equal(flt, np.asarray([1, 1, 1, 1, 1], dtype=np.bool)))
+        self.assertTrue(np.array_equal(flt, np.asarray([1, 1, 1, 1, 1], dtype=bool)))
         ops.apply_spans_index_of_last_filter(spans, dest, flt)
         self.assertTrue(np.array_equal(dest, np.asarray([2, 5, 7, 9, 10], dtype=np.int32)))
-        self.assertTrue(np.array_equal(flt, np.asarray([1, 1, 1, 1, 1], dtype=np.bool)))
+        self.assertTrue(np.array_equal(flt, np.asarray([1, 1, 1, 1, 1], dtype=bool)))
 
         spans = np.asarray([0, 3, 3, 6, 8, 8, 10, 11], dtype=np.int32)
         dest = np.zeros(len(spans)-1, dtype=np.int32)
         flt = np.zeros(len(spans)-1, dtype=np.int32)
         ops.apply_spans_index_of_min_filter(spans, values, dest, flt)
         self.assertTrue(np.array_equal(dest, np.asarray([0, 0, 5, 6, 0, 9, 10], dtype=np.int32)))
-        self.assertTrue(np.array_equal(flt, np.asarray([1, 0, 1, 1, 0, 1, 1], dtype=np.bool)))
+        self.assertTrue(np.array_equal(flt, np.asarray([1, 0, 1, 1, 0, 1, 1], dtype=bool)))
         ops.apply_spans_index_of_max_filter(spans, values, dest, flt)
         self.assertTrue(np.array_equal(dest, np.asarray([2, 0, 3, 7, 0, 8, 10], dtype=np.int32)))
-        self.assertTrue(np.array_equal(flt, np.asarray([1, 0, 1, 1, 0, 1, 1], dtype=np.bool)))
+        self.assertTrue(np.array_equal(flt, np.asarray([1, 0, 1, 1, 0, 1, 1], dtype=bool)))
         ops.apply_spans_index_of_first_filter(spans, dest, flt)
         self.assertTrue(np.array_equal(dest, np.asarray([0, 0, 3, 6, 0, 8, 10], dtype=np.int32)))
-        self.assertTrue(np.array_equal(flt, np.asarray([1, 0, 1, 1, 0, 1, 1], dtype=np.bool)))
+        self.assertTrue(np.array_equal(flt, np.asarray([1, 0, 1, 1, 0, 1, 1], dtype=bool)))
         ops.apply_spans_index_of_last_filter(spans, dest, flt)
         self.assertTrue(np.array_equal(dest, np.asarray([2, 0, 5, 7, 0, 9, 10], dtype=np.int32)))
-        self.assertTrue(np.array_equal(flt, np.asarray([1, 0, 1, 1, 0, 1, 1], dtype=np.bool)))
+        self.assertTrue(np.array_equal(flt, np.asarray([1, 0, 1, 1, 0, 1, 1], dtype=bool)))
 
 
     def test_ordered_map_valid_stream(self):
@@ -309,14 +309,14 @@ class TestAggregation(unittest.TestCase):
 
         old_data = np.asarray([0, 1, 2, 10, 11, 20, 30, 31, 50, 51, 52])
         new_data = np.asarray([2, 20, 31, 40, 52, 60])
-        to_keep = np.zeros(len(new_i), dtype=np.bool)
+        to_keep = np.zeros(len(new_i), dtype=bool)
         ops.compare_rows_for_journalling(old_i, new_i, old_data, new_data, to_keep)
         expected = np.asarray([False, False, False, False, True, False, True])
         self.assertTrue(np.array_equal(to_keep, expected))
 
         old_data = np.asarray([0, 1, 2, 10, 11, 20, 30, 31, 50, 51, 52])
         new_data = np.asarray([3, 21, 32, 41, 53, 61])
-        to_keep = np.zeros(len(new_i), dtype=np.bool)
+        to_keep = np.zeros(len(new_i), dtype=bool)
         ops.compare_rows_for_journalling(old_i, new_i, old_data, new_data, to_keep)
         expected = np.asarray([True, False, True, True, True, True, True])
         self.assertTrue(np.array_equal(to_keep, expected))
@@ -329,7 +329,7 @@ class TestAggregation(unittest.TestCase):
 
         old_data = np.asarray([0, 1, 2, 10, 11, 20, 30, 31, 50, 51, 52])
         new_data = np.asarray([2, 20, 31, 40, 52, 60])
-        to_keep = np.zeros(len(new_i), dtype=np.bool)
+        to_keep = np.zeros(len(new_i), dtype=bool)
         ops.compare_rows_for_journalling(old_i, new_i, old_data, new_data, to_keep)
 
         dest = np.zeros(len(old) + to_keep.sum(), dtype=old.dtype)
@@ -339,7 +339,7 @@ class TestAggregation(unittest.TestCase):
 
         old_data = np.asarray([0, 1, 2, 10, 11, 20, 30, 31, 50, 51, 52])
         new_data = np.asarray([3, 21, 32, 40, 53, 60])
-        to_keep = np.zeros(len(new_i), dtype=np.bool)
+        to_keep = np.zeros(len(new_i), dtype=bool)
         ops.compare_rows_for_journalling(old_i, new_i, old_data, new_data, to_keep)
 
         dest = np.zeros(len(old) + to_keep.sum(), dtype=old.dtype)
@@ -368,7 +368,7 @@ class TestAggregation(unittest.TestCase):
         new_inds = np.asarray([0, 2, 4, 7, 9, 12, 14])
         new_vals = np.frombuffer(
             b''.join([b'ad', b'cb', b'dac', b'ea', b'fad', b'ga']), dtype='S1')
-        to_keep = np.zeros(len(new_i), dtype=np.bool)
+        to_keep = np.zeros(len(new_i), dtype=bool)
         ops.compare_indexed_rows_for_journalling(old_i, new_i, old_inds, old_vals,
                                                  new_inds, new_vals, to_keep)
 
@@ -395,7 +395,7 @@ class TestAggregation(unittest.TestCase):
         new_inds = np.asarray([0, 2, 4, 7, 9, 12, 14])
         new_vals = np.frombuffer(
             b''.join([b'ad', b'cb', b'dac', b'ea', b'fad', b'ga']), dtype='S1')
-        to_keep = np.zeros(len(new_i), dtype=np.bool)
+        to_keep = np.zeros(len(new_i), dtype=bool)
         ops.compare_indexed_rows_for_journalling(old_i, new_i, old_inds, old_vals,
                                                  new_inds, new_vals, to_keep)
 

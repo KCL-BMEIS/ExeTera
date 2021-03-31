@@ -743,7 +743,8 @@ class DateImporter:
                  optional=False, timestamp=None, chunksize=None):
         timestamp_field_constructor(session, group, name, timestamp, chunksize)
         self._field = TimestampField(session, group, name, write_enabled=True)
-        self._results = np.zeros(chunksize, dtype='float64')
+        self._results = np.zeros(session.chunksize if chunksize is None else chunksize,
+                                 dtype='float64')
 
         if optional is True:
             filter_name = '{}_set'.format(name)
