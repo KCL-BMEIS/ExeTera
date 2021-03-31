@@ -7,6 +7,8 @@ import numpy as np
 from exetera.core import persistence as pers
 from exetera.core.data_writer import DataWriter
 
+from numba import njit
+from numba.typed import List
 
 class Reader:
     def __init__(self, field):
@@ -379,12 +381,42 @@ class CategoricalWriter(Writer):
         # string:number
         self.keys = categories
 
-
     def chunk_factory(self, length):
-        return np.zeros(length, dtype='int8')
+        return np.full(length, '', dtype=object)
 
-    def write_part(self, values):
-        DataWriter.write(self.field, 'values', values, len(values))
+    def write_part(self, str_values):
+        length = len(str_values)
+        sorted_keys_list = List(sorted(self.keys.items()))
+        str_value_list = List(str_values)
+        int_values = CategoricalWriter._categorical_conversion_str_to_int(str_value_list, length, sorted_keys_list)
+
+        DataWriter.write(self.field, 'values', str_values, length)
+
+    @staticmethod
+    @njit
+    def _categorical_conversion_str_to_int(str_value_list, length, sorted_keys_list):
+        int_value_list = np.empty(length, dtype='int8')
+        for i, target_str in enumerate(str_value_list):
+            t_len = len(target_str)
+
+            if target_str == '' and len(sorted_keys_list) > 0 and sorted_keys_list[0][0] == '':
+                int_value_list[i] = sorted_keys_list[0][1]
+                continue
+
+            for string, number in sorted_keys_list:
+
+                if t_len != len(string):
+                    continue
+                
+                for i in range(t_len):
+                    if string[i] != target_str[i]:
+                        break
+                        
+                    if i == t_len - 1:
+                        int_value_list[i] = number
+
+        return int_value_list
+
 
     def flush(self):
         key_strs = list()

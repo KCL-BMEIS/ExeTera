@@ -212,7 +212,7 @@ class DatasetImporter:
                                     error = "'{}' not valid: must be one of {} for field '{}'"
                                     raise KeyError(
                                         error.format(f, categorical_map, available_keys[i_f]))
-                                f = categorical_map[f]
+                                #f = categorical_map[f]
                             field_chunk_list[i_df][chunk_index] = f
                         chunk_index += 1
                         if chunk_index == chunk_size:
@@ -236,3 +236,6 @@ class DatasetImporter:
 
             print(f"{i_r} rows parsed in {time.time() - time0}s")
 
+        print('=======00======')
+        print(time.time() - time0)
+        print('=======00======')
