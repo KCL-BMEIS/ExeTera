@@ -11,7 +11,7 @@
 
 import csv
 
-from exetera.core import dataset, utils
+from exetera.core import csvdataset, utils
 
 
 # read patients in batches of n
@@ -76,8 +76,8 @@ def assessment_splitter(input_filename, output_filename, assessment_buckets, buc
 def split_data(patient_data, assessment_data, bucket_size=500000, territories=None):
 
     with open(patient_data) as f:
-        p_ds = dataset.Dataset(f, keys=('id', 'created_at'),
-                               show_progress_every=500000)
+        p_ds = csvdataset.Dataset(f, keys=('id', 'created_at'),
+                                  show_progress_every=500000)
                                # show_progress_every=500000, stop_after=500000)
         p_ds.sort(('created_at', 'id'))
         p_ids = p_ds.field_by_name('id')
@@ -106,7 +106,7 @@ def split_data(patient_data, assessment_data, bucket_size=500000, territories=No
 
     print('buckets:', bucket_index)
     with open(assessment_data) as f:
-        a_ds = dataset.Dataset(f, keys=('patient_id', 'other_symptoms'), show_progress_every=500000)
+        a_ds = csvdataset.Dataset(f, keys=('patient_id', 'other_symptoms'), show_progress_every=500000)
 
     print(utils.build_histogram(buckets.values()))
 

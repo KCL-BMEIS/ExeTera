@@ -1,24 +1,52 @@
 from exetera.core import fields as fld
 from datetime import  datetime,timezone
+import h5py
 
 class DataFrame():
     """
     DataFrame is a table of data that contains a list of Fields (columns)
     """
-    def __init__(self, group ,data=None):
+    def __init__(self, name, dataset,data=None,h5group:h5py.Group=None):
+        """
+        Create a Dataframe object.
+
+        :param name: name of the dataframe, or the group name in HDF5
+        :param dataset: a dataset object, where this dataframe belongs to
+        :param dataframe: optional - replicate data from another dictionary
+        :param h5group: optional - acquire data from h5group object directly, the h5group needs to have a
+                        h5group<-group-dataset structure, the group has a 'fieldtype' attribute
+                         and the dataset is named 'values'.
+        """
+        self.fields = dict()
+        self.name = name
+        self.dataset = dataset
+
         if data is not None:
             if isinstance(data,dict) and isinstance(list(data.items())[0][0],str) and isinstance(list(data.items())[0][1], fld.Field) :
-                self.data=data
-        self.data = dict()
-        self.name=group
+                self.fields=data
+        elif h5group is not None and isinstance(h5group,h5py.Group):
+            fieldtype_map = {
+                'indexedstring': fld.IndexedStringField,
+                'fixedstring': fld.FixedStringField,
+                'categorical': fld.CategoricalField,
+                'boolean': fld.NumericField,
+                'numeric': fld.NumericField,
+                'datetime': fld.TimestampField,
+                'date': fld.TimestampField,
+                'timestamp': fld.TimestampField
+            }
+            for subg in h5group.keys():
+                fieldtype = h5group[subg].attrs['fieldtype'].split(',')[0]
+                self.fields[subg] = fieldtype_map[fieldtype](self, h5group[subg])
+                print(" ")
 
     def add(self,field,name=None):
         if name is not None:
             if not isinstance(name,str):
                 raise TypeError("The name must be a str object.")
             else:
-                self.data[name]=field
-        self.data[field.name]=field #note the name has '/' for hdf5 object
+                self.fields[name]=field
+        self.fields[field.name]=field #note the name has '/' for hdf5 object
 
     def __contains__(self, name):
         """
@@ -28,7 +56,7 @@ class DataFrame():
         if not isinstance(name,str):
             raise TypeError("The name must be a str object.")
         else:
-            return self.data.__contains__(name)
+            return self.fields.__contains__(name)
 
     def contains_field(self,field):
         """
@@ -38,7 +66,7 @@ class DataFrame():
         if not isinstance(field, fld.Field):
             raise TypeError("The field must be a Field object")
         else:
-            for v in self.data.values():
+            for v in self.fields.values():
                 if id(field) == id(v):
                     return True
                     break
@@ -50,18 +78,18 @@ class DataFrame():
         elif not self.__contains__(name):
             raise ValueError("Can not find the name from this dataframe.")
         else:
-            return self.data[name]
+            return self.fields[name]
 
     def get_field(self,name):
         return self.__getitem__(name)
 
     def get_name(self,field):
         """
-        Get the name of the field in dataframe
+        Get the name of the field in dataframe.
         """
         if not isinstance(field,fld.Field):
             raise TypeError("The field argument must be a Field object.")
-        for name,v in self.data.items():
+        for name,v in self.fields.items():
             if id(field) == id(v):
                 return name
                 break
@@ -73,14 +101,14 @@ class DataFrame():
         elif not isinstance(field,fld.Field):
             raise TypeError("The field must be a Field object.")
         else:
-            self.data[name]=field
+            self.fields[name]=field
             return True
 
     def __delitem__(self, name):
         if not self.__contains__(name=name):
             raise ValueError("This dataframe does not contain the name to delete.")
         else:
-            del self.data[name]
+            del self.fields[name]
             return True
 
     def delete_field(self,field):
@@ -94,26 +122,26 @@ class DataFrame():
             self.__delitem__(name)
 
     def list(self):
-        return tuple(n for n in self.data.keys())
+        return tuple(n for n in self.fields.keys())
 
     def __iter__(self):
-        return iter(self.data)
+        return iter(self.fields)
 
     def __next__(self):
-        return next(self.data)
+        return next(self.fields)
     """
     def search(self): #is search similar to get & get_name?
         pass
     """
     def __len__(self):
-        return len(self.data)
+        return len(self.fields)
 
     def get_spans(self):
         """
         Return the name and spans of each field as a dictionary.
         """
         spans={}
-        for name,field in self.data.items():
+        for name,field in self.fields.items():
             spans[name]=field.get_spans()
         return spans
 
@@ -128,13 +156,13 @@ class DataFrame():
         if ddf is not None:
             if not isinstance(ddf,DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
-            for name, field in self.data.items():
+            for name, field in self.fields.items():
                 # TODO integration w/ session, dataset
                 newfld = field.create_like(ddf.name,field.name)
                 ddf.add(field.apply_filter(filter_to_apply,dstfld=newfld),name=name)
             return ddf
         else:
-            for field in self.data.values():
+            for field in self.fields.values():
                 field.apply_filter(filter_to_apply)
             return self
 
@@ -150,13 +178,13 @@ class DataFrame():
         if ddf is not None:
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
-            for name, field in self.data.items():
+            for name, field in self.fields.items():
                 #TODO integration w/ session, dataset
                 newfld = field.create_like(ddf.name, field.name)
                 ddf.add(field.apply_index(index_to_apply,dstfld=newfld), name=name)
             return ddf
         else:
-            for field in self.data.values():
+            for field in self.fields.values():
                 field.apply_index(index_to_apply)
             return self
 
