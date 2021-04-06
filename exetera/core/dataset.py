@@ -59,7 +59,7 @@ class HDF5Dataset(Dataset):
     def close(self):
         self.file.close()
 
-    def create_group(self,name):
+    def create_dataframe(self,name):
         """
         Create a group object in HDF5 file and a Exetera dataframe in memory.
 

@@ -15,6 +15,8 @@ from exetera.core import fields as fld
 from exetera.core import readerwriter as rw
 from exetera.core import validation as val
 from exetera.core import operations as ops
+from exetera.core import dataset as ds
+from exetera.core import dataframe as df
 from exetera.core import utils
 
 
@@ -86,7 +88,8 @@ class Session:
         if name in self.datasets:
             raise ValueError("A dataset with name '{}' is already open, and must be closed first.".format(name))
 
-        self.datasets[name] = h5py.File(dataset_path, h5py_modes[mode])
+        #self.datasets[name] = h5py.File(dataset_path, h5py_modes[mode])
+        self.datasets[name] = ds.HDF5Dataset(dataset_path,mode,name)
         return self.datasets[name]
 
 
@@ -638,30 +641,40 @@ class Session:
 
 
     def create_indexed_string(self, group, name, timestamp=None, chunksize=None):
-        fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
-        return fld.IndexedStringField(self, group[name], write_enabled=True)
+        if isinstance(group,ds.Dataset):
+            pass
+        elif isinstance(group,df.DataFrame):
+            return group.create_indexed_string(self,name, timestamp,chunksize)
 
 
     def create_fixed_string(self, group, name, length, timestamp=None, chunksize=None):
-        fld.fixed_string_field_constructor(self, group, name, length, timestamp, chunksize)
-        return fld.FixedStringField(self, group[name], write_enabled=True)
+        if isinstance(group,ds.Dataset):
+            pass
+        elif isinstance(group,df.DataFrame):
+            return group.create_fixed_string(self,name,  length,timestamp,chunksize)
 
 
     def create_categorical(self, group, name, nformat, key,
                            timestamp=None, chunksize=None):
-        fld.categorical_field_constructor(self, group, name, nformat, key,
-                                          timestamp, chunksize)
-        return fld.CategoricalField(self, group[name], write_enabled=True)
+        if isinstance(group, ds.Dataset):
+            pass
+        elif isinstance(group, df.DataFrame):
+            return group.create_categorical(self, name, nformat,key,timestamp,chunksize)
 
 
     def create_numeric(self, group, name, nformat, timestamp=None, chunksize=None):
-        fld.numeric_field_constructor(self, group, name, nformat, timestamp, chunksize)
-        return fld.NumericField(self, group[name], write_enabled=True)
+        if isinstance(group,ds.Dataset):
+            pass
+        elif isinstance(group,df.DataFrame):
+            return group.create_numeric(self,name, nformat, timestamp, chunksize)
+
 
 
     def create_timestamp(self, group, name, timestamp=None, chunksize=None):
-        fld.timestamp_field_constructor(self, group, name, timestamp, chunksize)
-        return fld.TimestampField(self, group[name], write_enabled=True)
+        if isinstance(group,ds.Dataset):
+            pass
+        elif isinstance(group,df.DataFrame):
+            return group.create_timestamp(self,name, timestamp, chunksize)
 
 
     def get_or_create_group(self, group, name):

@@ -14,33 +14,33 @@ class TestDataFrame(unittest.TestCase):
         bio=BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio,'w','dst')
-            numf = s.create_numeric(dst,'numf','int32')
             #init
             df = dataframe.DataFrame('dst',dst)
             self.assertTrue(isinstance(df, dataframe.DataFrame))
-            fdf = {'/numf',numf}
+            numf = df.create_numeric(s,'numf','uint32')
+            fdf = {'numf',numf}
             df2 = dataframe.DataFrame('dst2',dst,data=fdf)
             self.assertTrue(isinstance(df2,dataframe.DataFrame))
             #add & set & contains
             df.add(numf)
-            self.assertTrue('/numf' in df)
+            self.assertTrue('numf' in df)
             self.assertTrue(df.contains_field(numf))
-            cat=s.create_categorical(dst,'cat','int8',{'a':1,'b':2})
-            self.assertFalse('/cat' in df)
+            cat=s.create_categorical(df2,'cat','int8',{'a':1,'b':2})
+            self.assertFalse('cat' in df)
             self.assertFalse(df.contains_field(cat))
-            df['/cat']=cat
-            self.assertTrue('/cat' in df)
+            df['cat']=cat
+            self.assertTrue('cat' in df)
             #list & get
-            self.assertEqual(id(numf),id(df.get_field('/numf')))
-            self.assertEqual(id(numf), id(df['/numf']))
-            self.assertEqual('/numf',df.get_name(numf))
+            self.assertEqual(id(numf),id(df.get_field('numf')))
+            self.assertEqual(id(numf), id(df['numf']))
+            self.assertEqual('numf',df.get_name(numf))
             #list & iter
             dfit = iter(df)
-            self.assertEqual('/numf',next(dfit))
-            self.assertEqual('/cat', next(dfit))
+            self.assertEqual('numf',next(dfit))
+            self.assertEqual('cat', next(dfit))
             #del & del by field
-            del df['/numf']
-            self.assertFalse('/numf' in df)
+            del df['numf']
+            self.assertFalse('numf' in df)
             df.delete_field(cat)
             self.assertFalse(df.contains_field(cat))
             self.assertIsNone(df.get_name(cat))
@@ -48,12 +48,20 @@ class TestDataFrame(unittest.TestCase):
     def test_dataframe_init_fromh5(self):
         bio = BytesIO()
         with session.Session() as s:
-            dst=s.open_dataset(bio,'r+','dst')
+            ds=s.open_dataset(bio,'w','ds')
+            dst = ds.create_dataframe('dst')
             num=s.create_numeric(dst,'num','uint8')
             num.data.write([1,2,3,4,5,6,7])
             df = dataframe.DataFrame('dst',dst,h5group=dst)
 
-
+    def test_dataframe_create_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'r+', 'dst')
+            df = dataframe.DataFrame('dst',dst)
+            num = df.create_numeric(s,'num','uint32')
+            num.data.write([1,2,3,4])
+            self.assertEqual([1,2,3,4],num.data[:].tolist())
 
     # def test_dataframe_ops(self):
     #     bio = BytesIO()

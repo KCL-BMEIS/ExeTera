@@ -46,7 +46,51 @@ class DataFrame():
                 raise TypeError("The name must be a str object.")
             else:
                 self.fields[name]=field
-        self.fields[field.name]=field #note the name has '/' for hdf5 object
+        self.fields[field.name[field.name.index('/',1)+1:]]=field #note the name has '/' for hdf5 object
+
+    def create_group(self,name):
+        """
+        Create a group object in HDF5 file for field to use.
+
+        :param name: the name of the group and field
+        :return: a hdf5 group object
+        """
+        self.dataset.file.create_group("/"+self.name+"/"+name)
+        return self.dataset.file["/"+self.name+"/"+name]
+
+
+    def create_numeric(self, session, name, nformat, timestamp=None, chunksize=None):
+        fld.numeric_field_constructor(session, self, name, nformat, timestamp, chunksize)
+        field=fld.NumericField(session, self.dataset.file["/"+self.name+"/"+name], write_enabled=True)
+        self.fields[name]=field
+        return self.fields[name]
+
+    def create_indexed_string(self, session, name, timestamp=None, chunksize=None):
+        fld.indexed_string_field_constructor(session, self, name, timestamp, chunksize)
+        field= fld.IndexedStringField(session, self.dataset.file["/"+self.name+"/"+name], write_enabled=True)
+        self.fields[name] = field
+        return self.fields[name]
+
+    def create_fixed_string(self, session, name, length, timestamp=None, chunksize=None):
+        fld.fixed_string_field_constructor(session, self, name, length, timestamp, chunksize)
+        field= fld.FixedStringField(session, self.dataset.file["/"+self.name+"/"+name], write_enabled=True)
+        self.fields[name] = field
+        return self.fields[name]
+
+    def create_categorical(self, session, name, nformat, key,
+                           timestamp=None, chunksize=None):
+        fld.categorical_field_constructor(session, self, name, nformat, key,
+                                          timestamp, chunksize)
+        field= fld.CategoricalField(session, self.dataset.file["/"+self.name+"/"+name], write_enabled=True)
+        self.fields[name] = field
+        return self.fields[name]
+
+    def create_timestamp(self, session, name, timestamp=None, chunksize=None):
+        fld.timestamp_field_constructor(session, self, name, timestamp, chunksize)
+        field= fld.TimestampField(session, self.dataset.file["/"+self.name+"/"+name], write_enabled=True)
+        self.fields[name] = field
+        return self.fields[name]
+
 
     def __contains__(self, name):
         """
