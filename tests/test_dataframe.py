@@ -63,26 +63,26 @@ class TestDataFrame(unittest.TestCase):
             num.data.write([1,2,3,4])
             self.assertEqual([1,2,3,4],num.data[:].tolist())
 
-    # def test_dataframe_ops(self):
-    #     bio = BytesIO()
-    #     with session.Session() as s:
-    #         dst = s.open_dataset(bio, 'w', 'dst')
-    #         df = dataframe.DataFrame('dst',dst)
-    #         numf = s.create_numeric(dst, 'numf', 'int32')
-    #         numf.data.write([5,4,3,2,1])
-    #         df.add(numf)
-    #         fst = s.create_fixed_string(dst,'fst',3)
-    #         fst.data.write([b'e',b'd',b'c',b'b',b'a'])
-    #         df.add(fst)
-    #         index=np.array([4,3,2,1,0])
-    #         ddf = dataframe.DataFrame('dst2',dst)
-    #         df.apply_index(index,ddf)
-    #         self.assertEqual([1,2,3,4,5],ddf.get_field('/numf').data[:].tolist())
-    #         self.assertEqual([b'a',b'b',b'c',b'd',b'e'],ddf.get_field('/fst').data[:].tolist())
-    #
-    #         filter= np.array([True,True,False,False,True])
-    #         df.apply_filter(filter)
-    #         self.assertEqual([1, 2, 5], df.get_field('/numf').data[:].tolist())
-    #         self.assertEqual([b'a', b'b', b'e'], df.get_field('/fst').data[:].tolist())
+    def test_dataframe_ops(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dataframe.DataFrame('dst',dst)
+            numf = s.create_numeric(df, 'numf', 'int32')
+            numf.data.write([5,4,3,2,1])
+            df.add(numf)
+            fst = s.create_fixed_string(df,'fst',3)
+            fst.data.write([b'e',b'd',b'c',b'b',b'a'])
+            df.add(fst)
+            index=np.array([4,3,2,1,0])
+            ddf = dataframe.DataFrame('dst2',dst)
+            df.apply_index(index,ddf)
+            self.assertEqual([1,2,3,4,5],ddf.get_field('numf').data[:].tolist())
+            self.assertEqual([b'a',b'b',b'c',b'd',b'e'],ddf.get_field('fst').data[:].tolist())
+
+            filter= np.array([True,True,False,False,True])
+            df.apply_filter(filter)
+            self.assertEqual([5, 4, 1], df.get_field('numf').data[:].tolist())
+            self.assertEqual([b'e', b'd', b'a'], df.get_field('fst').data[:].tolist())
 
 

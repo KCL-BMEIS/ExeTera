@@ -157,6 +157,15 @@ class HDF5Dataset(Dataset):
     def list(self):
         return tuple(n for n in self.dataframes.keys())
 
+    def keys(self):
+        return self.file.keys()
+
+    def values(self):
+        return self.file.values()
+
+    def items(self):
+        return self.file.items()
+
     def __iter__(self):
         return iter(self.dataframes)
 

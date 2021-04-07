@@ -45,19 +45,23 @@ class TestSessionMerge(unittest.TestCase):
         d1_bytes = BytesIO()
         d2_bytes = BytesIO()
         dr_bytes = BytesIO()
-        with h5py.File(d1_bytes, 'w') as d1_hf:
-            with h5py.File(d2_bytes, 'w') as d2_hf:
-                with h5py.File(dr_bytes, 'w') as dr_hf:
-                    s = session.Session()
+        s = session.Session()
+        with session.Session() as s:
+            dst1=s.open_dataset(d1_bytes,'r+','d1')
+            d1_hf=dst1.create_dataframe('d1')
+            d2_hf=dst1.create_dataframe('d2')
+            dr_hf=dst1.create_dataframe('df')
 
-                    s.create_fixed_string(d1_hf, 'id', 1).data.write(d1_id)
-                    s.create_numeric(d1_hf, 'val', 'int32').data.write(d1_v1)
-                    s.create_timestamp(d1_hf, 'j_valid_from').data.write(d1_jvf)
-                    s.create_timestamp(d1_hf, 'j_valid_to').data.write(d1_jvt)
+            s.create_fixed_string(d1_hf, 'id', 1).data.write(d1_id)
+            s.create_numeric(d1_hf, 'val', 'int32').data.write(d1_v1)
+            s.create_timestamp(d1_hf, 'j_valid_from').data.write(d1_jvf)
+            s.create_timestamp(d1_hf, 'j_valid_to').data.write(d1_jvt)
 
-                    s.create_fixed_string(d2_hf, 'id', 1).data.write(d2_id)
-                    s.create_numeric(d2_hf, 'val', 'int32').data.write(d2_v1)
-                    s.create_timestamp(d2_hf, 'j_valid_from').data.write(d2_jvf)
-                    s.create_timestamp(d2_hf, 'j_valid_to').data.write(d2_jvt)
+            s.create_fixed_string(d2_hf, 'id', 1).data.write(d2_id)
+            s.create_numeric(d2_hf, 'val', 'int32').data.write(d2_v1)
+            s.create_timestamp(d2_hf, 'j_valid_from').data.write(d2_jvf)
+            s.create_timestamp(d2_hf, 'j_valid_to').data.write(d2_jvt)
 
-                    journal.journal_table(s, Schema(), d1_hf, d2_hf, 'id', dr_hf)
+            journal.journal_table(s, Schema(), d1_hf, d2_hf, 'id', dr_hf)
+
+

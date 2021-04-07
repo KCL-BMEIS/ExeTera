@@ -15,8 +15,6 @@ class HDF5Field(Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__()
 
-        # if name is None, the group is an existing field
-        # if name is set but group[name] doesn't exist, then create the field
         if name is None:
             field = group
         else:
@@ -370,8 +368,8 @@ class IndexedStringField(HDF5Field):
 
     def create_like(self, group, name, timestamp=None):
         ts = self.timestamp if timestamp is None else timestamp
-        indexed_string_field_constructor(self._session, group, name, ts, self.chunksize)
-        return IndexedStringField(self._session, group, name, write_enabled=True)
+        return group.create_indexed_string(self._session, name, ts, self.chunksize)
+
 
     @property
     def indexed(self):
@@ -461,8 +459,7 @@ class FixedStringField(HDF5Field):
     def create_like(self, group, name, timestamp=None):
         ts = self.timestamp if timestamp is None else timestamp
         length = self._field.attrs['strlen']
-        fixed_string_field_constructor(self._session, group, name, length, ts, self.chunksize)
-        return FixedStringField(self._session, group, name, write_enabled=True)
+        return group.create_fixed_string(self._session,name,length,ts,self.chunksize)
 
     @property
     def data(self):
@@ -517,8 +514,7 @@ class NumericField(HDF5Field):
     def create_like(self, group, name, timestamp=None):
         ts = self.timestamp if timestamp is None else timestamp
         nformat = self._field.attrs['nformat']
-        numeric_field_constructor(self._session, group, name, nformat, ts, self.chunksize)
-        return NumericField(self._session, group, name, write_enabled=True)
+        return group.create_numeric(self._session,name,nformat,ts,self.chunksize)
 
     @property
     def data(self):
@@ -573,9 +569,7 @@ class CategoricalField(HDF5Field):
         ts = self.timestamp if timestamp is None else timestamp
         nformat = self._field.attrs['nformat'] if 'nformat' in self._field.attrs else 'int8'
         keys = {v: k for k, v in self.keys.items()}
-        categorical_field_constructor(self._session, group, name, nformat, keys,
-                                      ts, self.chunksize)
-        return CategoricalField(self._session, group, name, write_enabled=True)
+        return group.create_categorical(self._session,name,nformat,keys,ts,self.chunksize)
 
     @property
     def data(self):
@@ -639,8 +633,7 @@ class TimestampField(HDF5Field):
 
     def create_like(self, group, name, timestamp=None):
         ts = self.timestamp if timestamp is None else timestamp
-        timestamp_field_constructor(self._session, group, name, ts, self.chunksize)
-        return TimestampField(self._session, group, name, write_enabled=True)
+        return group.create_timestamp(self._session, name, ts, self.chunksize)
 
     @property
     def data(self):
@@ -687,8 +680,7 @@ class TimestampField(HDF5Field):
 
 class IndexedStringImporter:
     def __init__(self, session, group, name, timestamp=None, chunksize=None):
-        indexed_string_field_constructor(session, group, name, timestamp, chunksize)
-        self._field = IndexedStringField(session, group, name, write_enabled=True)
+        self._field=group.create_indexed_string(session,name,timestamp,chunksize)
 
     def chunk_factory(self, length):
         return [None] * length
@@ -706,8 +698,7 @@ class IndexedStringImporter:
 
 class FixedStringImporter:
     def __init__(self, session, group, name, length, timestamp=None, chunksize=None):
-        fixed_string_field_constructor(session, group, name, length, timestamp, chunksize)
-        self._field = FixedStringField(session, group, name, write_enabled=True)
+        self._field=group.create_fixed_string(session,name,length,timestamp,chunksize)
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype=self._field.data.dtype)
@@ -726,17 +717,11 @@ class FixedStringImporter:
 class NumericImporter:
     def __init__(self, session, group, name, dtype, parser, timestamp=None, chunksize=None):
         filter_name = '{}_valid'.format(name)
-        numeric_field_constructor(session, group, name, dtype, timestamp, chunksize)
-        numeric_field_constructor(session, group, filter_name, 'bool',
-                                  timestamp, chunksize)
-
+        self._field=group.create_numeric(session,name,dtype, timestamp, chunksize)
+        self._filter_field=group.create_numeric(session,filter_name, 'bool',timestamp, chunksize)
         chunksize = session.chunksize if chunksize is None else chunksize
-        self._field = NumericField(session, group, name, write_enabled=True)
-        self._filter_field = NumericField(session, group, filter_name, write_enabled=True)
-
         self._parser = parser
         self._values = np.zeros(chunksize, dtype=self._field.data.dtype)
-
         self._filter_values = np.zeros(chunksize, dtype='bool')
 
     def chunk_factory(self, length):
@@ -763,8 +748,7 @@ class NumericImporter:
 class CategoricalImporter:
     def __init__(self, session, group, name, value_type, keys, timestamp=None, chunksize=None):
         chunksize = session.chunksize if chunksize is None else chunksize
-        categorical_field_constructor(session, group, name, value_type, keys, timestamp, chunksize)
-        self._field = CategoricalField(session, group, name, write_enabled=True)
+        self._field=group.create_categorical(session,name,value_type,keys,timestamp,chunksize)
         self._keys = keys
         self._dtype = value_type
         self._key_type = 'U{}'.format(max(len(k.encode()) for k in keys))
@@ -789,15 +773,9 @@ class LeakyCategoricalImporter:
     def __init__(self, session, group, name, value_type, keys, out_of_range,
                  timestamp=None, chunksize=None):
         chunksize = session.chunksize if chunksize is None else chunksize
-        categorical_field_constructor(session, group, name, value_type, keys,
-                                      timestamp, chunksize)
         out_of_range_name = '{}_{}'.format(name, out_of_range)
-        indexed_string_field_constructor(session, group, out_of_range_name,
-                                         timestamp, chunksize)
-
-        self._field = CategoricalField(session, group, name, write_enabled=True)
-        self._str_field = IndexedStringField(session, group, out_of_range_name, write_enabled=True)
-
+        self._field=group.create_categorical(session,name, value_type, keys,timestamp, chunksize)
+        self._str_field =group.create_indexed_string(session,out_of_range_name,timestamp, chunksize)
         self._keys = keys
         self._dtype = value_type
         self._key_type = 'S{}'.format(max(len(k.encode()) for k in keys))
@@ -840,8 +818,7 @@ class DateTimeImporter:
     def __init__(self, session, group, name,
                  optional=False, write_days=False, timestamp=None, chunksize=None):
         chunksize = session.chunksize if chunksize is None else chunksize
-        timestamp_field_constructor(session, group, name, timestamp, chunksize)
-        self._field = TimestampField(session, group, name, write_enabled=True)
+        self._field =group.create_timestamp(session,name, timestamp, chunksize)
         self._results = np.zeros(chunksize , dtype='float64')
         self._optional = optional
 
@@ -884,8 +861,7 @@ class DateTimeImporter:
 class DateImporter:
     def __init__(self, session, group, name,
                  optional=False, timestamp=None, chunksize=None):
-        timestamp_field_constructor(session, group, name, timestamp, chunksize)
-        self._field = TimestampField(session, group, name, write_enabled=True)
+        self._field=group.create_timestamp(session,name, timestamp, chunksize)
         self._results = np.zeros(chunksize, dtype='float64')
 
         if optional is True:

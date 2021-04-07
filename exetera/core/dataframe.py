@@ -1,5 +1,6 @@
 from exetera.core import fields as fld
 from datetime import  datetime,timezone
+from exetera.core import  dataset as dst
 import h5py
 
 class DataFrame():
@@ -20,7 +21,8 @@ class DataFrame():
         self.fields = dict()
         self.name = name
         self.dataset = dataset
-
+        if isinstance(dataset,dst.HDF5Dataset):
+            dataset[name]=self
         if data is not None:
             if isinstance(data,dict) and isinstance(list(data.items())[0][0],str) and isinstance(list(data.items())[0][1], fld.Field) :
                 self.fields=data
@@ -56,6 +58,7 @@ class DataFrame():
         :return: a hdf5 group object
         """
         self.dataset.file.create_group("/"+self.name+"/"+name)
+
         return self.dataset.file["/"+self.name+"/"+name]
 
 
@@ -168,6 +171,15 @@ class DataFrame():
     def list(self):
         return tuple(n for n in self.fields.keys())
 
+    def keys(self):
+        return self.fields.keys()
+
+    def values(self):
+        return self.fields.values()
+
+    def items(self):
+        return self.fields.items()
+
     def __iter__(self):
         return iter(self.fields)
 
@@ -202,7 +214,7 @@ class DataFrame():
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self.fields.items():
                 # TODO integration w/ session, dataset
-                newfld = field.create_like(ddf.name,field.name)
+                newfld = field.create_like(ddf,field.name)
                 ddf.add(field.apply_filter(filter_to_apply,dstfld=newfld),name=name)
             return ddf
         else:
@@ -223,8 +235,7 @@ class DataFrame():
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self.fields.items():
-                #TODO integration w/ session, dataset
-                newfld = field.create_like(ddf.name, field.name)
+                newfld = field.create_like(ddf, field.name)
                 ddf.add(field.apply_index(index_to_apply,dstfld=newfld), name=name)
             return ddf
         else:
