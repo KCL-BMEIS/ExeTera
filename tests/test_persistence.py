@@ -506,11 +506,12 @@ class TestPersistence(unittest.TestCase):
             reader2 = datastore.get_reader(hf['foo2'])
             self.assertTrue(np.array_equal(reader[:], reader2[:]))
 
-
+    from dateutil import tz as tzd
     def test_timestamp_reader(self):
 
         datastore = persistence.DataStore(10)
-        dt = datetime.now(timezone.utc)
+        from dateutil import tz
+        dt = datetime.now(tz=tz.tzlocal())
         ts = str(dt)
         bio = BytesIO()
         random.seed(12345678)
@@ -533,7 +534,8 @@ class TestPersistence(unittest.TestCase):
     def test_new_timestamp_reader(self):
 
         datastore = persistence.DataStore(10)
-        dt = datetime.now(timezone.utc)
+        from dateutil import tz
+        dt = datetime.now(tz=tz.tzlocal())
         ts = str(dt)
         bio = BytesIO()
         random.seed(12345678)
@@ -560,7 +562,7 @@ class TestPersistence(unittest.TestCase):
     def test_new_timestamp_writer_from_reader(self):
 
         datastore = persistence.DataStore(10)
-        dt = datetime.now(timezone.utc)
+        dt = datetime.now(timezone.utc)+timedelta(hours=1)
         ts = str(dt)
         bio = BytesIO()
         random.seed(12345678)
