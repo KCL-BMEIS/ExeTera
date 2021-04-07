@@ -188,7 +188,8 @@ class TestGetPeriodOffsets(unittest.TestCase):
         periods_by_day = np.asarray([0, 0, 0, 1, 1, 1, 2], dtype=np.int32)
         in_range = np.asarray([1, 1, 1, 1, 1, 1, 1, 0], dtype=bool)
         days = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype=np.int32)
-        self.assertRaises(ValueError)
+        with self.assertRaises(IndexError):
+            dth.get_period_offsets(periods_by_day, days)
         actual = dth.get_period_offsets(periods_by_day, days, in_range)
         expected = np.asarray([0, 0, 0, 1, 1, 1, 2, -1])
         self.assertListEqual(actual.tolist(), expected.tolist())

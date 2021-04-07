@@ -144,7 +144,7 @@ def generate_period_offset_map(periods: Sequence[datetime]
 
 def get_period_offsets(periods_by_day: ArrayLike,
                        days: ArrayLike,
-                       in_range: Optional[ArrayLike]
+                       in_range: Optional[ArrayLike] = None
                        ) -> ArrayLike:
     """
     Given a ``periods_by_day``, a numpy array of days mapping to periods and ``days``, a numpy array of days to be mapped to
