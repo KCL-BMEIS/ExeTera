@@ -19,6 +19,9 @@ import numpy as np
 from numba import njit
 
 
+SECONDS_PER_DAY = 86400
+
+
 def validate_file_exists(file_name):
     import os
     if not os.path.exists(file_name):
