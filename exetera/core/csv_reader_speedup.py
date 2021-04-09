@@ -19,7 +19,6 @@ class Timer:
 
 def main():
     source = 'resources/assessment_input_small_data.csv' 
-
     print(source)
     # run once first
     original_csv_read(source)
@@ -52,12 +51,11 @@ def file_read_line_fast_csv(source):
         header = csv.DictReader(f)
         count_columns = len(header.fieldnames)
         content = f.read()
-        count_rows = content.count('\n')
+        count_rows = content.count('\n') + 1
 
-    #print(count_rows, count_columns)
-    #print(content)
+    content = np.fromfile(source, dtype='|S1')
+
     column_inds = np.zeros(count_rows * count_columns, dtype = np.int64).reshape(count_rows, count_columns)
-    #content_nparray = np.array(list(content))
 
     my_fast_csv_reader_int(content, column_inds)
 
@@ -69,9 +67,9 @@ def file_read_line_fast_csv(source):
 
 @njit
 def my_fast_csv_reader_int(source, column_inds):
-    ESCAPE_VALUE = '"' 
-    SEPARATOR_VALUE = ','
-    NEWLINE_VALUE = '\n'    
+    ESCAPE_VALUE = b'"' 
+    SEPARATOR_VALUE = b','
+    NEWLINE_VALUE = b'\n'    
 
     #max_rowcount = len(column_inds) - 1
     colcount = len(column_inds[0])
@@ -99,7 +97,6 @@ def my_fast_csv_reader_int(source, column_inds):
     escaped_literal_candidate = False
     while True:
         c = source[index]
-
         if c == SEPARATOR_VALUE:
             if not escaped: #or escaped_literal_candidate:
                 # don't write this char
