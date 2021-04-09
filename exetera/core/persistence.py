@@ -24,6 +24,8 @@ import pandas as pd
 
 from exetera.core import validation as val
 from exetera.core import readerwriter as rw
+from exetera.core import fields as fld
+from exetera.core import operations as ops
 from exetera.core.operations import INVALID_INDEX, DEFAULT_CHUNKSIZE
 
 # TODO: rename this persistence file to hdf5persistence
@@ -264,15 +266,16 @@ def temp_dataset():
         hd.close()
 
 
-def _get_spans(field, fields):
-    if field is not None:
-        return _get_spans_for_field(field)
-    elif len(fields) == 1:
-        return _get_spans_for_field(fields[0])
-    elif len(fields) == 2:
-        return _get_spans_for_2_fields(*fields)
-    else:
-        raise NotImplementedError("This operation does not support more than two fields at present")
+# def _get_spans(field, fields):
+#
+#     if field is not None:
+#         return _get_spans_for_field(field)
+#     elif len(fields) == 1:
+#         return _get_spans_for_field(fields[0])
+#     elif len(fields) == 2:
+#         return _get_spans_for_2_fields(*fields)
+#     else:
+#         raise NotImplementedError("This operation does not support more than two fields at present")
 
 
 @njit
@@ -284,30 +287,28 @@ def _index_spans(spans, results):
     return results
 
 
-def _get_spans_for_field(field0):
-    results = np.zeros(len(field0) + 1, dtype=np.bool)
-    if np.issubdtype(field0.dtype, np.number):
-        fn = np.not_equal
-    else:
-        fn = np.char.not_equal
-    results[1:-1] = fn(field0[:-1], field0[1:])
+# def _get_spans_for_field(field0):
+#     results = np.zeros(len(field0) + 1, dtype=np.bool)
+#     if np.issubdtype(field0.dtype, np.number):
+#         fn = np.not_equal
+#     else:
+#         fn = np.char.not_equal
+#     results[1:-1] = fn(field0[:-1], field0[1:])
+#
+#     results[0] = True
+#     results[-1] = True
+#     return np.nonzero(results)[0]
 
-    results[0] = True
-    results[-1] = True
-    return np.nonzero(results)[0]
-
-
-@njit
-def _get_spans_for_2_fields(field0, field1):
-    count = 0
-    spans = np.zeros(len(field0)+1, dtype=np.uint32)
-    spans[0] = 0
-    for i in np.arange(1, len(field0)):
-        if field0[i] != field0[i-1] or field1[i] != field1[i-1]:
-            count += 1
-            spans[count] = i
-    spans[count+1] = len(field0)
-    return spans[:count+2]
+# def _get_spans_for_2_fields(field0, field1):
+#     count = 0
+#     spans = np.zeros(len(field0)+1, dtype=np.uint32)
+#     spans[0] = 0
+#     for i in np.arange(1, len(field0)):
+#         if field0[i] != field0[i-1] or field1[i] != field1[i-1]:
+#             count += 1
+#             spans[count] = i
+#     spans[count+1] = len(field0)
+#     return spans[:count+2]
 
 
 @njit
@@ -692,7 +693,7 @@ def _aggregate_impl(predicate, fkey_indices=None, fkey_index_spans=None,
             raise ValueError("'writer' must be either a Writer or an ndarray instance")
 
     if fkey_index_spans is None:
-        fkey_index_spans = _get_spans(field=fkey_indices)
+        fkey_index_spans = ops.get_spans_for_field(fkey_indices)
 
     if isinstance(writer, np.ndarray):
         if len(writer) != len(fkey_index_spans) - 1:
@@ -808,8 +809,8 @@ class DataStore:
             src_indices = reader.field['index'][:]
             src_values = reader.field.get('values', np.zeros(0, dtype=np.uint8))[:]
             if len(src_indices) != len(filter_to_apply) + 1:
-                raise ValueError(f"'indices' (length {len(indices)}) must be one longer than "
-                                 f"'index_filter' (length {len(index_filter)})")
+                raise ValueError(f"'indices' (length {len(src_indices)}) must be one longer than "
+                                 f"'index_filter' (length {len(filter_to_apply)})")
 
             indices, values = _apply_filter_to_index_values(filter_to_apply,
                                                             src_indices, src_values)
@@ -883,21 +884,17 @@ class DataStore:
 
 
     def get_spans(self, field=None, fields=None):
-        if field is None and fields is None:
-            raise ValueError("One of 'field' and 'fields' must be set")
-        if field is not None and fields is not None:
-            raise ValueError("Only one of 'field' and 'fields' may be set")
-        raw_field = None
-        raw_fields = None
-        if field is not None:
-            val._check_is_reader_or_ndarray('field', field)
-            raw_field = field[:] if isinstance(field, rw.Reader) else field
+        if fields is not None:
+            if isinstance(fields[0], fld.Field):
+                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(), fields[1].get_spans())
+            if isinstance(fields[0], np.ndarray):
+                return ops._get_spans_for_2_fields(fields[0], fields[1])
         else:
-            raw_fields = []
-            for f in fields:
-                val._check_is_reader_or_ndarray('elements of tuple/list fields', f)
-                raw_fields.append(f[:] if isinstance(f, rw.Reader) else f)
-        return _get_spans(raw_field, raw_fields)
+            if isinstance(field, fld.Field):
+                return field.get_spans()
+            if isinstance(field, np.ndarray):
+                return ops.get_spans_for_field(field)
+
 
 
     def index_spans(self, spans):
@@ -1240,7 +1237,7 @@ class DataStore:
 
     def get_reader(self, field):
         if 'fieldtype' not in field.attrs.keys():
-            raise ValueError(f"'{field_name}' is not a well-formed field")
+            raise ValueError(f"'{field.name}' is not a well-formed field")
 
         fieldtype_map = {
             'indexedstring': rw.IndexedStringReader,
@@ -1259,7 +1256,7 @@ class DataStore:
 
     def get_existing_writer(self, field, timestamp=None):
         if 'fieldtype' not in field.attrs.keys():
-            raise ValueError(f"'{field_name}' is not a well-formed field")
+            raise ValueError(f"'{field.name}' is not a well-formed field")
 
         fieldtype_map = {
             'indexedstring': rw.IndexedStringReader,

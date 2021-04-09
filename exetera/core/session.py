@@ -1,3 +1,14 @@
+# Copyright 2020 KCL-BMEIS - King's College London
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import uuid
 from datetime import datetime, timezone
@@ -8,12 +19,15 @@ import pandas as pd
 
 import h5py
 
+from exetera.core.abstract_types import Field
 from exetera.core import operations
 from exetera.core import persistence as per
 from exetera.core import fields as fld
 from exetera.core import readerwriter as rw
 from exetera.core import validation as val
 from exetera.core import operations as ops
+from exetera.core import dataset as ds
+from exetera.core import dataframe as df
 from exetera.core import utils
 
 
@@ -85,7 +99,8 @@ class Session:
         if name in self.datasets:
             raise ValueError("A dataset with name '{}' is already open, and must be closed first.".format(name))
 
-        self.datasets[name] = h5py.File(dataset_path, h5py_modes[mode])
+        #self.datasets[name] = h5py.File(dataset_path, h5py_modes[mode])
+        self.datasets[name] = ds.HDF5Dataset(dataset_path,mode,name)
         return self.datasets[name]
 
 
@@ -256,7 +271,7 @@ class Session:
         and returned from the function call. If the field is an IndexedStringField, the
         indices and values are returned separately.
 
-        :param filter_to_apply: the filter to be applied to the source field
+        :param filter_to_apply: the filter to be applied to the source field, an array of boolean
         :param src: the field to be filtered
         :param dest: optional - a field to write the filtered data to
         :return: the filtered values
@@ -266,14 +281,12 @@ class Session:
         if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
         if isinstance(src, fld.IndexedStringField):
-            src_ = val.field_from_parameter(self, 'reader', src)
-            dest_indices, dest_values =\
-                ops.apply_filter_to_index_values(filter_to_apply_,
-                                                 src_.indices[:], src_.values[:])
-            if writer_ is not None:
-                writer_.indices.write(dest_indices)
-                writer_.values.write(dest_values)
-            return dest_indices, dest_values
+            newfld = src.apply_filter(filter_to_apply_,writer_)
+            return newfld.indices, newfld.values
+        elif isinstance(src,fld.Field):
+            newfld = src.apply_filter(filter_to_apply_,writer_)
+            return newfld.data[:]
+        #elif isinstance(src, df.datafrme):
         else:
             reader_ = val.array_from_parameter(self, 'reader', src)
             result = reader_[filter_to_apply]
@@ -288,7 +301,7 @@ class Session:
         and returned from the function call. If the field is an IndexedStringField, the
         indices and values are returned separately.
 
-        :param index_to_apply: the index to be applied to the source field
+        :param index_to_apply: the index to be applied to the source field, must be one of Group, Field, or ndarray
         :param src: the field to be index
         :param dest: optional - a field to write the indexed data to
         :return: the indexed values
@@ -298,14 +311,13 @@ class Session:
         if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
         if isinstance(src, fld.IndexedStringField):
-            src_ = val.field_from_parameter(self, 'reader', src)
-            dest_indices, dest_values =\
+            dest_indices, dest_values = \
                 ops.apply_indices_to_index_values(index_to_apply_,
-                                                  src_.indices[:], src_.values[:])
-            if writer_ is not None:
-                writer_.indices.write(dest_indices)
-                writer_.values.write(dest_values)
+                                                  src.indices[:], src.values[:])
             return dest_indices, dest_values
+        elif isinstance(src,fld.Field):
+            newfld = src.apply_index(index_to_apply_,writer_)
+            return newfld.data[:]
         else:
             reader_ = val.array_from_parameter(self, 'reader', src)
             result = reader_[index_to_apply]
@@ -350,24 +362,21 @@ class Session:
             field: [1, 2, 2, 1, 1, 1, 3, 4, 4, 4, 2, 2, 2, 2, 2]
             result: [0, 1, 3, 6, 7, 10, 15]
         """
-        if field is None and fields is None:
-            raise ValueError("One of 'field' and 'fields' must be set")
-        if field is not None and fields is not None:
-            raise ValueError("Only one of 'field' and 'fields' may be set")
-        raw_field = None
-        raw_fields = None
-        if field is not None:
-            raw_field = val.array_from_parameter(self, 'field', field)
-
-        raw_fields = []
         if fields is not None:
-            for i_f, f in enumerate(fields):
-                raw_fields.append(val.array_from_parameter(self, "'fields[{}]'".format(i_f), f))
-        return per._get_spans(raw_field, raw_fields)
+            if isinstance(fields[0],fld.Field):
+                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(),fields[1].get_spans())
+            if isinstance(fields[0],np.ndarray):
+                return ops._get_spans_for_2_fields(fields[0],fields[1])
+        else:
+            if isinstance(field,fld.Field):
+                return field.get_spans()
+            if isinstance(field,np.ndarray):
+                return ops.get_spans_for_field(field)
+
 
 
     def _apply_spans_no_src(self, predicate, spans, dest=None):
-        assert(dest is None or isinstance(dest, fld.Field))
+        assert(dest is None or isinstance(dest, Field))
         if dest is not None:
             dest_f = val.field_from_parameter(self, 'dest', dest)
             results = np.zeros(len(spans) - 1, dtype=dest_f.data.dtype)
@@ -380,7 +389,7 @@ class Session:
             return results
 
     def _apply_spans_src(self, predicate, spans, src, dest=None):
-        assert(dest is None or isinstance(dest, fld.Field))
+        assert(dest is None or isinstance(dest, Field))
         src_ = val.array_from_parameter(self, 'src', src)
         if len(src) != spans[-1]:
             error_msg = ("'src' (length {}) must be one element shorter than 'spans' "
@@ -609,7 +618,7 @@ class Session:
 
 
     def get(self, field):
-        if isinstance(field, fld.Field):
+        if isinstance(field, Field):
             return field
 
         if 'fieldtype' not in field.attrs.keys():
@@ -636,37 +645,47 @@ class Session:
                 raise ValueError("{} is not a well-formed field".format(field))
             f = self.get(field)
             return f.create_like(dest_group, dest_name)
-        elif isinstance(field, field.Field):
+        elif isinstance(field, Field):
             return field.create_like(dest_group, dest_name)
         else:
             raise ValueError("'field' must be either a Field or a h5py.Group, but is {}".format(type(field)))
 
 
     def create_indexed_string(self, group, name, timestamp=None, chunksize=None):
-        fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
-        return fld.IndexedStringField(self, group[name], write_enabled=True)
+        if isinstance(group,ds.Dataset):
+            pass
+        elif isinstance(group,df.DataFrame):
+            return group.create_indexed_string(self,name, timestamp,chunksize)
 
 
     def create_fixed_string(self, group, name, length, timestamp=None, chunksize=None):
-        fld.fixed_string_field_constructor(self, group, name, length, timestamp, chunksize)
-        return fld.FixedStringField(self, group[name], write_enabled=True)
+        if isinstance(group,ds.Dataset):
+            pass
+        elif isinstance(group,df.DataFrame):
+            return group.create_fixed_string(self,name,  length,timestamp,chunksize)
 
 
     def create_categorical(self, group, name, nformat, key,
                            timestamp=None, chunksize=None):
-        fld.categorical_field_constructor(self, group, name, nformat, key,
-                                          timestamp, chunksize)
-        return fld.CategoricalField(self, group[name], write_enabled=True)
+        if isinstance(group, ds.Dataset):
+            pass
+        elif isinstance(group, df.DataFrame):
+            return group.create_categorical(self, name, nformat,key,timestamp,chunksize)
 
 
     def create_numeric(self, group, name, nformat, timestamp=None, chunksize=None):
-        fld.numeric_field_constructor(self, group, name, nformat, timestamp, chunksize)
-        return fld.NumericField(self, group[name], write_enabled=True)
+        if isinstance(group,ds.Dataset):
+            pass
+        elif isinstance(group,df.DataFrame):
+            return group.create_numeric(self,name, nformat, timestamp, chunksize)
+
 
 
     def create_timestamp(self, group, name, timestamp=None, chunksize=None):
-        fld.timestamp_field_constructor(self, group, name, timestamp, chunksize)
-        return fld.TimestampField(self, group[name], write_enabled=True)
+        if isinstance(group,ds.Dataset):
+            pass
+        elif isinstance(group,df.DataFrame):
+            return group.create_timestamp(self,name, timestamp, chunksize)
 
 
     def get_or_create_group(self, group, name):

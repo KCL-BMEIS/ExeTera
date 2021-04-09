@@ -1,9 +1,22 @@
+# Copyright 2020 KCL-BMEIS - King's College London
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 import numpy as np
 
 import h5py
 
-from exetera.core import fields as fld
+from exetera.core.abstract_types import Field
 from exetera.core import readerwriter as rw
+from exetera.core import fields as flds
 
 
 def _writer_from_writer_or_group(writer_getter, param_name, writer):
@@ -53,8 +66,8 @@ def _check_all_readers_valid_and_same_type(readers):
         expected_type = h5py.Group
     elif isinstance(readers[0], rw.Reader):
         expected_type = rw.Reader
-    elif isinstance(readers[0], fld.Field):
-        expected_type = fld.Field
+    elif isinstance(readers[0], Field):
+        expected_type = Field
     elif isinstance(readers[0], np.ndarray):
         expected_type = np.ndarray
     else:
@@ -96,12 +109,12 @@ def _reader_from_group_if_required(reader_source, name, reader):
 
 
 def ensure_valid_field(name, field):
-    if not isinstance(field, fld.Field):
+    if not isinstance(field, Field):
         raise ValueError("'{}' is not of type '{}'; expected Field".format(name, type(field)))
 
 
 def ensure_valid_field_like(name, field):
-    if not isinstance(field, (h5py.Group, fld.Field, np.ndarray)):
+    if not isinstance(field, (h5py.Group, Field, np.ndarray)):
         raise ValueError("'{}' is of type '{}'; expected Group, Field or ndarray".format(name, type(field)))
 
 
@@ -110,7 +123,7 @@ def raw_array_from_parameter(datastore, name, field):
         return datastore.get(field).data[:]
     elif isinstance(field, rw.Reader):
         return field[:]
-    elif isinstance(field, fld.Field):
+    elif isinstance(field, Field):
         return field.data[:]
     elif isinstance(field, np.ndarray):
         return field
@@ -122,7 +135,9 @@ def raw_array_from_parameter(datastore, name, field):
 def array_from_parameter(session, name, field):
     if isinstance(field, h5py.Group):
         return session.get(field).data[:]
-    elif isinstance(field, fld.Field):
+    elif isinstance(field, flds.IndexedStringField):
+        return field.indices[:],field.values[:]
+    elif isinstance(field, flds.Field):
         return field.data[:]
     elif isinstance(field, np.ndarray):
         return field
@@ -131,17 +146,29 @@ def array_from_parameter(session, name, field):
         raise ValueError(error_str.format(name, type(field)))
 
 
+def array_from_field_or_lower(name, field):
+    if isinstance(field, Field):
+        return field.data[:]
+    elif isinstance(field, np.ndarray):
+        return field
+    else:
+        error_str = "'{}' must be one of (Field, or ndarray, but is {}"
+        raise ValueError(error_str.format(name, type(field)))
+
+
 def field_from_parameter(session, name, field):
     if isinstance(field, h5py.Group):
         return session.get(field)
-    elif isinstance(field, fld.Field):
+    elif isinstance(field, Field):
         return field
     else:
         error_str = "'{}' must be one of (Group, Field, or ndarray, but is {}"
         raise ValueError(error_str.format(name, type(field)))
 
+
 def is_field_parameter(field):
-    return isinstance(field, (fld.Field, h5py.Group))
+    return isinstance(field, (Field, h5py.Group))
+
 
 def all_same_basic_type(name, fields):
     msg = "'{}' cannot be mixture of groups, fields and ndarrays".format(name)
@@ -149,9 +176,9 @@ def all_same_basic_type(name, fields):
         for f in fields[1:]:
             if not isinstance(f, h5py.Group):
                 raise ValueError(msg)
-    if isinstance(fields[0], fld.Field):
+    if isinstance(fields[0], Field):
         for f in fields[1:]:
-            if not isinstance(f, fld.Field):
+            if not isinstance(f, Field):
                 raise ValueError(msg)
     if isinstance(fields[0], np.ndarray):
         for f in fields[1:]:

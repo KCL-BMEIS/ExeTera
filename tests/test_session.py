@@ -72,36 +72,39 @@ class TestSessionMerge(unittest.TestCase):
 
     def test_merge_left_dataset(self):
         bio1 = BytesIO()
-        with h5py.File(bio1, 'w') as src:
-            s = session.Session()
+        with session.Session() as s:
+            src = s.open_dataset(bio1,'w','src')
+
             p_id = np.array([100, 200, 300, 400, 500, 600, 800, 900])
             p_val = np.array([-1, -2, -3, -4, -5, -6, -8, -9])
             a_pid = np.array([100, 100, 100, 200, 200, 400, 400, 400, 400, 600,
                               600, 600, 700, 700, 900, 900, 900])
             a_val = np.array([10, 11, 12, 23, 22, 40, 43, 42, 41, 60,
                               61, 63, 71, 71, 94, 93, 92])
-            src.create_group('p')
+            src.create_dataframe('p')
             s.create_numeric(src['p'], 'id', 'int32').data.write(p_id)
             s.create_numeric(src['p'], 'val', 'int32').data.write(p_val)
-            src.create_group('a')
+            src.create_dataframe('a')
             s.create_numeric(src['a'], 'pid', 'int32').data.write(a_pid)
 
-        bio2 = BytesIO()
-        with h5py.File(bio1, 'r') as src:
-            with h5py.File(bio2, 'w') as snk:
-                s.merge_left(s.get(src['a']['pid']), s.get(src['p']['id']),
+            bio2 = BytesIO()
+            dst = s.open_dataset(bio2,'w','dst')
+            snk=dst.create_dataframe('snk')
+            s.merge_left(s.get(src['a']['pid']), s.get(src['p']['id']),
                              right_fields=(s.get(src['p']['val']),),
                              right_writers=(s.create_numeric(snk, 'val', 'int32'),)
                              )
-                expected = [-1, -1, -1, -2, -2, -4, -4, -4, -4, -6, -6, -6, 0, 0, -9, -9, -9]
-                actual = s.get(snk['val']).data[:]
-                self.assertListEqual(expected, actual.data[:].tolist())
+            expected = [-1, -1, -1, -2, -2, -4, -4, -4, -4, -6, -6, -6, 0, 0, -9, -9, -9]
+            actual = s.get(snk['val']).data[:]
+            self.assertListEqual(expected, actual.data[:].tolist())
 
 
     def test_ordered_merge_left_2(self):
         bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
-            s = session.Session()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            hf = dst.create_dataframe('dst')
+
             p_id = np.array([100, 200, 300, 400, 500, 600, 800, 900])
             p_val = np.array([-1, -2, -3, -4, -5, -6, -8, -9])
             a_pid = np.array([100, 100, 100, 200, 200, 400, 400, 400, 400, 600,
@@ -126,8 +129,9 @@ class TestSessionMerge(unittest.TestCase):
 
     def test_ordered_merge_right_2(self):
         bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
-            s = session.Session()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            hf = dst.create_dataframe('dst')
             p_id = np.array([100, 200, 300, 400, 500, 600, 800, 900])
             p_val = np.array([-1, -2, -3, -4, -5, -6, -8, -9])
             a_pid = np.array([100, 100, 100, 200, 200, 400, 400, 400, 400, 600,
@@ -248,8 +252,9 @@ class TestSessionMerge(unittest.TestCase):
                                   dtype=np.int32)
 
         bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
-            s = session.Session()
+        with session.Session() as s:
+            dst = s.open_dataset(bio,'w','dst')
+            hf=dst.create_dataframe('dst')
             l_id_f = s.create_fixed_string(hf, 'l_id', 1); l_id_f.data.write(l_id)
             l_vals_f = s.create_numeric(hf, 'l_vals_f', 'int32'); l_vals_f.data.write(l_vals)
             l_vals_2_f = s.create_numeric(hf, 'l_vals_2_f', 'int32'); l_vals_2_f.data.write(l_vals_2)
@@ -339,7 +344,10 @@ class TestSessionSort(unittest.TestCase):
         vb = np.asarray([5, 4, 3, 2, 1])
 
         bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            hf = dst.create_dataframe('dst')
+
             s.create_fixed_string(hf, 'x', 1).data.write(vx)
             s.create_numeric(hf, 'a', 'int32').data.write(va)
             s.create_numeric(hf, 'b', 'int32').data.write(vb)
@@ -366,7 +374,10 @@ class TestSessionSort(unittest.TestCase):
         vb = np.asarray([5, 4, 3, 2, 1])
 
         bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            hf = dst.create_dataframe('dst')
+
             s.create_fixed_string(hf, 'x', 1).data.write(vx)
             s.create_numeric(hf, 'a', 'int32').data.write(va)
             s.create_numeric(hf, 'b', 'int32').data.write(vb)
@@ -390,7 +401,8 @@ class TestSessionSort(unittest.TestCase):
 
         bio = BytesIO()
         with session.Session(10) as s:
-            src = s.open_dataset(bio, "w", "src")
+            dst = s.open_dataset(bio, "w", "src")
+            src = dst.create_dataframe('ds')
             idx_f = s.create_fixed_string(src, "idx", 1)
             val_f = s.create_numeric(src, "val", "int32")
             val2_f = s.create_indexed_string(src, "val2")
@@ -425,7 +437,8 @@ class TestSessionGetSpans(unittest.TestCase):
         with session.Session() as s:
             self.assertListEqual([0, 1, 3, 5, 6, 9], s.get_spans(vals).tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "src")
+            ds = dst.create_dataframe('ds')
             vals_f = s.create_numeric(ds, "vals", "int32")
             vals_f.data.write(vals)
             self.assertListEqual([0, 1, 3, 5, 6, 9], s.get_spans(s.get(ds['vals'])).tolist())
@@ -438,12 +451,23 @@ class TestSessionGetSpans(unittest.TestCase):
         with session.Session() as s:
             self.assertListEqual([0, 2, 3, 5, 6, 8, 12], s.get_spans(fields=(vals_1, vals_2)).tolist())
 
-            ds = s.open_dataset(bio, 'w', 'ds')
+            dst = s.open_dataset(bio, "w", "src")
+            ds = dst.create_dataframe('ds')
             vals_1_f = s.create_fixed_string(ds, 'vals_1', 1)
             vals_1_f.data.write(vals_1)
             vals_2_f = s.create_numeric(ds, 'vals_2', 'int32')
             vals_2_f.data.write(vals_2)
             self.assertListEqual([0, 2, 3, 5, 6, 8, 12], s.get_spans(fields=(vals_1, vals_2)).tolist())
+
+    def test_get_spans_index_string_field(self):
+        bio=BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            ds = dst.create_dataframe('ds')
+            idx= s.create_indexed_string(ds,'idx')
+            idx.data.write(['aa','bb','bb','c','c','c','d','d','e','f','f','f'])
+            self.assertListEqual([0,1,3,6,8,9,12],s.get_spans(idx))
+
 
 
 class TestSessionAggregate(unittest.TestCase):
@@ -457,7 +481,8 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.apply_spans_count(spans)
             self.assertListEqual([1, 2, 3, 4], results.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             s.apply_spans_count(spans, dest=s.create_numeric(ds, 'result', 'int32'))
             self.assertListEqual([1, 2, 3, 4], s.get(ds['result']).data[:].tolist())
 
@@ -471,7 +496,8 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.apply_spans_first(spans, vals)
             self.assertListEqual([0, 8, 6, 3], results.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             s.apply_spans_first(spans, vals, dest=s.create_numeric(ds, 'result', 'int64'))
             self.assertListEqual([0, 8, 6, 3], s.get(ds['result']).data[:].tolist())
 
@@ -488,7 +514,8 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.apply_spans_last(spans, vals)
             self.assertListEqual([0, 2, 5, 9], results.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             s.apply_spans_last(spans, vals, dest=s.create_numeric(ds, 'result', 'int64'))
             self.assertListEqual([0, 2, 5, 9], s.get(ds['result']).data[:].tolist())
 
@@ -505,7 +532,8 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.apply_spans_min(spans, vals)
             self.assertListEqual([0, 2, 4, 1], results.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             s.apply_spans_min(spans, vals, dest=s.create_numeric(ds, 'result', 'int64'))
             self.assertListEqual([0, 2, 4, 1], s.get(ds['result']).data[:].tolist())
 
@@ -522,7 +550,8 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.apply_spans_max(spans, vals)
             self.assertListEqual([0, 8, 6, 9], results.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             s.apply_spans_max(spans, vals, dest=s.create_numeric(ds, 'result', 'int64'))
             self.assertListEqual([0, 8, 6, 9], s.get(ds['result']).data[:].tolist())
 
@@ -538,7 +567,8 @@ class TestSessionAggregate(unittest.TestCase):
             spans = s.get_spans(idx)
             self.assertListEqual([0, 1, 3, 6, 10], spans.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             s.create_indexed_string(ds, 'vals').data.write(vals)
             s.apply_spans_concat(spans, s.get(ds['vals']), dest=s.create_indexed_string(ds, 'result'))
             self.assertListEqual([0, 1, 4, 9, 16], s.get(ds['result']).indices[:].tolist())
@@ -552,7 +582,8 @@ class TestSessionAggregate(unittest.TestCase):
             spans = s.get_spans(idx)
             self.assertListEqual([0, 2, 3, 5, 6, 10], spans.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             s.create_indexed_string(ds, 'vals').data.write(vals)
             s.apply_spans_concat(spans, s.get(ds['vals']), dest=s.create_indexed_string(ds, 'result'))
             self.assertListEqual([0, 7, 8, 15, 20, 35], s.get(ds['result']).indices[:].tolist())
@@ -572,7 +603,8 @@ class TestSessionAggregate(unittest.TestCase):
             # results = s.apply_spans_concat(spans, vals)
             # self.assertListEqual([0, 8, 6, 9], results.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             # s.apply_spans_concat(spans, vals, dest=s.create_indexed_string(ds, 'result'))
             # self.assertListEqual([0, 8, 6, 9], s.get(ds['result']).data[:].tolist())
 
@@ -600,7 +632,8 @@ class TestSessionAggregate(unittest.TestCase):
             self.assertListEqual([0, 3, 5, 8, 10, 13, 15, 18, 20, 23, 25, 28,
                                   30, 33, 35, 38, 40, 43, 45, 48, 50], spans.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             s.create_indexed_string(ds, 'vals').data.write(vals)
 
             expected_indices = [0,
@@ -628,7 +661,8 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.aggregate_count(idx)
             self.assertListEqual([1, 2, 3, 4], results.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             s.aggregate_count(idx, dest=s.create_numeric(ds, 'result', 'int32'))
             self.assertListEqual([1, 2, 3, 4], s.get(ds['result']).data[:].tolist())
 
@@ -640,7 +674,8 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.aggregate_first(idx, vals)
             self.assertListEqual([0, 8, 6, 3], results.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             s.aggregate_first(idx, vals, dest=s.create_numeric(ds, 'result', 'int64'))
             self.assertListEqual([0, 8, 6, 3], s.get(ds['result']).data[:].tolist())
 
@@ -656,7 +691,8 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.aggregate_last(idx, vals)
             self.assertListEqual([0, 2, 5, 9], results.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             s.aggregate_last(idx, vals, dest=s.create_numeric(ds, 'result', 'int64'))
             self.assertListEqual([0, 2, 5, 9], s.get(ds['result']).data[:].tolist())
 
@@ -672,7 +708,8 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.aggregate_min(idx, vals)
             self.assertListEqual([0, 2, 4, 1], results.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             s.aggregate_min(idx, vals, dest=s.create_numeric(ds, 'result', 'int64'))
             self.assertListEqual([0, 2, 4, 1], s.get(ds['result']).data[:].tolist())
 
@@ -688,7 +725,8 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.aggregate_max(idx, vals)
             self.assertListEqual([0, 8, 6, 9], results.tolist())
 
-            ds = s.open_dataset(bio, "w", "ds")
+            dst = s.open_dataset(bio, "w", "ds")
+            ds = dst.create_dataframe('ds')
             s.aggregate_max(idx, vals, dest=s.create_numeric(ds, 'result', 'int64'))
             self.assertListEqual([0, 8, 6, 9], s.get(ds['result']).data[:].tolist())
 
@@ -802,9 +840,10 @@ class TestSessionFields(unittest.TestCase):
 class TestSessionImporters(unittest.TestCase):
 
     def test_indexed_string_importer(self):
-        s = session.Session()
         bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'r+', 'dst')
+            hf = dst.create_dataframe('hf')
             values = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
                       '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
             im = fields.IndexedStringImporter(s, hf, 'x')
@@ -827,9 +866,10 @@ class TestSessionImporters(unittest.TestCase):
             self.assertListEqual(expected, f.values[:].tolist())
 
     def test_fixed_string_importer(self):
-        s = session.Session()
         bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
+        with session.Session() as s:
+            dst=s.open_dataset(bio,'r+','dst')
+            hf=dst.create_dataframe('hf')
             values = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
                       '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
             bvalues = [v.encode() for v in values]
@@ -843,9 +883,10 @@ class TestSessionImporters(unittest.TestCase):
             self.assertListEqual(expected, f.data[:].tolist())
 
     def test_numeric_importer(self):
-        s = session.Session()
         bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'r+', 'dst')
+            hf = dst.create_dataframe('hf')
             values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
             im = fields.NumericImporter(s, hf, 'x', 'float32', per.try_str_to_float)
@@ -860,9 +901,10 @@ class TestSessionImporters(unittest.TestCase):
 
     def test_date_importer(self):
         from datetime import datetime
-        s = session.Session()
         bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
+        with session.Session() as s:
+            dst = s.open_dataset(bio,'r+','dst')
+            hf = dst.create_dataframe('hf')
             values = ['2020-05-10', '2020-05-12', '2020-05-12', '2020-05-15']
             im = fields.DateImporter(s, hf, 'x')
             im.write(values)
