@@ -18,7 +18,7 @@ class Timer:
 
 
 def main():
-    source = 'resources/assessment_input_large_data.csv' 
+    source = 'resources/assessment_input_small_data.csv' 
 
     original_csv_read(source)
     file_read_line_fast_csv(source)
