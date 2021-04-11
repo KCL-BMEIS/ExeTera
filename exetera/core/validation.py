@@ -1,9 +1,22 @@
+# Copyright 2020 KCL-BMEIS - King's College London
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 import numpy as np
 
 import h5py
 
 from exetera.core.abstract_types import Field
 from exetera.core import readerwriter as rw
+from exetera.core import fields as flds
 
 
 def _writer_from_writer_or_group(writer_getter, param_name, writer):
@@ -122,7 +135,9 @@ def raw_array_from_parameter(datastore, name, field):
 def array_from_parameter(session, name, field):
     if isinstance(field, h5py.Group):
         return session.get(field).data[:]
-    elif isinstance(field, Field):
+    elif isinstance(field, flds.IndexedStringField):
+        return field.indices[:],field.values[:]
+    elif isinstance(field, flds.Field):
         return field.data[:]
     elif isinstance(field, np.ndarray):
         return field
