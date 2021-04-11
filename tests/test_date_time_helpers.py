@@ -182,6 +182,16 @@ class TestGetDays(unittest.TestCase):
         self.assertListEqual(expected.tolist(), actual[0].tolist())
 
 
+class TestGeneratePeriodOffsetMap(unittest.TestCase):
+
+    def test_generate_period_offset_map(self):
+        start_dt = D(2020, 3, 1)
+        end_dt = D(2021, 3, 1)
+        periods = dth.get_periods(end_dt, start_dt, 'week', -1)
+        periods.reverse()
+        print(periods)
+
+
 class TestGetPeriodOffsets(unittest.TestCase):
 
     def test_get_period_offsets_with_out_of_range(self):
