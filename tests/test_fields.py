@@ -60,13 +60,14 @@ class TestIsSorted(unittest.TestCase):
         bio = BytesIO()
         with session.Session() as s:
             ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('foo')
 
-            f = s.create_indexed_string(ds, 'f')
+            f = df.create_indexed_string('f')
             vals = ['the', 'quick', '', 'brown', 'fox', 'jumps', '', 'over', 'the', 'lazy', '', 'dog']
             f.data.write(vals)
             self.assertFalse(f.is_sorted())
 
-            f2 = s.create_indexed_string(ds, 'f2')
+            f2 = df.create_indexed_string('f2')
             svals = sorted(vals)
             f2.data.write(svals)
             self.assertTrue(f2.is_sorted())
@@ -75,13 +76,14 @@ class TestIsSorted(unittest.TestCase):
         bio = BytesIO()
         with session.Session() as s:
             ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('foo')
 
-            f = s.create_fixed_string(ds, 'f', 5)
+            f = df.create_fixed_string('f', 5)
             vals = ['a', 'ba', 'bb', 'bac', 'de', 'ddddd', 'deff', 'aaaa', 'ccd']
             f.data.write([v.encode() for v in vals])
             self.assertFalse(f.is_sorted())
 
-            f2 = s.create_fixed_string(ds, 'f2', 5)
+            f2 = df.create_fixed_string('f2', 5)
             svals = sorted(vals)
             f2.data.write([v.encode() for v in svals])
             self.assertTrue(f2.is_sorted())
@@ -90,13 +92,14 @@ class TestIsSorted(unittest.TestCase):
         bio = BytesIO()
         with session.Session() as s:
             ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('foo')
 
-            f = s.create_numeric(ds, 'f', 'int32')
+            f = df.create_numeric('f', 'int32')
             vals = [74, 1897, 298, 0, -100098, 380982340, 8, 6587, 28421, 293878]
             f.data.write(vals)
             self.assertFalse(f.is_sorted())
 
-            f2 = s.create_numeric(ds, 'f2', 'int32')
+            f2 = df.create_numeric('f2', 'int32')
             svals = sorted(vals)
             f2.data.write(svals)
             self.assertTrue(f2.is_sorted())
@@ -105,13 +108,14 @@ class TestIsSorted(unittest.TestCase):
         bio = BytesIO()
         with session.Session() as s:
             ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('foo')
 
-            f = s.create_categorical(ds, 'f', 'int8', {'a': 0, 'c': 1, 'd': 2, 'b': 3})
+            f = df.create_categorical('f', 'int8', {'a': 0, 'c': 1, 'd': 2, 'b': 3})
             vals = [0, 1, 3, 2, 3, 2, 2, 0, 0, 1, 2]
             f.data.write(vals)
             self.assertFalse(f.is_sorted())
 
-            f2 = s.create_categorical(ds, 'f2', 'int8', {'a': 0, 'c': 1, 'd': 2, 'b': 3})
+            f2 = df.create_categorical('f2', 'int8', {'a': 0, 'c': 1, 'd': 2, 'b': 3})
             svals = sorted(vals)
             f2.data.write(svals)
             self.assertTrue(f2.is_sorted())
@@ -122,8 +126,9 @@ class TestIsSorted(unittest.TestCase):
         bio = BytesIO()
         with session.Session() as s:
             ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('foo')
 
-            f = s.create_timestamp(ds, 'f')
+            f = df.create_timestamp('f')
             d = D(2020, 5, 10)
             vals = [d + T(seconds=50000), d - T(days=280), d + T(weeks=2), d + T(weeks=250),
                     d - T(weeks=378), d + T(hours=2897), d - T(days=23), d + T(minutes=39873)]
@@ -131,7 +136,7 @@ class TestIsSorted(unittest.TestCase):
             f.data.write(vals)
             self.assertFalse(f.is_sorted())
 
-            f2 = s.create_timestamp(ds, 'f2')
+            f2 = df.create_timestamp('f2')
             svals = sorted(vals)
             f2.data.write(svals)
             self.assertTrue(f2.is_sorted())
