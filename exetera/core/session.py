@@ -28,45 +28,7 @@ from exetera.core import validation as val
 from exetera.core import operations as ops
 from exetera.core import dataset as ds
 from exetera.core import dataframe as df
-from exetera.core import utils
 
-
-# TODO:
-"""
- * joins: get mapping and map multiple fields using mapping
-   * can use pandas for initial functionality and then improve
-   * mark fields has having sorted order if they are sorted
-     * would have to check field
-   * for sorted, can use fast
-   * aggregation
-     * aggregate and join / join and aggregate
-       * if they resolve to being the same thing, best to aggregate first
- * everything can accept groups
- * groups are registered and given names
- * indices can be built from merging pk and fks and mapping to values
- * everything can accept tuples instead of groups and operate on all of them
- * advanced sorting / filtering
-   * FilteredReader / FilteredWriter for applying filters without copying data
-   * SortedReader / SortedWriter for applying sorts without copying data
-   * Filters corresponding to the presence or absence of elements of a maybe field
-     * should be marked indicating that they are related to that field. This allows
-       a user to query all the filters generated for different fields, whether the
-       values are valid or whether they are a standard filtering for different
-       categories (age sub-ranges, for example)
- * reader/writers
-
-   * soft sorting / filtering
-     rw = s.get(name)
-     rw.add_transform(filter)
-     rw.add_transform(sort)
-     rw.writeable[:] = data # can this be done?
-     rw.clean()
-     rw.write(data)
-
-    * refactor: encapsulate dataset handling into session
-      * provide group objects with api
-      * provide field objects with additional api
-"""
 
 class Session(AbstractSession):
 
@@ -99,7 +61,6 @@ class Session(AbstractSession):
         if name in self.datasets:
             raise ValueError("A dataset with name '{}' is already open, and must be closed first.".format(name))
 
-        #self.datasets[name] = h5py.File(dataset_path, h5py_modes[mode])
         self.datasets[name] = ds.HDF5Dataset(self, dataset_path, mode, name)
         return self.datasets[name]
 
@@ -281,10 +242,10 @@ class Session(AbstractSession):
         if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
         if isinstance(src, fld.IndexedStringField):
-            newfld = src.apply_filter(filter_to_apply_,writer_)
+            newfld = src.apply_filter(filter_to_apply_, writer_)
             return newfld.indices, newfld.values
         elif isinstance(src,fld.Field):
-            newfld = src.apply_filter(filter_to_apply_,writer_)
+            newfld = src.apply_filter(filter_to_apply_, writer_)
             return newfld.data[:]
         #elif isinstance(src, df.datafrme):
         else:
@@ -316,7 +277,7 @@ class Session(AbstractSession):
                                                   src.indices[:], src.values[:])
             return dest_indices, dest_values
         elif isinstance(src,fld.Field):
-            newfld = src.apply_index(index_to_apply_,writer_)
+            newfld = src.apply_index(index_to_apply_, writer_)
             return newfld.data[:]
         else:
             reader_ = val.array_from_parameter(self, 'reader', src)
@@ -365,14 +326,14 @@ class Session(AbstractSession):
         """
 
         if fields is not None:
-            if isinstance(fields[0],fld.Field):
-                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(),fields[1].get_spans())
-            if isinstance(fields[0],np.ndarray):
-                return ops._get_spans_for_2_fields(fields[0],fields[1])
+            if isinstance(fields[0], fld.Field):
+                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(), fields[1].get_spans())
+            if isinstance(fields[0], np.ndarray):
+                return ops._get_spans_for_2_fields(fields[0], fields[1])
         else:
-            if isinstance(field,fld.Field):
+            if isinstance(field, fld.Field):
                 return field.get_spans()
-            if isinstance(field,np.ndarray):
+            if isinstance(field, np.ndarray):
                 return ops.get_spans_for_field(field)
 
 
