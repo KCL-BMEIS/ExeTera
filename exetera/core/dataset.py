@@ -9,55 +9,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# class Dataset():
-#     """
-#     DataSet is a container of dataframes
-#     """
-#     def __init__(self,file_path,name):
-#         pass
-#
-#     def close(self):
-#         pass
-#
-#     def add(self, field, name=None):
-#         pass
-#
-#     def __contains__(self, name):
-#         pass
-#
-#     def contains_dataframe(self, dataframe):
-#         pass
-#
-#     def __getitem__(self, name):
-#         pass
-#
-#     def get_dataframe(self, name):
-#         pass
-#
-#     def get_name(self, dataframe):
-#         pass
-#
-#     def __setitem__(self, name, dataframe):
-#         pass
-#
-#     def __delitem__(self, name):
-#         pass
-#
-#     def delete_dataframe(self, dataframe):
-#         pass
-#
-#     def list(self):
-#         pass
-#
-#     def __iter__(self):
-#         pass
-#
-#     def __next__(self):
-#         pass
-#
-#     def __len__(self):
-#         pass
-
 import h5py
 from exetera.core.abstract_types import Dataset
 from exetera.core import dataframe as edf
@@ -69,7 +20,9 @@ class HDF5Dataset(Dataset):
         self._session = session
         self.file = h5py.File(dataset_path, mode)
         self.dataframes = dict()
-
+        for subgrp in self.file.keys():
+            hdf = edf.HDF5DataFrame(self,subgrp,h5group=self.file[subgrp])
+            self.dataframes[subgrp]=hdf
 
     @property
     def session(self):
@@ -88,7 +41,7 @@ class HDF5Dataset(Dataset):
         :return: a dataframe object
         """
         self.file.create_group(name)
-        dataframe = edf.DataFrame(self, name)
+        dataframe = edf.HDF5DataFrame(self, name)
         self.dataframes[name] = dataframe
         return dataframe
 
@@ -101,9 +54,9 @@ class HDF5Dataset(Dataset):
         :param dataframe: the dataframe to copy to this dataset
         :param name: optional- change the dataframe name
         """
-        dname = dataframe if name is None else name
-        self.file.copy(dataframe.dataset[dataframe.name], self.file, name=dname)
-        df = edf.DataFrame(self, dname, h5group=self.file[dname])
+        dname = dataframe.name if name is None else name
+        self.file.copy(dataframe.dataset.file[dataframe.name], self.file, name=dname)
+        df = edf.HDF5DataFrame(self, dname, h5group=self.file[dname])
         self.dataframes[dname] = df
 
 
@@ -152,15 +105,15 @@ class HDF5Dataset(Dataset):
                 break
         return None
 
-
     def __setitem__(self, name, dataframe):
         if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
         elif not isinstance(dataframe, edf.DataFrame):
             raise TypeError("The field must be a DataFrame object.")
         else:
-            self.dataframes[name] = dataframe
-            return True
+            if self.dataframes.__contains__(name):
+                self.__delitem__(name)
+            return self.add(dataframe,name)
 
 
     def __delitem__(self, name):
@@ -168,6 +121,7 @@ class HDF5Dataset(Dataset):
             raise ValueError("This dataframe does not contain the name to delete.")
         else:
             del self.dataframes[name]
+            del self.file[name]
             return True
 
 
@@ -187,15 +141,15 @@ class HDF5Dataset(Dataset):
 
 
     def keys(self):
-        return self.file.keys()
+        return self.dataframes.keys()
 
 
     def values(self):
-        return self.file.values()
+        return self.dataframes.values()
 
 
     def items(self):
-        return self.file.items()
+        return self.dataframes.items()
 
 
     def __iter__(self):

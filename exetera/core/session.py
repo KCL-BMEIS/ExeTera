@@ -361,7 +361,9 @@ class Session(AbstractSession):
         Example:
             field: [1, 2, 2, 1, 1, 1, 3, 4, 4, 4, 2, 2, 2, 2, 2]
             result: [0, 1, 3, 6, 7, 10, 15]
+
         """
+
         if fields is not None:
             if isinstance(fields[0],fld.Field):
                 return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(),fields[1].get_spans())
@@ -727,7 +729,6 @@ class Session(AbstractSession):
             return group.create_timestamp(name, timestamp, chunksize)
 
 
-    #TODO: update this method for the existence of dataframes
     def get_or_create_group(self, group, name):
         if name in group:
             return group[name]
