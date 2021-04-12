@@ -102,6 +102,7 @@ def file_read_line_fast_csv(source):
     content = np.fromfile(source, dtype='|S1')#np.uint8)
     column_inds = np.zeros((count_columns, count_rows), dtype=np.int64)
     column_vals = np.zeros((count_columns, count_rows * 20), dtype=np.uint8)
+    print(column_inds.shape)
 
     # separator = np.frombuffer(b',', dtype='S1')[0][0]
     # delimiter = np.frombuffer(b'"', dtype='S1')[0][0]
@@ -176,9 +177,9 @@ def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separ
     end_cell = False
     end_line = False
     escaped_literal_candidate = False
-    cur_ind_array = column_inds[0]
-    cur_val_array = column_vals[0]
-    cur_cell_start = cur_ind_array[row_index]
+    # cur_ind_array = column_inds[0]
+    # cur_val_array = column_vals[0]
+    cur_cell_start = column_inds[col_index, row_index] if row_index >= 0 else 0
     cur_cell_char_count = 0
     while True:
         write_char = False
@@ -195,21 +196,21 @@ def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separ
             write_char = True
 
         if write_char and row_index >= 0:
-            cur_val_array[cur_cell_start + cur_cell_char_count] = c
+            column_vals[col_index, cur_cell_start + cur_cell_char_count] = c
             cur_cell_char_count += 1
 
         if end_cell:
             if row_index >= 0:
-                cur_ind_array[row_index+1] = cur_cell_start + cur_cell_char_count
+                column_inds[col_index, row_index+1] = cur_cell_start + cur_cell_char_count
             if end_line:
                 row_index += 1
                 col_index = 0
             else:
                 col_index += 1
 
-            cur_ind_array = column_inds[col_index]
-            cur_val_array = column_vals[col_index]
-            cur_cell_start = cur_ind_array[row_index]
+            # cur_ind_array = column_inds[col_index]
+            # cur_val_array = column_vals[col_index]
+            cur_cell_start = column_inds[col_index, row_index]
             cur_cell_char_count = 0
 
         index += 1
