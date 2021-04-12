@@ -9,16 +9,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from exetera.core.abstract_types import AbstractSession, Dataset
 from exetera.core import fields as fld
-from datetime import  datetime,timezone
-from exetera.core import  dataset as dst
+from exetera.core import dataset as dst
 import h5py
 
-class DataFrame():
+
+class DataFrame:
     """
     DataFrame is a table of data that contains a list of Fields (columns)
     """
-    def __init__(self, name, dataset,data=None,h5group:h5py.Group=None):
+    def __init__(self,
+                 dataset: Dataset,
+                 name: str,
+                 dataframe: dict = None,
+                 h5group: h5py.Group = None):
         """
         Create a Dataframe object.
 
@@ -29,15 +34,20 @@ class DataFrame():
                         h5group<-group-dataset structure, the group has a 'fieldtype' attribute
                          and the dataset is named 'values'.
         """
+        # TODO: consider columns as a name rather than fields
         self.fields = dict()
         self.name = name
         self.dataset = dataset
-        if isinstance(dataset,dst.HDF5Dataset):
-            dataset[name]=self
-        if data is not None:
-            if isinstance(data,dict) and isinstance(list(data.items())[0][0],str) and isinstance(list(data.items())[0][1], fld.Field) :
-                self.fields=data
-        elif h5group is not None and isinstance(h5group,h5py.Group):
+        if isinstance(dataset, dst.HDF5Dataset):
+            dataset[name] = self
+        if dataframe is not None:
+            if isinstance(dataframe, dict) and isinstance(list(dataframe.items())[0][0], str) and\
+                    isinstance(list(dataframe.items())[0][1], fld.Field):
+                self.fields = dataframe
+            else:
+                raise ValueError("if set, 'dataframe' must be a dictionary mapping strings to fields")
+
+        elif h5group is not None and isinstance(h5group, h5py.Group):
             fieldtype_map = {
                 'indexedstring': fld.IndexedStringField,
                 'fixedstring': fld.FixedStringField,
@@ -53,15 +63,16 @@ class DataFrame():
                 self.fields[subg] = fieldtype_map[fieldtype](self, h5group[subg])
                 print(" ")
 
-    def add(self,field,name=None):
+    def add(self, field, name=None):
         if name is not None:
-            if not isinstance(name,str):
+            if not isinstance(name, str):
                 raise TypeError("The name must be a str object.")
             else:
-                self.fields[name]=field
-        self.fields[field.name[field.name.index('/',1)+1:]]=field #note the name has '/' for hdf5 object
+                self.fields[name] = field
+        # note the name has '/' for hdf5 object
+        self.fields[field.name[field.name.index('/', 1)+1:]] = field
 
-    def create_group(self,name):
+    def create_group(self, name):
         """
         Create a group object in HDF5 file for field to use.
 
@@ -72,51 +83,53 @@ class DataFrame():
 
         return self.dataset.file["/"+self.name+"/"+name]
 
-
-    def create_numeric(self, session, name, nformat, timestamp=None, chunksize=None):
-        fld.numeric_field_constructor(session, self, name, nformat, timestamp, chunksize)
-        field=fld.NumericField(session, self.dataset.file["/"+self.name+"/"+name], write_enabled=True)
-        self.fields[name]=field
-        return self.fields[name]
-
-    def create_indexed_string(self, session, name, timestamp=None, chunksize=None):
-        fld.indexed_string_field_constructor(session, self, name, timestamp, chunksize)
-        field= fld.IndexedStringField(session, self.dataset.file["/"+self.name+"/"+name], write_enabled=True)
+    def create_numeric(self, name, nformat, timestamp=None, chunksize=None):
+        fld.numeric_field_constructor(self.dataset.session, self, name, nformat, timestamp, chunksize)
+        field = fld.NumericField(self.dataset.session, self.dataset.file["/"+self.name+"/"+name],
+                                 write_enabled=True)
         self.fields[name] = field
         return self.fields[name]
 
-    def create_fixed_string(self, session, name, length, timestamp=None, chunksize=None):
-        fld.fixed_string_field_constructor(session, self, name, length, timestamp, chunksize)
-        field= fld.FixedStringField(session, self.dataset.file["/"+self.name+"/"+name], write_enabled=True)
+    def create_indexed_string(self, name, timestamp=None, chunksize=None):
+        fld.indexed_string_field_constructor(self.dataset.session, self, name, timestamp, chunksize)
+        field = fld.IndexedStringField(self.dataset.session, self.dataset.file["/"+self.name+"/"+name],
+                                       write_enabled=True)
         self.fields[name] = field
         return self.fields[name]
 
-    def create_categorical(self, session, name, nformat, key,
-                           timestamp=None, chunksize=None):
-        fld.categorical_field_constructor(session, self, name, nformat, key,
+    def create_fixed_string(self, name, length, timestamp=None, chunksize=None):
+        fld.fixed_string_field_constructor(self.dataset.session, self, name, length, timestamp, chunksize)
+        field = fld.FixedStringField(self.dataset.session, self.dataset.file["/"+self.name+"/"+name],
+                                     write_enabled=True)
+        self.fields[name] = field
+        return self.fields[name]
+
+    def create_categorical(self, name, nformat, key, timestamp=None, chunksize=None):
+        fld.categorical_field_constructor(self.dataset.session, self, name, nformat, key,
                                           timestamp, chunksize)
-        field= fld.CategoricalField(session, self.dataset.file["/"+self.name+"/"+name], write_enabled=True)
+        field = fld.CategoricalField(self.dataset.session, self.dataset.file["/"+self.name+"/"+name],
+                                     write_enabled=True)
         self.fields[name] = field
         return self.fields[name]
 
-    def create_timestamp(self, session, name, timestamp=None, chunksize=None):
-        fld.timestamp_field_constructor(session, self, name, timestamp, chunksize)
-        field= fld.TimestampField(session, self.dataset.file["/"+self.name+"/"+name], write_enabled=True)
+    def create_timestamp(self, name, timestamp=None, chunksize=None):
+        fld.timestamp_field_constructor(self.dataset.session, self, name, timestamp, chunksize)
+        field = fld.TimestampField(self.dataset.session, self.dataset.file["/"+self.name+"/"+name],
+                                   write_enabled=True)
         self.fields[name] = field
         return self.fields[name]
-
 
     def __contains__(self, name):
         """
         check if dataframe contains a field, by the field name
         name: the name of the field to check,return a bool
         """
-        if not isinstance(name,str):
+        if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
         else:
             return self.fields.__contains__(name)
 
-    def contains_field(self,field):
+    def contains_field(self, field):
         """
         check if dataframe contains a field by the field object
         field: the filed object to check, return a tuple(bool,str). The str is the name stored in dataframe.
@@ -127,39 +140,37 @@ class DataFrame():
             for v in self.fields.values():
                 if id(field) == id(v):
                     return True
-                    break
             return False
 
     def __getitem__(self, name):
-        if not isinstance(name,str):
+        if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
         elif not self.__contains__(name):
             raise ValueError("Can not find the name from this dataframe.")
         else:
             return self.fields[name]
 
-    def get_field(self,name):
+    def get_field(self, name):
         return self.__getitem__(name)
 
-    def get_name(self,field):
+    def get_name(self, field):
         """
         Get the name of the field in dataframe.
         """
-        if not isinstance(field,fld.Field):
+        if not isinstance(field, fld.Field):
             raise TypeError("The field argument must be a Field object.")
-        for name,v in self.fields.items():
+        for name, v in self.fields.items():
             if id(field) == id(v):
                 return name
-                break
         return None
 
     def __setitem__(self, name, field):
-        if not isinstance(name,str):
+        if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
-        elif not isinstance(field,fld.Field):
+        elif not isinstance(field, fld.Field):
             raise TypeError("The field must be a Field object.")
         else:
-            self.fields[name]=field
+            self.fields[name] = field
             return True
 
     def __delitem__(self, name):
@@ -169,7 +180,7 @@ class DataFrame():
             del self.fields[name]
             return True
 
-    def delete_field(self,field):
+    def delete_field(self, field):
         """
         Remove field from dataframe by field
         """
@@ -196,6 +207,7 @@ class DataFrame():
 
     def __next__(self):
         return next(self.fields)
+
     """
     def search(self): #is search similar to get & get_name?
         pass
@@ -207,12 +219,12 @@ class DataFrame():
         """
         Return the name and spans of each field as a dictionary.
         """
-        spans={}
-        for name,field in self.fields.items():
-            spans[name]=field.get_spans()
+        spans = {}
+        for name, field in self.fields.items():
+            spans[name] = field.get_spans()
         return spans
 
-    def apply_filter(self,filter_to_apply,ddf=None):
+    def apply_filter(self, filter_to_apply, ddf=None):
         """
         Apply the filter to all the fields in this dataframe, return a dataframe with filtered fields.
 
@@ -221,18 +233,17 @@ class DataFrame():
         :returns: a dataframe contains all the fields filterd, self if ddf is not set
         """
         if ddf is not None:
-            if not isinstance(ddf,DataFrame):
+            if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self.fields.items():
                 # TODO integration w/ session, dataset
-                newfld = field.create_like(ddf,field.name)
-                ddf.add(field.apply_filter(filter_to_apply,dstfld=newfld),name=name)
+                newfld = field.create_like(ddf, field.name)
+                ddf.add(field.apply_filter(filter_to_apply, dstfld=newfld), name=name)
             return ddf
         else:
             for field in self.fields.values():
                 field.apply_filter(filter_to_apply)
             return self
-
 
     def apply_index(self, index_to_apply, ddf=None):
         """
@@ -247,10 +258,9 @@ class DataFrame():
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self.fields.items():
                 newfld = field.create_like(ddf, field.name)
-                ddf.add(field.apply_index(index_to_apply,dstfld=newfld), name=name)
+                ddf.add(field.apply_index(index_to_apply, dstfld=newfld), name=name)
             return ddf
         else:
             for field in self.fields.values():
                 field.apply_index(index_to_apply)
             return self
-

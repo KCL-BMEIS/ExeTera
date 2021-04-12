@@ -73,7 +73,7 @@ class TestSessionMerge(unittest.TestCase):
     def test_merge_left_dataset(self):
         bio1 = BytesIO()
         with session.Session() as s:
-            src = s.open_dataset(bio1,'w','src')
+            src = s.open_dataset(bio1, 'w', 'src')
 
             p_id = np.array([100, 200, 300, 400, 500, 600, 800, 900])
             p_val = np.array([-1, -2, -3, -4, -5, -6, -8, -9])
@@ -92,8 +92,7 @@ class TestSessionMerge(unittest.TestCase):
             snk=dst.create_dataframe('snk')
             s.merge_left(s.get(src['a']['pid']), s.get(src['p']['id']),
                              right_fields=(s.get(src['p']['val']),),
-                             right_writers=(s.create_numeric(snk, 'val', 'int32'),)
-                             )
+                             right_writers=(s.create_numeric(snk, 'val', 'int32'),))
             expected = [-1, -1, -1, -2, -2, -4, -4, -4, -4, -6, -6, -6, 0, 0, -9, -9, -9]
             actual = s.get(snk['val']).data[:]
             self.assertListEqual(expected, actual.data[:].tolist())

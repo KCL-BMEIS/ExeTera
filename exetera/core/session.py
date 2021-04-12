@@ -19,7 +19,7 @@ import pandas as pd
 
 import h5py
 
-from exetera.core.abstract_types import Field
+from exetera.core.abstract_types import Field, AbstractSession
 from exetera.core import operations
 from exetera.core import persistence as per
 from exetera.core import fields as fld
@@ -68,7 +68,7 @@ from exetera.core import utils
       * provide field objects with additional api
 """
 
-class Session:
+class Session(AbstractSession):
 
     def __init__(self, chunksize=ops.DEFAULT_CHUNKSIZE,
                  timestamp=str(datetime.now(timezone.utc))):
@@ -100,7 +100,7 @@ class Session:
             raise ValueError("A dataset with name '{}' is already open, and must be closed first.".format(name))
 
         #self.datasets[name] = h5py.File(dataset_path, h5py_modes[mode])
-        self.datasets[name] = ds.HDF5Dataset(dataset_path,mode,name)
+        self.datasets[name] = ds.HDF5Dataset(self, dataset_path, mode, name)
         return self.datasets[name]
 
 
@@ -652,42 +652,82 @@ class Session:
 
 
     def create_indexed_string(self, group, name, timestamp=None, chunksize=None):
-        if isinstance(group,ds.Dataset):
-            pass
-        elif isinstance(group,df.DataFrame):
-            return group.create_indexed_string(self,name, timestamp,chunksize)
+
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
+
+        if isinstance(group, h5py.Group):
+            return fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
+        else:
+            return group.create_indexed_string(name, timestamp, chunksize)
 
 
     def create_fixed_string(self, group, name, length, timestamp=None, chunksize=None):
-        if isinstance(group,ds.Dataset):
-            pass
-        elif isinstance(group,df.DataFrame):
-            return group.create_fixed_string(self,name,  length,timestamp,chunksize)
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
+        if isinstance(group, h5py.Group):
+            return fld.fixed_string_field_constructor(self, group, name, timestamp, chunksize)
+        else:
+            return group.create_fixed_string(name, length, timestamp, chunksize)
 
 
     def create_categorical(self, group, name, nformat, key,
                            timestamp=None, chunksize=None):
-        if isinstance(group, ds.Dataset):
-            pass
-        elif isinstance(group, df.DataFrame):
-            return group.create_categorical(self, name, nformat,key,timestamp,chunksize)
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
+
+        if isinstance(group, h5py.Group):
+            return fld.categorical_field_constructor(self, group, name, timestamp, chunksize)
+        else:
+            return group.create_categorical(name, nformat, key, timestamp, chunksize)
 
 
     def create_numeric(self, group, name, nformat, timestamp=None, chunksize=None):
-        if isinstance(group,ds.Dataset):
-            pass
-        elif isinstance(group,df.DataFrame):
-            return group.create_numeric(self,name, nformat, timestamp, chunksize)
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
 
+        if isinstance(group, h5py.Group):
+            return fld.numeric_field_constructor(self. group, name, timestamp, chunksize)
+        else:
+            return group.create_numeric(name, nformat, timestamp, chunksize)
 
 
     def create_timestamp(self, group, name, timestamp=None, chunksize=None):
-        if isinstance(group,ds.Dataset):
-            pass
-        elif isinstance(group,df.DataFrame):
-            return group.create_timestamp(self,name, timestamp, chunksize)
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
+
+        if isinstance(group, h5py.Group):
+            return fld.categorical_field_constructor(self, group, name, timestamp, chunksize)
+        else:
+            return group.create_timestamp(name, timestamp, chunksize)
 
 
+    #TODO: update this method for the existence of dataframes
     def get_or_create_group(self, group, name):
         if name in group:
             return group[name]
