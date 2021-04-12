@@ -133,6 +133,112 @@ class Dataset(ABC):
         raise NotImplementedError()
 
 
+class DataFrame(ABC):
+    """
+    DataFrame is a table of data that contains a list of Fields (columns)
+    """
+
+    @abstractmethod
+    def add(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def create_group(self, name):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def create_numeric(self, name, nformat, timestamp=None, chunksize=None):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def create_indexed_string(self, name, timestamp=None, chunksize=None):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def create_fixed_string(self, name, length, timestamp=None, chunksize=None):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def create_categorical(self, name, nformat, key, timestamp=None, chunksize=None):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def create_timestamp(self, name, timestamp=None, chunksize=None):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def __contains__(self, name):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def contains_field(self, field):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def __getitem__(self, name):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_field(self, name):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_name(self, field):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def __setitem__(self, name, field):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def __delitem__(self, name):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def delete_field(self, field):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def list(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def keys(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def values(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def items(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def __iter__(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def __next__(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def __len__(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_spans(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def apply_filter(self, filter_to_apply, ddf=None):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def apply_index(self, index_to_apply, ddf=None):
+        raise NotImplementedError()
+
+
 class AbstractSession(ABC):
 
     @abstractmethod

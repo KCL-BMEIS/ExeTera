@@ -9,15 +9,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from exetera.core.abstract_types import AbstractSession, Dataset
+from exetera.core.abstract_types import AbstractSession, Dataset, DataFrame
 from exetera.core import fields as fld
 from exetera.core import dataset as dst
 import h5py
 
 
-class DataFrame:
+class HDF5DataFrame(DataFrame):
     """
-    DataFrame is a table of data that contains a list of Fields (columns)
+    DataFrame that utilising HDF5 file as storage.
     """
     def __init__(self,
                  dataset: Dataset,
@@ -38,30 +38,31 @@ class DataFrame:
         self.fields = dict()
         self.name = name
         self.dataset = dataset
-        if isinstance(dataset, dst.HDF5Dataset):
-            dataset[name] = self
+        # if isinstance(dataset, dst.HDF5Dataset):
+        #     dataset[name] = self
         if dataframe is not None:
-            if isinstance(dataframe, dict) and isinstance(list(dataframe.items())[0][0], str) and\
-                    isinstance(list(dataframe.items())[0][1], fld.Field):
+            if isinstance(dataframe, dict):
+                for k,v in dataframe.items():
+                    if not isinstance(k, str) or not isinstance(v, fld.Field):
+                        raise ValueError("If dataframe parameter is set, must be a dictionary mapping strings to fields")
                 self.fields = dataframe
-            else:
-                raise ValueError("if set, 'dataframe' must be a dictionary mapping strings to fields")
-
         elif h5group is not None and isinstance(h5group, h5py.Group):
-            fieldtype_map = {
-                'indexedstring': fld.IndexedStringField,
-                'fixedstring': fld.FixedStringField,
-                'categorical': fld.CategoricalField,
-                'boolean': fld.NumericField,
-                'numeric': fld.NumericField,
-                'datetime': fld.TimestampField,
-                'date': fld.TimestampField,
-                'timestamp': fld.TimestampField
-            }
             for subg in h5group.keys():
-                fieldtype = h5group[subg].attrs['fieldtype'].split(',')[0]
-                self.fields[subg] = fieldtype_map[fieldtype](self, h5group[subg])
-                print(" ")
+                self.fields[subg]=dataset.session.get(h5group[subg])
+            # fieldtype_map = {
+            #     'indexedstring': fld.IndexedStringField,
+            #     'fixedstring': fld.FixedStringField,
+            #     'categorical': fld.CategoricalField,
+            #     'boolean': fld.NumericField,
+            #     'numeric': fld.NumericField,
+            #     'datetime': fld.TimestampField,
+            #     'date': fld.TimestampField,
+            #     'timestamp': fld.TimestampField
+            # }
+            # for subg in h5group.keys():
+            #     fieldtype = h5group[subg].attrs['fieldtype'].split(',')[0]
+            #     self.fields[subg] = fieldtype_map[fieldtype](self, h5group[subg])
+            #     print(" ")
 
     def add(self, field, name=None):
         if name is not None:
@@ -208,10 +209,6 @@ class DataFrame:
     def __next__(self):
         return next(self.fields)
 
-    """
-    def search(self): #is search similar to get & get_name?
-        pass
-    """
     def __len__(self):
         return len(self.fields)
 
