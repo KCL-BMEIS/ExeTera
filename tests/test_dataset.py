@@ -65,7 +65,7 @@ class TestDataSet(unittest.TestCase):
             #del dataframe
             del dst['df2'] #only 'grp1' left
             self.assertTrue(len(dst.keys())==1)
-            self.assertTrue(len(dst.file.keys())==1)
+            self.assertTrue(len(dst._file.keys())==1)
 
             #set dataframe
             dst['grp1']=df2
