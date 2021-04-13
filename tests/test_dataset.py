@@ -71,3 +71,13 @@ class TestDataSet(unittest.TestCase):
             dst['grp1']=df2
             self.assertTrue(isinstance(dst['grp1'], DataFrame))
             self.assertEqual([b'a', b'b', b'c', b'd'], dst['grp1']['fs'].data[:].tolist())
+
+    def test_create_duplicate_named_datasets(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'r+', 'dst')
+            _ = dst.create_dataframe('df')
+            with self.assertRaises(ValueError,
+                                   msg="A DataFrame already exists with the name 'df' "):
+                _ = dst.create_dataframe('df')
+            _ = dst.create_dataframe('df2')

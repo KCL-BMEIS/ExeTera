@@ -16,13 +16,16 @@ from exetera.core import dataframe as edf
 
 class HDF5Dataset(Dataset):
 
+    reserved_names = ('trash')
+
     def __init__(self, session, dataset_path, mode, name):
         self._session = session
         self.file = h5py.File(dataset_path, mode)
         self.dataframes = dict()
         for subgrp in self.file.keys():
-            hdf = edf.HDF5DataFrame(self,subgrp,h5group=self.file[subgrp])
-            self.dataframes[subgrp]=hdf
+            if subgrp not in HDF5Dataset.reserved_names:
+                hdf = edf.HDF5DataFrame(self, subgrp, h5group=self.file[subgrp])
+                self.dataframes[subgrp] = hdf
 
     @property
     def session(self):
@@ -40,6 +43,11 @@ class HDF5Dataset(Dataset):
         :param name: the name of the group and dataframe
         :return: a dataframe object
         """
+        if name in HDF5Dataset.reserved_names:
+            raise ValueError("The name '{}' is reserved and cannot be used".format(name))
+        if name in self.dataframes:
+            raise ValueError("A DataFrame already exists with the name '{}'".format(name))
+
         self.file.create_group(name)
         dataframe = edf.HDF5DataFrame(self, name)
         self.dataframes[name] = dataframe
@@ -54,6 +62,11 @@ class HDF5Dataset(Dataset):
         :param dataframe: the dataframe to copy to this dataset
         :param name: optional- change the dataframe name
         """
+        if name in HDF5Dataset.reserved_names:
+            raise ValueError("The name '{}' is reserved and cannot be used".format(name))
+        if name in self.dataframes:
+            raise ValueError("A DataFrame already exists with the name '{}'".format(name))
+
         dname = dataframe.name if name is None else name
         self.file.copy(dataframe.dataset.file[dataframe.name], self.file, name=dname)
         df = edf.HDF5DataFrame(self, dname, h5group=self.file[dname])

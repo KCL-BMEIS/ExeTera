@@ -833,6 +833,7 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
             reader = rw.NumericReader(datastore, hf['foo'])
             self.assertListEqual((values * 2).tolist(), reader[:].tolist())
 
+
     def test_try_create_group(self):
         datastore = persistence.DataStore(10)
         bio = BytesIO()

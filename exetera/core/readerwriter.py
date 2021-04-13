@@ -189,11 +189,7 @@ class Writer:
             raise ValueError(f"'write_mode' must be one of {write_modes}")
         if name in group:
             if write_mode == 'overwrite':
-                field = group[name]
-                trash = datastore.get_trash_group(field)
-                dest_name = trash.name + f"/{name.split('/')[-1]}"
-                group.move(field.name, dest_name)
-                self.trash_field = trash[name]
+                del group[name]
                 DataWriter.create_group(group, name, attributes)
             else:
                 error = (f"Field '{name}' already exists. Set 'write_mode' to 'overwrite' "
