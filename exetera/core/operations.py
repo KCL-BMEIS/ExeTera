@@ -207,7 +207,7 @@ def apply_indices_to_index_values(indices_to_apply, indices, values):
 
 
 def get_spans_for_field(ndarray):
-    results = np.zeros(len(ndarray) + 1, dtype=np.bool)
+    results = np.zeros(len(ndarray) + 1, dtype=bool)
     if np.issubdtype(ndarray.dtype, np.number):
         fn = np.not_equal
     else:
@@ -1141,7 +1141,7 @@ def streaming_sort_merge(src_index_f, src_value_f, tgt_index_f, tgt_value_f,
         tgt_value_f.data.write(dest_values[:index_delta])
         target_index += index_delta
 
-        chunk_filter = np.ones(segment_count, dtype=np.bool)
+        chunk_filter = np.ones(segment_count, dtype=bool)
         for i in range(segment_count):
             if in_chunk_indices[i] == in_chunk_lengths[i]:
                 chunk_indices[i] += 1

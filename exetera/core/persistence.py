@@ -634,7 +634,7 @@ def _values_from_reader_or_ndarray(name, field):
 # TODO: handle usage of reader
 def filter_duplicate_fields(field):
 
-    filter_ = np.ones(len(field), dtype=np.bool)
+    filter_ = np.ones(len(field), dtype=bool)
     _filter_duplicate_fields(field, filter_)
     return filter_
 
@@ -662,14 +662,14 @@ def foreign_key_is_in_primary_key(primary_key, foreign_key):
     else:
         fk = foreign_key
 
-    result = np.zeros(len(fk), dtype=np.bool)
+    result = np.zeros(len(fk), dtype=bool)
     return _filter_non_orphaned_foreign_keys(pk, fk, result)
 
 
 def _filter_non_orphaned_foreign_keys(primary_key, foreign_key, results):
     pkids = dict()
-    trueval = np.bool(True)
-    falseval = np.bool(False)
+    trueval = bool(True)
+    falseval = bool(False)
     for p in primary_key:
         pkids[p] = trueval
 

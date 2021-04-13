@@ -1,6 +1,7 @@
 import unittest
 import random
 from datetime import datetime, timezone, timedelta
+from dateutil import tz
 import time
 from io import BytesIO
 
@@ -310,7 +311,7 @@ class TestPersistence(unittest.TestCase):
             foov = rw.NumericWriter(datastore, hf, 'foo', 'float32', ts)
             foof = rw.NumericWriter(datastore, hf, 'foo_filter', 'bool', ts)
             out_values = np.zeros(len(values), dtype=np.float32)
-            out_filter = np.zeros(len(values), dtype=np.bool)
+            out_filter = np.zeros(len(values), dtype=bool)
             for i in range(len(values)):
                 try:
                     out_values[i] = float(values[i])
@@ -345,7 +346,7 @@ class TestPersistence(unittest.TestCase):
                   '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
         with h5py.File(bio, 'w') as hf:
             out_values = np.zeros(len(values), dtype=np.float32)
-            out_filter = np.zeros(len(values), dtype=np.bool)
+            out_filter = np.zeros(len(values), dtype=bool)
             for i in range(len(values)):
                 try:
                     out_values[i] = float(values[i])
@@ -405,7 +406,7 @@ class TestPersistence(unittest.TestCase):
         expected_valid =\
             np.asarray([False, False, True, True, True, True, False, True, True, True, True,
                         True, False, True, True, True, True, False, True, True, True, True],
-                       dtype=np.bool)
+                       dtype=bool)
         with h5py.File(bio, 'r') as hf:
             foo = rw.NumericReader(datastore, hf['foo'])
             foo_valid = rw.NumericReader(datastore, hf['foo_valid'])
@@ -491,7 +492,7 @@ class TestPersistence(unittest.TestCase):
     def test_categorical_field_writer_from_reader(self):
 
         datastore = persistence.DataStore(10)
-        ts = str(datetime.now(timezone.utc))
+        ts = str(datetime.now(tz.tzlocal()))
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
             values = ['', 'True', 'False', 'False', '', '', 'True', 'False', 'True', '',
@@ -506,11 +507,10 @@ class TestPersistence(unittest.TestCase):
             reader2 = datastore.get_reader(hf['foo2'])
             self.assertTrue(np.array_equal(reader[:], reader2[:]))
 
-    from dateutil import tz as tzd
+
     def test_timestamp_reader(self):
 
         datastore = persistence.DataStore(10)
-        from dateutil import tz
         dt = datetime.now(tz=tz.tzlocal())
         ts = str(dt)
         bio = BytesIO()
@@ -534,7 +534,6 @@ class TestPersistence(unittest.TestCase):
     def test_new_timestamp_reader(self):
 
         datastore = persistence.DataStore(10)
-        from dateutil import tz
         dt = datetime.now(tz=tz.tzlocal())
         ts = str(dt)
         bio = BytesIO()
@@ -556,13 +555,13 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'r') as hf:
             foo = rw.TimestampReader(datastore, hf['foo'])
             actual = foo[:]
-            self.assertTrue(np.alltrue(tsvalues == actual))
-
+            self.assertListEqual(tsvalues.tolist(), actual.tolist())
 
     def test_new_timestamp_writer_from_reader(self):
 
         datastore = persistence.DataStore(10)
-        dt = datetime.now(timezone.utc)+timedelta(hours=1)
+        dt = datetime.now(tz.tzlocal())
+        # dt = datetime.now(timezone.utc)+timedelta(hours=1)
         ts = str(dt)
         bio = BytesIO()
         random.seed(12345678)
@@ -578,13 +577,13 @@ class TestPersistence(unittest.TestCase):
             writer = reader.get_writer(hf, 'foo2', ts)
             writer.write(reader[:])
             reader2 = datastore.get_reader(hf['foo2'])
-            self.assertTrue(np.array_equal(reader[:], reader2[:]))
+            self.assertEqual(reader[:].tolist(), reader2[:].tolist())
 
     def test_np_filtered_iterator(self):
 
         datastore = persistence.DataStore(10)
         values = np.asarray([1.0, 0.0, 2.1], dtype=np.float32)
-        filter = np.asarray([True, False, True], dtype=np.bool)
+        filter = np.asarray([True, False, True], dtype=bool)
         expected = [np.nan, 0.0, np.nan]
         for i, v in enumerate(persistence.filtered_iterator(values, filter)):
             if np.isnan(expected[i]):
@@ -977,14 +976,14 @@ class TestPersistenceOperations(unittest.TestCase):
             raw_indices = hf['foo']['index'][:]
             raw_values = hf['foo']['values'][:]
 
-            even_filter = np.zeros(len(values), np.bool)
+            even_filter = np.zeros(len(values), bool)
             for i in range(len(even_filter)):
                 even_filter[i] = i % 2 == 0
             expected = values[::2]
             filter_framework('even_filter', raw_indices, raw_values,
                              even_filter, expected)
 
-            middle_filter = np.ones(len(values), np.bool)
+            middle_filter = np.ones(len(values), bool)
             middle_filter[0] = False
             middle_filter[-1] = False
             expected = values[1:-1]
@@ -996,12 +995,12 @@ class TestPersistenceOperations(unittest.TestCase):
             filter_framework('end_filter', raw_indices, raw_values,
                              ends_filter, expected)
 
-            all_true_filter = np.ones(len(values), np.bool)
+            all_true_filter = np.ones(len(values), bool)
             expected = values
             filter_framework('all_true_filter', raw_indices, raw_values,
                              all_true_filter, expected)
 
-            all_false_filter = np.zeros(len(values), np.bool)
+            all_false_filter = np.zeros(len(values), bool)
             expected = []
             filter_framework('all_false_filter', raw_indices, raw_values,
                              all_false_filter, expected)

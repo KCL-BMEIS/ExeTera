@@ -295,64 +295,68 @@ class AbstractSession(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def apply_spans_index_of_min(self, spans, src, dest=None):
+    def apply_spans_index_of_min(self, spans, target, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def apply_spans_index_of_max(self, spans, src, dest=None):
+    def apply_spans_index_of_max(self, spans, target, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def apply_spans_index_of_first(self, spans, src, dest=None):
+    def apply_spans_index_of_first(self, spans, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def apply_spans_count(self, spans, src=None, dest=None):
+    def apply_spans_index_of_last(self, spans, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def apply_spans_min(self, spans, src, dest=None):
+    def apply_spans_count(self, spans, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def apply_spans_max(self, spans, src, dest=None):
+    def apply_spans_min(self, spans, target, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def apply_spans_first(self, spans, src, dest=None):
+    def apply_spans_max(self, spans, target, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def apply_spans_last(self, spans, src, dest=None):
+    def apply_spans_first(self, spans, target, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def apply_spans_concat(self, spans, src, dest,
+    def apply_spans_last(self, spans, target, dest=None):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def apply_spans_concat(self, spans, target, dest,
                            src_chunksize=None, dest_chunksize=None, chunksize_mult=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def aggregate_count(self, index=None, src=None, dest=None):
+    def aggregate_count(self, index, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def aggregate_first(self, index, src=None, dest=None):
+    def aggregate_first(self, index, target=None, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def aggregate_last(self, index, src=None, dest=None):
+    def aggregate_last(self, index, target=None, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def aggregate_min(self, index, src=None, dest=None):
+    def aggregate_min(self, index, target=None, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def aggregate_max(self, index, src=None, dest=None):
+    def aggregate_max(self, index, target=None, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
-    def aggregate_custom(self, index, src=None, dest=None):
+    def aggregate_custom(self, predicate, index, target=None, dest=None):
         raise NotImplementedError()
 
     @abstractmethod

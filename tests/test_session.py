@@ -10,6 +10,25 @@ from exetera.core import fields
 from exetera.core import persistence as per
 
 
+class TestSessionLoadExisting(unittest.TestCase):
+
+    def test_create_new_then_load(self):
+        bio1 = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio1, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_numeric('foo', 'int32').data.write(np.asarray([1, 2, 3, 4]))
+
+        with session.Session() as s:
+            src = s.open_dataset(bio1, 'r', 'src')
+            df = src['df']
+            f = df['foo']
+            self.assertIsNotNone(f)
+            self.assertEqual('/df/foo', f.name)
+
+            f2 = s.get(df['foo'])
+
+
 class TestSessionMerge(unittest.TestCase):
 
     def test_merge_left(self):
