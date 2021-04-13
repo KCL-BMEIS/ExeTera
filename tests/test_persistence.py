@@ -511,7 +511,7 @@ class TestPersistence(unittest.TestCase):
     def test_timestamp_reader(self):
 
         datastore = persistence.DataStore(10)
-        dt = datetime.now(tz.tzlocal())
+        dt = datetime.now(tz=tz.tzlocal())
         ts = str(dt)
         bio = BytesIO()
         random.seed(12345678)
@@ -534,7 +534,7 @@ class TestPersistence(unittest.TestCase):
     def test_new_timestamp_reader(self):
 
         datastore = persistence.DataStore(10)
-        dt = datetime.now(tz.tzlocal())
+        dt = datetime.now(tz=tz.tzlocal())
         ts = str(dt)
         bio = BytesIO()
         random.seed(12345678)
@@ -561,6 +561,7 @@ class TestPersistence(unittest.TestCase):
 
         datastore = persistence.DataStore(10)
         dt = datetime.now(tz.tzlocal())
+        # dt = datetime.now(timezone.utc)+timedelta(hours=1)
         ts = str(dt)
         bio = BytesIO()
         random.seed(12345678)

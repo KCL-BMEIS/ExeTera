@@ -6,7 +6,7 @@ from datetime import datetime
 
 import numpy as np
 
-from exetera.core import dataset
+from exetera.core import csvdataset
 from exetera.core import utils
 
 

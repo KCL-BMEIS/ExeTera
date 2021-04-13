@@ -16,7 +16,7 @@ import time
 import numpy as np
 import h5py
 
-from exetera.core import dataset as dataset
+from exetera.core import csvdataset as dataset
 from exetera.core import persistence as per
 from exetera.core import utils
 from exetera.core import operations as ops
