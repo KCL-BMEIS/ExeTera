@@ -845,7 +845,7 @@ class Session(AbstractSession):
 
 
     def get(self,
-            field: Union[fld.Field, h5py.Group]):
+            field: Union[Field, h5py.Group]):
         """
         Get a Field from a h5py Group.
         Example:
@@ -1060,7 +1060,7 @@ class Session(AbstractSession):
             if isinstance(v, rw.Reader):
                 input_readers[k] = v
             else:
-                input_readers[k] = self.get_reader(v)
+                input_readers[k] = self.get(v)
         output_writers = dict()
         output_arrays = dict()
         for k, v in outputs.items():
