@@ -22,56 +22,54 @@ class HDF5DataFrame(DataFrame):
     def __init__(self,
                  dataset: Dataset,
                  name: str,
-                 dataframe: dict = None,
-                 h5group: h5py.Group = None):
+                 h5group: h5py.Group,
+                 dataframe: dict = None):
         """
-        Create a Dataframe object.
+        Create a Dataframe object, user should always call from dataset.create_dataframe.
 
         :param name: name of the dataframe, or the group name in HDF5
         :param dataset: a dataset object, where this dataframe belongs to
-        :param dataframe: optional - replicate data from another dictionary
-        :param h5group: optional - acquire data from h5group object directly, the h5group needs to have a
+        :param h5group: acquire data from h5group object directly, the h5group needs to have a
                         h5group<-group-dataset structure, the group has a 'fieldtype' attribute
                          and the dataset is named 'values'.
+        :param dataframe: optional - replicate data from another dictionary
         """
-        # TODO: consider columns as a name rather than fields
-        self.fields = dict()
+
         self.name = name
-        self.dataset = dataset
-        # if isinstance(dataset, dst.HDF5Dataset):
-        #     dataset[name] = self
+        self._columns = dict()
+        self._dataset = dataset
+        self._h5group = h5group
+
         if dataframe is not None:
             if isinstance(dataframe, dict):
-                for k,v in dataframe.items():
+                for k, v in dataframe.items():
                     if not isinstance(k, str) or not isinstance(v, fld.Field):
-                        raise ValueError("If dataframe parameter is set, must be a dictionary mapping strings to fields")
-                self.fields = dataframe
-        elif h5group is not None and isinstance(h5group, h5py.Group):
-            for subg in h5group.keys():
-                self.fields[subg]=dataset.session.get(h5group[subg])
-            # fieldtype_map = {
-            #     'indexedstring': fld.IndexedStringField,
-            #     'fixedstring': fld.FixedStringField,
-            #     'categorical': fld.CategoricalField,
-            #     'boolean': fld.NumericField,
-            #     'numeric': fld.NumericField,
-            #     'datetime': fld.TimestampField,
-            #     'date': fld.TimestampField,
-            #     'timestamp': fld.TimestampField
-            # }
-            # for subg in h5group.keys():
-            #     fieldtype = h5group[subg].attrs['fieldtype'].split(',')[0]
-            #     self.fields[subg] = fieldtype_map[fieldtype](self, h5group[subg])
-            #     print(" ")
+                        raise ValueError("If dataframe parameter is set, "
+                                         "must be a dictionary mapping strings to fields")
+                self._columns = dataframe
+        for subg in h5group.keys():
+            self._columns[subg] = dataset.session.get(h5group[subg])
+
+    @property
+    def columns(self):
+        return dict(self._columns)
+
+    @property
+    def dataset(self):
+        return self._dataset
+
+    @property
+    def h5group(self):
+        return self._h5group
 
     def add(self, field, name=None):
         if name is not None:
             if not isinstance(name, str):
                 raise TypeError("The name must be a str object.")
             else:
-                self.fields[name] = field
+                self._columns[name] = field
         # note the name has '/' for hdf5 object
-        self.fields[field.name[field.name.index('/', 1)+1:]] = field
+        self._columns[field.name[field.name.index('/', 1)+1:]] = field
 
     def create_group(self, name):
         """
@@ -80,45 +78,44 @@ class HDF5DataFrame(DataFrame):
         :param name: the name of the group and field
         :return: a hdf5 group object
         """
-        self.dataset.file.create_group("/"+self.name+"/"+name)
-
-        return self.dataset.file["/"+self.name+"/"+name]
+        self._h5group.create_group(name)
+        return self._h5group[name]
 
     def create_numeric(self, name, nformat, timestamp=None, chunksize=None):
-        fld.numeric_field_constructor(self.dataset.session, self, name, nformat, timestamp, chunksize)
-        field = fld.NumericField(self.dataset.session, self.dataset.file["/"+self.name+"/"+name],
+        fld.numeric_field_constructor(self._dataset.session, self, name, nformat, timestamp, chunksize)
+        field = fld.NumericField(self._dataset.session, self._h5group[name],
                                  write_enabled=True)
-        self.fields[name] = field
-        return self.fields[name]
+        self._columns[name] = field
+        return self._columns[name]
 
     def create_indexed_string(self, name, timestamp=None, chunksize=None):
-        fld.indexed_string_field_constructor(self.dataset.session, self, name, timestamp, chunksize)
-        field = fld.IndexedStringField(self.dataset.session, self.dataset.file["/"+self.name+"/"+name],
+        fld.indexed_string_field_constructor(self._dataset.session, self, name, timestamp, chunksize)
+        field = fld.IndexedStringField(self._dataset.session, self._h5group[name],
                                        write_enabled=True)
-        self.fields[name] = field
-        return self.fields[name]
+        self._columns[name] = field
+        return self._columns[name]
 
     def create_fixed_string(self, name, length, timestamp=None, chunksize=None):
-        fld.fixed_string_field_constructor(self.dataset.session, self, name, length, timestamp, chunksize)
-        field = fld.FixedStringField(self.dataset.session, self.dataset.file["/"+self.name+"/"+name],
+        fld.fixed_string_field_constructor(self._dataset.session, self, name, length, timestamp, chunksize)
+        field = fld.FixedStringField(self._dataset.session, self._h5group[name],
                                      write_enabled=True)
-        self.fields[name] = field
-        return self.fields[name]
+        self._columns[name] = field
+        return self._columns[name]
 
     def create_categorical(self, name, nformat, key, timestamp=None, chunksize=None):
-        fld.categorical_field_constructor(self.dataset.session, self, name, nformat, key,
+        fld.categorical_field_constructor(self._dataset.session, self, name, nformat, key,
                                           timestamp, chunksize)
-        field = fld.CategoricalField(self.dataset.session, self.dataset.file["/"+self.name+"/"+name],
+        field = fld.CategoricalField(self._dataset.session, self._h5group[name],
                                      write_enabled=True)
-        self.fields[name] = field
-        return self.fields[name]
+        self._columns[name] = field
+        return self._columns[name]
 
     def create_timestamp(self, name, timestamp=None, chunksize=None):
-        fld.timestamp_field_constructor(self.dataset.session, self, name, timestamp, chunksize)
-        field = fld.TimestampField(self.dataset.session, self.dataset.file["/"+self.name+"/"+name],
+        fld.timestamp_field_constructor(self._dataset.session, self, name, timestamp, chunksize)
+        field = fld.TimestampField(self._dataset.session, self._h5group[name],
                                    write_enabled=True)
-        self.fields[name] = field
-        return self.fields[name]
+        self._columns[name] = field
+        return self._columns[name]
 
     def __contains__(self, name):
         """
@@ -128,7 +125,7 @@ class HDF5DataFrame(DataFrame):
         if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
         else:
-            return self.fields.__contains__(name)
+            return self._columns.__contains__(name)
 
     def contains_field(self, field):
         """
@@ -138,7 +135,7 @@ class HDF5DataFrame(DataFrame):
         if not isinstance(field, fld.Field):
             raise TypeError("The field must be a Field object")
         else:
-            for v in self.fields.values():
+            for v in self._columns.values():
                 if id(field) == id(v):
                     return True
             return False
@@ -149,7 +146,7 @@ class HDF5DataFrame(DataFrame):
         elif not self.__contains__(name):
             raise ValueError("Can not find the name from this dataframe.")
         else:
-            return self.fields[name]
+            return self._columns[name]
 
     def get_field(self, name):
         return self.__getitem__(name)
@@ -160,7 +157,7 @@ class HDF5DataFrame(DataFrame):
         """
         if not isinstance(field, fld.Field):
             raise TypeError("The field argument must be a Field object.")
-        for name, v in self.fields.items():
+        for name, v in self._columns.items():
             if id(field) == id(v):
                 return name
         return None
@@ -171,14 +168,14 @@ class HDF5DataFrame(DataFrame):
         elif not isinstance(field, fld.Field):
             raise TypeError("The field must be a Field object.")
         else:
-            self.fields[name] = field
+            self._columns[name] = field
             return True
 
     def __delitem__(self, name):
         if not self.__contains__(name=name):
             raise ValueError("This dataframe does not contain the name to delete.")
         else:
-            del self.fields[name]
+            del self._columns[name]
             return True
 
     def delete_field(self, field):
@@ -191,33 +188,30 @@ class HDF5DataFrame(DataFrame):
         else:
             self.__delitem__(name)
 
-    def list(self):
-        return tuple(n for n in self.fields.keys())
-
     def keys(self):
-        return self.fields.keys()
+        return self._columns.keys()
 
     def values(self):
-        return self.fields.values()
+        return self._columns.values()
 
     def items(self):
-        return self.fields.items()
+        return self._columns.items()
 
     def __iter__(self):
-        return iter(self.fields)
+        return iter(self._columns)
 
     def __next__(self):
-        return next(self.fields)
+        return next(self._columns)
 
     def __len__(self):
-        return len(self.fields)
+        return len(self._columns)
 
     def get_spans(self):
         """
         Return the name and spans of each field as a dictionary.
         """
         spans = {}
-        for name, field in self.fields.items():
+        for name, field in self._columns.items():
             spans[name] = field.get_spans()
         return spans
 
@@ -232,13 +226,12 @@ class HDF5DataFrame(DataFrame):
         if ddf is not None:
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
-            for name, field in self.fields.items():
-                # TODO integration w/ session, dataset
-                newfld = field.create_like(ddf, field.name)
+            for name, field in self._columns.items():
+                newfld = field.create_like(ddf, field.name[field.name.index('/', 1)+1:])
                 ddf.add(field.apply_filter(filter_to_apply, dstfld=newfld), name=name)
             return ddf
         else:
-            for field in self.fields.values():
+            for field in self._columns.values():
                 field.apply_filter(filter_to_apply)
             return self
 
@@ -253,11 +246,12 @@ class HDF5DataFrame(DataFrame):
         if ddf is not None:
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
-            for name, field in self.fields.items():
-                newfld = field.create_like(ddf, field.name)
-                ddf.add(field.apply_index(index_to_apply, dstfld=newfld), name=name)
+            for name, field in self._columns.items():
+                newfld = field.create_like(ddf, field.name[field.name.index('/', 1)+1:])
+                idx = field.apply_index(index_to_apply, dstfld=newfld)
+                ddf.add(idx, name=name)
             return ddf
         else:
-            for field in self.fields.values():
+            for field in self._columns.values():
                 field.apply_index(index_to_apply)
             return self

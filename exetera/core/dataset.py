@@ -17,52 +17,61 @@ from exetera.core import dataframe as edf
 class HDF5Dataset(Dataset):
 
     def __init__(self, session, dataset_path, mode, name):
+        self.name = name
         self._session = session
-        self.file = h5py.File(dataset_path, mode)
-        self.dataframes = dict()
-        for subgrp in self.file.keys():
-            hdf = edf.HDF5DataFrame(self,subgrp,h5group=self.file[subgrp])
-            self.dataframes[subgrp]=hdf
+        self._file = h5py.File(dataset_path, mode)
+        self._dataframes = dict()
+        for subgrp in self._file.keys():
+            self.create_dataframe(subgrp, h5group=self._file[subgrp])
 
     @property
     def session(self):
         return self._session
 
+    @property
+    def dataframes(self):
+        return self._dataframes
+
+    @property
+    def file(self):
+        return self._file
 
     def close(self):
-        self.file.close()
+        self._file.close()
 
-
-    def create_dataframe(self, name):
+    def create_dataframe(self, name, dataframe: dict = None, h5group: h5py.Group = None):
         """
         Create a group object in HDF5 file and a Exetera dataframe in memory.
 
-        :param name: the name of the group and dataframe
+        :param name: name of the dataframe, or the group name in HDF5
+        :param dataframe: optional - replicate data from another dictionary
+        :param h5group: optional - acquire data from h5group object directly, the h5group needs to have a
+                        h5group<-group-dataset structure, the group has a 'fieldtype' attribute
+                         and the dataset is named 'values'.
         :return: a dataframe object
         """
-        self.file.create_group(name)
-        dataframe = edf.HDF5DataFrame(self, name)
-        self.dataframes[name] = dataframe
+        if h5group is None:
+            self._file.create_group(name)
+            h5group = self._file[name]
+        dataframe = edf.HDF5DataFrame(self, name, h5group, dataframe)
+        self._dataframes[name] = dataframe
         return dataframe
-
 
     def add(self, dataframe, name=None):
         """
-        Add an existing dataframe to this dataset, write the existing group
+        Add an existing dataframe (from other dataset) to this dataset, write the existing group
         attributes and HDF5 datasets to this dataset.
 
         :param dataframe: the dataframe to copy to this dataset
         :param name: optional- change the dataframe name
         """
         dname = dataframe.name if name is None else name
-        self.file.copy(dataframe.dataset.file[dataframe.name], self.file, name=dname)
-        df = edf.HDF5DataFrame(self, dname, h5group=self.file[dname])
-        self.dataframes[dname] = df
-
+        self._file.copy(dataframe.h5group, self._file, name=dname)
+        df = edf.HDF5DataFrame(self, dname, h5group=self._file[dname])
+        self._dataframes[dname] = df
 
     def __contains__(self, name):
-        return self.dataframes.__contains__(name)
-
+        return self._dataframes.__contains__(name)
 
     def contains_dataframe(self, dataframe):
         """
@@ -74,11 +83,10 @@ class HDF5Dataset(Dataset):
         if not isinstance(dataframe, edf.DataFrame):
             raise TypeError("The field must be a DataFrame object")
         else:
-            for v in self.dataframes.values():
+            for v in self._dataframes.values():
                 if id(dataframe) == id(v):
                     return True
             return False
-
 
     def __getitem__(self, name):
         if not isinstance(name, str):
@@ -86,12 +94,10 @@ class HDF5Dataset(Dataset):
         elif not self.__contains__(name):
             raise ValueError("Can not find the name from this dataset.")
         else:
-            return self.dataframes[name]
-
+            return self._dataframes[name]
 
     def get_dataframe(self, name):
         self.__getitem__(name)
-
 
     def get_name(self, dataframe):
         """
@@ -99,31 +105,36 @@ class HDF5Dataset(Dataset):
         """
         if not isinstance(dataframe, edf.DataFrame):
             raise TypeError("The field argument must be a DataFrame object.")
-        for name, v in self.fields.items():
+        for name, v in self.dataframes.items():
             if id(dataframe) == id(v):
                 return name
-                break
         return None
 
     def __setitem__(self, name, dataframe):
+        """
+        Add an existing dataframe (from other dataset) to this dataset, the existing dataframe can from:
+        1) this dataset, so perform a 'rename' operation, or;
+        2) another dataset, so perform an 'add' or 'replace' operation
+        """
         if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
         elif not isinstance(dataframe, edf.DataFrame):
             raise TypeError("The field must be a DataFrame object.")
         else:
-            if self.dataframes.__contains__(name):
-                self.__delitem__(name)
-            return self.add(dataframe,name)
-
+            if dataframe.dataset == self:  # rename a dataframe
+                return self._file.move(dataframe.name, name)
+            else:  # new dataframe from another dataset
+                if self._dataframes.__contains__(name):
+                    self.__delitem__(name)
+                return self.add(dataframe, name)
 
     def __delitem__(self, name):
         if not self.__contains__(name):
             raise ValueError("This dataframe does not contain the name to delete.")
         else:
-            del self.dataframes[name]
-            del self.file[name]
+            del self._dataframes[name]
+            del self._file[name]
             return True
-
 
     def delete_dataframe(self, dataframe):
         """
@@ -135,30 +146,20 @@ class HDF5Dataset(Dataset):
         else:
             self.__delitem__(name)
 
-
-    def list(self):
-        return tuple(n for n in self.dataframes.keys())
-
-
     def keys(self):
-        return self.dataframes.keys()
-
+        return self._dataframes.keys()
 
     def values(self):
-        return self.dataframes.values()
-
+        return self._dataframes.values()
 
     def items(self):
-        return self.dataframes.items()
-
+        return self._dataframes.items()
 
     def __iter__(self):
-        return iter(self.dataframes)
-
+        return iter(self._dataframes)
 
     def __next__(self):
-        return next(self.dataframes)
-
+        return next(self._dataframes)
 
     def __len__(self):
-        return len(self.dataframes)
+        return len(self._dataframes)

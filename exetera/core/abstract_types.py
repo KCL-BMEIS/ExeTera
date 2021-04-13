@@ -117,10 +117,6 @@ class Dataset(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def list(self):
-        raise NotImplementedError()
-
-    @abstractmethod
     def __iter__(self):
         raise NotImplementedError()
 
@@ -139,7 +135,7 @@ class DataFrame(ABC):
     """
 
     @abstractmethod
-    def add(self):
+    def add(self, field, name=None):
         raise NotImplementedError()
 
     @abstractmethod
@@ -196,10 +192,6 @@ class DataFrame(ABC):
 
     @abstractmethod
     def delete_field(self, field):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def list(self):
         raise NotImplementedError()
 
     @abstractmethod
