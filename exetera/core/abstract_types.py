@@ -344,7 +344,7 @@ class AbstractSession(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def aggregate_count(self, index=None, dest=None):
+    def aggregate_count(self, index, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
@@ -364,7 +364,7 @@ class AbstractSession(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def aggregate_custom(self, index, target=None, dest=None):
+    def aggregate_custom(self, predicate, index, target=None, dest=None):
         raise NotImplementedError()
 
     @abstractmethod
