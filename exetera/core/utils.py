@@ -305,7 +305,7 @@ def concatenate_maybe_strs(sequence, value, separator=',', delimiter='"'):
 
 def replace_if_invalid(replacement):
     def inner_(value):
-        if value is '':
+        if value == '':
             return replacement
         else:
             return float(value)
