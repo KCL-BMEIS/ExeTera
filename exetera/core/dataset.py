@@ -28,14 +28,6 @@ class HDF5Dataset(Dataset):
     def session(self):
         return self._session
 
-    @property
-    def dataframes(self):
-        return self._dataframes
-
-    @property
-    def file(self):
-        return self._file
-
     def close(self):
         self._file.close()
 
@@ -105,7 +97,7 @@ class HDF5Dataset(Dataset):
         """
         if not isinstance(dataframe, edf.DataFrame):
             raise TypeError("The field argument must be a DataFrame object.")
-        for name, v in self.dataframes.items():
+        for name, v in self._dataframes.items():
             if id(dataframe) == id(v):
                 return name
         return None
