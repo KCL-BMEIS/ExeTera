@@ -29,7 +29,6 @@ from exetera.core import validation as val
 from exetera.core import operations as ops
 from exetera.core import dataset as ds
 from exetera.core import dataframe as df
-from exetera.core import utils
 
 
 class Session(AbstractSession):
@@ -80,7 +79,6 @@ class Session(AbstractSession):
         if name in self.datasets:
             raise ValueError("A dataset with name '{}' is already open, and must be closed first.".format(name))
 
-        #self.datasets[name] = h5py.File(dataset_path, h5py_modes[mode])
         self.datasets[name] = ds.HDF5Dataset(self, dataset_path, mode, name)
         return self.datasets[name]
 
@@ -381,9 +379,9 @@ class Session(AbstractSession):
 
         if fields is not None:
             if isinstance(fields[0], Field):
-                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(),fields[1].get_spans())
+                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(), fields[1].get_spans())
             if isinstance(fields[0], np.ndarray):
-                return ops._get_spans_for_2_fields(fields[0],fields[1])
+                return ops._get_spans_for_2_fields(fields[0], fields[1])
         else:
             if isinstance(field, Field):
                 return field.get_spans()
