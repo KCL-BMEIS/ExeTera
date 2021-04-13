@@ -66,7 +66,7 @@ def journal_table(session, schema, old_src, new_src, src_pk, result):
         new_ids_ = new_ids_[new_sorted_index]
         old_map, new_map = ops.ordered_generate_journalling_indices(old_ids_, new_ids_)
 
-    to_keep = np.zeros(len(old_map), dtype=np.bool)
+    to_keep = np.zeros(len(old_map), dtype=bool)
 
     schema_fields = schema.fields.keys()
     common_keys = [k for k in schema_fields if k in common_keys]
