@@ -1,3 +1,14 @@
+# Copyright 2020 KCL-BMEIS - King's College London
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from typing import Callable, Tuple, Union
 import os
 import uuid
@@ -9,16 +20,19 @@ import pandas as pd
 
 import h5py
 
+from exetera.core.abstract_types import Field, AbstractSession
 from exetera.core import operations
 from exetera.core import persistence as per
 from exetera.core import fields as fld
 from exetera.core import readerwriter as rw
 from exetera.core import validation as val
 from exetera.core import operations as ops
+from exetera.core import dataset as ds
+from exetera.core import dataframe as df
 from exetera.core import utils
 
 
-class Session:
+class Session(AbstractSession):
 
     def __init__(self,
                  chunksize: int = ops.DEFAULT_CHUNKSIZE,
@@ -66,7 +80,8 @@ class Session:
         if name in self.datasets:
             raise ValueError("A dataset with name '{}' is already open, and must be closed first.".format(name))
 
-        self.datasets[name] = h5py.File(dataset_path, h5py_modes[mode])
+        #self.datasets[name] = h5py.File(dataset_path, h5py_modes[mode])
+        self.datasets[name] = ds.HDF5Dataset(self, dataset_path, mode, name)
         return self.datasets[name]
 
 
@@ -171,7 +186,6 @@ class Session:
         self.timestamp = timestamp
 
 
-
     def sort_on(self,
                 src_group: h5py.Group,
                 dest_group: h5py.Group,
@@ -222,7 +236,6 @@ class Session:
         print_if_verbose(f"fields reordered in {time.time() - t0}s")
 
 
-
     def dataset_sort_index(self, sort_indices, index=None):
         """
         Generate a sorted index based on a set of fields upon which to sort and an optional
@@ -261,7 +274,7 @@ class Session:
         and returned from the function call. If the field is an IndexedStringField, the
         indices and values are returned separately.
 
-        :param filter_to_apply: the filter to be applied to the source field
+        :param filter_to_apply: the filter to be applied to the source field, an array of boolean
         :param src: the field to be filtered
         :param dest: optional - a field to write the filtered data to
         :return: the filtered values
@@ -271,14 +284,12 @@ class Session:
         if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
         if isinstance(src, fld.IndexedStringField):
-            src_ = val.field_from_parameter(self, 'reader', src)
-            dest_indices, dest_values =\
-                ops.apply_filter_to_index_values(filter_to_apply_,
-                                                 src_.indices[:], src_.values[:])
-            if writer_ is not None:
-                writer_.indices.write(dest_indices)
-                writer_.values.write(dest_values)
-            return dest_indices, dest_values
+            newfld = src.apply_filter(filter_to_apply_, writer_)
+            return newfld.indices, newfld.values
+        elif isinstance(src, Field):
+            newfld = src.apply_filter(filter_to_apply_, writer_)
+            return newfld.data[:]
+        #elif isinstance(src, df.datafrme):
         else:
             reader_ = val.array_from_parameter(self, 'reader', src)
             result = reader_[filter_to_apply]
@@ -293,7 +304,7 @@ class Session:
         and returned from the function call. If the field is an IndexedStringField, the
         indices and values are returned separately.
 
-        :param index_to_apply: the index to be applied to the source field
+        :param index_to_apply: the index to be applied to the source field, must be one of Group, Field, or ndarray
         :param src: the field to be index
         :param dest: optional - a field to write the indexed data to
         :return: the indexed values
@@ -303,14 +314,13 @@ class Session:
         if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
         if isinstance(src, fld.IndexedStringField):
-            src_ = val.field_from_parameter(self, 'reader', src)
             dest_indices, dest_values =\
                 ops.apply_indices_to_index_values(index_to_apply_,
-                                                  src_.indices[:], src_.values[:])
-            if writer_ is not None:
-                writer_.indices.write(dest_indices)
-                writer_.values.write(dest_values)
+                                                  src.indices[:], src.values[:])
             return dest_indices, dest_values
+        elif isinstance(src, Field):
+            newfld = src.apply_index(index_to_apply_, writer_)
+            return newfld.data[:]
         else:
             reader_ = val.array_from_parameter(self, 'reader', src)
             result = reader_[index_to_apply]
@@ -340,8 +350,8 @@ class Session:
 
 
     def get_spans(self,
-                  field: Union[fld.Field, np.array] = None,
-                  fields: Union[Tuple[fld.Field], Tuple[np.array]] = None):
+                  field: Union[Field, np.array] = None,
+                  fields: Union[Tuple[Field], Tuple[np.array]] = None):
         """
         Calculate a set of spans that indicate contiguous equal values.
         The entries in the result array correspond to the inclusive start and
@@ -369,17 +379,22 @@ class Session:
         if field is not None:
             raw_field = val.array_from_parameter(self, 'field', field)
 
-        raw_fields = []
         if fields is not None:
-            for i_f, f in enumerate(fields):
-                raw_fields.append(val.array_from_parameter(self, "'fields[{}]'".format(i_f), f))
-        return per._get_spans(raw_field, raw_fields)
+            if isinstance(fields[0], Field):
+                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(),fields[1].get_spans())
+            if isinstance(fields[0], np.ndarray):
+                return ops._get_spans_for_2_fields(fields[0],fields[1])
+        else:
+            if isinstance(field, Field):
+                return field.get_spans()
+            if isinstance(field, np.ndarray):
+                return ops.get_spans_for_field(field)
 
 
     def _apply_spans_no_src(self,
                             predicate: Callable[[np.array, np.array], None],
                             spans: np.array,
-                            dest: fld.Field = None) -> np.array:
+                            dest: Field = None) -> np.array:
         """
         An implementation method for span applications that are carried out on the spans themselves rather than a target
         field.
@@ -388,7 +403,8 @@ class Session:
         :params dest: if set, the field to which the results are written
         :returns: A numpy array containing the resulting values
         """
-        assert(dest is None or isinstance(dest, fld.Field))
+        assert(dest is None or isinstance(dest, Field))
+
         if dest is not None:
             dest_f = val.field_from_parameter(self, 'dest', dest)
             results = np.zeros(len(spans) - 1, dtype=dest_f.data.dtype)
@@ -400,11 +416,12 @@ class Session:
             predicate(spans, results)
             return results
 
+
     def _apply_spans_src(self,
                          predicate: Callable[[np.array, np.array, np.array], None],
                          spans: np.array,
                          target: np.array,
-                         dest: fld.Field = None) -> np.array:
+                         dest: Field = None) -> np.array:
         """
         An implementation method for span applications that are carried out on a target field.
         :params predicate: a predicate function that carries out the operation on the spans and a target field, and
@@ -414,7 +431,7 @@ class Session:
         :params dest: if set, the field to which the results are written
         :returns: A numpy array containing the resulting values
         """
-        assert(dest is None or isinstance(dest, fld.Field))
+        assert(dest is None or isinstance(dest, Field))
         target_ = val.array_from_parameter(self, 'target', target)
         if len(target) != spans[-1]:
             error_msg = ("'target' (length {}) must be one element shorter than 'spans' "
@@ -432,10 +449,11 @@ class Session:
             predicate(spans, target_, results)
             return results
 
+
     def apply_spans_index_of_min(self,
                                  spans: np.array,
                                  target: np.array,
-                                 dest: fld.Field = None):
+                                 dest: Field = None):
         """
         Finds the index of the minimum value within each span on a target field
         :params spans: the numpy array of spans to be applied
@@ -445,10 +463,11 @@ class Session:
         """
         return self._apply_spans_src(ops.apply_spans_index_of_min, spans, target, dest)
 
+
     def apply_spans_index_of_max(self,
                                  spans: np.array,
                                  target: np.array,
-                                 dest: fld.Field = None):
+                                 dest: Field = None):
         """
         Finds the index of the maximum value within each span on a target field
         :params spans: the numpy array of spans to be applied
@@ -458,9 +477,10 @@ class Session:
         """
         return self._apply_spans_src(ops.apply_spans_index_of_max, spans, target, dest)
 
+
     def apply_spans_index_of_first(self,
                                    spans: np.array,
-                                   dest: fld.Field = None):
+                                   dest: Field = None):
         """
         Finds the index of the first entry within each span
         :params spans: the numpy array of spans to be applied
@@ -469,9 +489,10 @@ class Session:
         """
         return self._apply_spans_no_src(ops.apply_spans_index_of_first, spans, dest)
 
+
     def apply_spans_index_of_last(self,
                                   spans: np.array,
-                                  dest: fld.Field = None):
+                                  dest: Field = None):
         """
         Finds the index of the last entry within each span
         :params spans: the numpy array of spans to be applied
@@ -480,9 +501,10 @@ class Session:
         """
         return self._apply_spans_no_src(ops.apply_spans_index_of_last, spans, dest)
 
+
     def apply_spans_count(self,
                           spans: np.array,
-                          dest: fld.Field = None):
+                          dest: Field = None):
         """
         Finds the number of entries within each span
         :params spans: the numpy array of spans to be applied
@@ -491,10 +513,11 @@ class Session:
         """
         return self._apply_spans_no_src(ops.apply_spans_count, spans, dest)
 
+
     def apply_spans_min(self,
                         spans: np.array,
                         target: np.array,
-                        dest: fld.Field = None):
+                        dest: Field = None):
         """
         Finds the minimum value within span on a target field
         :params spans: the numpy array of spans to be applied
@@ -504,10 +527,11 @@ class Session:
         """
         return self._apply_spans_src(ops.apply_spans_min, spans, target, dest)
 
+
     def apply_spans_max(self,
                         spans: np.array,
                         target: np.array,
-                        dest: fld.Field = None):
+                        dest: Field = None):
         """
         Finds the maximum value within each span on a target field
         :params spans: the numpy array of spans to be applied
@@ -517,10 +541,11 @@ class Session:
         """
         return self._apply_spans_src(ops.apply_spans_max, spans, target, dest)
 
+
     def apply_spans_first(self,
                           spans: np.array,
                           target: np.array,
-                          dest: fld.Field = None):
+                          dest: Field = None):
         """
         Finds the first entry within each span on a target field
         :params spans: the numpy array of spans to be applied
@@ -530,10 +555,11 @@ class Session:
         """
         return self._apply_spans_src(ops.apply_spans_first, spans, target, dest)
 
+
     def apply_spans_last(self,
                          spans: np.array,
                          target: np.array,
-                         dest: fld.Field = None):
+                         dest: Field = None):
         """
         Finds the last entry within each span on a target field
         :params spans: the numpy array of spans to be applied
@@ -543,25 +569,26 @@ class Session:
         """
         return self._apply_spans_src(ops.apply_spans_last, spans, target, dest)
 
+
     def apply_spans_concat(self,
                            spans,
-                           src,
+                           target,
                            dest,
                            src_chunksize=None,
                            dest_chunksize=None,
                            chunksize_mult=None):
-        if not isinstance(src, fld.IndexedStringField):
-            raise ValueError(f"'src' must be one of 'IndexedStringField' but is {type(src)}")
+        if not isinstance(target, fld.IndexedStringField):
+            raise ValueError(f"'target' must be one of 'IndexedStringField' but is {type(target)}")
         if not isinstance(dest, fld.IndexedStringField):
             raise ValueError(f"'dest' must be one of 'IndexedStringField' but is {type(dest)}")
 
-        src_chunksize = src.chunksize if src_chunksize is None else src_chunksize
+        src_chunksize = target.chunksize if src_chunksize is None else src_chunksize
         dest_chunksize = dest.chunksize if dest_chunksize is None else dest_chunksize
         chunksize_mult = 16 if chunksize_mult is None else chunksize_mult
 
 
-        src_index = src.indices[:]
-        src_values = src.values[:]
+        src_index = target.indices[:]
+        src_values = target.values[:]
         dest_index = np.zeros(src_chunksize, src_index.dtype)
         dest_values = np.zeros(dest_chunksize * chunksize_mult, src_values.dtype)
 
@@ -641,7 +668,7 @@ class Session:
         return self._aggregate_impl(self.apply_spans_count, index, None, dest)
 
 
-    def aggregate_first(self, index, target, dest=None):
+    def aggregate_first(self, index, target=None, dest=None):
         """
         Finds the first entries within each sub-group of index.
         Example:
@@ -675,7 +702,7 @@ class Session:
         return self.aggregate_custom(self.apply_spans_last, index, target, dest)
 
 
-    def aggregate_min(self, index, src=None, dest=None):
+    def aggregate_min(self, index, target=None, dest=None):
         """
         Finds the minimum value within each sub-group of index.
         Example:
@@ -689,10 +716,10 @@ class Session:
         :params dest: If set, a Field to which the resulting counts are written
         :returns: A numpy array containing the resulting values
         """
-        return self.aggregate_custom(self.apply_spans_min, index, src, dest)
+        return self.aggregate_custom(self.apply_spans_min, index, target, dest)
 
 
-    def aggregate_max(self, index, src=None, dest=None):
+    def aggregate_max(self, index, target=None, dest=None):
         """
         Finds the maximum value within each sub-group of index.
         Example:
@@ -706,17 +733,17 @@ class Session:
         :params dest: If set, a Field to which the resulting counts are written
         :returns: A numpy array containing the resulting values
         """
-        return self.aggregate_custom(self.apply_spans_max, index, src, dest)
+        return self.aggregate_custom(self.apply_spans_max, index, target, dest)
 
 
-    def aggregate_custom(self, predicate, index, src=None, dest=None):
-        if src is None:
+    def aggregate_custom(self, predicate, index, target=None, dest=None):
+        if target is None:
             raise ValueError("'src' must not be None")
-        val.ensure_valid_field_like("src", src)
+        val.ensure_valid_field_like("src", target)
         if dest is not None:
             val.ensure_valid_field("dest", dest)
 
-        return self._aggregate_impl(predicate, index, src, dest)
+        return self._aggregate_impl(predicate, index, target, dest)
 
 
     def join(self,
@@ -835,7 +862,7 @@ class Session:
           # get the bird decibel field
           bird_decibels = s.get(birds['decibels'])
         """
-        if isinstance(field, fld.Field):
+        if isinstance(field, Field):
             return field
 
         if 'fieldtype' not in field.attrs.keys():
@@ -877,7 +904,7 @@ class Session:
                 raise ValueError("{} is not a well-formed field".format(field))
             f = self.get(field)
             return f.create_like(dest_group, dest_name)
-        elif isinstance(field, field.Field):
+        elif isinstance(field, Field):
             return field.create_like(dest_group, dest_name)
         else:
             raise ValueError("'field' must be either a Field or a h5py.Group, but is {}".format(type(field)))
@@ -885,7 +912,7 @@ class Session:
 
     def create_indexed_string(self, group, name, timestamp=None, chunksize=None):
         """
-        Create an indexed string field in the given group with the given name.
+        Create an indexed string field in the given DataFrame with the given name.
 
         :params group: The group in which the new field should be created
         :params name: The name of the new field
@@ -894,13 +921,23 @@ class Session:
         :params chunksize: If set, the chunksize that should be used to create the new field. In general, this should
         not be set unless you are writing unit tests.
         """
-        fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
-        return fld.IndexedStringField(self, group[name], write_enabled=True)
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
+
+        if isinstance(group, h5py.Group):
+            return fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
+        else:
+            return group.create_indexed_string(name, timestamp, chunksize)
 
 
     def create_fixed_string(self, group, name, length, timestamp=None, chunksize=None):
         """
-        Create an fixed string field in the given group with the given name, with the given max string length per entry.
+        Create an fixed string field in the given DataFrame with the given name, with the given max string length per entry.
 
         :params group: The group in which the new field should be created
         :params name: The name of the new field
@@ -910,14 +947,22 @@ class Session:
         :params chunksize: If set, the chunksize that should be used to create the new field. In general, this should
         not be set unless you are writing unit tests.
         """
-        fld.fixed_string_field_constructor(self, group, name, length, timestamp, chunksize)
-        return fld.FixedStringField(self, group[name], write_enabled=True)
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
+        if isinstance(group, h5py.Group):
+            return fld.fixed_string_field_constructor(self, group, name, timestamp, chunksize)
+        else:
+            return group.create_fixed_string(name, length, timestamp, chunksize)
 
 
-    def create_categorical(self, group, name, nformat, key,
-                           timestamp=None, chunksize=None):
+    def create_categorical(self, group, name, nformat, key, timestamp=None, chunksize=None):
         """
-        Create a categorical field in the given group with the given name. This function also takes a numerical format
+        Create a categorical field in the given DataFrame with the given name. This function also takes a numerical format
         for the numeric representation of the categories, and a key that maps numeric values to their string
         string descriptions.
 
@@ -931,14 +976,23 @@ class Session:
         :params chunksize: If set, the chunksize that should be used to create the new field. In general, this should
         not be set unless you are writing unit tests.
         """
-        fld.categorical_field_constructor(self, group, name, nformat, key,
-                                          timestamp, chunksize)
-        return fld.CategoricalField(self, group[name], write_enabled=True)
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
+
+        if isinstance(group, h5py.Group):
+            return fld.categorical_field_constructor(self, group, name, timestamp, chunksize)
+        else:
+            return group.create_categorical(name, nformat, key, timestamp, chunksize)
 
 
     def create_numeric(self, group, name, nformat, timestamp=None, chunksize=None):
         """
-        Create a numeric field in the given group with the given name.
+        Create a numeric field in the given DataFrame with the given name.
 
         :params group: The group in which the new field should be created
         :params name: The name of the new field
@@ -950,13 +1004,36 @@ class Session:
         :params chunksize: If set, the chunksize that should be used to create the new field. In general, this should
         not be set unless you are writing unit tests.
         """
-        fld.numeric_field_constructor(self, group, name, nformat, timestamp, chunksize)
-        return fld.NumericField(self, group[name], write_enabled=True)
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
+
+        if isinstance(group, h5py.Group):
+            return fld.numeric_field_constructor(self. group, name, timestamp, chunksize)
+        else:
+            return group.create_numeric(name, nformat, timestamp, chunksize)
 
 
     def create_timestamp(self, group, name, timestamp=None, chunksize=None):
-        fld.timestamp_field_constructor(self, group, name, timestamp, chunksize)
-        return fld.TimestampField(self, group[name], write_enabled=True)
+        """
+        Create a timestamp field in the given group with the given name.
+        """
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
+
+        if isinstance(group, h5py.Group):
+            return fld.categorical_field_constructor(self, group, name, timestamp, chunksize)
+        else:
+            return group.create_timestamp(name, timestamp, chunksize)
 
 
     def get_or_create_group(self, group, name):

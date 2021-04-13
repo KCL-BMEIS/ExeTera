@@ -1,33 +1,30 @@
+# Copyright 2020 KCL-BMEIS - King's College London
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from typing import Union
 from datetime import datetime, timezone
 
 import numpy as np
 import numba
 import h5py
 
+from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
-from exetera.core import utils
-from exetera.core import persistence as per
+from exetera.core import operations as ops
+from exetera.core import validation as val
 
-
-# def test_field_iterator(data):
-#     @numba.njit
-#     def _inner():
-#         for d in data:
-#             yield d
-#     return _inner()
-#
-# iterator_type = numba.from_dtype(test_field_iterator)
-#
-# @numba.jit
-# def sum_iterator(iter_):
-#     total = np.int64(0)
-#     for i in iter_:
-#         total += i
-#     return total
-
-
-class Field:
+class HDF5Field(Field):
     def __init__(self, session, group, name=None, write_enabled=False):
+        super().__init__()
+
         if name is None:
             field = group
         else:
@@ -50,6 +47,10 @@ class Field:
     def chunksize(self):
         return self._field.attrs['chunksize']
 
+    @property
+    def indexed(self):
+        return False
+
     def __bool__(self):
         # this method is required to prevent __len__ being called on derived methods when fields are queried as
         #   if f:
@@ -58,8 +59,13 @@ class Field:
         return True
 
     def get_spans(self):
-        return per._get_spans(self._value_wrapper[:], None)
+        raise NotImplementedError("Please use get_spans() on specific fields, not the field base class.")
 
+    def apply_filter(self, filter_to_apply, dstfld=None):
+        raise NotImplementedError("Please use apply_filter() on specific fields, not the field base class.")
+
+    def apply_index(self, index_to_apply, dstfld=None):
+        raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
 
 
 class ReadOnlyFieldArray:
@@ -121,7 +127,7 @@ class WriteableFieldArray:
     def clear(self):
         nformat = self._dataset.dtype
         DataWriter._clear_dataset(self._field, self._name)
-        DataWriter.write(self._field, 'values', [], 0, nformat)
+        DataWriter.write(self._field, self._name, [], 0, nformat)
         self._dataset = self._field[self._name]
 
     def write_part(self, part):
@@ -352,7 +358,7 @@ def timestamp_field_constructor(session, group, name, timestamp=None, chunksize=
     DataWriter.write(field, 'values', [], 0, 'float64')
 
 
-class IndexedStringField(Field):
+class IndexedStringField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
         self._session = session
@@ -365,8 +371,12 @@ class IndexedStringField(Field):
 
     def create_like(self, group, name, timestamp=None):
         ts = self.timestamp if timestamp is None else timestamp
-        indexed_string_field_constructor(self._session, group, name, ts, self.chunksize)
-        return IndexedStringField(self._session, group, name, write_enabled=True)
+        return group.create_indexed_string(name, ts, self.chunksize)
+
+
+    @property
+    def indexed(self):
+        return True
 
     @property
     def data(self):
@@ -375,6 +385,20 @@ class IndexedStringField(Field):
                 WriteableIndexedFieldArray if self._write_enabled else ReadOnlyIndexedFieldArray
             self._data_wrapper = wrapper(self._field, 'index', 'values')
         return self._data_wrapper
+
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+
+        indices = self.indices[:]
+        values = self.values[:]
+        last = values[indices[0]:indices[1]].tobytes()
+        for i in range(1, len(indices)-1):
+            cur = values[indices[i]:indices[i+1]].tobytes()
+            if last > cur:
+                return False
+            last = cur
+        return True
 
     @property
     def indices(self):
@@ -393,8 +417,56 @@ class IndexedStringField(Field):
     def __len__(self):
         return len(self.data)
 
+    def get_spans(self):
+        return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
 
-class FixedStringField(Field):
+    def apply_filter(self, filter_to_apply, dstfld=None):
+        """
+        Apply a filter (array of boolean) to the field, return itself if destination field (detfld) is not set.
+        """
+        dest_indices, dest_values = \
+            ops.apply_filter_to_index_values(filter_to_apply,
+                                             self.indices[:], self.values[:])
+
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.indices) == len(dest_indices):
+            dstfld.indices[:] = dest_indices
+        else:
+            dstfld.indices.clear()
+            dstfld.indices.write(dest_indices)
+        if len(dstfld.values) == len(dest_values):
+            dstfld.values[:] = dest_values
+        else:
+            dstfld.values.clear()
+            dstfld.values.write(dest_values)
+        return dstfld
+
+    def apply_index(self,index_to_apply,dstfld=None):
+        """
+        Reindex the current field, return itself if destination field is not set.
+        """
+        dest_indices, dest_values = \
+            ops.apply_indices_to_index_values(index_to_apply,
+                                              self.indices[:], self.values[:])
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.indices) == len(dest_indices):
+            dstfld.indices[:] = dest_indices
+        else:
+            dstfld.indices.clear()
+            dstfld.indices.write(dest_indices)
+        if len(dstfld.values) == len(dest_values):
+            dstfld.values[:] = dest_values
+        else:
+            dstfld.values.clear()
+            dstfld.values.write(dest_values)
+        return dstfld
+
+
+class FixedStringField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
@@ -404,8 +476,7 @@ class FixedStringField(Field):
     def create_like(self, group, name, timestamp=None):
         ts = self.timestamp if timestamp is None else timestamp
         length = self._field.attrs['strlen']
-        fixed_string_field_constructor(self._session, group, name, length, ts, self.chunksize)
-        return FixedStringField(self._session, group, name, write_enabled=True)
+        return group.create_fixed_string(name, length, ts, self.chunksize)
 
     @property
     def data(self):
@@ -416,11 +487,47 @@ class FixedStringField(Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return np.all(np.char.compare_chararrays(data[:-1], data[1:], "<=", False))
+
     def __len__(self):
         return len(self.data)
 
+    def get_spans(self):
+        return ops.get_spans_for_field(self.data[:])
 
-class NumericField(Field):
+    def apply_filter(self, filter_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[filter_to_apply]
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.data) == len(result):
+            dstfld.data[:] = result
+        else:
+            dstfld.data.clear()
+            dstfld.data.write(result)
+        return dstfld
+
+
+    def apply_index(self, index_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[index_to_apply]
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.data) == len(result):
+            dstfld.data[:] = result
+        else:
+            dstfld.data.clear()
+            dstfld.data.write(result)
+        return dstfld
+
+
+class NumericField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
@@ -430,8 +537,7 @@ class NumericField(Field):
     def create_like(self, group, name, timestamp=None):
         ts = self.timestamp if timestamp is None else timestamp
         nformat = self._field.attrs['nformat']
-        numeric_field_constructor(self._session, group, name, nformat, ts, self.chunksize)
-        return NumericField(self._session, group, name, write_enabled=True)
+        return group.create_numeric(name, nformat, ts, self.chunksize)
 
     @property
     def data(self):
@@ -442,11 +548,45 @@ class NumericField(Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return np.all(data[:-1] <= data[1:])
+
     def __len__(self):
         return len(self.data)
 
+    def get_spans(self):
+        return ops.get_spans_for_field(self.data[:])
 
-class CategoricalField(Field):
+    def apply_filter(self, filter_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[filter_to_apply]
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.data) == len(result):
+            dstfld.data[:] = result
+        else:
+            dstfld.data.clear()
+            dstfld.data.write(result)
+        return dstfld
+
+    def apply_index(self, index_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[index_to_apply]
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.data) == len(result):
+            dstfld.data[:] = result
+        else:
+            dstfld.data.clear()
+            dstfld.data.write(result)
+        return dstfld
+
+class CategoricalField(HDF5Field):
     def __init__(self, session, group,
                  name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
@@ -458,9 +598,7 @@ class CategoricalField(Field):
         ts = self.timestamp if timestamp is None else timestamp
         nformat = self._field.attrs['nformat'] if 'nformat' in self._field.attrs else 'int8'
         keys = {v: k for k, v in self.keys.items()}
-        categorical_field_constructor(self._session, group, name, nformat, keys,
-                                      ts, self.chunksize)
-        return CategoricalField(self._session, group, name, write_enabled=True)
+        return group.create_categorical(name, nformat, keys, ts, self.chunksize)
 
     @property
     def data(self):
@@ -471,8 +609,17 @@ class CategoricalField(Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return np.all(data[:-1] <= data[1:])
+
     def __len__(self):
         return len(self.data)
+
+    def get_spans(self):
+        return ops.get_spans_for_field(self.data[:])
 
     # Note: key is presented as value: str, even though the dictionary must be presented
     # as str: value
@@ -483,8 +630,36 @@ class CategoricalField(Field):
         keys = dict(zip(kv, kn))
         return keys
 
+    def get_spans(self):
+        return ops.get_spans_for_field(self.data[:])
 
-class TimestampField(Field):
+    def apply_filter(self, filter_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[filter_to_apply]
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.data) == len(result):
+            dstfld.data[:] = result
+        else:
+            dstfld.data.clear()
+            dstfld.data.write(result)
+        return dstfld
+
+    def apply_index(self, index_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[index_to_apply]
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.data) == len(result):
+            dstfld.data[:] = result
+        else:
+            dstfld.data.clear()
+            dstfld.data.write(result)
+        return dstfld
+
+class TimestampField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
@@ -493,8 +668,7 @@ class TimestampField(Field):
 
     def create_like(self, group, name, timestamp=None):
         ts = self.timestamp if timestamp is None else timestamp
-        timestamp_field_constructor(self._session, group, name, ts, self.chunksize)
-        return TimestampField(self._session, group, name, write_enabled=True)
+        return group.create_timestamp(name, ts, self.chunksize)
 
     @property
     def data(self):
@@ -505,14 +679,49 @@ class TimestampField(Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return np.all(data[:-1] <= data[1:])
+
     def __len__(self):
         return len(self.data)
+
+    def get_spans(self):
+        return ops.get_spans_for_field(self.data[:])
+
+    def apply_filter(self, filter_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[filter_to_apply]
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.data) == len(result):
+            dstfld.data[:] = result
+        else:
+            dstfld.data.clear()
+            dstfld.data.write(result)
+        return dstfld
+
+    def apply_index(self, index_to_apply, dstfld=None):
+        array = self.data[:]
+        result = array[index_to_apply]
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.data) == len(result):
+            dstfld.data[:] = result
+        else:
+            dstfld.data.clear()
+            dstfld.data.write(result)
+        return dstfld
+
 
 
 class IndexedStringImporter:
     def __init__(self, session, group, name, timestamp=None, chunksize=None):
-        indexed_string_field_constructor(session, group, name, timestamp, chunksize)
-        self._field = IndexedStringField(session, group, name, write_enabled=True)
+        self._field = group.create_indexed_string(name, timestamp, chunksize)
 
     def chunk_factory(self, length):
         return [None] * length
@@ -530,8 +739,7 @@ class IndexedStringImporter:
 
 class FixedStringImporter:
     def __init__(self, session, group, name, length, timestamp=None, chunksize=None):
-        fixed_string_field_constructor(session, group, name, length, timestamp, chunksize)
-        self._field = FixedStringField(session, group, name, write_enabled=True)
+        self._field = group.create_fixed_string(name, length, timestamp, chunksize)
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype=self._field.data.dtype)
@@ -550,17 +758,11 @@ class FixedStringImporter:
 class NumericImporter:
     def __init__(self, session, group, name, dtype, parser, timestamp=None, chunksize=None):
         filter_name = '{}_valid'.format(name)
-        numeric_field_constructor(session, group, name, dtype, timestamp, chunksize)
-        numeric_field_constructor(session, group, filter_name, 'bool',
-                                  timestamp, chunksize)
-
+        self._field = group.create_numeric(name, dtype, timestamp, chunksize)
+        self._filter_field = group.create_numeric(filter_name, 'bool', timestamp, chunksize)
         chunksize = session.chunksize if chunksize is None else chunksize
-        self._field = NumericField(session, group, name, write_enabled=True)
-        self._filter_field = NumericField(session, group, filter_name, write_enabled=True)
-
         self._parser = parser
         self._values = np.zeros(chunksize, dtype=self._field.data.dtype)
-
         self._filter_values = np.zeros(chunksize, dtype='bool')
 
     def chunk_factory(self, length):
@@ -587,8 +789,7 @@ class NumericImporter:
 class CategoricalImporter:
     def __init__(self, session, group, name, value_type, keys, timestamp=None, chunksize=None):
         chunksize = session.chunksize if chunksize is None else chunksize
-        categorical_field_constructor(session, group, name, value_type, keys, timestamp, chunksize)
-        self._field = CategoricalField(session, group, name, write_enabled=True)
+        self._field = group.create_categorical(name, value_type, keys, timestamp, chunksize)
         self._keys = keys
         self._dtype = value_type
         self._key_type = 'U{}'.format(max(len(k.encode()) for k in keys))
@@ -613,15 +814,9 @@ class LeakyCategoricalImporter:
     def __init__(self, session, group, name, value_type, keys, out_of_range,
                  timestamp=None, chunksize=None):
         chunksize = session.chunksize if chunksize is None else chunksize
-        categorical_field_constructor(session, group, name, value_type, keys,
-                                      timestamp, chunksize)
         out_of_range_name = '{}_{}'.format(name, out_of_range)
-        indexed_string_field_constructor(session, group, out_of_range_name,
-                                         timestamp, chunksize)
-
-        self._field = CategoricalField(session, group, name, write_enabled=True)
-        self._str_field = IndexedStringField(session, group, out_of_range_name, write_enabled=True)
-
+        self._field = group.create_categorical(name, value_type, keys, timestamp, chunksize)
+        self._str_field = group.create_indexed_string(out_of_range_name, timestamp, chunksize)
         self._keys = keys
         self._dtype = value_type
         self._key_type = 'S{}'.format(max(len(k.encode()) for k in keys))
@@ -664,15 +859,13 @@ class DateTimeImporter:
     def __init__(self, session, group, name,
                  optional=False, write_days=False, timestamp=None, chunksize=None):
         chunksize = session.chunksize if chunksize is None else chunksize
-        timestamp_field_constructor(session, group, name, timestamp, chunksize)
-        self._field = TimestampField(session, group, name, write_enabled=True)
-        self._results = np.zeros(chunksize , dtype='float64')
+        self._field = group.create_timestamp(name, timestamp, chunksize)
+        self._results = np.zeros(chunksize, dtype=np.float64)
         self._optional = optional
 
         if optional is True:
             filter_name = '{}_set'.format(name)
-            numeric_field_constructor(session, group, filter_name, 'bool',
-                                      timestamp, chunksize)
+            numeric_field_constructor(group, filter_name, 'bool', timestamp, chunksize)
             self._filter_field = NumericField(session, group, filter_name, write_enabled=True)
 
     def chunk_factory(self, length):
@@ -708,9 +901,8 @@ class DateTimeImporter:
 class DateImporter:
     def __init__(self, session, group, name,
                  optional=False, timestamp=None, chunksize=None):
-        timestamp_field_constructor(session, group, name, timestamp, chunksize)
-        self._field = TimestampField(session, group, name, write_enabled=True)
-        self._results = np.zeros(chunksize, dtype='float64')
+        self._field = group.create_timestamp(name, timestamp, chunksize)
+        self._results = np.zeros(() if chunksize is None else chunksize, dtype='float64')
 
         if optional is True:
             filter_name = '{}_set'.format(name)

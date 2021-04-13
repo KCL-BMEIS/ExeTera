@@ -5,6 +5,7 @@ import numba
 from numba.typed import List
 
 from exetera.core import validation as val
+from exetera.core.abstract_types import Field
 from exetera.core import fields, utils
 
 DEFAULT_CHUNKSIZE = 1 << 20
@@ -21,7 +22,7 @@ def chunks(length, chunksize=1 << 20):
 
 
 def safe_map(field, map_field, map_filter, empty_value=None):
-    if isinstance(field, fields.Field):
+    if isinstance(field, Field):
         if isinstance(field, fields.IndexedStringField):
             return safe_map_indexed_values(
                 field.indices[:], field.values[:], map_field, map_filter, empty_value)
@@ -203,6 +204,62 @@ def apply_indices_to_index_values(indices_to_apply, indices, values):
         dest_indices[count] = total
         count += 1
     return dest_indices, dest_values
+
+
+def get_spans_for_field(ndarray):
+    results = np.zeros(len(ndarray) + 1, dtype=np.bool)
+    if np.issubdtype(ndarray.dtype, np.number):
+        fn = np.not_equal
+    else:
+        fn = np.char.not_equal
+    results[1:-1] = fn(ndarray[:-1], ndarray[1:])
+
+    results[0] = True
+    results[-1] = True
+    return np.nonzero(results)[0]
+
+def _get_spans_for_2_fields_by_spans(span0, span1):
+    spans = []
+    j=0
+    for i in range(len(span0)):
+        if j<len(span1):
+            while span1[j] < span0[i]:
+                spans.append(span1[j])
+                j += 1
+            if span1[j] == span0[i]:
+                j += 1
+        spans.append(span0[i])
+    if j<len(span1): #if two ndarray are not equally sized
+        spans.extend(span1[j:])
+    return spans
+
+def _get_spans_for_2_fields(ndarray0, ndarray1):
+    count = 0
+    spans = np.zeros(len(ndarray0)+1, dtype=np.uint32)
+    spans[0] = 0
+    for i in np.arange(1, len(ndarray0)):
+        if ndarray0[i] != ndarray0[i-1] or ndarray1[i] != ndarray1[i-1]:
+            count += 1
+            spans[count] = i
+    spans[count+1] = len(ndarray0)
+    return spans[:count+2]
+
+
+@njit
+def _get_spans_for_index_string_field(indices,values):
+    result = []
+    result.append(0)
+    for i in range(1, len(indices) - 1):
+        last = indices[i - 1]
+        current = indices[i]
+        next = indices[i + 1]
+        if next - current != current - last:  # compare size first
+            result.append(i)
+            continue
+        if not np.array_equal(values[last:current], values[current:next]):
+            result.append(i)
+    result.append(len(indices) - 1)  # total number of elements
+    return result
 
 
 @njit
