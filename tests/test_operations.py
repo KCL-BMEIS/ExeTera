@@ -109,9 +109,10 @@ class TestAggregation(unittest.TestCase):
 
 
     def test_ordered_map_valid_stream(self):
-        s = session.Session()
         bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'r+', 'dst')
+            hf = dst.create_dataframe('hf')
             map_field = np.asarray([0, 0, 0, 1, 1, 3, 3, 3, 3, 5, 5, 5, 5,
                                     ops.INVALID_INDEX, ops.INVALID_INDEX, 7, 7, 7],
                                    dtype=np.int64)
@@ -150,9 +151,10 @@ class TestAggregation(unittest.TestCase):
 
 
     def test_ordered_map_to_right_left_unique_streamed(self):
-        s = session.Session()
         bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'r+', 'dst')
+            hf = dst.create_dataframe('hf')
             a_ids = np.asarray([0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 15, 16, 17, 18],
                                dtype=np.int64)
             b_ids = np.asarray([0, 1, 1, 2, 4, 5, 5, 6, 8, 9, 9, 10, 12, 13, 13, 14,
@@ -252,9 +254,10 @@ class TestAggregation(unittest.TestCase):
         self.assertTrue(np.array_equal(b_map, expected_b))
 
     def test_ordered_inner_map_left_unique_streamed(self):
-        s = session.Session()
         bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
+        with session.Session() as s:
+            dst = s.open_dataset(bio,'r+','dst')
+            hf=dst.create_dataframe('hf')
             a_ids = np.asarray([0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 15, 16, 17, 18],
                                dtype=np.int64)
             b_ids = np.asarray([0, 1, 1, 2, 4, 5, 5, 6, 8, 9, 9, 10, 12, 13, 13, 14,
@@ -427,9 +430,10 @@ class TestAggregation(unittest.TestCase):
 
 
     def test_streaming_sort_merge(self):
-        s = session.Session()
         bio = BytesIO()
-        with h5py.File(bio, 'w') as hf:
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'r+', 'dst')
+            hf = dst.create_dataframe('hf')
             rs = np.random.RandomState(12345678)
             length = 105
             segment_length = 25
@@ -480,6 +484,7 @@ class TestGetSpans(unittest.TestCase):
 
         spans1=ops.get_spans_for_field(np.array([1, 2, 2, 3, 3, 3, 4, 4, 5, 6, 7, 8, 9, 10]))
         spans2=ops.get_spans_for_field(np.array([1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5]))
+
         spans3= ops._get_spans_for_2_fields_by_spans(spans1,spans2)
         self.assertTrue(list(spans), list(spans3))
 

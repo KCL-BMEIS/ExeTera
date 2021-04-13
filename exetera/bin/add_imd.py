@@ -11,7 +11,7 @@ import pandas as pd
 from exetera.core import exporter, persistence, utils
 from exetera.core.persistence import DataStore
 from exetera.processing.nat_medicine_model import nature_medicine_model_1
-from exetera.core.dataset import Dataset
+from exetera.core.csvdataset import Dataset
 
 # England
 # http://geoportal.statistics.gov.uk/datasets/index-of-multiple-deprivation-december-2019-lookup-in-england/data
