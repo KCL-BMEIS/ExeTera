@@ -9,9 +9,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from exetera.core.abstract_types import AbstractSession, Dataset, DataFrame
+from exetera.core.abstract_types import Dataset, DataFrame
 from exetera.core import fields as fld
-from exetera.core import dataset as dst
 import h5py
 
 

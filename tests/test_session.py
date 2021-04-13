@@ -7,6 +7,7 @@ import h5py
 
 from exetera.core import session
 from exetera.core import fields
+from exetera.core import dataframe
 from exetera.core import persistence as per
 
 
@@ -449,7 +450,6 @@ class TestSessionFilter(unittest.TestCase):
 class TestSessionGetSpans(unittest.TestCase):
 
     def test_get_spans_one_field(self):
-
         vals = np.asarray([0, 1, 1, 3, 3, 6, 5, 5, 5], dtype=np.int32)
         bio = BytesIO()
         with session.Session() as s:
@@ -462,7 +462,6 @@ class TestSessionGetSpans(unittest.TestCase):
             self.assertListEqual([0, 1, 3, 5, 6, 9], s.get_spans(s.get(ds['vals'])).tolist())
 
     def test_get_spans_two_fields(self):
-
         vals_1 = np.asarray(['a', 'a', 'a', 'b', 'b', 'b', 'b', 'b', 'c', 'c', 'c', 'c'], dtype='S1')
         vals_2 = np.asarray([5, 5, 6, 2, 2, 3, 4, 4, 7, 7, 7, 7], dtype=np.int32)
         bio = BytesIO()
@@ -486,6 +485,21 @@ class TestSessionGetSpans(unittest.TestCase):
             idx.data.write(['aa','bb','bb','c','c','c','d','d','e','f','f','f'])
             self.assertListEqual([0,1,3,6,8,9,12],s.get_spans(idx))
 
+    def test_get_spans_with_dest(self):
+        vals = np.asarray([0, 1, 1, 3, 3, 6, 5, 5, 5], dtype=np.int32)
+        bio = BytesIO()
+        with session.Session() as s:
+            self.assertListEqual([0, 1, 3, 5, 6, 9], s.get_spans(vals).tolist())
+
+            dst = s.open_dataset(bio, "w", "src")
+            ds = dst.create_dataframe('ds')
+            vals_f = s.create_numeric(ds, "vals", "int32")
+            vals_f.data.write(vals)
+            self.assertListEqual([0, 1, 3, 5, 6, 9], s.get_spans(s.get(ds['vals'])).tolist())
+
+            span_dest = ds.create_numeric('span','int32')
+            s.get_spans(ds['vals'],dest=span_dest)
+            self.assertListEqual([0, 1, 3, 5, 6, 9],ds['span'].data[:].tolist())
 
 
 class TestSessionAggregate(unittest.TestCase):

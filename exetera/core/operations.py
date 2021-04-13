@@ -218,6 +218,8 @@ def get_spans_for_field(ndarray):
     results[-1] = True
     return np.nonzero(results)[0]
 
+
+@njit
 def _get_spans_for_2_fields_by_spans(span0, span1):
     spans = []
     j=0
@@ -233,6 +235,8 @@ def _get_spans_for_2_fields_by_spans(span0, span1):
         spans.extend(span1[j:])
     return spans
 
+
+@njit
 def _get_spans_for_2_fields(ndarray0, ndarray1):
     count = 0
     spans = np.zeros(len(ndarray0)+1, dtype=np.uint32)
