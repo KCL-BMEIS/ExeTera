@@ -234,3 +234,18 @@ class TestFieldArray(unittest.TestCase):
         num.data.write_part(np.arange(10))
         num.data.clear()
         self.assertListEqual([], list(num.data[:]))
+
+
+class TestMemoryFields(unittest.TestCase):
+
+    def test_write_to_memory_field(self):
+
+        v = np.array([1, 2, 3, 4], dtype=np.int32)
+        print(v.dtype)
+
+        s = session.Session()
+        f1 = fields.NumericMemField(s, 'int32')
+        f2 = fields.NumericMemField(s, 'int32')
+        f1.data.write(np.array([1, 2, 3, 4], dtype=np.int32))
+        f2.data.write(np.array([2, 3, 4, 5], dtype=np.int32))
+        print((f1 + f2).data[:])

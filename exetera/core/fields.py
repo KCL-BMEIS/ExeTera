@@ -68,6 +68,46 @@ class HDF5Field(Field):
         raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
 
 
+class MemoryField(Field):
+
+    def __init__(self, session):
+        super().__init__()
+        self._session = session
+        self._value_wrapper = None
+
+    @property
+    def name(self):
+        return None
+
+    @property
+    def timestamp(self):
+        return None
+
+    @property
+    def chunksize(self):
+        return None
+
+    @property
+    def indexed(self):
+        return False
+
+    def __bool__(self):
+        # this method is required to prevent __len__ being called on derived methods when fields are queried as
+        #   if f:
+        # rather than
+        #   if f is not None:
+        return True
+
+    def get_spans(self):
+        raise NotImplementedError("Please use get_spans() on specific fields, not the field base class.")
+
+    def apply_filter(self, filter_to_apply, dstfld=None):
+        raise NotImplementedError("Please use apply_filter() on specific fields, not the field base class.")
+
+    def apply_index(self, index_to_apply, dstfld=None):
+        raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
+
+
 class ReadOnlyFieldArray:
     def __init__(self, field, dataset_name):
         self._field = field
@@ -105,6 +145,9 @@ class ReadOnlyFieldArray:
                               "for a writeable copy of the field")
 
 
+# Field arrays
+# ============
+
 class WriteableFieldArray:
     def __init__(self, field, dataset_name):
         self._field = field
@@ -139,6 +182,40 @@ class WriteableFieldArray:
 
     def complete(self):
         DataWriter.flush(self._field[self._name])
+
+
+class MemoryFieldArray:
+
+    def __init__(self, field, dtype):
+        self._field = field
+        self._dtype = dtype
+        self._dataset = None
+
+    def __len__(self):
+        return len(self._dataset)
+
+    def __getitem__(self, item):
+        return self._dataset[item]
+
+    def __setitem__(self, key, value):
+        self._dataset[key] = value
+
+    def clear(self):
+        self._dataset = None
+
+    def write_part(self, part):
+        if self._dataset is None:
+            self._dataset = part[:]
+        else:
+            self._dataset.resize(len(self._dataset) + len(part))
+            self._dataset[-len(part):] = part
+
+    def write(self, part):
+        self.write_part(part)
+        self.complete()
+
+    def complete(self):
+        pass
 
 
 class ReadOnlyIndexedFieldArray:
@@ -303,6 +380,80 @@ class WriteableIndexedFieldArray:
             self._index_index = 0
 
 
+# Memory-based fields
+# ===================
+
+
+class NumericMemField(MemoryField):
+    def __init__(self, session, nformat):
+        super().__init__(session)
+        self._nformat = nformat
+
+
+    def writeable(self):
+        return self
+
+    def create_like(self, group, name, timestamp=None):
+        ts = timestamp
+        nformat = self._nformat
+        if isinstance(group, h5py.Group):
+            numeric_field_constructor(self._session, group, name, nformat, ts, self.chunksize)
+            return NumericField(self._session, group[name], write_enabled=True)
+        else:
+            return group.create_numeric(name, nformat, ts, self.chunksize)
+
+    @property
+    def data(self):
+        if self._value_wrapper is None:
+            self._value_wrapper = MemoryFieldArray(self, self._nformat)
+        return self._value_wrapper
+
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return np.all(data[:-1] <= data[1:])
+
+    def __len__(self):
+        return len(self.data)
+
+    def get_spans(self):
+        return ops.get_spans_for_field(self.data[:])
+
+    def apply_filter(self, filter_to_apply, dstfld=None):
+        result = self.data[filter_to_apply]
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.data) == len(result):
+            dstfld.data[:] = result
+        else:
+            dstfld.data.clear()
+            dstfld.data.write(result)
+        return dstfld
+
+    def apply_index(self, index_to_apply, dstfld=None):
+        result = self.data[index_to_apply]
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.data) == len(result):
+            dstfld.data[:] = result
+        else:
+            dstfld.data.clear()
+            dstfld.data.write(result)
+        return dstfld
+
+    def __add__(self, second):
+        return FieldDataOps.numeric_add(self._session, self, second)
+
+    def __radd__(self, first):
+        return FieldDataOps.numeric_add(self._session, first, self)
+
+
+# HDF5 field constructors
+# =======================
+
 
 def base_field_contructor(session, group, name, timestamp=None, chunksize=None):
     """
@@ -356,6 +507,10 @@ def timestamp_field_constructor(session, group, name, timestamp=None, chunksize=
     field = base_field_contructor(session, group, name, timestamp, chunksize)
     field.attrs['fieldtype'] = 'timestamp'
     DataWriter.write(field, 'values', [], 0, 'float64')
+
+
+# HDF5 fields
+# ===========
 
 
 class IndexedStringField(HDF5Field):
@@ -536,7 +691,7 @@ class FixedStringField(HDF5Field):
 
 
 class NumericField(HDF5Field):
-    def __init__(self, session, group, name=None, write_enabled=False):
+    def __init__(self, session, group, name=None, mem_only=True, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
 
     def writeable(self):
@@ -573,7 +728,7 @@ class NumericField(HDF5Field):
         return ops.get_spans_for_field(self.data[:])
 
     def apply_filter(self, filter_to_apply, dstfld=None):
-        array = self.data[:]
+        array = self.data[filter_to_apply]
         result = array[filter_to_apply]
         dstfld = self if dstfld is None else dstfld
         if not dstfld._write_enabled:
@@ -597,6 +752,13 @@ class NumericField(HDF5Field):
             dstfld.data.clear()
             dstfld.data.write(result)
         return dstfld
+
+    def __add__(self, second):
+        raise NotImplementedError()
+
+    def __radd__(self, first):
+        raise NotImplementedError()
+
 
 class CategoricalField(HDF5Field):
     def __init__(self, session, group,
@@ -738,6 +900,9 @@ class TimestampField(HDF5Field):
             dstfld.data.write(result)
         return dstfld
 
+
+# HDF5 field importers
+# ====================
 
 
 class IndexedStringImporter:
@@ -951,3 +1116,65 @@ class DateImporter:
     def write(self, values):
         self.write_part(values)
         self.complete()
+
+
+# Operation implementations
+
+class FieldDataOps:
+
+    type_converters = {
+        bool: 'bool',
+        np.int8: 'int8',
+        np.int16: 'int16',
+        np.int32: 'int32',
+        np.int64: 'int64',
+        np.uint8: 'uint8',
+        np.uint16: 'uint16',
+        np.uint32: 'uint32',
+        np.uint64: 'uint64',
+        np.float32: 'float32',
+        np.float64: 'float64'
+    }
+
+    @classmethod
+    def dtype_to_str(cls, dtype):
+        if isinstance(dtype, str):
+            return dtype
+
+        if dtype == bool:
+            return 'bool'
+        elif dtype == np.int8:
+            return 'int8'
+        elif dtype == np.int16:
+            return 'int16'
+        elif dtype == np.int32:
+            return 'int32'
+        elif dtype == np.int64:
+            return 'int64'
+        elif dtype == np.uint8:
+            return 'uint8'
+        elif dtype == np.uint16:
+            return 'uint16'
+        elif dtype == np.uint32:
+            return 'uint32'
+        elif dtype == np.uint64:
+            return 'uint64'
+
+        raise ValueError("Unsupported dtype '{}'".format(dtype))
+
+    @classmethod
+    def numeric_add(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data + second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
