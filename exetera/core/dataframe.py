@@ -21,8 +21,7 @@ class HDF5DataFrame(DataFrame):
     def __init__(self,
                  dataset: Dataset,
                  name: str,
-                 h5group: h5py.Group,
-                 dataframe: dict = None):
+                 h5group: h5py.Group):
         """
         Create a Dataframe object, user should always call from dataset.create_dataframe.
 
@@ -31,7 +30,6 @@ class HDF5DataFrame(DataFrame):
         :param h5group: acquire data from h5group object directly, the h5group needs to have a
                         h5group<-group-dataset structure, the group has a 'fieldtype' attribute
                          and the dataset is named 'values'.
-        :param dataframe: optional - replicate data from another dictionary
         """
 
         self.name = name
@@ -39,13 +37,20 @@ class HDF5DataFrame(DataFrame):
         self._dataset = dataset
         self._h5group = h5group
 
-        if dataframe is not None:
-            if isinstance(dataframe, dict):
-                for k, v in dataframe.items():
-                    if not isinstance(k, str) or not isinstance(v, fld.Field):
-                        raise ValueError("If dataframe parameter is set, "
-                                         "must be a dictionary mapping strings to fields")
-                self._columns = dataframe
+        # if columns is not None:
+        #     if isinstance(columns, dict):
+        #         for k, v in columns.items():
+        #             if not isinstance(k, str) or not isinstance(v, fld.Field):
+        #                 raise ValueError("If dataframe parameter is set, "
+        #                                  "must be a dictionary mapping strings to fields")
+        #         self._columns = columns
+        #     elif isinstance(dataframe, DataFrame):
+        #         # copy each field
+        #         for k, v in dataframe.items():
+        #             w = v.create_like(self, )
+        #     else:
+        #         raise ValueError("if set, 'columns' must be one of (dict, DataFrame) ",
+        #                          "but is of type {}".format(type(columns)))
         for subg in h5group.keys():
             self._columns[subg] = dataset.session.get(h5group[subg])
 
@@ -56,10 +61,6 @@ class HDF5DataFrame(DataFrame):
     @property
     def dataset(self):
         return self._dataset
-
-    @property
-    def h5group(self):
-        return self._h5group
 
     def add(self, field, name=None):
         if name is not None:
@@ -72,7 +73,8 @@ class HDF5DataFrame(DataFrame):
 
     def create_group(self, name):
         """
-        Create a group object in HDF5 file for field to use.
+        Create a group object in HDF5 file for field to use. Please note, this function is for
+        backwards compatibility with older scripts and should not be used in the general case.
 
         :param name: the name of the group and field
         :return: a hdf5 group object
