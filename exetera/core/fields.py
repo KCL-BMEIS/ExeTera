@@ -510,6 +510,106 @@ class NumericMemField(MemoryField):
     def __ror__(self, first):
         return FieldDataOps.numeric_or(self._session, first, self)
 
+    def __lt__(self, value):
+        return FieldDataOps.less_than(self._session, self, value)
+
+    def __le__(self, value):
+        return FieldDataOps.less_than_equal(self._session, self, value)
+
+    def __eq__(self, value):
+        return FieldDataOps.equal(self._session, self, value)
+
+    def __ne__(self, value):
+        return FieldDataOps.not_equal(self._session, self, value)
+
+    def __gt__(self, value):
+        return FieldDataOps.greater_than(self._session, self, value)
+
+    def __ge__(self, value):
+        return FieldDataOps.greater_than_equal(self._session, self, value)
+
+
+class CategoricalMemField(MemoryField):
+    def __init__(self, session, nformat, keys):
+        super().__init__(session)
+        self._nformat = nformat
+        self._keys = keys
+
+    def writeable(self):
+        return self
+
+    def create_like(self, group, name, timestamp=None):
+        ts = timestamp
+        nformat = self._nformat
+        keys = self._keys
+        if isinstance(group, h5py.Group):
+            numeric_field_constructor(self._session, group, name, nformat, keys,
+                                      ts, self.chunksize)
+            return CategoricalField(self._session, group[name], write_enabled=True)
+        else:
+            return group.create_numeric(name, nformat, keys, ts, self.chunksize)
+
+    @property
+    def data(self):
+        if self._value_wrapper is None:
+            self._value_wrapper = MemoryFieldArray(self, self._nformat)
+        return self._value_wrapper
+
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return np.all(data[:-1] <= data[1:])
+
+    def __len__(self):
+        return len(self.data)
+
+    def get_spans(self):
+        return ops.get_spans_for_field(self.data[:])
+
+    def apply_filter(self, filter_to_apply, dstfld=None):
+        result = self.data[filter_to_apply]
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.data) == len(result):
+            dstfld.data[:] = result
+        else:
+            dstfld.data.clear()
+            dstfld.data.write(result)
+        return dstfld
+
+    def apply_index(self, index_to_apply, dstfld=None):
+        result = self.data[index_to_apply]
+        dstfld = self if dstfld is None else dstfld
+        if not dstfld._write_enabled:
+            dstfld = dstfld.writeable()
+        if len(dstfld.data) == len(result):
+            dstfld.data[:] = result
+        else:
+            dstfld.data.clear()
+            dstfld.data.write(result)
+        return dstfld
+
+    def __lt__(self, value):
+        return FieldDataOps.less_than(self._session, self, value)
+
+    def __le__(self, value):
+        return FieldDataOps.less_than_equal(self._session, self, value)
+
+    def __eq__(self, value):
+        return FieldDataOps.equal(self._session, self, value)
+
+    def __ne__(self, value):
+        return FieldDataOps.not_equal(self._session, self, value)
+
+    def __gt__(self, value):
+        return FieldDataOps.greater_than(self._session, self, value)
+
+    def __ge__(self, value):
+        return FieldDataOps.greater_than_equal(self._session, self, value)
+
+
 # HDF5 field constructors
 # =======================
 
@@ -590,7 +690,6 @@ class IndexedStringField(HDF5Field):
             return IndexedStringField(self._session, group[name], write_enabled=True)
         else:
             return group.create_indexed_string(name, ts, self.chunksize)
-
 
     @property
     def indexed(self):
@@ -872,6 +971,24 @@ class NumericField(HDF5Field):
     def __ror__(self, first):
         return FieldDataOps.numeric_or(self._session, first, self)
 
+    def __lt__(self, value):
+        return FieldDataOps.less_than(self._session, self, value)
+
+    def __le__(self, value):
+        return FieldDataOps.less_than_equal(self._session, self, value)
+
+    def __eq__(self, value):
+        return FieldDataOps.equal(self._session, self, value)
+
+    def __ne__(self, value):
+        return FieldDataOps.not_equal(self._session, self, value)
+
+    def __gt__(self, value):
+        return FieldDataOps.greater_than(self._session, self, value)
+
+    def __ge__(self, value):
+        return FieldDataOps.greater_than_equal(self._session, self, value)
+
 
 class CategoricalField(HDF5Field):
     def __init__(self, session, group,
@@ -951,6 +1068,25 @@ class CategoricalField(HDF5Field):
             dstfld.data.write(result)
         return dstfld
 
+    def __lt__(self, value):
+        return FieldDataOps.less_than(self._session, self, value)
+
+    def __le__(self, value):
+        return FieldDataOps.less_than_equal(self._session, self, value)
+
+    def __eq__(self, value):
+        return FieldDataOps.equal(self._session, self, value)
+
+    def __eq__(self, value):
+        return FieldDataOps.not_equal(self._session, self, value)
+
+    def __gt__(self, value):
+        return FieldDataOps.greater_than(self._session, self, value)
+
+    def __ge__(self, value):
+        return FieldDataOps.greater_than_equal(self._session, self, value)
+
+
 class TimestampField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
@@ -1012,6 +1148,66 @@ class TimestampField(HDF5Field):
             dstfld.data.clear()
             dstfld.data.write(result)
         return dstfld
+
+    def __add__(self, second):
+        return FieldDataOps.numeric_add(self._session, self, second)
+
+    def __radd__(self, first):
+        return FieldDataOps.numeric_add(self._session, first, self)
+
+    def __sub__(self, second):
+        return FieldDataOps.numeric_sub(self._session, self, second)
+
+    def __rsub__(self, first):
+        return FieldDataOps.numeric_sub(self._session, first, self)
+
+    def __mul__(self, second):
+        return FieldDataOps.numeric_mul(self._session, self, second)
+
+    def __rmul__(self, first):
+        return FieldDataOps.numeric_mul(self._session, first, self)
+
+    def __truediv__(self, second):
+        return FieldDataOps.numeric_truediv(self._session, self, second)
+
+    def __rtruediv__(self, first):
+        return FieldDataOps.numeric_truediv(self._session, first, self)
+
+    def __floordiv__(self, second):
+        return FieldDataOps.numeric_floordiv(self._session, self, second)
+
+    def __rfloordiv__(self, first):
+        return FieldDataOps.numeric_floordiv(self._session, first, self)
+
+    def __mod__(self, second):
+        return FieldDataOps.numeric_mod(self._session, self, second)
+
+    def __rmod__(self, first):
+        return FieldDataOps.numeric_mod(self._session, first, self)
+
+    def __divmod__(self, second):
+        return FieldDataOps.numeric_divmod(self._session, self, second)
+
+    def __rdivmod__(self, first):
+        return FieldDataOps.numeric_divmod(self._session, first, self)
+
+    def __lt__(self, value):
+        return FieldDataOps.less_than(self._session, self, value)
+
+    def __le__(self, value):
+        return FieldDataOps.less_than_equal(self._session, self, value)
+
+    def __eq__(self, value):
+        return FieldDataOps.equal(self._session, self, value)
+
+    def __eq__(self, value):
+        return FieldDataOps.not_equal(self._session, self, value)
+
+    def __gt__(self, value):
+        return FieldDataOps.greater_than(self._session, self, value)
+
+    def __ge__(self, value):
+        return FieldDataOps.greater_than_equal(self._session, self, value)
 
 
 # HDF5 field importers
@@ -1460,6 +1656,108 @@ class FieldDataOps:
             second_data = second
 
         r = first_data | second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
+    @classmethod
+    def less_than(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data < second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
+    @classmethod
+    def less_than_equal(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data <= second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
+    @classmethod
+    def equal(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data == second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
+    @classmethod
+    def not_equal(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data != second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
+    @classmethod
+    def greater_than(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data > second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
+    @classmethod
+    def greater_than_equal(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data >= second_data
         f = NumericMemField(session, cls.dtype_to_str(r.dtype))
         f.data.write(r)
         return f

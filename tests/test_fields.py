@@ -200,7 +200,7 @@ class TestFieldArray(unittest.TestCase):
         dst = ds.create_dataframe('src')
         num = s.create_numeric(dst, 'num', 'int32')
         num.data.write_part(np.arange(10))
-        self.assertListEqual([0,1,2,3,4,5,6,7,8,9],list(num.data[:]))
+        self.assertListEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], list(num.data[:]))
 
     def test_clear(self):
         bio = BytesIO()
@@ -223,7 +223,7 @@ class TestFieldArray(unittest.TestCase):
         dst = ds.create_dataframe('src')
         num = s.create_numeric(dst, 'num', 'int32')
         num.data.write_part(np.arange(10))
-        self.assertListEqual([0,1,2,3,4,5,6,7,8,9],list(num.data[:]))
+        self.assertListEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], list(num.data[:]))
 
     def test_clear(self):
         bio = BytesIO()
@@ -234,6 +234,21 @@ class TestFieldArray(unittest.TestCase):
         num.data.write_part(np.arange(10))
         num.data.clear()
         self.assertListEqual([], list(num.data[:]))
+
+
+class TestMemoryFieldCreateLike(unittest.TestCase):
+
+    def test_numeric_create_like(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            foo = df.create_numeric('foo', 'int32')
+            foo.data.write(np.array([1, 2, 3, 4]))
+            mfoo = foo + 1
+            foo2 = mfoo.create_like(df, 'foo2')
+            foo2.data.write(mfoo)
+            self.assertListEqual([2, 3, 4, 5], foo2.data[:].tolist())
 
 
 class TestMemoryFields(unittest.TestCase):
@@ -264,7 +279,6 @@ class TestMemoryFields(unittest.TestCase):
         test_equal(expected, function(fields.as_field(a1), f2))
         test_equal(expected_scalar, function(f1, 1))
         test_equal(expected_rscalar, function(1, f2))
-
 
     def _execute_field_test(self, a1, a2, scalar, function):
 
@@ -359,7 +373,6 @@ class TestMemoryFields(unittest.TestCase):
         self._execute_memory_field_test(a1, a2, 1, lambda x, y: x % y)
         self._execute_field_test(a1, a2, 1, lambda x, y: x % y)
 
-
     def test_mixed_field_divmod(self):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
@@ -387,3 +400,46 @@ class TestMemoryFields(unittest.TestCase):
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
         self._execute_memory_field_test(a1, a2, 1, lambda x, y: x | y)
         self._execute_field_test(a1, a2, 1, lambda x, y: x | y)
+
+    def test_less_than(self):
+
+        a1 = np.array([1, 2, 3, 4], dtype=np.int32)
+        r = 1 < a1
+        a2 = np.array([5, 4, 3, 2], dtype=np.int32)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x < y)
+
+    def test_less_than_equal(self):
+
+        a1 = np.array([1, 2, 3, 4], dtype=np.int32)
+        r = 1 < a1
+        a2 = np.array([5, 4, 3, 2], dtype=np.int32)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x <= y)
+
+    def test_equal(self):
+
+        a1 = np.array([1, 2, 3, 4], dtype=np.int32)
+        r = 1 < a1
+        a2 = np.array([5, 4, 3, 2], dtype=np.int32)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x == y)
+
+    def test_not_equal(self):
+
+        a1 = np.array([1, 2, 3, 4], dtype=np.int32)
+        r = 1 < a1
+        a2 = np.array([5, 4, 3, 2], dtype=np.int32)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x != y)
+
+    def test_greater_than_equal(self):
+
+        a1 = np.array([1, 2, 3, 4], dtype=np.int32)
+        r = 1 < a1
+        a2 = np.array([5, 4, 3, 2], dtype=np.int32)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x >= y)
+
+    def test_greater_than(self):
+
+        a1 = np.array([1, 2, 3, 4], dtype=np.int32)
+        r = 1 < a1
+        a2 = np.array([5, 4, 3, 2], dtype=np.int32)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x > y)
+
