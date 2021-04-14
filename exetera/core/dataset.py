@@ -34,24 +34,33 @@ class HDF5Dataset(Dataset):
     def close(self):
         self._file.close()
 
-    def create_dataframe(self, name, columns: dict = None, dataframe: DataFrame = None):
+    def create_dataframe(self, name, dataframe: DataFrame = None):
         """
         Create a group object in HDF5 file and a Exetera dataframe in memory.
 
         :param name: name of the dataframe, or the group name in HDF5
-        :param columns: optional - replicate data from another dictionary
         :param dataframe: optional - copy an existing dataframe
-        This parameter should not in general be used by the end-user of this API.
         :return: a dataframe object
         """
-        if columns is not None and dataframe is not None:
-            raise ValueError("At most one of 'columns' and 'dataframe' can be provided")
+        if dataframe is not None:
+            if not isinstance(dataframe, DataFrame):
+                raise ValueError("If set, 'dataframe' must be of type DataFrame "
+                                 "but is of type {}".format(type(dataframe)))
 
         self._file.create_group(name)
         h5group = self._file[name]
-        dataframe = edf.HDF5DataFrame(self, name, h5group, columns)
-        self._dataframes[name] = dataframe
-        return dataframe
+        _dataframe = edf.HDF5DataFrame(self, name, h5group)
+        if dataframe is not None:
+            for k, v in dataframe.items():
+                f = v.create_like(_dataframe, k)
+                if f.indexed:
+                    f.indices.write(v.indices[:])
+                    f.values.write(v.values[:])
+                else:
+                    f.data.write(v.data[:])
+
+        self._dataframes[name] = _dataframe
+        return _dataframe
 
     def add(self, dataframe, name=None):
         """

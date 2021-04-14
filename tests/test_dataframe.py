@@ -18,8 +18,9 @@ class TestDataFrame(unittest.TestCase):
             df = dst.create_dataframe('dst')
             self.assertTrue(isinstance(df, dataframe.DataFrame))
             numf = df.create_numeric('numf', 'uint32')
-            fdf = {'numf': numf}
-            df2 = dst.create_dataframe('dst2', dataframe=fdf)
+            # fdf = {'numf': numf}
+            # df2 = dst.create_dataframe('dst2', dataframe=fdf)
+            df2 = dst.create_dataframe('dst2', dataframe=df)
             self.assertTrue(isinstance(df2, dataframe.DataFrame))
 
             # add & set & contains
