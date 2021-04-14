@@ -13,19 +13,79 @@ from exetera.core import persistence as per
 
 class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
 
-    def test_create_then_load_categorical(self):
+    def test_create_then_load_indexed_string(self):
         bio = BytesIO()
+        contents = ['a', 'bb', 'ccc', 'dddd', 'eeeee']
         with session.Session() as s:
             with h5py.File(bio, 'w') as src:
                 df = src.create_group('df')
-                f = s.create_categorical(df, 'foo', 'int8', {'a': 1, 'b': 2})
-                f.data.write(np.array([1, 2, 1, 2]))
+                f = s.create_indexed_string(df, 'foo')
+                f.data.write(contents)
 
         with session.Session() as s:
             with h5py.File(bio, 'r') as src:
                 f = s.get(src['df']['foo'])
+                self.assertListEqual(contents, f.data[:])
+
+    def test_create_then_load_fixed_string(self):
+        bio = BytesIO()
+        contents = [s.encode() for s in ['a', 'bb', 'ccc', 'dddd', 'eeeee']]
+        with session.Session() as s:
+            with h5py.File(bio, 'w') as src:
+                df = src.create_group('df')
+                f = s.create_fixed_string(df, 'foo', 5)
+                f.data.write(contents)
+
+        with session.Session() as s:
+            with h5py.File(bio, 'r') as src:
+                f = s.get(src['df']['foo'])
+                self.assertListEqual(contents, f.data[:].tolist())
+
+    def test_create_then_load_categorical(self):
+        bio = BytesIO()
+        contents = [1, 2, 1, 2]
+        with session.Session() as s:
+            with h5py.File(bio, 'w') as src:
+                df = src.create_group('df')
+                f = s.create_categorical(df, 'foo', 'int8', {'a': 1, 'b': 2})
+                f.data.write(np.array(contents))
+
+        with session.Session() as s:
+            with h5py.File(bio, 'r') as src:
+                f = s.get(src['df']['foo'])
+                self.assertListEqual(contents, f.data[:].tolist())
                 self.assertDictEqual({1: b'a', 2: b'b'}, f.keys)
 
+    def test_create_then_load_numeric(self):
+        bio = BytesIO()
+        contents = [1, 2, 1, 2]
+        with session.Session() as s:
+            with h5py.File(bio, 'w') as src:
+                df = src.create_group('df')
+                f = s.create_numeric(df, 'foo', 'int8')
+                f.data.write(np.array(contents))
+
+        with session.Session() as s:
+            with h5py.File(bio, 'r') as src:
+                f = s.get(src['df']['foo'])
+                self.assertListEqual(contents, f.data[:].tolist())
+
+    def test_create_then_load_timestamp(self):
+        from datetime import datetime as D
+        bio = BytesIO()
+        contents = [D(2021, 2, 6), D(2020, 11, 5), D(2974, 8, 1), D(1873, 12, 28)]
+        contents = [c.timestamp() for c in contents]
+
+        with session.Session() as s:
+            with h5py.File(bio, 'w') as src:
+                df = src.create_group('df')
+                f = s.create_timestamp(df, 'foo')
+                f.data.write(np.array(contents))
+
+        with session.Session() as s:
+            with h5py.File(bio, 'r') as src:
+                f = s.get(src['df']['foo'])
+                self.assertListEqual(contents, f.data[:].tolist())
 
 class TestCreateThenLoadBetweenSessionsNew(unittest.TestCase):
 
