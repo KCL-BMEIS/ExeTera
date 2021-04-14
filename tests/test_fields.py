@@ -238,7 +238,7 @@ class TestFieldArray(unittest.TestCase):
 
 class TestMemoryFields(unittest.TestCase):
 
-    def test_write_to_memory_field(self):
+    def test_memory_field_addition(self):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
@@ -258,3 +258,41 @@ class TestMemoryFields(unittest.TestCase):
         print((f1 + 1).data[:])
 
         print((1 + f2).data[:])
+
+    def test_mixed_field_addition(self):
+
+        a1 = np.array([1, 2, 3, 4], dtype=np.int32)
+        a2 = np.array([2, 3, 4, 5], dtype=np.int32)
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+
+            m1 = fields.NumericMemField(s, 'int32')
+            m2 = fields.NumericMemField(s, 'int32')
+            m1.data.write(a1)
+            m2.data.write(a2)
+
+            f1 = df.create_numeric('f1', 'int32')
+            f2 = df.create_numeric('f2', 'int32')
+            f1.data.write(a1)
+            f2.data.write(a2)
+
+            print(f1 + f2, (f1 + f2).data[:])
+
+            print(f1 + m2, (f1 + m2).data[:])
+
+            print(m1 + f2, (m1 + f2).data[:])
+
+            print(f1 + 1, (f1 + 1).data[:])
+
+            print(1 + f1, (1 + f2).data[:])
+
+            df.create_numeric('f3', 'int32').data.write(f1 + f2)
+            print(df['f3'].data[:])
+
+            df.create_numeric('f4', 'int32').data.write(f1 + f2)
+            print(df['f4'].data[:])
+
+            print(a2 / a1)

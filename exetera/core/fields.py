@@ -177,6 +177,8 @@ class WriteableFieldArray:
         DataWriter.write(self._field, self._name, part, len(part), dtype=self._dataset.dtype)
 
     def write(self, part):
+        if isinstance(part, Field):
+            part = part.data[:]
         DataWriter.write(self._field, self._name, part, len(part), dtype=self._dataset.dtype)
         self.complete()
 
@@ -203,7 +205,7 @@ class MemoryFieldArray:
     def clear(self):
         self._dataset = None
 
-    def write_part(self, part):
+    def write_part(self, part, move_mem=False):
         if self._dataset is None:
             self._dataset = part[:]
         else:
@@ -450,6 +452,35 @@ class NumericMemField(MemoryField):
     def __radd__(self, first):
         return FieldDataOps.numeric_add(self._session, first, self)
 
+    def __sub__(self, second):
+        return FieldDataOps.numeric_add(self._session, self, second)
+
+    def __rsub__(self, first):
+        return FieldDataOps.numeric_add(self._session, first, self)
+
+    def __mul__(self, second):
+        return FieldDataOps.numeric_mul(self._session, self, second)
+
+    def __rmul__(self, first):
+        return FieldDataOps.numeric_mul(self._session, first, self)
+
+    def __truediv__(self, second):
+        return FieldDataOps.numeric_truediv(self._session, self, second)
+
+    def __rtruediv__(self, first):
+        return FieldDataOps.numeric_truediv(self._session, first, self)
+
+    def __floordiv__(self, second):
+        return FieldDataOps.numeric_floordiv(self._session, self, second)
+
+    def __rfloordiv__(self, first):
+        return FieldDataOps.numeric_floordiv(self._session, first, self)
+
+    def __and__(self, second):
+        return FieldDataOps.numeric_and(self._session, self, second)
+
+    def __or__(self, first):
+        return FieldDataOps.numeric_or(self._session, first, self)
 
 # HDF5 field constructors
 # =======================
@@ -728,7 +759,7 @@ class NumericField(HDF5Field):
         return ops.get_spans_for_field(self.data[:])
 
     def apply_filter(self, filter_to_apply, dstfld=None):
-        array = self.data[filter_to_apply]
+        array = self.data[:]
         result = array[filter_to_apply]
         dstfld = self if dstfld is None else dstfld
         if not dstfld._write_enabled:
@@ -759,7 +790,35 @@ class NumericField(HDF5Field):
     def __radd__(self, first):
         return FieldDataOps.numeric_add(self._session, first, self)
 
+    def __sub__(self, second):
+        return FieldDataOps.numeric_add(self._session, self, second)
 
+    def __rsub__(self, first):
+        return FieldDataOps.numeric_add(self._session, first, self)
+
+    def __mul__(self, second):
+        return FieldDataOps.numeric_mul(self._session, self, second)
+
+    def __rmul__(self, first):
+        return FieldDataOps.numeric_mul(self._session, first, self)
+
+    def __truediv__(self, second):
+        return FieldDataOps.numeric_truediv(self._session, self, second)
+
+    def __rtruediv__(self, first):
+        return FieldDataOps.numeric_truediv(self._session, first, self)
+
+    def __floordiv__(self, second):
+        return FieldDataOps.numeric_floordiv(self._session, self, second)
+
+    def __rfloordiv__(self, first):
+        return FieldDataOps.numeric_floordiv(self._session, first, self)
+
+    def __and__(self, second):
+        return FieldDataOps.numeric_and(self._session, self, second)
+
+    def __or__(self, first):
+        return FieldDataOps.numeric_or(self._session, first, self)
 
 class CategoricalField(HDF5Field):
     def __init__(self, session, group,
@@ -1189,6 +1248,112 @@ class FieldDataOps:
             second_data = second
 
         r = first_data + second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
+    @classmethod
+    def numeric_sub(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data - second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
+    @classmethod
+    def numeric_mul(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data * second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
+
+    @classmethod
+    def numeric_truediv(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data / second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
+
+    @classmethod
+    def numeric_floordiv(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data // second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
+
+    @classmethod
+    def numeric_and(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data & second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
+
+    @classmethod
+    def numeric_or(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data | second_data
         f = NumericMemField(session, cls.dtype_to_str(r.dtype))
         f.data.write(r)
         return f
