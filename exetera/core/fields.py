@@ -371,7 +371,11 @@ class IndexedStringField(HDF5Field):
 
     def create_like(self, group, name, timestamp=None):
         ts = self.timestamp if timestamp is None else timestamp
-        return group.create_indexed_string(name, ts, self.chunksize)
+        if isinstance(group, h5py.Group):
+            indexed_string_field_constructor(self._session, group, name, ts, self.chunksize)
+            return IndexedStringField(self._session, group[name], write_enabled=True)
+        else:
+            return group.create_indexed_string(name, ts, self.chunksize)
 
 
     @property
@@ -476,7 +480,11 @@ class FixedStringField(HDF5Field):
     def create_like(self, group, name, timestamp=None):
         ts = self.timestamp if timestamp is None else timestamp
         length = self._field.attrs['strlen']
-        return group.create_fixed_string(name, length, ts, self.chunksize)
+        if isinstance(group, h5py.Group):
+            fixed_string_field_constructor(self._session, group, name, length, ts, self.chunksize)
+            return FixedStringField(self._session, group[name], write_enabled=True)
+        else:
+            return group.create_fixed_string(name, length, ts, self.chunksize)
 
     @property
     def data(self):
@@ -537,7 +545,11 @@ class NumericField(HDF5Field):
     def create_like(self, group, name, timestamp=None):
         ts = self.timestamp if timestamp is None else timestamp
         nformat = self._field.attrs['nformat']
-        return group.create_numeric(name, nformat, ts, self.chunksize)
+        if isinstance(group, h5py.Group):
+            numeric_field_constructor(self._session, group, name, nformat, ts, self.chunksize)
+            return NumericField(self._session, group[name], write_enabled=True)
+        else:
+            return group.create_numeric(name, nformat, ts, self.chunksize)
 
     @property
     def data(self):
@@ -598,7 +610,12 @@ class CategoricalField(HDF5Field):
         ts = self.timestamp if timestamp is None else timestamp
         nformat = self._field.attrs['nformat'] if 'nformat' in self._field.attrs else 'int8'
         keys = {v: k for k, v in self.keys.items()}
-        return group.create_categorical(name, nformat, keys, ts, self.chunksize)
+        if isinstance(group, h5py.Group):
+            categorical_field_constructor(self._session, group, name, nformat, keys, ts,
+                                          self.chunksize)
+            return CategoricalField(self, group[name], write_enabled=True)
+        else:
+            return group.create_categorical(name, nformat, keys, timestamp, self.chunksize)
 
     @property
     def data(self):
@@ -668,7 +685,11 @@ class TimestampField(HDF5Field):
 
     def create_like(self, group, name, timestamp=None):
         ts = self.timestamp if timestamp is None else timestamp
-        return group.create_timestamp(name, ts, self.chunksize)
+        if isinstance(group, h5py.Group):
+            timestamp_field_constructor(self._session, group, name, ts, self.chunksize)
+            return TimestampField(self._session, group[name], write_enabled=True)
+        else:
+            return group.create_timestamp(name, ts, self.chunksize)
 
     @property
     def data(self):

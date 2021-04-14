@@ -962,7 +962,7 @@ class Session(AbstractSession):
                                  "{} was passed to it".format(type(group)))
 
         if isinstance(group, h5py.Group):
-            fld.categorical_field_constructor(self, group, name, timestamp, chunksize)
+            fld.categorical_field_constructor(self, group, name, key, timestamp, chunksize)
             return fld.CategoricalField(self, group[name], write_enabled=True)
         else:
             return group.create_categorical(name, nformat, key, timestamp, chunksize)
