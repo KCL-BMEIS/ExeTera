@@ -1285,6 +1285,10 @@ class FieldDataOps:
             return 'uint32'
         elif dtype == np.uint64:
             return 'uint64'
+        elif dtype == np.float32:
+            return 'float32'
+        elif dtype == np.float64:
+            return 'float64'
 
         raise ValueError("Unsupported dtype '{}'".format(dtype))
 
