@@ -932,7 +932,7 @@ class Session(AbstractSession):
                 raise ValueError("'group' must be an Exetera DataFrame but a "
                                  "{} was passed to it".format(type(group)))
         if isinstance(group, h5py.Group):
-            fld.fixed_string_field_constructor(self, group, name, timestamp, chunksize)
+            fld.fixed_string_field_constructor(self, group, name, length, timestamp, chunksize)
             return fld.FixedStringField(self, group[name], write_enabled=True)
         else:
             return group.create_fixed_string(name, length, timestamp, chunksize)
