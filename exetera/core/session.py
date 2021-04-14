@@ -52,16 +52,13 @@ class Session(AbstractSession):
         self.timestamp = timestamp
         self.datasets = dict()
 
-
     def __enter__(self):
         """Context manager enter."""
         return self
 
-
     def __exit__(self, etype, evalue, etraceback):
         """Context manager exit closes any open datasets."""
         self.close()
-
 
     def open_dataset(self,
                      dataset_path: str,
@@ -82,7 +79,6 @@ class Session(AbstractSession):
         self.datasets[name] = ds.HDF5Dataset(self, dataset_path, mode, name)
         return self.datasets[name]
 
-
     def close_dataset(self,
                       name: str):
         """
@@ -93,7 +89,6 @@ class Session(AbstractSession):
         if name in self.datasets:
             self.datasets[name].close()
             del self.datasets[name]
-
 
     def list_datasets(self):
         """
@@ -108,7 +103,6 @@ class Session(AbstractSession):
         """
         return tuple(n for n in self.datasets.keys())
 
-
     def get_dataset(self,
                     name: str):
         """
@@ -120,7 +114,6 @@ class Session(AbstractSession):
         """
         return self.datasets[name]
 
-
     def close(self):
         """
         Close all open datasets
@@ -129,7 +122,6 @@ class Session(AbstractSession):
         for v in self.datasets.values():
             v.close()
         self.datasets = dict()
-
 
     def get_shared_index(self,
                          keys: Tuple[np.array]):
@@ -168,7 +160,6 @@ class Session(AbstractSession):
 
         return tuple(np.searchsorted(concatted, k) for k in raw_keys)
 
-
     def set_timestamp(self,
                       timestamp: str = str(datetime.now(timezone.utc))):
         """
@@ -182,7 +173,6 @@ class Session(AbstractSession):
             error_str = "'timestamp' must be a string but is of type {}"
             raise ValueError(error_str.format(type(timestamp)))
         self.timestamp = timestamp
-
 
     def sort_on(self,
                 src_group: h5py.Group,
@@ -201,6 +191,7 @@ class Session(AbstractSession):
         exist
         :return: None
         """
+
         # TODO: fields is being ignored at present
         def print_if_verbose(*args):
             if verbose:
@@ -233,7 +224,6 @@ class Session(AbstractSession):
                 print_if_verbose(f"  '{k}' reordered in {time.time() - t1}s")
         print_if_verbose(f"fields reordered in {time.time() - t0}s")
 
-
     def dataset_sort_index(self, sort_indices, index=None):
         """
         Generate a sorted index based on a set of fields upon which to sort and an optional
@@ -265,7 +255,6 @@ class Session(AbstractSession):
 
         return acc_index
 
-
     def apply_filter(self, filter_to_apply, src, dest=None):
         """
         Apply a filter to an a src field. The filtered field is written to dest if it set,
@@ -287,14 +276,13 @@ class Session(AbstractSession):
         elif isinstance(src, Field):
             newfld = src.apply_filter(filter_to_apply_, writer_)
             return newfld.data[:]
-        #elif isinstance(src, df.datafrme):
+        # elif isinstance(src, df.datafrme):
         else:
             reader_ = val.array_from_parameter(self, 'reader', src)
             result = reader_[filter_to_apply]
             if writer_:
                 writer_.data.write(result)
             return result
-
 
     def apply_index(self, index_to_apply, src, dest=None):
         """
@@ -312,7 +300,7 @@ class Session(AbstractSession):
         if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
         if isinstance(src, fld.IndexedStringField):
-            dest_indices, dest_values =\
+            dest_indices, dest_values = \
                 ops.apply_indices_to_index_values(index_to_apply_,
                                                   src.indices[:], src.values[:])
             return dest_indices, dest_values
@@ -325,7 +313,6 @@ class Session(AbstractSession):
             if writer_:
                 writer_.data.write(result)
             return result
-
 
     def distinct(self, field=None, fields=None, filter=None):
 
@@ -346,10 +333,8 @@ class Session(AbstractSession):
         results = [uniques[f'{i}'] for i in range(len(fields))]
         return results
 
-
-    def get_spans(self,
-                  field: Union[Field, np.array] = None,
-                  fields: Union[Tuple[Field], Tuple[np.array]] = None):
+    def get_spans(self, field: Union[Field, np.array] = None,
+                  dest: Field = None, **kwargs):
         """
         Calculate a set of spans that indicate contiguous equal values.
         The entries in the result array correspond to the inclusive start and
@@ -366,28 +351,47 @@ class Session(AbstractSession):
             result: [0, 1, 3, 6, 7, 10, 15]
 
         :param field: A Field or numpy array to be evaluated for spans
-        :param fields: A tuple of Fields or tuple of numpy arrays to be evaluated for spans
+        :param dest: A destination Field to store the result
+        :param **kwargs: See below. For parameters set in both argument and kwargs, use kwargs
+
+        :Keyword Arguments:
+            * field -- Similar to field parameter, in case user specify field as keyword
+            * fields -- A tuple of Fields or tuple of numpy arrays to be evaluated for spans
+            * dest -- Similar to dest parameter, in case user specify as keyword
+
         :return: The resulting set of spans as a numpy array
         """
-        if field is None and fields is None:
-            raise ValueError("One of 'field' and 'fields' must be set")
-        if field is not None and fields is not None:
-            raise ValueError("Only one of 'field' and 'fields' may be set")
-        raw_field = None
+        fields = []
+        result = None
+        if len(kwargs) > 0:
+            for k in kwargs.keys():
+                if k == 'field':
+                    field = kwargs[k]
+                elif k == 'fields':
+                    fields = kwargs[k]
+                elif k == 'dest':
+                    dest = kwargs[k]
+        if dest is not None and not isinstance(dest, Field):
+            raise TypeError(f"'dest' must be one of 'Field' but is {type(dest)}")
+
         if field is not None:
-            raw_field = val.array_from_parameter(self, 'field', field)
-
-        if fields is not None:
-            if isinstance(fields[0], Field):
-                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(), fields[1].get_spans())
-            if isinstance(fields[0], np.ndarray):
-                return ops._get_spans_for_2_fields(fields[0], fields[1])
-        else:
             if isinstance(field, Field):
-                return field.get_spans()
-            if isinstance(field, np.ndarray):
-                return ops.get_spans_for_field(field)
+                result = field.get_spans()
+            elif isinstance(field, np.ndarray):
+                result = ops.get_spans_for_field(field)
+        elif len(fields) > 0:
+            if isinstance(fields[0], Field):
+                result = ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(), fields[1].get_spans())
+            elif isinstance(fields[0], np.ndarray):
+                result = ops._get_spans_for_2_fields(fields[0], fields[1])
+        else:
+            raise ValueError("One of 'field' and 'fields' must be set")
 
+        if dest is not None:
+            dest.data.write(result)
+            return dest
+        else:
+            return result
 
     def _apply_spans_no_src(self,
                             predicate: Callable[[np.array, np.array], None],
@@ -401,7 +405,7 @@ class Session(AbstractSession):
         :params dest: if set, the field to which the results are written
         :returns: A numpy array containing the resulting values
         """
-        assert(dest is None or isinstance(dest, Field))
+        assert (dest is None or isinstance(dest, Field))
 
         if dest is not None:
             dest_f = val.field_from_parameter(self, 'dest', dest)
@@ -413,7 +417,6 @@ class Session(AbstractSession):
             results = np.zeros(len(spans) - 1, dtype='int64')
             predicate(spans, results)
             return results
-
 
     def _apply_spans_src(self,
                          predicate: Callable[[np.array, np.array, np.array], None],
@@ -429,7 +432,7 @@ class Session(AbstractSession):
         :params dest: if set, the field to which the results are written
         :returns: A numpy array containing the resulting values
         """
-        assert(dest is None or isinstance(dest, Field))
+        assert (dest is None or isinstance(dest, Field))
         target_ = val.array_from_parameter(self, 'target', target)
         if len(target) != spans[-1]:
             error_msg = ("'target' (length {}) must be one element shorter than 'spans' "
@@ -447,7 +450,6 @@ class Session(AbstractSession):
             predicate(spans, target_, results)
             return results
 
-
     def apply_spans_index_of_min(self,
                                  spans: np.array,
                                  target: np.array,
@@ -460,7 +462,6 @@ class Session(AbstractSession):
         :returns: A numpy array containing the resulting values
         """
         return self._apply_spans_src(ops.apply_spans_index_of_min, spans, target, dest)
-
 
     def apply_spans_index_of_max(self,
                                  spans: np.array,
@@ -475,7 +476,6 @@ class Session(AbstractSession):
         """
         return self._apply_spans_src(ops.apply_spans_index_of_max, spans, target, dest)
 
-
     def apply_spans_index_of_first(self,
                                    spans: np.array,
                                    dest: Field = None):
@@ -486,7 +486,6 @@ class Session(AbstractSession):
         :returns: A numpy array containing the resulting values
         """
         return self._apply_spans_no_src(ops.apply_spans_index_of_first, spans, dest)
-
 
     def apply_spans_index_of_last(self,
                                   spans: np.array,
@@ -499,7 +498,6 @@ class Session(AbstractSession):
         """
         return self._apply_spans_no_src(ops.apply_spans_index_of_last, spans, dest)
 
-
     def apply_spans_count(self,
                           spans: np.array,
                           dest: Field = None):
@@ -510,7 +508,6 @@ class Session(AbstractSession):
         :returns: A numpy array containing the resulting values
         """
         return self._apply_spans_no_src(ops.apply_spans_count, spans, dest)
-
 
     def apply_spans_min(self,
                         spans: np.array,
@@ -525,7 +522,6 @@ class Session(AbstractSession):
         """
         return self._apply_spans_src(ops.apply_spans_min, spans, target, dest)
 
-
     def apply_spans_max(self,
                         spans: np.array,
                         target: np.array,
@@ -538,7 +534,6 @@ class Session(AbstractSession):
         :returns: A numpy array containing the resulting values
         """
         return self._apply_spans_src(ops.apply_spans_max, spans, target, dest)
-
 
     def apply_spans_first(self,
                           spans: np.array,
@@ -553,7 +548,6 @@ class Session(AbstractSession):
         """
         return self._apply_spans_src(ops.apply_spans_first, spans, target, dest)
 
-
     def apply_spans_last(self,
                          spans: np.array,
                          target: np.array,
@@ -566,7 +560,6 @@ class Session(AbstractSession):
         :returns: A numpy array containing the resulting values
         """
         return self._apply_spans_src(ops.apply_spans_last, spans, target, dest)
-
 
     def apply_spans_concat(self,
                            spans,
@@ -583,7 +576,6 @@ class Session(AbstractSession):
         src_chunksize = target.chunksize if src_chunksize is None else src_chunksize
         dest_chunksize = dest.chunksize if dest_chunksize is None else dest_chunksize
         chunksize_mult = 16 if chunksize_mult is None else chunksize_mult
-
 
         src_index = target.indices[:]
         src_values = target.values[:]
@@ -620,7 +612,6 @@ class Session(AbstractSession):
         #         dest.write_raw(dest_index[:index_i], dest_values[:index_v])
         # dest.complete()
 
-
     def _aggregate_impl(self, predicate, index, target=None, dest=None):
         """
         An implementation method for aggregation of fields via various predicates. This method takes a predicate that
@@ -650,7 +641,6 @@ class Session(AbstractSession):
 
         return dest if dest is not None else results
 
-
     def aggregate_count(self, index, dest=None):
         """
          Finds the number of entries within each sub-group of index.
@@ -664,7 +654,6 @@ class Session(AbstractSession):
          :returns: A numpy array containing the resulting values
          """
         return self._aggregate_impl(self.apply_spans_count, index, None, dest)
-
 
     def aggregate_first(self, index, target=None, dest=None):
         """
@@ -682,7 +671,6 @@ class Session(AbstractSession):
         """
         return self.aggregate_custom(self.apply_spans_first, index, target, dest)
 
-
     def aggregate_last(self, index, target=None, dest=None):
         """
         Finds the first entries within each sub-group of index.
@@ -698,7 +686,6 @@ class Session(AbstractSession):
         :returns: A numpy array containing the resulting values
         """
         return self.aggregate_custom(self.apply_spans_last, index, target, dest)
-
 
     def aggregate_min(self, index, target=None, dest=None):
         """
@@ -716,7 +703,6 @@ class Session(AbstractSession):
         """
         return self.aggregate_custom(self.apply_spans_min, index, target, dest)
 
-
     def aggregate_max(self, index, target=None, dest=None):
         """
         Finds the maximum value within each sub-group of index.
@@ -733,7 +719,6 @@ class Session(AbstractSession):
         """
         return self.aggregate_custom(self.apply_spans_max, index, target, dest)
 
-
     def aggregate_custom(self, predicate, index, target=None, dest=None):
         if target is None:
             raise ValueError("'src' must not be None")
@@ -742,7 +727,6 @@ class Session(AbstractSession):
             val.ensure_valid_field("dest", dest)
 
         return self._aggregate_impl(predicate, index, target, dest)
-
 
     def join(self,
              destination_pkey, fkey_indices, values_to_join,
@@ -782,9 +766,8 @@ class Session(AbstractSession):
         safe_values_to_join = raw_values_to_join[invalid_filter]
 
         # now get the memory that the results will be mapped to
-        #destination_space_values = writer.chunk_factory(len(destination_pkey))
+        # destination_space_values = writer.chunk_factory(len(destination_pkey))
         destination_space_values = np.zeros(len(destination_pkey), dtype=raw_values_to_join.dtype)
-
 
         # finally, map the results from the source space to the destination space
         destination_space_values[safe_unique_fkey_indices] = safe_values_to_join
@@ -793,7 +776,6 @@ class Session(AbstractSession):
             writer.data.write(destination_space_values)
         else:
             return destination_space_values
-
 
     def predicate_and_join(self,
                            predicate, destination_pkey, fkey_indices,
@@ -827,7 +809,7 @@ class Session(AbstractSession):
             dtype = reader.dtype()
         else:
             dtype = np.uint32
-        results = np.zeros(len(fkey_index_spans)-1, dtype=dtype)
+        results = np.zeros(len(fkey_index_spans) - 1, dtype=dtype)
         predicate(fkey_index_spans, reader, results)
 
         # the predicate results are in the same space as the unique_fkey_indices, which
@@ -840,7 +822,6 @@ class Session(AbstractSession):
         destination_space_values[safe_unique_fkey_indices] = safe_results
 
         writer.write(destination_space_values)
-
 
     def get(self,
             field: Union[Field, h5py.Group]):
@@ -880,7 +861,6 @@ class Session(AbstractSession):
         fieldtype = field.attrs['fieldtype'].split(',')[0]
         return fieldtype_map[fieldtype](self, field)
 
-
     def create_like(self, field, dest_group, dest_name, timestamp=None, chunksize=None):
         """
         Create a field of the same type as an existing field, in the location and with the name provided.
@@ -907,7 +887,6 @@ class Session(AbstractSession):
         else:
             raise ValueError("'field' must be either a Field or a h5py.Group, but is {}".format(type(field)))
 
-
     def create_indexed_string(self, group, name, timestamp=None, chunksize=None):
         """
         Create an indexed string field in the given DataFrame with the given name.
@@ -932,7 +911,6 @@ class Session(AbstractSession):
         else:
             return group.create_indexed_string(name, timestamp, chunksize)
 
-
     def create_fixed_string(self, group, name, length, timestamp=None, chunksize=None):
         """
         Create an fixed string field in the given DataFrame with the given name, with the given max string length per entry.
@@ -956,7 +934,6 @@ class Session(AbstractSession):
             return fld.fixed_string_field_constructor(self, group, name, timestamp, chunksize)
         else:
             return group.create_fixed_string(name, length, timestamp, chunksize)
-
 
     def create_categorical(self, group, name, nformat, key, timestamp=None, chunksize=None):
         """
@@ -987,7 +964,6 @@ class Session(AbstractSession):
         else:
             return group.create_categorical(name, nformat, key, timestamp, chunksize)
 
-
     def create_numeric(self, group, name, nformat, timestamp=None, chunksize=None):
         """
         Create a numeric field in the given DataFrame with the given name.
@@ -1011,10 +987,9 @@ class Session(AbstractSession):
                                  "{} was passed to it".format(type(group)))
 
         if isinstance(group, h5py.Group):
-            return fld.numeric_field_constructor(self. group, name, timestamp, chunksize)
+            return fld.numeric_field_constructor(self.group, name, timestamp, chunksize)
         else:
             return group.create_numeric(name, nformat, timestamp, chunksize)
-
 
     def create_timestamp(self, group, name, timestamp=None, chunksize=None):
         """
@@ -1033,12 +1008,10 @@ class Session(AbstractSession):
         else:
             return group.create_timestamp(name, timestamp, chunksize)
 
-
     def get_or_create_group(self, group, name):
         if name in group:
             return group[name]
         return group.create_group(name)
-
 
     def chunks(self, length, chunksize=None):
         if chunksize is None:
@@ -1048,7 +1021,6 @@ class Session(AbstractSession):
             next = min(length, cur + chunksize)
             yield cur, next
             cur = next
-
 
     def process(self, inputs, outputs, predicate):
 
@@ -1090,7 +1062,6 @@ class Session(AbstractSession):
         for k, v in output_writers.items():
             output_writers[k].flush()
 
-
     def get_index(self, target, foreign_key, destination=None):
         print('  building patient_id index')
         t0 = time.time()
@@ -1124,7 +1095,6 @@ class Session(AbstractSession):
         else:
             return foreign_key_index
 
-
     def get_trash_group(self, group):
 
         group_names = group.name[1:].split('/')
@@ -1137,13 +1107,11 @@ class Session(AbstractSession):
             except KeyError:
                 pass
 
-
     def temp_filename(self):
         uid = str(uuid.uuid4())
         while os.path.exists(uid + '.hdf5'):
             uid = str(uuid.uuid4())
         return uid + '.hdf5'
-
 
     def merge_left(self, left_on, right_on,
                    right_fields=tuple(), right_writers=None):
@@ -1171,7 +1139,6 @@ class Session(AbstractSession):
 
         return right_results
 
-
     def merge_right(self, left_on, right_on,
                     left_fields=None, left_writers=None):
         l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
@@ -1196,7 +1163,6 @@ class Session(AbstractSession):
                 left_writers[ilf].data.write(joined_field)
 
         return left_results
-
 
     def merge_inner(self, left_on, right_on,
                     left_fields=None, left_writers=None, right_fields=None, right_writers=None):
@@ -1234,7 +1200,6 @@ class Session(AbstractSession):
 
         return left_results, right_results
 
-
     def _map_fields(self, field_map, field_sources, field_sinks):
         rtn_sinks = None
         if field_sinks is None:
@@ -1259,7 +1224,6 @@ class Session(AbstractSession):
                 ops.map_valid(src_, field_map, snk_)
         return None if rtn_sinks is None else tuple(rtn_sinks)
 
-
     def _streaming_map_fields(self, field_map, field_sources, field_sinks):
         # field map must be a field
         # field sources must be fields
@@ -1270,7 +1234,6 @@ class Session(AbstractSession):
             src_ = val.field_from_parameter(self, 'field_sources', src)
             snk_ = val.field_from_parameter(self, 'field_sinks', snk)
             ops.ordered_map_valid_stream(src_, map_, snk_)
-
 
     def ordered_merge_left(self, left_on, right_on, right_field_sources=tuple(), left_field_sinks=None,
                            left_to_right_map=None, left_unique=False, right_unique=False):
@@ -1321,7 +1284,7 @@ class Session(AbstractSession):
                 if streamable:
                     has_unmapped = \
                         ops.ordered_map_to_right_right_unique_streamed(left_on, right_on,
-                                                                      left_to_right_map)
+                                                                       left_to_right_map)
                     result = left_to_right_map
                 else:
                     result = np.zeros(len(left_on), dtype=np.int64)
@@ -1346,7 +1309,6 @@ class Session(AbstractSession):
         else:
             rtn_left_sinks = self._map_fields(result, right_field_sources, left_field_sinks)
             return rtn_left_sinks
-
 
     def ordered_merge_right(self, left_on, right_on,
                             left_field_sources=tuple(), right_field_sinks=None,
@@ -1375,7 +1337,6 @@ class Session(AbstractSession):
         """
         return self.ordered_merge_left(right_on, left_on, left_field_sources, right_field_sinks,
                                        right_to_left_map, right_unique, left_unique)
-
 
     def ordered_merge_inner(self, left_on, right_on,
                             left_field_sources=tuple(), left_field_sinks=None,

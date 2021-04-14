@@ -14,13 +14,12 @@ class TestDataFrame(unittest.TestCase):
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio, 'w', 'dst')
-
             # init
-            df = dataframe.HDF5DataFrame(dst, 'dst')
+            df = dst.create_dataframe('dst')
             self.assertTrue(isinstance(df, dataframe.DataFrame))
             numf = df.create_numeric('numf', 'uint32')
             fdf = {'numf': numf}
-            df2 = dataframe.HDF5DataFrame(dst, 'dst2', dataframe=fdf)
+            df2 = dst.create_dataframe('dst2', dataframe=fdf)
             self.assertTrue(isinstance(df2, dataframe.DataFrame))
 
             # add & set & contains
@@ -57,13 +56,13 @@ class TestDataFrame(unittest.TestCase):
             dst = ds.create_dataframe('dst')
             num=s.create_numeric(dst,'num', 'uint8')
             num.data.write([1, 2, 3, 4, 5, 6, 7])
-            df = dataframe.HDF5DataFrame(dst, 'dst', h5group=dst)
+            df = ds.create_dataframe('dst2', h5group=dst)
 
     def test_dataframe_create_field(self):
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio, 'r+', 'dst')
-            df = dataframe.HDF5DataFrame(dst, 'dst',)
+            df = dst.create_dataframe('dst')
             num = df.create_numeric('num', 'uint32')
             num.data.write([1, 2, 3, 4])
             self.assertEqual([1, 2, 3, 4], num.data[:].tolist())
@@ -72,7 +71,7 @@ class TestDataFrame(unittest.TestCase):
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio, 'w', 'dst')
-            df = dataframe.HDF5DataFrame(dst, 'dst')
+            df = dst.create_dataframe('dst')
             numf = s.create_numeric(df, 'numf', 'int32')
             numf.data.write([5, 4, 3, 2, 1])
             df.add(numf)
@@ -80,7 +79,7 @@ class TestDataFrame(unittest.TestCase):
             fst.data.write([b'e', b'd', b'c', b'b', b'a'])
             df.add(fst)
             index = np.array([4, 3, 2, 1, 0])
-            ddf = dataframe.HDF5DataFrame(dst, 'dst2')
+            ddf = dst.create_dataframe('dst2')
             df.apply_index(index, ddf)
             self.assertEqual([1, 2, 3, 4, 5], ddf.get_field('numf').data[:].tolist())
             self.assertEqual([b'a', b'b', b'c', b'd', b'e'], ddf.get_field('fst').data[:].tolist())
