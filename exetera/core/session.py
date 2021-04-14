@@ -1008,7 +1008,7 @@ class Session(AbstractSession):
                                  "{} was passed to it".format(type(group)))
 
         if isinstance(group, h5py.Group):
-            fld.categorical_field_constructor(self, group, name, timestamp, chunksize)
+            fld.timestamp_field_constructor(self, group, name, timestamp, chunksize)
             return fld.TimestampField(self, group[name], write_enabled=True)
         else:
             return group.create_timestamp(name, timestamp, chunksize)
