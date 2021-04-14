@@ -72,19 +72,59 @@ class TestDataSet(unittest.TestCase):
 
     def test_dataframe_create_with_dataframe(self):
 
-        contents1 = np.array([1, 2, 3, 4], dtype=np.int32)
-        contents2 = np.array([5, 6, 7, 8], dtype=np.int32)
+        iscontents1 = ['a', 'bb', 'ccc', 'dddd']
+        iscontents2 = ['eeee', 'fff', 'gg', 'h']
+        fscontents1 = [s.encode() for s in iscontents1]
+        fscontents2 = [s.encode() for s in iscontents2]
+        ccontents1 = np.array([1, 2, 2, 1], dtype=np.int8)
+        ccontents2 = np.array([2, 1, 1, 2], dtype=np.int8)
+        ncontents1 = np.array([1, 2, 3, 4], dtype=np.int32)
+        ncontents2 = np.array([5, 6, 7, 8], dtype=np.int32)
+        from datetime import datetime as D
+        tcontents1 = [D(2020, 1, 1), D(2020, 1, 2), D(2020, 1, 3), D(2020, 1, 4)]
+        tcontents1 = np.array([d.timestamp() for d in tcontents1])
+        tcontents2 = [D(2021, 1, 1), D(2021, 1, 2), D(2021, 1, 3), D(2021, 1, 4)]
+        tcontents2 = np.array([d.timestamp() for d in tcontents2])
 
         bio = BytesIO()
         with session.Session() as s:
             ds = s.open_dataset(bio, 'w', 'ds')
             df1 = ds.create_dataframe('df1')
-            df1.create_numeric('foo', 'uint32').data.write(contents1)
+            df1.create_indexed_string('is_foo').data.write(iscontents1)
+            df1.create_fixed_string('fs_foo', 4).data.write(fscontents1)
+            df1.create_categorical('c_foo', 'int8', {b'a': 1, b'b': 2}).data.write(ccontents1)
+            df1.create_numeric('n_foo', 'uint32').data.write(ncontents1)
+            df1.create_timestamp('t_foo').data.write(tcontents1)
 
             df2 = ds.create_dataframe('df2', dataframe=df1)
 
-            self.assertListEqual(contents1.tolist(), df1['foo'].data[:].tolist())
-            self.assertListEqual(contents1.tolist(), df2['foo'].data[:].tolist())
-            df2['foo'].data[:] = np.array(contents2, dtype=np.uint32)
-            self.assertListEqual(contents1.tolist(), df1['foo'].data[:].tolist())
-            self.assertListEqual(contents2.tolist(), df2['foo'].data[:].tolist())
+            self.assertListEqual(iscontents1, df1['is_foo'].data[:])
+            self.assertListEqual(iscontents1, df2['is_foo'].data[:])
+            df2['is_foo'].data.clear()
+            df2['is_foo'].data.write(iscontents2)
+            self.assertListEqual(iscontents1, df1['is_foo'].data[:])
+            self.assertListEqual(iscontents2, df2['is_foo'].data[:])
+
+            self.assertListEqual(fscontents1, df1['fs_foo'].data[:].tolist())
+            self.assertListEqual(fscontents1, df2['fs_foo'].data[:].tolist())
+            df2['fs_foo'].data[:] = fscontents2
+            self.assertListEqual(fscontents1, df1['fs_foo'].data[:].tolist())
+            self.assertListEqual(fscontents2, df2['fs_foo'].data[:].tolist())
+
+            self.assertListEqual(ccontents1.tolist(), df1['c_foo'].data[:].tolist())
+            self.assertListEqual(ccontents1.tolist(), df2['c_foo'].data[:].tolist())
+            df2['c_foo'].data[:] = ccontents2
+            self.assertListEqual(ccontents1.tolist(), df1['c_foo'].data[:].tolist())
+            self.assertListEqual(ccontents2.tolist(), df2['c_foo'].data[:].tolist())
+
+            self.assertListEqual(ncontents1.tolist(), df1['n_foo'].data[:].tolist())
+            self.assertListEqual(ncontents1.tolist(), df2['n_foo'].data[:].tolist())
+            df2['n_foo'].data[:] = np.array(ncontents2, dtype=np.uint32)
+            self.assertListEqual(ncontents1.tolist(), df1['n_foo'].data[:].tolist())
+            self.assertListEqual(ncontents2.tolist(), df2['n_foo'].data[:].tolist())
+
+            self.assertListEqual(tcontents1.tolist(), df1['t_foo'].data[:].tolist())
+            self.assertListEqual(tcontents1.tolist(), df2['t_foo'].data[:].tolist())
+            df2['t_foo'].data[:] = np.array(tcontents2, dtype=np.float64)
+            self.assertListEqual(tcontents1.tolist(), df1['t_foo'].data[:].tolist())
+            self.assertListEqual(tcontents2.tolist(), df2['t_foo'].data[:].tolist())
