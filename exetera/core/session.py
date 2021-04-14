@@ -9,7 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Tuple, Union
+from typing import Callable, IO, Tuple, Union
 import os
 import uuid
 from datetime import datetime, timezone
@@ -61,7 +61,7 @@ class Session(AbstractSession):
         self.close()
 
     def open_dataset(self,
-                     dataset_path: str,
+                     dataset_path: Union[str, IO[bytes]],
                      mode: str,
                      name: str):
         """

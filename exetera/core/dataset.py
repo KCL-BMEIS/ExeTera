@@ -10,7 +10,7 @@
 # limitations under the License.
 
 import h5py
-from exetera.core.abstract_types import Dataset
+from exetera.core.abstract_types import DataFrame, Dataset
 from exetera.core import dataframe as edf
 
 
@@ -21,8 +21,11 @@ class HDF5Dataset(Dataset):
         self._session = session
         self._file = h5py.File(dataset_path, mode)
         self._dataframes = dict()
-        for subgrp in self._file.keys():
-            self.create_dataframe(subgrp, h5group=self._file[subgrp])
+
+        for group in self._file.keys():
+            h5group = self._file[group]
+            dataframe = edf.HDF5DataFrame(self, group, h5group=h5group)
+            self._dataframes[group] = dataframe
 
     @property
     def session(self):
@@ -31,23 +34,33 @@ class HDF5Dataset(Dataset):
     def close(self):
         self._file.close()
 
-    def create_dataframe(self, name, dataframe: dict = None, h5group: h5py.Group = None):
+    def create_dataframe(self, name, dataframe: DataFrame = None):
         """
         Create a group object in HDF5 file and a Exetera dataframe in memory.
 
         :param name: name of the dataframe, or the group name in HDF5
-        :param dataframe: optional - replicate data from another dictionary
-        :param h5group: optional - acquire data from h5group object directly, the h5group needs to have a
-                        h5group<-group-dataset structure, the group has a 'fieldtype' attribute
-                         and the dataset is named 'values'.
+        :param dataframe: optional - copy an existing dataframe
         :return: a dataframe object
         """
-        if h5group is None:
-            self._file.create_group(name)
-            h5group = self._file[name]
-        dataframe = edf.HDF5DataFrame(self, name, h5group, dataframe)
-        self._dataframes[name] = dataframe
-        return dataframe
+        if dataframe is not None:
+            if not isinstance(dataframe, DataFrame):
+                raise ValueError("If set, 'dataframe' must be of type DataFrame "
+                                 "but is of type {}".format(type(dataframe)))
+
+        self._file.create_group(name)
+        h5group = self._file[name]
+        _dataframe = edf.HDF5DataFrame(self, name, h5group)
+        if dataframe is not None:
+            for k, v in dataframe.items():
+                f = v.create_like(_dataframe, k)
+                if f.indexed:
+                    f.indices.write(v.indices[:])
+                    f.values.write(v.values[:])
+                else:
+                    f.data.write(v.data[:])
+
+        self._dataframes[name] = _dataframe
+        return _dataframe
 
     def add(self, dataframe, name=None):
         """
@@ -58,12 +71,12 @@ class HDF5Dataset(Dataset):
         :param name: optional- change the dataframe name
         """
         dname = dataframe.name if name is None else name
-        self._file.copy(dataframe.h5group, self._file, name=dname)
+        self._file.copy(dataframe._h5group, self._file, name=dname)
         df = edf.HDF5DataFrame(self, dname, h5group=self._file[dname])
         self._dataframes[dname] = df
 
     def __contains__(self, name):
-        return self._dataframes.__contains__(name)
+        return name in self._dataframes
 
     def contains_dataframe(self, dataframe):
         """
