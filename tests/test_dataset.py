@@ -69,7 +69,6 @@ class TestDataSet(unittest.TestCase):
             self.assertTrue(isinstance(dst['grp1'], DataFrame))
             self.assertEqual([b'a', b'b', b'c', b'd'], dst['grp1']['fs'].data[:].tolist())
 
-
     def test_dataframe_create_with_dataframe(self):
 
         iscontents1 = ['a', 'bb', 'ccc', 'dddd']
