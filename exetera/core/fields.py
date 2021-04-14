@@ -196,6 +196,10 @@ class MemoryFieldArray:
     def __len__(self):
         return len(self._dataset)
 
+    @property
+    def dtype(self):
+        return self._dataset.dtype
+
     def __getitem__(self, item):
         return self._dataset[item]
 
@@ -453,10 +457,10 @@ class NumericMemField(MemoryField):
         return FieldDataOps.numeric_add(self._session, first, self)
 
     def __sub__(self, second):
-        return FieldDataOps.numeric_add(self._session, self, second)
+        return FieldDataOps.numeric_sub(self._session, self, second)
 
     def __rsub__(self, first):
-        return FieldDataOps.numeric_add(self._session, first, self)
+        return FieldDataOps.numeric_sub(self._session, first, self)
 
     def __mul__(self, second):
         return FieldDataOps.numeric_mul(self._session, self, second)
@@ -476,10 +480,34 @@ class NumericMemField(MemoryField):
     def __rfloordiv__(self, first):
         return FieldDataOps.numeric_floordiv(self._session, first, self)
 
+    def __mod__(self, second):
+        return FieldDataOps.numeric_mod(self._session, self, second)
+
+    def __rmod__(self, first):
+        return FieldDataOps.numeric_mod(self._session, first, self)
+
+    def __divmod__(self, second):
+        return FieldDataOps.numeric_divmod(self._session, self, second)
+
+    def __rdivmod__(self, first):
+        return FieldDataOps.numeric_divmod(self._session, first, self)
+
     def __and__(self, second):
         return FieldDataOps.numeric_and(self._session, self, second)
 
-    def __or__(self, first):
+    def __rand__(self, first):
+        return FieldDataOps.numeric_and(self._session, first, self)
+
+    def __xor__(self, second):
+        return FieldDataOps.numeric_xor(self._session, self, second)
+
+    def __rxor__(self, first):
+        return FieldDataOps.numeric_xor(self._session, first, self)
+
+    def __or__(self, second):
+        return FieldDataOps.numeric_or(self._session, self, second)
+
+    def __ror__(self, first):
         return FieldDataOps.numeric_or(self._session, first, self)
 
 # HDF5 field constructors
@@ -791,10 +819,10 @@ class NumericField(HDF5Field):
         return FieldDataOps.numeric_add(self._session, first, self)
 
     def __sub__(self, second):
-        return FieldDataOps.numeric_add(self._session, self, second)
+        return FieldDataOps.numeric_sub(self._session, self, second)
 
     def __rsub__(self, first):
-        return FieldDataOps.numeric_add(self._session, first, self)
+        return FieldDataOps.numeric_sub(self._session, first, self)
 
     def __mul__(self, second):
         return FieldDataOps.numeric_mul(self._session, self, second)
@@ -814,11 +842,36 @@ class NumericField(HDF5Field):
     def __rfloordiv__(self, first):
         return FieldDataOps.numeric_floordiv(self._session, first, self)
 
+    def __mod__(self, second):
+        return FieldDataOps.numeric_mod(self._session, self, second)
+
+    def __rmod__(self, first):
+        return FieldDataOps.numeric_mod(self._session, first, self)
+
+    def __divmod__(self, second):
+        return FieldDataOps.numeric_divmod(self._session, self, second)
+
+    def __rdivmod__(self, first):
+        return FieldDataOps.numeric_divmod(self._session, first, self)
+
     def __and__(self, second):
         return FieldDataOps.numeric_and(self._session, self, second)
 
-    def __or__(self, first):
+    def __rand__(self, first):
+        return FieldDataOps.numeric_and(self._session, first, self)
+
+    def __xor__(self, second):
+        return FieldDataOps.numeric_xor(self._session, self, second)
+
+    def __rxor__(self, first):
+        return FieldDataOps.numeric_xor(self._session, first, self)
+
+    def __or__(self, second):
+        return FieldDataOps.numeric_or(self._session, self, second)
+
+    def __ror__(self, first):
         return FieldDataOps.numeric_or(self._session, first, self)
+
 
 class CategoricalField(HDF5Field):
     def __init__(self, session, group,
@@ -1286,7 +1339,6 @@ class FieldDataOps:
         f.data.write(r)
         return f
 
-
     @classmethod
     def numeric_truediv(cls, session, first, second):
         if isinstance(first, Field):
@@ -1303,7 +1355,6 @@ class FieldDataOps:
         f = NumericMemField(session, cls.dtype_to_str(r.dtype))
         f.data.write(r)
         return f
-
 
     @classmethod
     def numeric_floordiv(cls, session, first, second):
@@ -1322,6 +1373,41 @@ class FieldDataOps:
         f.data.write(r)
         return f
 
+    @classmethod
+    def numeric_mod(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data % second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
+    @classmethod
+    def numeric_divmod(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r1, r2 = np.divmod(first_data, second_data)
+        f1 = NumericMemField(session, cls.dtype_to_str(r1.dtype))
+        f1.data.write(r1)
+        f2 = NumericMemField(session, cls.dtype_to_str(r2.dtype))
+        f2.data.write(r2)
+        return f1, f2
 
     @classmethod
     def numeric_and(cls, session, first, second):
@@ -1340,6 +1426,22 @@ class FieldDataOps:
         f.data.write(r)
         return f
 
+    @classmethod
+    def numeric_xor(cls, session, first, second):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        if isinstance(second, Field):
+            second_data = second.data[:]
+        else:
+            second_data = second
+
+        r = first_data ^ second_data
+        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
 
     @classmethod
     def numeric_or(cls, session, first, second):
