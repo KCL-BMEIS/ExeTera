@@ -443,3 +443,14 @@ class TestMemoryFields(unittest.TestCase):
         a2 = np.array([5, 4, 3, 2], dtype=np.int32)
         self._execute_memory_field_test(a1, a2, 1, lambda x, y: x > y)
 
+    def test_categorical_remap(self):
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            foo = df.create_categorical('foo', 'int8', {b'a': 1, b'b': 2})
+            foo.data.write(np.array([1, 2, 2, 1], dtype='int8'))
+            bar = foo.remap([(1, 0), (2, 1)], {b'a': 0, b'b': 1})
+            print(bar.data[:])
+            print(bar.keys)

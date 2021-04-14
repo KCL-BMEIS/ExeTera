@@ -567,6 +567,23 @@ class CategoricalMemField(MemoryField):
     def get_spans(self):
         return ops.get_spans_for_field(self.data[:])
 
+    # Note: key is presented as value: str, even though the dictionary must be presented
+    # as str: value
+    @property
+    def keys(self):
+        kv = self._keys.values()
+        kn = self._keys.keys()
+        keys = dict(zip(kv, kn))
+        return keys
+
+    def remap(self, key_map, new_key):
+        values = self.data[:]
+        for k in key_map:
+            values = np.where(values == k[0], k[1], values)
+        result = CategoricalMemField(self._session, self._nformat, new_key)
+        result.data.write(values)
+        return result
+
     def apply_filter(self, filter_to_apply, dstfld=None):
         result = self.data[filter_to_apply]
         dstfld = self if dstfld is None else dstfld
@@ -994,6 +1011,7 @@ class CategoricalField(HDF5Field):
     def __init__(self, session, group,
                  name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
+        self._nformat = self._field.attrs['nformat']
 
     def writeable(self):
         return CategoricalField(self._session, self._field, write_enabled=True)
@@ -1030,6 +1048,10 @@ class CategoricalField(HDF5Field):
     def get_spans(self):
         return ops.get_spans_for_field(self.data[:])
 
+    @property
+    def nformat(self):
+        return self._nformat
+
     # Note: key is presented as value: str, even though the dictionary must be presented
     # as str: value
     @property
@@ -1039,8 +1061,13 @@ class CategoricalField(HDF5Field):
         keys = dict(zip(kv, kn))
         return keys
 
-    def get_spans(self):
-        return ops.get_spans_for_field(self.data[:])
+    def remap(self, key_map, new_key):
+        values = self.data[:]
+        for k in key_map:
+            values = np.where(values == k[0], k[1], values)
+        result = CategoricalMemField(self._session, self._nformat, new_key)
+        result.data.write(values)
+        return result
 
     def apply_filter(self, filter_to_apply, dstfld=None):
         array = self.data[:]
