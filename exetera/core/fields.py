@@ -754,10 +754,11 @@ class NumericField(HDF5Field):
         return dstfld
 
     def __add__(self, second):
-        raise NotImplementedError()
+        return FieldDataOps.numeric_add(self._session, self, second)
 
     def __radd__(self, first):
-        raise NotImplementedError()
+        return FieldDataOps.numeric_add(self._session, first, self)
+
 
 
 class CategoricalField(HDF5Field):
@@ -1119,6 +1120,19 @@ class DateImporter:
 
 
 # Operation implementations
+
+
+def as_field(data, key=None):
+    if np.issubdtype(data.dtype, np.number):
+        if key is None:
+            r = NumericMemField(None, data.dtype)
+            r.data.write(data)
+            return r
+        else:
+            raise NotImplementedError()
+    else:
+        raise NotImplementedError()
+
 
 class FieldDataOps:
 

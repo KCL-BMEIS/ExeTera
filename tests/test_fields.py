@@ -240,12 +240,21 @@ class TestMemoryFields(unittest.TestCase):
 
     def test_write_to_memory_field(self):
 
-        v = np.array([1, 2, 3, 4], dtype=np.int32)
-        print(v.dtype)
+        a1 = np.array([1, 2, 3, 4], dtype=np.int32)
+        a2 = np.array([2, 3, 4, 5], dtype=np.int32)
 
         s = session.Session()
         f1 = fields.NumericMemField(s, 'int32')
         f2 = fields.NumericMemField(s, 'int32')
-        f1.data.write(np.array([1, 2, 3, 4], dtype=np.int32))
-        f2.data.write(np.array([2, 3, 4, 5], dtype=np.int32))
+        f1.data.write(a1)
+        f2.data.write(a2)
+
         print((f1 + f2).data[:])
+
+        print((f1 + a2).data[:])
+
+        print((fields.as_field(a1) + f2).data[:])
+
+        print((f1 + 1).data[:])
+
+        print((1 + f2).data[:])
