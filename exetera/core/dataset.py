@@ -25,7 +25,7 @@ class HDF5Dataset(Dataset):
         for group in self._file.keys():
             h5group = self._file[group]
             dataframe = edf.HDF5DataFrame(self, group, h5group=h5group)
-            self._dataframes[name] = dataframe
+            self._dataframes[group] = dataframe
 
     @property
     def session(self):
@@ -62,12 +62,12 @@ class HDF5Dataset(Dataset):
         :param name: optional- change the dataframe name
         """
         dname = dataframe.name if name is None else name
-        self._file.copy(dataframe.h5group, self._file, name=dname)
+        self._file.copy(dataframe._h5group, self._file, name=dname)
         df = edf.HDF5DataFrame(self, dname, h5group=self._file[dname])
         self._dataframes[dname] = df
 
     def __contains__(self, name):
-        return self._dataframes.__contains__(name)
+        return name in self._dataframes
 
     def contains_dataframe(self, dataframe):
         """
