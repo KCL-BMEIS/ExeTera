@@ -11,7 +11,36 @@ from exetera.core import dataframe
 from exetera.core import persistence as per
 
 
-class TestSessionLoadExisting(unittest.TestCase):
+class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
+
+    def test_create_then_load_categorical(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            with h5py.File(bio, 'w') as src:
+                df = src.create_group('df')
+                f = s.create_categorical(df, 'foo', 'int8', {'a': 1, 'b': 2})
+                f.data.write(np.array([1, 2, 1, 2]))
+
+        with session.Session() as s:
+            with h5py.File(bio, 'r') as src:
+                f = s.get(src['df']['foo'])
+                self.assertDictEqual({1: b'a', 2: b'b'}, f.keys)
+
+
+class TestCreateThenLoadBetweenSessionsNew(unittest.TestCase):
+
+    def test_create_then_load_categorical(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = s.create_categorical(df, 'foo', 'int8', {'a': 1, 'b': 2})
+            f.data.write(np.array([1, 2, 1, 2]))
+
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'r', 'src')
+            f = s.get(src['df']['foo'])
+            self.assertDictEqual({1: b'a', 2: b'b'}, f.keys)
 
     def test_create_new_then_load(self):
         bio1 = BytesIO()

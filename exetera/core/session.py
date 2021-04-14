@@ -907,7 +907,8 @@ class Session(AbstractSession):
                                  "{} was passed to it".format(type(group)))
 
         if isinstance(group, h5py.Group):
-            return fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
+            fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
+            return fld.IndexedStringField(self, group[name], write_enabled=True)
         else:
             return group.create_indexed_string(name, timestamp, chunksize)
 
@@ -931,7 +932,8 @@ class Session(AbstractSession):
                 raise ValueError("'group' must be an Exetera DataFrame but a "
                                  "{} was passed to it".format(type(group)))
         if isinstance(group, h5py.Group):
-            return fld.fixed_string_field_constructor(self, group, name, timestamp, chunksize)
+            fld.fixed_string_field_constructor(self, group, name, length, timestamp, chunksize)
+            return fld.FixedStringField(self, group[name], write_enabled=True)
         else:
             return group.create_fixed_string(name, length, timestamp, chunksize)
 
@@ -960,7 +962,8 @@ class Session(AbstractSession):
                                  "{} was passed to it".format(type(group)))
 
         if isinstance(group, h5py.Group):
-            return fld.categorical_field_constructor(self, group, name, timestamp, chunksize)
+            fld.categorical_field_constructor(self, group, name, nformat, key, timestamp, chunksize)
+            return fld.CategoricalField(self, group[name], write_enabled=True)
         else:
             return group.create_categorical(name, nformat, key, timestamp, chunksize)
 
@@ -987,7 +990,8 @@ class Session(AbstractSession):
                                  "{} was passed to it".format(type(group)))
 
         if isinstance(group, h5py.Group):
-            return fld.numeric_field_constructor(self.group, name, timestamp, chunksize)
+            fld.numeric_field_constructor(self, group, name, nformat, timestamp, chunksize)
+            return fld.NumericField(self, group[name], write_enabled=True)
         else:
             return group.create_numeric(name, nformat, timestamp, chunksize)
 
@@ -1004,7 +1008,8 @@ class Session(AbstractSession):
                                  "{} was passed to it".format(type(group)))
 
         if isinstance(group, h5py.Group):
-            return fld.categorical_field_constructor(self, group, name, timestamp, chunksize)
+            fld.categorical_field_constructor(self, group, name, timestamp, chunksize)
+            return fld.TimestampField(self, group[name], write_enabled=True)
         else:
             return group.create_timestamp(name, timestamp, chunksize)
 
