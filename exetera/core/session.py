@@ -987,7 +987,7 @@ class Session(AbstractSession):
                                  "{} was passed to it".format(type(group)))
 
         if isinstance(group, h5py.Group):
-            return fld.numeric_field_constructor(self.group, name, timestamp, chunksize)
+            return fld.numeric_field_constructor(self, group, name, timestamp, chunksize)
         else:
             return group.create_numeric(name, nformat, timestamp, chunksize)
 
