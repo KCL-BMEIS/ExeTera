@@ -10,7 +10,7 @@
 # limitations under the License.
 
 import h5py
-from exetera.core.abstract_types import Dataset
+from exetera.core.abstract_types import DataFrame, Dataset
 from exetera.core import dataframe as edf
 
 
@@ -21,8 +21,11 @@ class HDF5Dataset(Dataset):
         self._session = session
         self._file = h5py.File(dataset_path, mode)
         self._dataframes = dict()
-        for subgrp in self._file.keys():
-            self.create_dataframe(subgrp, h5group=self._file[subgrp])
+
+        for group in self._file.keys():
+            h5group = self._file[group]
+            dataframe = edf.HDF5DataFrame(self, group, h5group=h5group)
+            self._dataframes[name] = dataframe
 
     @property
     def session(self):
@@ -31,21 +34,22 @@ class HDF5Dataset(Dataset):
     def close(self):
         self._file.close()
 
-    def create_dataframe(self, name, dataframe: dict = None, h5group: h5py.Group = None):
+    def create_dataframe(self, name, columns: dict = None, dataframe: DataFrame = None):
         """
         Create a group object in HDF5 file and a Exetera dataframe in memory.
 
         :param name: name of the dataframe, or the group name in HDF5
-        :param dataframe: optional - replicate data from another dictionary
-        :param h5group: optional - acquire data from h5group object directly, the h5group needs to have a
-                        h5group<-group-dataset structure, the group has a 'fieldtype' attribute
-                         and the dataset is named 'values'.
+        :param columns: optional - replicate data from another dictionary
+        :param dataframe: optional - copy an existing dataframe
+        This parameter should not in general be used by the end-user of this API.
         :return: a dataframe object
         """
-        if h5group is None:
-            self._file.create_group(name)
-            h5group = self._file[name]
-        dataframe = edf.HDF5DataFrame(self, name, h5group, dataframe)
+        if columns is not None and dataframe is not None:
+            raise ValueError("At most one of 'columns' and 'dataframe' can be provided")
+
+        self._file.create_group(name)
+        h5group = self._file[name]
+        dataframe = edf.HDF5DataFrame(self, name, h5group, columns)
         self._dataframes[name] = dataframe
         return dataframe
 

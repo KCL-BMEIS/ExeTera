@@ -38,34 +38,36 @@ class TestDataSet(unittest.TestCase):
     def test_dataset_init_with_data(self):
         bio = BytesIO()
         with session.Session() as s:
-            h5file = h5py.File(bio,'w')
-            h5file.create_group("grp1") #dataframe
-            num1 = h5file["grp1"].create_group('num1') #field
-            num1.attrs['fieldtype'] = 'numeric,{}'.format('uint32')
-            num1.attrs['nformat'] = 'uint32'
-            ds=num1.create_dataset('values',(5,),dtype='uint32')
-            ds[:]=np.array([0,1,2,3,4])
+            h5file = h5py.File(bio, 'w')
+            hgrp1 = h5file.create_group("grp1") #dataframe
+            num1 = s.create_numeric(hgrp1, 'num1', 'uint32')
+            num1.data.write(np.array([0, 1, 2, 3, 4]))
+            # num1 = h5file["grp1"].create_group('num1') #field
+            # num1.attrs['fieldtype'] = 'numeric,{}'.format('uint32')
+            # num1.attrs['nformat'] = 'uint32'
+            # ds=num1.create_dataset('values', (5,), dtype='uint32')
+            # ds[:]=np.array([0, 1, 2, 3, 4])
             h5file.close()
 
             #read existing datafile
-            dst=s.open_dataset(bio,'r+','dst')
-            self.assertTrue(isinstance(dst['grp1'],DataFrame))
-            self.assertEqual(s.get(dst['grp1']['num1']).data[:].tolist(),[0,1,2,3,4])
+            dst=s.open_dataset(bio, 'r+', 'dst')
+            self.assertTrue(isinstance(dst['grp1'], DataFrame))
+            self.assertEqual(s.get(dst['grp1']['num1']).data[:].tolist(), [0, 1, 2, 3, 4])
             #add dataframe
             bio2 = BytesIO()
-            ds2 = s.open_dataset(bio2,'w','ds2')
+            ds2 = s.open_dataset(bio2, 'w', 'ds2')
             df2=ds2.create_dataframe('df2')
-            fs=df2.create_fixed_string('fs',1)
-            fs.data.write([b'a',b'b',b'c',b'd'])
+            fs=df2.create_fixed_string('fs', 1)
+            fs.data.write([b'a', b'b', b'c', b'd'])
 
             dst.add(df2)
-            self.assertTrue(isinstance(dst['df2'],DataFrame))
-            self.assertEqual([b'a',b'b',b'c',b'd'],dst['df2']['fs'].data[:].tolist())
+            self.assertTrue(isinstance(dst['df2'], DataFrame))
+            self.assertEqual([b'a', b'b', b'c', b'd'], dst['df2']['fs'].data[:].tolist())
 
             #del dataframe
             del dst['df2'] #only 'grp1' left
-            self.assertTrue(len(dst.keys())==1)
-            self.assertTrue(len(dst._file.keys())==1)
+            self.assertTrue(len(dst.keys()) == 1)
+            self.assertTrue(len(dst._file.keys()) == 1)
 
             #set dataframe
             dst['grp1']=df2
