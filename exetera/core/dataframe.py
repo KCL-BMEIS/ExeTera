@@ -68,7 +68,8 @@ class HDF5DataFrame(DataFrame):
 
     def create_group(self, name):
         """
-        Create a group object in HDF5 file for field to use.
+        Create a group object in HDF5 file for field to use. Please note, this function is for
+        backwards compatibility with older scripts and should not be used in the general case.
 
         :param name: the name of the group and field
         :return: a hdf5 group object
