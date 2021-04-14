@@ -238,10 +238,20 @@ class TestFieldArray(unittest.TestCase):
 
 class TestMemoryFields(unittest.TestCase):
 
-    def test_memory_field_addition(self):
+    def _execute_memory_field_test(self, a1, a2, scalar, function):
 
-        a1 = np.array([1, 2, 3, 4], dtype=np.int32)
-        a2 = np.array([2, 3, 4, 5], dtype=np.int32)
+        def test_simple(expected, actual):
+            self.assertListEqual(expected.tolist(), actual.data[:].tolist())
+
+        def test_tuple(expected, actual):
+            self.assertListEqual(expected[0].tolist(), actual[0].data[:].tolist())
+            self.assertListEqual(expected[1].tolist(), actual[1].data[:].tolist())
+
+        expected = function(a1, a2)
+        expected_scalar = function(a1, scalar)
+        expected_rscalar = function(scalar, a2)
+
+        test_equal = test_tuple if isinstance(expected, tuple) else test_simple
 
         s = session.Session()
         f1 = fields.NumericMemField(s, 'int32')
@@ -249,17 +259,14 @@ class TestMemoryFields(unittest.TestCase):
         f1.data.write(a1)
         f2.data.write(a2)
 
-        print((f1 + f2).data[:])
+        test_equal(expected, function(f1, f2))
+        test_equal(expected, function(f1, a2))
+        test_equal(expected, function(fields.as_field(a1), f2))
+        test_equal(expected_scalar, function(f1, 1))
+        test_equal(expected_rscalar, function(1, f2))
 
-        print((f1 + a2).data[:])
 
-        print((fields.as_field(a1) + f2).data[:])
-
-        print((f1 + 1).data[:])
-
-        print((1 + f2).data[:])
-
-    def _execute_test(self, a1, a2, scalar, function):
+    def _execute_field_test(self, a1, a2, scalar, function):
 
         def test_simple(expected, actual):
             self.assertListEqual(expected.tolist(), actual.data[:].tolist())
@@ -314,59 +321,69 @@ class TestMemoryFields(unittest.TestCase):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
-        self._execute_test(a1, a2, 1, lambda x, y: x + y)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x + y)
+        self._execute_field_test(a1, a2, 1, lambda x, y: x + y)
 
     def test_mixed_field_sub(self):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
-        self._execute_test(a1, a2, 1, lambda x, y: x - y)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x - y)
+        self._execute_field_test(a1, a2, 1, lambda x, y: x - y)
 
     def test_mixed_field_mul(self):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
-        self._execute_test(a1, a2, 1, lambda x, y: x * y)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x * y)
+        self._execute_field_test(a1, a2, 1, lambda x, y: x * y)
 
     def test_mixed_field_div(self):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
-        self._execute_test(a1, a2, 1, lambda x, y: x / y)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x / y)
+        self._execute_field_test(a1, a2, 1, lambda x, y: x / y)
 
     def test_mixed_field_floordiv(self):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
-        self._execute_test(a1, a2, 1, lambda x, y: x // y)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x // y)
+        self._execute_field_test(a1, a2, 1, lambda x, y: x // y)
 
     def test_mixed_field_mod(self):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
-        self._execute_test(a1, a2, 1, lambda x, y: x % y)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x % y)
+        self._execute_field_test(a1, a2, 1, lambda x, y: x % y)
 
 
     def test_mixed_field_divmod(self):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
-        self._execute_test(a1, a2, 1, lambda x, y: divmod(x, y))
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: divmod(x, y))
+        self._execute_field_test(a1, a2, 1, lambda x, y: divmod(x, y))
 
     def test_mixed_field_and(self):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
-        self._execute_test(a1, a2, 1, lambda x, y: x & y)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x & y)
+        self._execute_field_test(a1, a2, 1, lambda x, y: x & y)
 
     def test_mixed_field_xor(self):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
-        self._execute_test(a1, a2, 1, lambda x, y: x ^ y)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x ^ y)
+        self._execute_field_test(a1, a2, 1, lambda x, y: x ^ y)
 
     def test_mixed_field_or(self):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
-        self._execute_test(a1, a2, 1, lambda x, y: x | y)
+        self._execute_memory_field_test(a1, a2, 1, lambda x, y: x | y)
+        self._execute_field_test(a1, a2, 1, lambda x, y: x | y)
