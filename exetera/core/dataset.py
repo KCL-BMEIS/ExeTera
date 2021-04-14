@@ -10,13 +10,25 @@
 # limitations under the License.
 
 import h5py
-from exetera.core.abstract_types import Dataset
+from exetera.core.abstract_types import Dataset,DataFrame
 from exetera.core import dataframe as edf
 
 
 class HDF5Dataset(Dataset):
 
     def __init__(self, session, dataset_path, mode, name):
+        """
+        Create a HDF5Dataset instance that contains dataframes. The dataframes are represented in a dict() with the
+        name(str) as a key. The construction should always be called by Session.open_dataset() otherwise the instance
+        is not included in Session.datasets. If the HDF5 datafile contains group, the content in loaded into dataframes.
+
+        :param session: The session instance to include this dataset to.
+        :param dataset_path: The path of HDF5 file.
+        :param mode: the mode in which the dataset should be opened. This is one of "r", "r+" or "w".
+        :param name: the name that is associated with this dataset. This can be used to retrieve the dataset when
+        calling :py:meth:`~session.Session.get_dataset`.
+        :return: A HDF5Dataset instance.
+        """
         self.name = name
         self._session = session
         self._file = h5py.File(dataset_path, mode)
@@ -26,9 +38,15 @@ class HDF5Dataset(Dataset):
 
     @property
     def session(self):
+        """
+        The session property interface.
+
+        :return: The _session instance.
+        """
         return self._session
 
     def close(self):
+        """Close the HDF5 file operations."""
         self._file.close()
 
     def create_dataframe(self, name, dataframe: dict = None, h5group: h5py.Group = None):
@@ -54,25 +72,32 @@ class HDF5Dataset(Dataset):
         Add an existing dataframe (from other dataset) to this dataset, write the existing group
         attributes and HDF5 datasets to this dataset.
 
-        :param dataframe: the dataframe to copy to this dataset
-        :param name: optional- change the dataframe name
+        :param dataframe: the dataframe to copy to this dataset.
+        :param name: optional- change the dataframe name.
+        :return: None if the operation is successful; otherwise throw Error.
         """
         dname = dataframe.name if name is None else name
         self._file.copy(dataframe.h5group, self._file, name=dname)
         df = edf.HDF5DataFrame(self, dname, h5group=self._file[dname])
         self._dataframes[dname] = df
 
-    def __contains__(self, name):
+    def __contains__(self, name: str):
+        """
+        Check if the name exists in this dataset.
+
+        :param name: Name of the dataframe to check.
+        :return: Boolean if the name exists.
+        """
         return self._dataframes.__contains__(name)
 
-    def contains_dataframe(self, dataframe):
+    def contains_dataframe(self, dataframe: DataFrame):
         """
         Check if a dataframe is contained in this dataset by the dataframe object itself.
 
         :param dataframe: the dataframe object to check
         :return: Ture or False if the dataframe is contained
         """
-        if not isinstance(dataframe, edf.DataFrame):
+        if not isinstance(dataframe, DataFrame):
             raise TypeError("The field must be a DataFrame object")
         else:
             for v in self._dataframes.values():
@@ -80,7 +105,12 @@ class HDF5Dataset(Dataset):
                     return True
             return False
 
-    def __getitem__(self, name):
+    def __getitem__(self, name: str):
+        """
+        Get the dataframe by dataset[dataframe_name].
+
+        :param name: The name of the dataframe to get.
+        """
         if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
         elif not self.__contains__(name):
@@ -88,12 +118,21 @@ class HDF5Dataset(Dataset):
         else:
             return self._dataframes[name]
 
-    def get_dataframe(self, name):
+    def get_dataframe(self, name: str):
+        """
+        Get the dataframe by dataset.get_dataframe(dataframe_name).
+
+        :param name: The name of the dataframe.
+        :return: The dataframe or throw Error if the name is not existed in this dataset.
+        """
         self.__getitem__(name)
 
-    def get_name(self, dataframe):
+    def get_name(self, dataframe: DataFrame):
         """
-        Get the name of the dataframe in this dataset.
+        If the dataframe exist in this dataset, return the name; otherwise return None.
+
+        :param dataframe: The dataframe instance to find the name.
+        :return: name (str) of the dataframe or None if dataframe not found in this dataset.
         """
         if not isinstance(dataframe, edf.DataFrame):
             raise TypeError("The field argument must be a DataFrame object.")
@@ -102,11 +141,15 @@ class HDF5Dataset(Dataset):
                 return name
         return None
 
-    def __setitem__(self, name, dataframe):
+    def __setitem__(self, name: str, dataframe: DataFrame):
         """
         Add an existing dataframe (from other dataset) to this dataset, the existing dataframe can from:
         1) this dataset, so perform a 'rename' operation, or;
         2) another dataset, so perform an 'add' or 'replace' operation
+
+        :param name: The name of the dataframe to store in this dataset.
+        :param dataframe: The dataframe instance to store in this dataset.
+        :return: None if the operation is successful; otherwise throw Error.
         """
         if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
@@ -120,7 +163,12 @@ class HDF5Dataset(Dataset):
                     self.__delitem__(name)
                 return self.add(dataframe, name)
 
-    def __delitem__(self, name):
+    def __delitem__(self, name: str):
+        """
+        Delete a dataframe by del dataset[name].
+        :param name: The name of dataframe to delete.
+        :return: Boolean if the dataframe is deleted.
+        """
         if not self.__contains__(name):
             raise ValueError("This dataframe does not contain the name to delete.")
         else:
@@ -128,9 +176,11 @@ class HDF5Dataset(Dataset):
             del self._file[name]
             return True
 
-    def delete_dataframe(self, dataframe):
+    def delete_dataframe(self, dataframe: DataFrame):
         """
-        Remove dataframe from this dataset by dataframe object.
+        Remove dataframe from this dataset by the dataframe object.
+        :param dataframe: The dataframe instance to delete.
+        :return: Boolean if the dataframe is deleted.
         """
         name = self.get_name(dataframe)
         if name is None:
@@ -139,19 +189,25 @@ class HDF5Dataset(Dataset):
             self.__delitem__(name)
 
     def keys(self):
+        """Return all dataframe names in this dataset."""
         return self._dataframes.keys()
 
     def values(self):
+        """Return all dataframe instance in this dataset."""
         return self._dataframes.values()
 
     def items(self):
+        """Return the (name, dataframe) tuple in this dataset."""
         return self._dataframes.items()
 
     def __iter__(self):
+        """Iteration through the dataframes stored in this dataset."""
         return iter(self._dataframes)
 
     def __next__(self):
+        """Next dataframe for iteration through dataframes stored."""
         return next(self._dataframes)
 
     def __len__(self):
+        """Return the number of dataframes stored in this dataset."""
         return len(self._dataframes)
