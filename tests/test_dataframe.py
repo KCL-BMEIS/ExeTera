@@ -18,8 +18,9 @@ class TestDataFrame(unittest.TestCase):
             df = dst.create_dataframe('dst')
             self.assertTrue(isinstance(df, dataframe.DataFrame))
             numf = df.create_numeric('numf', 'uint32')
-            fdf = {'numf': numf}
-            df2 = dst.create_dataframe('dst2', dataframe=fdf)
+            # fdf = {'numf': numf}
+            # df2 = dst.create_dataframe('dst2', dataframe=fdf)
+            df2 = dst.create_dataframe('dst2', dataframe=df)
             self.assertTrue(isinstance(df2, dataframe.DataFrame))
 
             # add & set & contains
@@ -48,15 +49,6 @@ class TestDataFrame(unittest.TestCase):
             df.delete_field(cat)
             self.assertFalse(df.contains_field(cat))
             self.assertIsNone(df.get_name(cat))
-
-    def test_dataframe_init_fromh5(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            ds=s.open_dataset(bio, 'w', 'ds')
-            dst = ds.create_dataframe('dst')
-            num=s.create_numeric(dst,'num', 'uint8')
-            num.data.write([1, 2, 3, 4, 5, 6, 7])
-            df = ds.create_dataframe('dst2', h5group=dst)
 
     def test_dataframe_create_field(self):
         bio = BytesIO()

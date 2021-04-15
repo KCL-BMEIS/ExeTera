@@ -21,8 +21,7 @@ class HDF5DataFrame(DataFrame):
     def __init__(self,
                  dataset: Dataset,
                  name: str,
-                 h5group: h5py.Group,
-                 dataframe: dict = None):
+                 h5group: h5py.Group):
         """
         Create a Dataframe object, that contains a dictionary of fields. User should always create dataframe by
         dataset.create_dataframe, otherwise the dataframe is not stored in the dataset.
@@ -41,13 +40,6 @@ class HDF5DataFrame(DataFrame):
         self._dataset = dataset
         self._h5group = h5group
 
-        if dataframe is not None:
-            if isinstance(dataframe, dict):
-                for k, v in dataframe.items():
-                    if not isinstance(k, str) or not isinstance(v, fld.Field):
-                        raise ValueError("If dataframe parameter is set, "
-                                         "must be a dictionary mapping strings to fields")
-                self._columns = dataframe
         for subg in h5group.keys():
             self._columns[subg] = dataset.session.get(h5group[subg])
 
@@ -87,7 +79,8 @@ class HDF5DataFrame(DataFrame):
 
     def create_group(self, name):
         """
-        Create a group object in HDF5 file for field to use.
+        Create a group object in HDF5 file for field to use. Please note, this function is for
+        backwards compatibility with older scripts and should not be used in the general case.
 
         :param name: the name of the group and field
         :return: a hdf5 group object
