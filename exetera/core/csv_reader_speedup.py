@@ -71,19 +71,24 @@ def main():
     # del orig_inds
     # del orig_vals
 
-    file_read_line_fast_csv(source)
 
     file_read_line_fast_csv(source)
 
+    file_read_line_fast_csv(source)
 
 
 # original csv reader
-def original_csv_read(source):
+def original_csv_read(source, column_inds=None, column_vals=None):
     time0 = time.time()
     with open(source) as f:
         csvf = csv.reader(f, delimiter=',', quotechar='"')
         for i_r, row in enumerate(csvf):
-            pass
+            if i_r == 0:
+                print(len(row))
+            for i_c in range(len(row)):
+                entry = row[i_c].encode()
+                column_inds[i_c][i_r+1] = column_inds[i_c][i_r] + len(entry)
+                column_vals[column_inds[i_c][i_r]:column_inds[i_c][i_r+1]] = entry
 
     # print('Original csv reader took {} s'.format(time.time() - time0))
 
@@ -149,6 +154,30 @@ def make_test_data(count, schema):
     df.to_csv('/home/ben/covid/benchmark_csv.csv', index_label='index')
 
 
+def make_test_data(count, schema):
+    """
+    [ {'name':name, 'type':'cat'|'float'|'fixed', 'values':(vals)} ]
+    """
+    import pandas as pd
+    rng = np.random.RandomState(12345678)
+    columns = {}
+    for s in schema:
+        if s['type'] == 'cat':
+            vals = s['vals']
+            arr = rng.randint(low=0, high=len(vals), size=count)
+            larr = [None] * count
+            for i in range(len(arr)):
+                larr[i] = vals[arr[i]]
+            columns[s['name']] = larr
+        elif s['type'] == 'float':
+            arr = rng.uniform(size=count)
+            columns[s['name']] = arr
+
+    df = pd.DataFrame(columns)
+    df.to_csv('/home/ben/covid/benchmark_csv.csv', index_label='index')
+
+
+
 @njit
 def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separator_value, newline_value):
     colcount = len(column_inds[0])
@@ -165,7 +194,6 @@ def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separ
     end_cell = False
     end_line = False
     escaped_literal_candidate = False
-
     cur_cell_start = column_inds[col_index, row_index] if row_index >= 0 else 0
     cur_cell_char_count = 0
     while True:
