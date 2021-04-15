@@ -215,5 +215,57 @@ def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separ
         if index == len(source):
             break
 
+
+"""
+original categories:
+"one", "two", "three", "four", "five"
+0    , 1    , 2      , 3     , 4
+
+sorted categories
+"five", "four", "one", "three", "two"
+
+sorted category map
+4, 3, 0, 2, 1
+
+lengths of sorted categories
+4, 4, 3, 5, 3
+
+sorted category indexed string
+
+scindex = [0, 4, 8, 11, 16, 19]
+scvalues = [fivefouronethreetwo]
+
+col_inds = value_index[col_index,...]
+
+def my_fast_categorical_mapper(...):
+    for e in range(len(rows_read)-1):
+        key_start = value_inds[col_index, e]
+        key_end = value_inds[col_index, e+1]
+        key_len = key_end - key_start
+    
+        for i in range(1, len(scindex)):
+            skeylen = scindex[i] - scindex[i - 1]
+            if skeylen == len(key):
+                index = i
+                for j in range(keylen):
+                    entry_start = scindex[i-1]
+                    if value_inds[col_index, key_start + j] != scvalues[entry_start + j]:
+                        index = -1
+                        break
+    
+            if index != -1:
+                destination_vals[e] = index
+               
+                    
+                
+            
+            
+
+
+
+
+
+"""
+
 if __name__ == "__main__":
     main()
