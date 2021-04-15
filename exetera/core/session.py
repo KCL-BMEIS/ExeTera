@@ -43,7 +43,7 @@ class Session(AbstractSession):
         is no longer required. In general, it should only be changed for testing.
         :param timestamp: Set the official timestamp for the Session's creation rather than taking
         the current date/time.
-        :return A newly created Session object
+        :return: A newly created Session object
         """
         if not isinstance(timestamp, str):
             error_str = "'timestamp' must be a string but is of type {}"

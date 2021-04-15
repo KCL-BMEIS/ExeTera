@@ -24,14 +24,16 @@ class HDF5DataFrame(DataFrame):
                  h5group: h5py.Group,
                  dataframe: dict = None):
         """
-        Create a Dataframe object, user should always call from dataset.create_dataframe.
+        Create a Dataframe object, that contains a dictionary of fields. User should always create dataframe by
+        dataset.create_dataframe, otherwise the dataframe is not stored in the dataset.
 
-        :param name: name of the dataframe, or the group name in HDF5
-        :param dataset: a dataset object, where this dataframe belongs to
-        :param h5group: acquire data from h5group object directly, the h5group needs to have a
-                        h5group<-group-dataset structure, the group has a 'fieldtype' attribute
-                         and the dataset is named 'values'.
-        :param dataframe: optional - replicate data from another dictionary
+        :param name: name of the dataframe.
+        :param dataset: a dataset object, where this dataframe belongs to.
+        :param h5group: the h5group object to store the fields. If the h5group is not empty, acquire data from h5group
+        object directly. The h5group structure is h5group<-h5group-dataset structure, the later group has a
+        'fieldtype' attribute and only one dataset named 'values'. So that the structure is mapped to
+        Dataframe<-Field-Field.data automatically.
+        :param dataframe: optional - replicate data from another dictionary of (name:str, field: Field).
         """
 
         self.name = name
@@ -51,17 +53,30 @@ class HDF5DataFrame(DataFrame):
 
     @property
     def columns(self):
+        """
+        The columns property interface.
+        """
         return dict(self._columns)
 
     @property
     def dataset(self):
+        """
+        The dataset property interface.
+        """
         return self._dataset
 
     @property
     def h5group(self):
+        """
+        The h5group property interface.
+        """
         return self._h5group
 
     def add(self, field, name=None):
+        """
+        Add a field to this dataframe.
+
+        """
         if name is not None:
             if not isinstance(name, str):
                 raise TypeError("The name must be a str object.")

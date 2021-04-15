@@ -211,3 +211,16 @@ class HDF5Dataset(Dataset):
     def __len__(self):
         """Return the number of dataframes stored in this dataset."""
         return len(self._dataframes)
+
+    @staticmethod
+    def copy(dataframe: DataFrame, dataset: Dataset, name: str):
+        dataset.add(dataframe,name=name)
+
+    @staticmethod
+    def move(dataframe: DataFrame, dataset: Dataset, name:str):
+        dataset.add(dataframe, name=name)
+        dataframe._dataset.delete_dataframe(dataframe)
+
+    @staticmethod
+    def drop(dataframe: DataFrame):
+        dataframe._dataset.delete_dataframe(dataframe)
