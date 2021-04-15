@@ -1011,7 +1011,7 @@ class CategoricalField(HDF5Field):
     def __init__(self, session, group,
                  name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
-        self._nformat = self._field.attrs['nformat']
+        self._nformat = self._field.attrs['nformat'] if 'nformat' in self._field.attrs else 'int8'
 
     def writeable(self):
         return CategoricalField(self._session, self._field, write_enabled=True)
