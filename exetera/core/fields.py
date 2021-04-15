@@ -547,7 +547,7 @@ class CategoricalMemField(MemoryField):
                                       ts, self.chunksize)
             return CategoricalField(self._session, group[name], write_enabled=True)
         else:
-            return group.create_numeric(name, nformat, keys, ts, self.chunksize)
+            return group.create_categorical(name, nformat, keys, ts, self.chunksize)
 
     @property
     def data(self):
