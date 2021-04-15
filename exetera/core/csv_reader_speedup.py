@@ -17,19 +17,64 @@ class Timer:
         print(self.end_msg + f' {time.time() - self.t0} seconds')
 
 
+# def generate_test_arrays(count):
+#     strings = [b'one', b'two', b'three', b'four', b'five', b'six', b'seven']
+#     raw_values = np.random.RandomState(12345678).randint(low=1, high=7, size=count)
+#     total_len = 0
+#     for r in raw_values:
+#         total_len += len(strings[r])
+#     indices = np.zeros(count+1, dtype=np.int64)
+#     values = np.zeros(total_len, dtype=np.int8)
+#     for i_r, r in enumerate(raw_values):
+#         indices[i_r+1] = indices[i_r] + len(strings[r])
+#         for i_c in range(len(strings[r])):
+#             values[indices[i_r]+i_c] = strings[r][i_c]
+#
+#     for i_r in range(20):
+#         start, end = indices[i_r], indices[i_r+1]
+#         print(values[start:end].tobytes())
+
+
 def main():
-    source = 'resources/assessment_input_small_data.csv' 
-    print(source)
-    # run once first
-    original_csv_read(source)
-    
+    # generate_test_arrays(1000)
+    col_dicts = [{'name': 'a', 'type': 'cat', 'vals': ('a', 'bb', 'ccc', 'dddd', 'eeeee')},
+                 {'name': 'b', 'type': 'float'},
+                 {'name': 'c', 'type': 'cat', 'vals': ('', '', '', '', '', 'True', 'False')},
+                 {'name': 'd', 'type': 'float'},
+                 {'name': 'e', 'type': 'float'},
+                 {'name': 'f', 'type': 'cat', 'vals': ('', '', '', '', '', 'True', 'False')},
+                 {'name': 'g', 'type': 'cat', 'vals': ('', '', '', '', 'True', 'False')},
+                 {'name': 'h', 'type': 'cat', 'vals': ('', '', '', 'No', 'Yes')}]
+    # make_test_data(100000, col_dicts)
+    #source = '/Users/lc21/Documents/KCL_BMEIS/ExeTera/resources/assessment_input_small_data.csv'
+
+    source = '/Users/frecar/Desktop/ExeTera/resources/assessment_input_sample_data.csv'
+
+    # print(source)
+    # # run once first
+    # orig_inds = []
+    # orig_vals = []
+    # for i in range(len(col_dicts)+1):
+    #     orig_inds.append(np.zeros(1000000, dtype=np.int64))
+    #     orig_vals.append(np.zeros(10000000, dtype='|S1'))
+    # original_csv_read(source, orig_inds, orig_vals)
+    # del orig_inds
+    # del orig_vals
+
+    # orig_inds = []
+    # orig_vals = []
+    # for i in range(len(col_dicts)+1):
+    #     orig_inds.append(np.zeros(1000000, dtype=np.int64))
+    #     orig_vals.append(np.zeros(10000000, dtype='|S1'))
     with Timer("Original csv reader took:"):
         original_csv_read(source)
+    # del orig_inds
+    # del orig_vals
 
     file_read_line_fast_csv(source)
-    with Timer("FAST Open file read lines took"):
-        file_read_line_fast_csv(source)
-    
+
+    file_read_line_fast_csv(source)
+
 
 
 # original csv reader
@@ -37,13 +82,12 @@ def original_csv_read(source):
     time0 = time.time()
     with open(source) as f:
         csvf = csv.reader(f, delimiter=',', quotechar='"')
-
         for i_r, row in enumerate(csvf):
             pass
 
     # print('Original csv reader took {} s'.format(time.time() - time0))
 
-    
+
 # FAST open file read line
 def file_read_line_fast_csv(source):
 
@@ -53,25 +97,60 @@ def file_read_line_fast_csv(source):
         content = f.read()
         count_rows = content.count('\n') + 1
 
-    content = np.fromfile(source, dtype='|S1')
+    content = np.fromfile(source, dtype='|S1')#np.uint8)
+    column_inds = np.zeros((count_columns, count_rows), dtype=np.int64)
+    column_vals = np.zeros((count_columns, count_rows * 25), dtype=np.uint8)
 
-    column_inds = np.zeros(count_rows * count_columns, dtype = np.int64).reshape(count_rows, count_columns)
+    # separator = np.frombuffer(b',', dtype='S1')[0][0]
+    # delimiter = np.frombuffer(b'"', dtype='S1')[0][0]
+    ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
+    SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
+    NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
+    # ESCAPE_VALUE = b'"'
+    # SEPARATOR_VALUE = b','
+    # NEWLINE_VALUE = b'\n'
+    with Timer("my_fast_csv_reader_int"):
+        #source = '/Users/lc21/Documents/KCL_BMEIS/ExeTera/resources/assessment_input_small_data.csv'
+        #source = '/Users/frecar/Desktop/ExeTera/resources/assessment_input_small_data.csv'
+        content = np.fromfile(source, dtype=np.uint8)
+        my_fast_csv_reader_int(content, column_inds, column_vals, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE)
 
-    my_fast_csv_reader_int(content, column_inds)
+    #a = get_cell(0,1,column_inds, column_vals)
 
-    for row in column_inds:
-        #print(row)
-        for i, e in enumerate(row):
-            pass
+    return column_inds, column_vals
+
+
+def get_cell(row,col, column_inds, column_vals):
+    start_row_index = column_inds[col][row]
+    end_row_index = column_inds[col][row+1]
+    return column_vals[col][start_row_index:end_row_index].tobytes()
+
+
+def make_test_data(count, schema):
+    """
+    [ {'name':name, 'type':'cat'|'float'|'fixed', 'values':(vals)} ]
+    """
+    import pandas as pd
+    rng = np.random.RandomState(12345678)
+    columns = {}
+    for s in schema:
+        if s['type'] == 'cat':
+            vals = s['vals']
+            arr = rng.randint(low=0, high=len(vals), size=count)
+            larr = [None] * count
+            for i in range(len(arr)):
+                larr[i] = vals[arr[i]]
+            columns[s['name']] = larr
+        elif s['type'] == 'float':
+            arr = rng.uniform(size=count)
+            columns[s['name']] = arr
+
+    df = pd.DataFrame(columns)
+    df.to_csv('/home/ben/covid/benchmark_csv.csv', index_label='index')
 
 
 @njit
-def my_fast_csv_reader_int(source, column_inds):
-    ESCAPE_VALUE = b'"' 
-    SEPARATOR_VALUE = b','
-    NEWLINE_VALUE = b'\n'    
-
-    #max_rowcount = len(column_inds) - 1
+def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separator_value, newline_value):
     colcount = len(column_inds[0])
 
     index = np.int64(0)
@@ -79,111 +158,59 @@ def my_fast_csv_reader_int(source, column_inds):
     cell_start_idx = np.int64(0)
     cell_end_idx = np.int64(0)
     col_index = np.int64(0)
-    row_index = np.int64(0)
+    row_index = np.int64(-1)
+    current_char_count = np.int32(0)
 
-    # how to parse csv
-    # . " is the escape character
-    # . fields that need to contain '"', ',' or '\n' must be quoted
-    # . while escaped
-    #   . ',' and '\n' are considered part of the field
-    #   . i.e. a,"b,c","d\ne","f""g"""
-    # . while not escaped
-    #   . ',' ends the cell and starts a new cell
-    #   . '\n' ends the cell and starts a new row
-    #     . after the first row, we should check that subsequent rows have the same cell count
     escaped = False
     end_cell = False
     end_line = False
     escaped_literal_candidate = False
+
+    cur_cell_start = column_inds[col_index, row_index] if row_index >= 0 else 0
+    cur_cell_char_count = 0
     while True:
+        write_char = False
+        end_cell = False
+        end_line = False
+
         c = source[index]
-        if c == SEPARATOR_VALUE:
-            if not escaped: #or escaped_literal_candidate:
-                # don't write this char
-                end_cell = True  
-                cell_end_idx = index
-                # while index + 1 < len(source) and source[index + 1] == ' ':
-                #     index += 1
-                
-
-            else:
-                # write literal ','
-                # cell_value.append(c)
-                pass
-
-        elif c == NEWLINE_VALUE:
-            if not escaped: #or escaped_literal_candidate:
-                # don't write this char
-                end_cell = True
-                end_line = True  
-                cell_end_idx = index
-            else:
-                # write literal '\n'
-                pass
-                #cell_value.append(c)
-
-        elif c == ESCAPE_VALUE:
-            # ,"... - start of an escaped cell
-            # ...", - end of an escaped cell
-            # ...""... - literal quote character
-            # otherwise error
+        if c == separator_value:
             if not escaped:
-                # this must be the first character of a cell
-                if index != cell_start_idx:
-                    # raise error!
-                    pass
-                # don't write this char
-                else:
-                    escaped = True
+                end_cell = True
             else:
+                write_char = True
 
-                escaped = False
-                # if escaped_literal_candidate:
-                #     escaped_literal_candidate = False
-                #     # literal quote character confirmed, write it
-                #     cell_value.append(c)
-                # else:
-                #     escaped_literal_candidate = True
-                #     # don't write this char
-
+        elif c == newline_value:
+            if not escaped:
+                end_cell = True
+                end_line = True
+            else:
+                write_char = True
+        elif c == escape_value:
+            escaped = not escaped
         else:
-            # cell_value.append(c)
-            pass
-        #     if escaped_literal_candidate:
-        #         # error!
-        #         pass
-        #         # raise error return -2
+            write_char = True
 
-        # parse c
-        index += 1
-          
+        if write_char and row_index >= 0:
+            column_vals[col_index, cur_cell_start + cur_cell_char_count] = c
+            cur_cell_char_count += 1
+
         if end_cell:
-            end_cell = False
-            #column_inds[col_index][row_index+1] =\
-            #    column_inds[col_index][row_index] + cell_end - cell_start
-            column_inds[row_index][col_index] = cell_end_idx
-
-            cell_start_idx = cell_end_idx + 1
-
-            col_index += 1
-
-    
-            if col_index == colcount:
-                if not end_line:
-                    raise Exception('.....')
-                else:
-                    end_line = False
-                    
+            if row_index >= 0:
+                column_inds[col_index, row_index+1] = cur_cell_start + cur_cell_char_count
+            if end_line:
                 row_index += 1
                 col_index = 0
+            else:
+                col_index += 1
 
+            cur_cell_start = column_inds[col_index, row_index]
+            cur_cell_char_count = 0
+
+        index += 1
 
         if index == len(source):
-            # "erase the partially written line"
-            return column_inds
-            #return line_start
-
-
+            break
 
 if __name__ == "__main__":
     main()

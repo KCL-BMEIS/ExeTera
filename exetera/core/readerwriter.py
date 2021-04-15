@@ -248,7 +248,11 @@ class IndexedStringWriter(Writer):
             self.ever_written = True
 
         for s in values:
-            evalue = s.encode()
+            if isinstance(s, str):
+                evalue = s.encode()
+            else:
+                evalue = s
+
             for v in evalue:
                 self.values[self.value_index] = v
                 self.value_index += 1
@@ -440,25 +444,24 @@ class NumericImporter:
         validity = np.zeros(len(values), dtype='bool')
         for i in range(len(values)):
             valid, value = self.parser(values[i], self.invalid_value)
-
             elements[i] = value
             validity[i] = valid
             
             if self.validation_mode == 'strict' and not valid: 
-                if self._is_blank_str(values[i]):
+                if self._is_blank(values[i]):
                     raise ValueError(f"Numeric value in the field '{self.field_name}' can not be empty in strict mode")  
                 else:        
                     raise ValueError(f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
 
-            if self.validation_mode == 'allow_empty' and not self._is_blank_str(values[i]) and not valid:
-                raise ValueError(f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
+            if self.validation_mode == 'allow_empty' and not self._is_blank(values[i]) and not valid:
+                raise ValueError(f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i]}")
 
         self.data_writer.write_part(elements)
         if self.flag_writer is not None:
             self.flag_writer.write_part(validity)
 
-    def _is_blank_str(self, value):
-        return type(value) == str and value.strip() == ''
+    def _is_blank(self, value):
+        return (isinstance(value, str) and value.strip() == '') or value == b''
 
     def flush(self):
         self.data_writer.flush()
