@@ -576,7 +576,6 @@ class DatasetImporter:
                     new_field_list[i_df].write_part(field_chunk_list[i_df][:chunk_index])
                     total.extend(field_chunk_list[i_df][:chunk_index])
 
-            print("====")
             print("i_df", i_df, Counter(total))
             for i_df in range(len(index_map)):
                 new_field_list[i_df].flush()

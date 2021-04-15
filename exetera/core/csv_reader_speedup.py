@@ -46,30 +46,10 @@ def main():
                  {'name': 'g', 'type': 'cat', 'vals': ('', '', '', '', 'True', 'False')},
                  {'name': 'h', 'type': 'cat', 'vals': ('', '', '', 'No', 'Yes')}]
     # make_test_data(100000, col_dicts)
-    #source = '/Users/lc21/Documents/KCL_BMEIS/ExeTera/resources/assessment_input_small_data.csv'
+    source = 'resources/assessment_input_small_data.csv'
 
-    source = '/Users/frecar/Desktop/ExeTera/resources/assessment_input_sample_data.csv'
-
-    # print(source)
-    # # run once first
-    # orig_inds = []
-    # orig_vals = []
-    # for i in range(len(col_dicts)+1):
-    #     orig_inds.append(np.zeros(1000000, dtype=np.int64))
-    #     orig_vals.append(np.zeros(10000000, dtype='|S1'))
-    # original_csv_read(source, orig_inds, orig_vals)
-    # del orig_inds
-    # del orig_vals
-
-    # orig_inds = []
-    # orig_vals = []
-    # for i in range(len(col_dicts)+1):
-    #     orig_inds.append(np.zeros(1000000, dtype=np.int64))
-    #     orig_vals.append(np.zeros(10000000, dtype='|S1'))
     with Timer("Original csv reader took:"):
         original_csv_read(source)
-    # del orig_inds
-    # del orig_vals
 
 
     file_read_line_fast_csv(source)
@@ -106,21 +86,15 @@ def file_read_line_fast_csv(source):
     column_inds = np.zeros((count_columns, count_rows), dtype=np.int64)
     column_vals = np.zeros((count_columns, count_rows * 25), dtype=np.uint8)
 
-    # separator = np.frombuffer(b',', dtype='S1')[0][0]
-    # delimiter = np.frombuffer(b'"', dtype='S1')[0][0]
+
     ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
     SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
     NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
-    # ESCAPE_VALUE = b'"'
-    # SEPARATOR_VALUE = b','
-    # NEWLINE_VALUE = b'\n'
+
     with Timer("my_fast_csv_reader_int"):
-        #source = '/Users/lc21/Documents/KCL_BMEIS/ExeTera/resources/assessment_input_small_data.csv'
-        #source = '/Users/frecar/Desktop/ExeTera/resources/assessment_input_small_data.csv'
+
         content = np.fromfile(source, dtype=np.uint8)
         my_fast_csv_reader_int(content, column_inds, column_vals, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE)
-
-    #a = get_cell(0,1,column_inds, column_vals)
 
     return column_inds, column_vals
 
@@ -229,6 +203,7 @@ def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separ
             if end_line:
                 row_index += 1
                 col_index = 0
+
             else:
                 col_index += 1
 
