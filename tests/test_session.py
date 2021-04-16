@@ -54,7 +54,7 @@ class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
             with h5py.File(bio, 'r') as src:
                 f = s.get(src['df']['foo'])
                 self.assertListEqual(contents, f.data[:].tolist())
-                self.assertDictEqual({1: 'a', 2: 'b'}, f.keys)
+                self.assertDictEqual({1: b'a', 2: b'b'}, f.keys)
 
     def test_create_then_load_numeric(self):
         bio = BytesIO()
@@ -100,7 +100,7 @@ class TestCreateThenLoadBetweenSessionsNew(unittest.TestCase):
         with session.Session() as s:
             src = s.open_dataset(bio, 'r', 'src')
             f = s.get(src['df']['foo'])
-            self.assertDictEqual({1: 'a', 2: 'b'}, f.keys)
+            self.assertDictEqual({1: b'a', 2: b'b'}, f.keys)
 
     def test_create_new_then_load(self):
         bio1 = BytesIO()
