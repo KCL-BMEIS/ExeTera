@@ -251,6 +251,18 @@ class TestFieldArray(unittest.TestCase):
 
 class TestMemoryFieldCreateLike(unittest.TestCase):
 
+
+    def test_categorical_create_like(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            foo = df.create_categorical('foo', 'int8', {b'a': 0, b'b': 1})
+            foo.data.write(np.array([0, 1, 1, 0]))
+            foo2 = foo.create_like(df, 'foo2')
+            foo2.data.write(foo)
+            self.assertListEqual([0, 1, 1, 0], foo2.data[:].tolist())
+
     def test_numeric_create_like(self):
         bio = BytesIO()
         with session.Session() as s:
@@ -465,12 +477,12 @@ class TestMemoryFields(unittest.TestCase):
             foo = df.create_categorical('foo', 'int8', {b'a': 1, b'b': 2})
             foo.data.write(np.array([1, 2, 2, 1], dtype='int8'))
             mbar = foo.remap([(1, 0), (2, 1)], {b'a': 0, b'b': 1})
-            print(mbar.data[:])
-            print(mbar.keys)
+            self.assertListEqual([0, 1, 1, 0], mbar.data[:].tolist())
+            self.assertDictEqual({0: b'a', 1: b'b'}, mbar.keys)
             bar = mbar.create_like(df, 'bar')
             bar.data.write(mbar)
-            print(bar.data[:])
-            print(bar.keys)
+            self.assertListEqual([0, 1, 1, 0], mbar.data[:].tolist())
+            self.assertDictEqual({0: b'a', 1: b'b'}, mbar.keys)
 
 
 class TestFieldApplyFilter(unittest.TestCase):
@@ -554,6 +566,71 @@ class TestFieldApplyFilter(unittest.TestCase):
             mb = b.apply_filter(filt)
             self.assertListEqual(expected, mb.data[:].tolist())
 
+    def test_categorical_apply_filter(self):
+        data = np.array([0, 1, 2, 0, 1, 2, 2, 1, 0], dtype=np.int32)
+        keys = {b'a': 0, b'b': 1, b'c': 2}
+        filt = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0], dtype=bool)
+        expected = [1, 0, 2, 1]
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_categorical('foo', 'int8', keys)
+            f.data.write(data)
+            self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+            g = f.apply_filter(filt, in_place=True)
+            self.assertListEqual(expected, f.data[:].tolist())
+
+            mf = fields.CategoricalMemField(s, 'int8', keys)
+            mf.data.write(data)
+            self.assertListEqual(data.tolist(), mf.data[:].tolist())
+
+            mf.apply_filter(filt, in_place=True)
+            self.assertListEqual(expected, mf.data[:].tolist())
+
+            b = df.create_categorical('bar', 'int8', keys)
+            b.data.write(data)
+            self.assertListEqual(data.tolist(), b.data[:].tolist())
+
+            mb = b.apply_filter(filt)
+            self.assertListEqual(expected, mb.data[:].tolist())
+
+    def test_timestamp_apply_filter(self):
+        from datetime import datetime as D
+        data = [D(2020, 1, 1), D(2021, 5, 18), D(2950, 8, 17), D(1840, 10, 11),
+                D(2110, 11, 1), D(2002, 3, 3), D(2018, 2, 28), D(2400, 9, 1)]
+        data = np.asarray([d.timestamp() for d in data], dtype=np.float64)
+        filt = np.array([0, 1, 0, 1, 0, 1, 0, 1], dtype=bool)
+        expected = data[filt].tolist()
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_timestamp('foo')
+            f.data.write(data)
+            self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+            g = f.apply_filter(filt, in_place=True)
+            self.assertListEqual(expected, f.data[:].tolist())
+
+            mf = fields.TimestampMemField(s)
+            mf.data.write(data)
+            self.assertListEqual(data.tolist(), mf.data[:].tolist())
+
+            mf.apply_filter(filt, in_place=True)
+            self.assertListEqual(expected, mf.data[:].tolist())
+
+            b = df.create_timestamp('bar')
+            b.data.write(data)
+            self.assertListEqual(data.tolist(), b.data[:].tolist())
+
+            mb = b.apply_filter(filt)
+            self.assertListEqual(expected, mb.data[:].tolist())
+
+
 
 class TestFieldApplyIndex(unittest.TestCase):
 
@@ -607,6 +684,35 @@ class TestFieldApplyIndex(unittest.TestCase):
             self.assertListEqual(expected_filt_values, mb.values[:].tolist())
             self.assertListEqual(expected_filt_data, mb.data[:])
 
+    def test_fixed_string_apply_index(self):
+        data = np.array([b'a', b'bb', b'ccc', b'dddd', b'eeee', b'fff', b'gg', b'h'], dtype='S4')
+        indices = np.array([7, 0, 6, 1, 5, 2, 4, 3], dtype=np.int32)
+        expected = [b'h', b'a', b'gg', b'bb', b'fff', b'ccc', b'eeee', b'dddd']
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_fixed_string('foo', 4)
+            f.data.write(data)
+            self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+            g = f.apply_index(indices, in_place=True)
+            self.assertListEqual(expected, f.data[:].tolist())
+
+            mf = fields.FixedStringMemField(s, 4)
+            mf.data.write(data)
+            self.assertListEqual(data.tolist(), mf.data[:].tolist())
+
+            mf.apply_index(indices, in_place=True)
+            self.assertListEqual(expected, mf.data[:].tolist())
+
+            b = df.create_fixed_string('bar', 4)
+            b.data.write(data)
+            self.assertListEqual(data.tolist(), b.data[:].tolist())
+
+            mb = b.apply_index(indices)
+            self.assertListEqual(expected, mb.data[:].tolist())
+
     def test_numeric_apply_index(self):
         data = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9], dtype='int32')
         indices = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
@@ -636,6 +742,68 @@ class TestFieldApplyIndex(unittest.TestCase):
             mb = b.apply_index(indices)
             self.assertListEqual(expected, mb.data[:].tolist())
 
+    def test_categorical_apply_index(self):
+        data = np.array([0, 1, 2, 0, 1, 2, 2, 1, 0], dtype=np.int32)
+        keys = {b'a': 0, b'b': 1, b'c': 2}
+        indices = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
+        expected = [0, 0, 1, 1, 2, 2, 2, 0, 1]
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_categorical('foo', 'int8', keys)
+            f.data.write(data)
+            self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+            g = f.apply_index(indices, in_place=True)
+            self.assertListEqual(expected, f.data[:].tolist())
+
+            mf = fields.CategoricalMemField(s, 'int8', keys)
+            mf.data.write(data)
+            self.assertListEqual(data.tolist(), mf.data[:].tolist())
+
+            mf.apply_index(indices, in_place=True)
+            self.assertListEqual(expected, mf.data[:].tolist())
+
+            b = df.create_categorical('bar', 'int8', keys)
+            b.data.write(data)
+            self.assertListEqual(data.tolist(), b.data[:].tolist())
+
+            mb = b.apply_index(indices)
+            self.assertListEqual(expected, mb.data[:].tolist())
+
+    def test_timestamp_apply_index(self):
+        from datetime import datetime as D
+        data = [D(2020, 1, 1), D(2021, 5, 18), D(2950, 8, 17), D(1840, 10, 11),
+                D(2110, 11, 1), D(2002, 3, 3), D(2018, 2, 28), D(2400, 9, 1)]
+        data = np.asarray([d.timestamp() for d in data], dtype=np.float64)
+        indices = np.array([7, 0, 6, 1, 5, 2, 4, 3], dtype=np.int32)
+        expected = data[indices].tolist()
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_timestamp('foo', 'int32')
+            f.data.write(data)
+            self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+            g = f.apply_index(indices, in_place=True)
+            self.assertListEqual(expected, f.data[:].tolist())
+
+            mf = fields.TimestampMemField(s)
+            mf.data.write(data)
+            self.assertListEqual(data.tolist(), mf.data[:].tolist())
+
+            mf.apply_index(indices, in_place=True)
+            self.assertListEqual(expected, mf.data[:].tolist())
+
+            b = df.create_timestamp('bar')
+            b.data.write(data)
+            self.assertListEqual(data.tolist(), b.data[:].tolist())
+
+            mb = b.apply_index(indices)
+            self.assertListEqual(expected, mb.data[:].tolist())
+
 
 class TestFieldCreateLike(unittest.TestCase):
 
@@ -654,6 +822,21 @@ class TestFieldCreateLike(unittest.TestCase):
             self.assertIsInstance(g, fields.IndexedStringMemField)
             self.assertEqual(0, len(g.data))
 
+    def test_fixed_string_field_create_like(self):
+        data = np.asarray([b'a', b'bb', b'ccc', b'dddd'], dtype='S4')
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_fixed_string('foo', 4)
+            f.data.write(data)
+            self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+            g = f.create_like(None, None)
+            self.assertIsInstance(g, fields.FixedStringMemField)
+            self.assertEqual(0, len(g.data))
+
     def test_numeric_field_create_like(self):
         data = np.asarray([1, 2, 3, 4], dtype=np.int32)
 
@@ -667,4 +850,37 @@ class TestFieldCreateLike(unittest.TestCase):
 
             g = f.create_like(None, None)
             self.assertIsInstance(g, fields.NumericMemField)
+            self.assertEqual(0, len(g.data))
+
+    def test_categorical_field_create_like(self):
+        data = np.asarray([0, 1, 1, 0], dtype=np.int8)
+        key = {b'a': 0, b'b': 1}
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_categorical('foo', 'int8', key)
+            f.data.write(data)
+            self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+            g = f.create_like(None, None)
+            self.assertIsInstance(g, fields.CategoricalMemField)
+            self.assertEqual(0, len(g.data))
+
+    def test_timestamp_field_create_like(self):
+        from datetime import datetime as D
+        data = [D(2020, 1, 1), D(2021, 5, 18), D(2950, 8, 17), D(1840, 10, 11)]
+        data = np.asarray([d.timestamp() for d in data], dtype=np.float64)
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_timestamp('foo')
+            f.data.write(data)
+            self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+            g = f.create_like(None, None)
+            self.assertIsInstance(g, fields.TimestampMemField)
             self.assertEqual(0, len(g.data))

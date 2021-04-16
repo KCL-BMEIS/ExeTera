@@ -73,6 +73,7 @@ class MemoryField(Field):
     def __init__(self, session):
         super().__init__()
         self._session = session
+        self._write_enabled = True
         self._value_wrapper = None
 
     @property
@@ -393,7 +394,6 @@ class IndexedStringMemField(MemoryField):
         self._data_wrapper = None
         self._index_wrapper = None
         self._value_wrapper = None
-        self._write_enabled = True
 
     def writeable(self):
         return self
@@ -476,12 +476,76 @@ class IndexedStringMemField(MemoryField):
         return FieldDataOps.apply_index_to_indexed_field(self, index_to_apply, target, in_place)
 
 
+class FixedStringMemField(MemoryField):
+    def __init__(self, session, length):
+        super().__init__(session)
+        # TODO: caution; we may want to consider the issues with long-lived field instances getting
+        # out of sync with their stored counterparts. Maybe a revision number of the stored field
+        # is required that we can check to see if we are out of date. That or just make this a
+        # property and have it always look the value up
+        self._length = length
+
+    def writeable(self):
+        return FixedStringField(self._session, self._field, write_enabled=True)
+
+    def create_like(self, group, name, timestamp=None):
+        return FieldDataOps.fixed_string_field_create_like(self, group, name, timestamp)
+
+    @property
+    def data(self):
+        if self._value_wrapper is None:
+            self._value_wrapper = MemoryFieldArray("S{}".format(self._length))
+        return self._value_wrapper
+
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return np.all(np.char.compare_chararrays(data[:-1], data[1:], "<=", False))
+
+    def __len__(self):
+        return len(self.data)
+
+    def get_spans(self):
+        return ops.get_spans_for_field(self.data[:])
+
+    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+        """
+        Apply a boolean filter to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the filtered data is written to.
+
+        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The filtered field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
+
+    def apply_index(self, index_to_apply, target=None, in_place=False):
+        """
+        Apply an index to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param: index_to_apply: a Field or numpy array that contains the indices
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The reindexed field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
+
+
 class NumericMemField(MemoryField):
     def __init__(self, session, nformat):
         super().__init__(session)
         self._nformat = nformat
-        # TODO: this is a hack, we should have a property on the interface of Field
-        self._write_enabled = True
 
 
     def writeable(self):
@@ -624,21 +688,12 @@ class CategoricalMemField(MemoryField):
         super().__init__(session)
         self._nformat = nformat
         self._keys = keys
-        self._write_enabled = True
 
     def writeable(self):
         return self
 
     def create_like(self, group, name, timestamp=None):
-        ts = timestamp
-        nformat = self._nformat
-        keys = self._keys
-        if isinstance(group, h5py.Group):
-            numeric_field_constructor(self._session, group, name, nformat, keys,
-                                      ts, self.chunksize)
-            return CategoricalField(self._session, group[name], write_enabled=True)
-        else:
-            return group.create_categorical(name, nformat, keys, ts, self.chunksize)
+        return FieldDataOps.categorical_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
@@ -717,6 +772,127 @@ class CategoricalMemField(MemoryField):
         return FieldDataOps.equal(self._session, self, value)
 
     def __ne__(self, value):
+        return FieldDataOps.not_equal(self._session, self, value)
+
+    def __gt__(self, value):
+        return FieldDataOps.greater_than(self._session, self, value)
+
+    def __ge__(self, value):
+        return FieldDataOps.greater_than_equal(self._session, self, value)
+
+
+class TimestampMemField(MemoryField):
+    def __init__(self, session):
+        super().__init__(session)
+
+    def writeable(self):
+        return TimestampField(self._session, self._field, write_enabled=True)
+
+    def create_like(self, group, name, timestamp=None):
+        return FieldDataOps.timestamp_field_create_like(self, group, name, timestamp)
+
+    @property
+    def data(self):
+        if self._value_wrapper is None:
+            self._value_wrapper = MemoryFieldArray(np.float64)
+        return self._value_wrapper
+
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+        data = self.data[:]
+        return np.all(data[:-1] <= data[1:])
+
+    def __len__(self):
+        return len(self.data)
+
+    def get_spans(self):
+        return ops.get_spans_for_field(self.data[:])
+
+    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+        """
+        Apply a boolean filter to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the filtered data is written to.
+
+        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The filtered field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
+
+    def apply_index(self, index_to_apply, target=None, in_place=False):
+        """
+        Apply an index to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param: index_to_apply: a Field or numpy array that contains the indices
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The reindexed field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
+
+    def __add__(self, second):
+        return FieldDataOps.numeric_add(self._session, self, second)
+
+    def __radd__(self, first):
+        return FieldDataOps.numeric_add(self._session, first, self)
+
+    def __sub__(self, second):
+        return FieldDataOps.numeric_sub(self._session, self, second)
+
+    def __rsub__(self, first):
+        return FieldDataOps.numeric_sub(self._session, first, self)
+
+    def __mul__(self, second):
+        return FieldDataOps.numeric_mul(self._session, self, second)
+
+    def __rmul__(self, first):
+        return FieldDataOps.numeric_mul(self._session, first, self)
+
+    def __truediv__(self, second):
+        return FieldDataOps.numeric_truediv(self._session, self, second)
+
+    def __rtruediv__(self, first):
+        return FieldDataOps.numeric_truediv(self._session, first, self)
+
+    def __floordiv__(self, second):
+        return FieldDataOps.numeric_floordiv(self._session, self, second)
+
+    def __rfloordiv__(self, first):
+        return FieldDataOps.numeric_floordiv(self._session, first, self)
+
+    def __mod__(self, second):
+        return FieldDataOps.numeric_mod(self._session, self, second)
+
+    def __rmod__(self, first):
+        return FieldDataOps.numeric_mod(self._session, first, self)
+
+    def __divmod__(self, second):
+        return FieldDataOps.numeric_divmod(self._session, self, second)
+
+    def __rdivmod__(self, first):
+        return FieldDataOps.numeric_divmod(self._session, first, self)
+
+    def __lt__(self, value):
+        return FieldDataOps.less_than(self._session, self, value)
+
+    def __le__(self, value):
+        return FieldDataOps.less_than_equal(self._session, self, value)
+
+    def __eq__(self, value):
+        return FieldDataOps.equal(self._session, self, value)
+
+    def __eq__(self, value):
         return FieldDataOps.not_equal(self._session, self, value)
 
     def __gt__(self, value):
@@ -886,18 +1062,17 @@ class IndexedStringField(HDF5Field):
 class FixedStringField(HDF5Field):
     def __init__(self, session, group, name=None, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
+        # TODO: caution; we may want to consider the issues with long-lived field instances getting
+        # out of sync with their stored counterparts. Maybe a revision number of the stored field
+        # is required that we can check to see if we are out of date. That or just make this a
+        # property and have it always look the value up
+        self._length = self._field.attrs['strlen']
 
     def writeable(self):
         return FixedStringField(self._session, self._field, write_enabled=True)
 
     def create_like(self, group, name, timestamp=None):
-        ts = self.timestamp if timestamp is None else timestamp
-        length = self._field.attrs['strlen']
-        if isinstance(group, h5py.Group):
-            fixed_string_field_constructor(self._session, group, name, length, ts, self.chunksize)
-            return FixedStringField(self._session, group[name], write_enabled=True)
-        else:
-            return group.create_fixed_string(name, length, ts, self.chunksize)
+        return FieldDataOps.fixed_string_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
@@ -951,7 +1126,6 @@ class FixedStringField(HDF5Field):
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
-
 
 
 class NumericField(HDF5Field):
@@ -1107,15 +1281,7 @@ class CategoricalField(HDF5Field):
         return CategoricalField(self._session, self._field, write_enabled=True)
 
     def create_like(self, group, name, timestamp=None):
-        ts = self.timestamp if timestamp is None else timestamp
-        nformat = self._field.attrs['nformat'] if 'nformat' in self._field.attrs else 'int8'
-        keys = {v: k for k, v in self.keys.items()}
-        if isinstance(group, h5py.Group):
-            categorical_field_constructor(self._session, group, name, nformat, keys, ts,
-                                          self.chunksize)
-            return CategoricalField(self, group[name], write_enabled=True)
-        else:
-            return group.create_categorical(name, nformat, keys, timestamp, self.chunksize)
+        return FieldDataOps.categorical_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
@@ -1175,18 +1341,21 @@ class CategoricalField(HDF5Field):
         """
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
 
-    def apply_index(self, index_to_apply, dstfld=None):
-        array = self.data[:]
-        result = array[index_to_apply]
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.data) == len(result):
-            dstfld.data[:] = result
-        else:
-            dstfld.data.clear()
-            dstfld.data.write(result)
-        return dstfld
+    def apply_index(self, index_to_apply, target=None, in_place=False):
+        """
+        Apply an index to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param: index_to_apply: a Field or numpy array that contains the indices
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The reindexed field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def __lt__(self, value):
         return FieldDataOps.less_than(self._session, self, value)
@@ -1197,7 +1366,7 @@ class CategoricalField(HDF5Field):
     def __eq__(self, value):
         return FieldDataOps.equal(self._session, self, value)
 
-    def __eq__(self, value):
+    def __ne__(self, value):
         return FieldDataOps.not_equal(self._session, self, value)
 
     def __gt__(self, value):
@@ -1215,12 +1384,7 @@ class TimestampField(HDF5Field):
         return TimestampField(self._session, self._field, write_enabled=True)
 
     def create_like(self, group, name, timestamp=None):
-        ts = self.timestamp if timestamp is None else timestamp
-        if isinstance(group, h5py.Group):
-            timestamp_field_constructor(self._session, group, name, ts, self.chunksize)
-            return TimestampField(self._session, group[name], write_enabled=True)
-        else:
-            return group.create_timestamp(name, ts, self.chunksize)
+        return FieldDataOps.timestamp_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
@@ -1259,18 +1423,21 @@ class TimestampField(HDF5Field):
         """
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
 
-    def apply_index(self, index_to_apply, dstfld=None):
-        array = self.data[:]
-        result = array[index_to_apply]
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.data) == len(result):
-            dstfld.data[:] = result
-        else:
-            dstfld.data.clear()
-            dstfld.data.write(result)
-        return dstfld
+    def apply_index(self, index_to_apply, target=None, in_place=False):
+        """
+        Apply an index to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param: index_to_apply: a Field or numpy array that contains the indices
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The reindexed field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def __add__(self, second):
         return FieldDataOps.numeric_add(self._session, self, second)
@@ -2028,6 +2195,23 @@ class FieldDataOps:
             return group.create_indexed_string(name, ts, source._chunksize)
 
     @staticmethod
+    def fixed_string_field_create_like(source, group, name, timestamp):
+        if group is None and name is not None:
+            raise ValueError("if 'group' is None, 'name' must also be 'None'")
+
+        ts = source.timestamp if timestamp is None else timestamp
+        length = source._length
+
+        if group is None:
+            return FixedStringMemField(source._session, length)
+
+        if isinstance(group, h5py.Group):
+            numeric_field_constructor(source._session, group, name, length, ts, source.chunksize)
+            return FixedStringField(source._session, group[name], write_enabled=True)
+        else:
+            return group.create_fixed_string(name, length, ts)
+
+    @staticmethod
     def numeric_field_create_like(source, group, name, timestamp):
         if group is None and name is not None:
             raise ValueError("if 'group' is None, 'name' must also be 'None'")
@@ -2042,4 +2226,41 @@ class FieldDataOps:
             numeric_field_constructor(source._session, group, name, nformat, ts, source.chunksize)
             return NumericField(source._session, group[name], write_enabled=True)
         else:
-            return group.create_numeric(name, nformat, ts, source.chunksize)
+            return group.create_numeric(name, nformat, ts)
+
+    @staticmethod
+    def categorical_field_create_like(source, group, name, timestamp):
+        if group is None and name is not None:
+            raise ValueError("if 'group' is None, 'name' must also be 'None'")
+
+        ts = source.timestamp if timestamp is None else timestamp
+        nformat = source._nformat
+        keys = source.keys
+        # TODO: we have to flip the keys until we fix https://github.com/KCL-BMEIS/ExeTera/issues/150
+        keys = {v: k for k, v in keys.items()}
+
+        if group is None:
+            return CategoricalMemField(source._session, nformat, keys)
+
+        if isinstance(group, h5py.Group):
+            categorical_field_constructor(source._session, group, name, nformat, keys,
+                                          ts, source.chunksize)
+            return CategoricalField(source._session, group[name], write_enabled=True)
+        else:
+            return group.create_numeric(name, nformat, keys, ts)
+
+    @staticmethod
+    def timestamp_field_create_like(source, group, name, timestamp):
+        if group is None and name is not None:
+            raise ValueError("if 'group' is None, 'name' must also be 'None'")
+
+        ts = source.timestamp if timestamp is None else timestamp
+
+        if group is None:
+            return TimestampMemField(source._session)
+
+        if isinstance(group, h5py.Group):
+            timestamp_field_constructor(source._session, group, name, ts, source.chunksize)
+            return TimestampField(source._session, group[name], write_enabled=True)
+        else:
+            return group.create_numeric(name, ts)
