@@ -91,9 +91,17 @@ class HDF5Dataset(Dataset):
         :return: None if the operation is successful; otherwise throw Error.
         """
         dname = dataframe.name if name is None else name
-        self._file.copy(dataframe._h5group, self._file, name=dname)
-        df = edf.HDF5DataFrame(self, dname, h5group=self._file[dname])
-        self._dataframes[dname] = df
+        self._file.create_group(dname)
+        h5group = self._file[dname]
+        _dataframe = edf.HDF5DataFrame(self, dname, h5group)
+        for k, v in dataframe.items():
+            f = v.create_like(_dataframe, k)
+            if f.indexed:
+                f.indices.write(v.indices[:])
+                f.values.write(v.values[:])
+            else:
+                f.data.write(v.data[:])
+        self._dataframes[dname] = _dataframe
 
     def __contains__(self, name: str):
         """
@@ -141,19 +149,19 @@ class HDF5Dataset(Dataset):
         """
         self.__getitem__(name)
 
-    def get_name(self, dataframe: DataFrame):
-        """
-        If the dataframe exist in this dataset, return the name; otherwise return None.
-
-        :param dataframe: The dataframe instance to find the name.
-        :return: name (str) of the dataframe or None if dataframe not found in this dataset.
-        """
-        if not isinstance(dataframe, edf.DataFrame):
-            raise TypeError("The field argument must be a DataFrame object.")
-        for name, v in self._dataframes.items():
-            if id(dataframe) == id(v):
-                return name
-        return None
+    # def get_name(self, dataframe: DataFrame):
+    #     """
+    #     If the dataframe exist in this dataset, return the name; otherwise return None.
+    #
+    #     :param dataframe: The dataframe instance to find the name.
+    #     :return: name (str) of the dataframe or None if dataframe not found in this dataset.
+    #     """
+    #     if not isinstance(dataframe, edf.DataFrame):
+    #         raise TypeError("The field argument must be a DataFrame object.")
+    #     for name, v in self._dataframes.items():
+    #         if id(dataframe) == id(v):
+    #             return name
+    #     return None
 
     def __setitem__(self, name: str, dataframe: DataFrame):
         """
@@ -171,11 +179,12 @@ class HDF5Dataset(Dataset):
             raise TypeError("The field must be a DataFrame object.")
         else:
             if dataframe.dataset == self:  # rename a dataframe
-                return self._file.move(dataframe.name, name)
+
+                self._file.move(dataframe.h5group.name, name)
             else:  # new dataframe from another dataset
                 if self._dataframes.__contains__(name):
                     self.__delitem__(name)
-                return self.add(dataframe, name)
+                self.add(dataframe, name)
 
     def __delitem__(self, name: str):
         """
@@ -196,7 +205,8 @@ class HDF5Dataset(Dataset):
         :param dataframe: The dataframe instance to delete.
         :return: Boolean if the dataframe is deleted.
         """
-        name = self.get_name(dataframe)
+        #name = self.get_name(dataframe)
+        name = dataframe.name
         if name is None:
             raise ValueError("This dataframe does not contain the field to delete.")
         else:
@@ -228,13 +238,45 @@ class HDF5Dataset(Dataset):
 
     @staticmethod
     def copy(dataframe: DataFrame, dataset: Dataset, name: str):
-        dataset.add(dataframe,name=name)
+        """
+        Copy dataframe to another dataset via HDF5DataFrame.copy(ds1['df1'], ds2, 'df1'])
 
-    @staticmethod
-    def move(dataframe: DataFrame, dataset: Dataset, name:str):
-        dataset.add(dataframe, name=name)
-        dataframe._dataset.delete_dataframe(dataframe)
+        :param dataframe: The dataframe to copy.
+        :param dataset: The destination dataset.
+        :param name: The name of dataframe in destination dataset.
+        """
+        dataset._file.create_group(name)
+        h5group = dataset._file[name]
+        _dataframe = edf.HDF5DataFrame(dataset, name, h5group)
+        for k, v in dataframe.items():
+            f = v.create_like(_dataframe, k)
+            if f.indexed:
+                f.indices.write(v.indices[:])
+                f.values.write(v.values[:])
+            else:
+                f.data.write(v.data[:])
+        dataset._dataframes[name] = _dataframe
 
     @staticmethod
     def drop(dataframe: DataFrame):
+        """
+        Delete a dataframe by HDF5DataFrame.drop(ds['df1']).
+
+        :param dataframe: The dataframe to delete.
+        """
         dataframe._dataset.delete_dataframe(dataframe)
+
+    @staticmethod
+    def move(dataframe: DataFrame, dataset: Dataset, name:str):
+        """
+        Move a dataframe to another dataset via HDF5DataFrame.move(ds1['df1'], ds2, 'df1']).
+        If move within the same dataset, e.g. HDF5DataFrame.move(ds1['df1'], ds1, 'df2']), function as a rename for both
+        dataframe and HDF5Group. However, to
+
+        :param dataframe: The dataframe to copy.
+        :param dataset: The destination dataset.
+        :param name: The name of dataframe in destination dataset.
+        """
+        HDF5Dataset.copy(dataframe, dataset, name)
+        HDF5Dataset.drop(dataframe)
+

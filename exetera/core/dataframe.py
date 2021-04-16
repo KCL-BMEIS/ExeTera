@@ -273,7 +273,7 @@ class HDF5DataFrame(DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self._columns.items():
                 newfld = field.create_like(ddf, field.name[field.name.index('/', 1)+1:])
-                ddf.add(field.apply_filter(filter_to_apply, dstfld=newfld), name=name)
+                field.apply_filter(filter_to_apply, dstfld=newfld)
             return ddf
         else:
             for field in self._columns.values():
@@ -294,7 +294,6 @@ class HDF5DataFrame(DataFrame):
             for name, field in self._columns.items():
                 newfld = field.create_like(ddf, field.name[field.name.index('/', 1)+1:])
                 idx = field.apply_index(index_to_apply, dstfld=newfld)
-                ddf.add(idx, name=name)
             return ddf
         else:
             for field in self._columns.values():
@@ -328,8 +327,6 @@ class HDF5DataFrame(DataFrame):
         """
         dataframe.delete_field(field)
 
-
-
     @staticmethod
     def move(src_df: DataFrame, field: fld.Field, dest_df: DataFrame, name: str):
         """
@@ -340,11 +337,5 @@ class HDF5DataFrame(DataFrame):
         :param dest_df: The destination dataframe to move to.
         :param name: The name of field under destination dataframe.
         """
-        dfield = field.create_like(dest_df, name)
-        if field.indexed:
-            dfield.indices.write(field.indices[:])
-            dfield.values.write(field.values[:])
-        else:
-            dfield.data.write(field.data[:])
-        dest_df.columns[name] = dfield
-        src_df.delete_field(field)
+        HDF5DataFrame.copy(field, dest_df, name)
+        HDF5DataFrame.drop(src_df, field)
