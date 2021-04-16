@@ -77,6 +77,6 @@ class TestDataFrame(unittest.TestCase):
             self.assertEqual([b'a', b'b', b'c', b'd', b'e'], ddf.get_field('fst').data[:].tolist())
 
             filter_to_apply = np.array([True, True, False, False, True])
-            df.apply_filter(filter_to_apply)
+            df.apply_filter_to_indexed_field(filter_to_apply)
             self.assertEqual([5, 4, 1], df.get_field('numf').data[:].tolist())
             self.assertEqual([b'e', b'd', b'a'], df.get_field('fst').data[:].tolist())

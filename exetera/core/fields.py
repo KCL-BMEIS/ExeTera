@@ -188,19 +188,19 @@ class WriteableFieldArray:
 
 class MemoryFieldArray:
 
-    def __init__(self, field, dtype):
-        self._field = field
+    def __init__(self, dtype):
         self._dtype = dtype
         self._dataset = None
 
     def __len__(self):
-        return len(self._dataset)
-
+        return 0 if self._dataset is None else len(self._dataset)
     @property
     def dtype(self):
-        return self._dataset.dtype
+        return self._dtype
 
     def __getitem__(self, item):
+        if self._dataset is None:
+            raise ValueError("Cannot get data from an empty Field")
         return self._dataset[item]
 
     def __setitem__(self, key, value):
@@ -210,11 +210,18 @@ class MemoryFieldArray:
         self._dataset = None
 
     def write_part(self, part, move_mem=False):
+        if not isinstance(part, np.ndarray):
+            raise ValueError("'part' must be a numpy array but is '{}'".format(type(part)))
         if self._dataset is None:
-            self._dataset = part[:]
+            if move_mem is True and dtype_to_str(part.dtype) == self._dtype:
+                self._dataset = part
+            else:
+                self._dataset = part.copy()
         else:
-            self._dataset.resize(len(self._dataset) + len(part))
-            self._dataset[-len(part):] = part
+            new_dataset = np.zeros(len(self._dataset) + len(part), dtype=self._dataset.dtype)
+            new_dataset[:len(self._dataset)] = self._dataset
+            new_dataset[-len(part):] = part
+            self._dataset = new_dataset
 
     def write(self, part):
         self.write_part(part)
@@ -225,27 +232,25 @@ class MemoryFieldArray:
 
 
 class ReadOnlyIndexedFieldArray:
-    def __init__(self, field, index_name, values_name):
+    def __init__(self, field, indices, values):
         self._field = field
-        self._index_name = index_name
-        self._index_dataset = field[index_name]
-        self._values_name = values_name
-        self._values_dataset = field[values_name]
+        self._indices = indices
+        self._values = values
 
     def __len__(self):
         # TODO: this occurs because of the initialized state of an indexed string. It would be better for the
         # index to be initialised as [0]
-        return max(len(self._index_dataset)-1, 0)
+        return max(len(self._indices)-1, 0)
 
     def __getitem__(self, item):
         try:
             if isinstance(item, slice):
                 start = item.start if item.start is not None else 0
-                stop = item.stop if item.stop is not None else len(self._index_dataset) - 1
+                stop = item.stop if item.stop is not None else len(self._indices) - 1
                 step = item.step
                 #TODO: validate slice
-                index = self._index_dataset[start:stop+1]
-                bytestr = self._values_dataset[index[0]:index[-1]]
+                index = self._indices[start:stop+1]
+                bytestr = self._values[index[0]:index[-1]]
                 results = [None] * (len(index)-1)
                 startindex = start
                 for ir in range(len(results)):
@@ -254,12 +259,12 @@ class ReadOnlyIndexedFieldArray:
                                 index[ir+1]-np.int64(startindex)].tobytes().decode()
                 return results
             elif isinstance(item, int):
-                if item >= len(self._index_dataset) - 1:
+                if item >= len(self._indices) - 1:
                     raise ValueError("index is out of range")
-                start, stop = self._index_dataset[item:item + 2]
+                start, stop = self._indices[item:item+2]
                 if start == stop:
                     return ''
-                value = self._values_dataset[start:stop].tobytes().decode()
+                value = self._values[start:stop].tobytes().decode()
                 return value
         except Exception as e:
             print("{}: unexpected exception {}".format(self._field.name, e))
@@ -287,31 +292,31 @@ class ReadOnlyIndexedFieldArray:
 
 
 class WriteableIndexedFieldArray:
-    def __init__(self, field, index_name, values_name):
-        self._field = field
-        self._index_name = index_name
-        self._index_dataset = field[index_name]
-        self._values_name = values_name
-        self._values_dataset = field[values_name]
-        self._chunksize = self._field.attrs['chunksize']
+    def __init__(self, chunksize, indices, values):
+        # self._field = field
+        self._indices = indices
+        self._values = values
+        # self._chunksize = self._field.attrs['chunksize']
+        self._chunksize = chunksize
         self._raw_values = np.zeros(self._chunksize, dtype=np.uint8)
         self._raw_indices = np.zeros(self._chunksize, dtype=np.int64)
-        self._accumulated = self._index_dataset[-1] if len(self._index_dataset) else 0
+        self._accumulated = self._indices[-1] if len(self._indices) > 0 else 0
         self._index_index = 0
         self._value_index = 0
 
     def __len__(self):
-        return len(self._index_dataset) - 1
+        return max(len(self._indices) - 1, 0)
 
     def __getitem__(self, item):
         try:
             if isinstance(item, slice):
                 start = item.start if item.start is not None else 0
-                stop = item.stop if item.stop is not None else len(self._index_dataset) - 1
+                stop = item.stop if item.stop is not None else len(self._indices) - 1
                 step = item.step
                 # TODO: validate slice
-                index = self._index_dataset[start:stop + 1]
-                bytestr = self._values_dataset[index[0]:index[-1]]
+
+                index = self._indices[start:stop+1]
+                bytestr = self._values[index[0]:index[-1]]
                 results = [None] * (len(index) - 1)
                 startindex = start
                 rmax = min(len(results), stop - start)
@@ -322,15 +327,15 @@ class WriteableIndexedFieldArray:
                     results[ir] = rstr
                 return results
             elif isinstance(item, int):
-                if item >= len(self._index_dataset) - 1:
+                if item >= len(self._indices) - 1:
                     raise ValueError("index is out of range")
-                start, stop = self._index_dataset[item:item + 2]
+                start, stop = self._indices[item:item+2]
                 if start == stop:
                     return ''
-                value = self._values_dataset[start:stop].tobytes().decode()
+                value = self._values[start:stop].tobytes().decode()
                 return value
         except Exception as e:
-            print("{}: unexpected exception {}".format(self._field.name, e))
+            print(e)
             raise
 
     def __setitem__(self, key, value):
@@ -339,14 +344,9 @@ class WriteableIndexedFieldArray:
 
     def clear(self):
         self._accumulated = 0
-        DataWriter.clear_dataset(self._field, self._index_name)
-        DataWriter.clear_dataset(self._field, self._values_name)
-        DataWriter.write(self._field, self._index_name, [], 0, 'int64')
-        DataWriter.write(self._field, self._values_name, [], 0, 'uint8')
-        self._index_dataset = self._field[self._index_name]
-        self._values_dataset = self._field[self._values_name]
+        self._indices.clear()
+        self._values.clear()
         self._accumulated = 0
-
 
     def write_part(self, part):
         for s in part:
@@ -355,19 +355,16 @@ class WriteableIndexedFieldArray:
                 self._raw_values[self._value_index] = v
                 self._value_index += 1
                 if self._value_index == self._chunksize:
-                    DataWriter.write(self._field, self._values_name,
-                                     self._raw_values, self._value_index)
+                    self._values.write_part(self._raw_values[:self._value_index])
                     self._value_index = 0
                 self._accumulated += 1
             self._raw_indices[self._index_index] = self._accumulated
             self._index_index += 1
             if self._index_index == self._chunksize:
-                if len(self._field['index']) == 0:
-                    DataWriter.write(self._field, self._index_name, [0], 1)
-                DataWriter.write(self._field, self._index_name,
-                                 self._raw_indices, self._index_index)
+                if len(self._indices) == 0:
+                    self._indices.write_part(np.array([0]))
+                self._indices.write_part(self._raw_indices[:self._index_index])
                 self._index_index = 0
-
 
     def write(self, part):
         self.write_part(part)
@@ -375,14 +372,12 @@ class WriteableIndexedFieldArray:
 
     def complete(self):
         if self._value_index != 0:
-            DataWriter.write(self._field, self._values_name,
-                             self._raw_values, self._value_index)
+            self._values.write(self._raw_values[:self._value_index])
             self._value_index = 0
         if self._index_index != 0:
-            if len(self._field['index']) == 0:
-                DataWriter.write(self._field, self._index_name, [0], 1)
-            DataWriter.write(self._field, self._index_name,
-                             self._raw_indices, self._index_index)
+            if len(self._indices) == 0:
+                self._indices.write_part(np.array([0]))
+            self._indices.write(self._raw_indices[:self._index_index])
             self._index_index = 0
 
 
@@ -390,28 +385,115 @@ class WriteableIndexedFieldArray:
 # ===================
 
 
+class IndexedStringMemField(MemoryField):
+    def __init__(self, session, chunksize=None):
+        super().__init__(session)
+        self._session = session
+        self._chunksize = session.chunksize if chunksize is None else chunksize
+        self._data_wrapper = None
+        self._index_wrapper = None
+        self._value_wrapper = None
+        self._write_enabled = True
+
+    def writeable(self):
+        return self
+
+    def create_like(self, group, name, timestamp=None):
+        return FieldDataOps.indexed_string_create_like(group, name, timestamp)
+
+    @property
+    def indexed(self):
+        return True
+
+    @property
+    def data(self):
+        if self._data_wrapper is None:
+            self._data_wrapper = WriteableIndexedFieldArray(self._chunksize, self.indices, self.values)
+        return self._data_wrapper
+
+    def is_sorted(self):
+        if len(self) < 2:
+            return True
+
+        indices = self.indices[:]
+        values = self.values[:]
+        last = values[indices[0]:indices[1]].tobytes()
+        for i in range(1, len(indices)-1):
+            cur = values[indices[i]:indices[i+1]].tobytes()
+            if last > cur:
+                return False
+            last = cur
+        return True
+
+    @property
+    def indices(self):
+        if self._index_wrapper is None:
+            self._index_wrapper = MemoryFieldArray('int64')
+        return self._index_wrapper
+
+    @property
+    def values(self):
+        if self._value_wrapper is None:
+            self._value_wrapper = MemoryFieldArray('int8')
+        return self._value_wrapper
+
+    def __len__(self):
+        return len(self.data)
+
+    def get_spans(self):
+        return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
+
+    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+        """
+        Apply a boolean filter to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the filtered data is written to.
+
+        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The filtered field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_filter_to_indexed_field(self, filter_to_apply, target, in_place)
+
+    def apply_index(self, index_to_apply, target=None, in_place=False):
+        """
+        Apply an index to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param: index_to_apply: a Field or numpy array that contains the indices
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The reindexed field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_index_to_indexed_field(self, index_to_apply, target, in_place)
+
+
 class NumericMemField(MemoryField):
     def __init__(self, session, nformat):
         super().__init__(session)
         self._nformat = nformat
+        # TODO: this is a hack, we should have a property on the interface of Field
+        self._write_enabled = True
 
 
     def writeable(self):
         return self
 
     def create_like(self, group, name, timestamp=None):
-        ts = timestamp
-        nformat = self._nformat
-        if isinstance(group, h5py.Group):
-            numeric_field_constructor(self._session, group, name, nformat, ts, self.chunksize)
-            return NumericField(self._session, group[name], write_enabled=True)
-        else:
-            return group.create_numeric(name, nformat, ts, self.chunksize)
+        return FieldDataOps.numeric_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
         if self._value_wrapper is None:
-            self._value_wrapper = MemoryFieldArray(self, self._nformat)
+            self._value_wrapper = MemoryFieldArray(self._nformat)
         return self._value_wrapper
 
     def is_sorted(self):
@@ -426,29 +508,37 @@ class NumericMemField(MemoryField):
     def get_spans(self):
         return ops.get_spans_for_field(self.data[:])
 
-    def apply_filter(self, filter_to_apply, dstfld=None):
-        result = self.data[filter_to_apply]
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.data) == len(result):
-            dstfld.data[:] = result
-        else:
-            dstfld.data.clear()
-            dstfld.data.write(result)
-        return dstfld
+    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+        """
+        Apply a boolean filter to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the filtered data is written to.
 
-    def apply_index(self, index_to_apply, dstfld=None):
-        result = self.data[index_to_apply]
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.data) == len(result):
-            dstfld.data[:] = result
-        else:
-            dstfld.data.clear()
-            dstfld.data.write(result)
-        return dstfld
+        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The filtered field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
+
+    def apply_index(self, index_to_apply, target=None, in_place=False):
+        """
+        Apply an index to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param: index_to_apply: a Field or numpy array that contains the indices
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The reindexed field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def __add__(self, second):
         return FieldDataOps.numeric_add(self._session, self, second)
@@ -534,6 +624,7 @@ class CategoricalMemField(MemoryField):
         super().__init__(session)
         self._nformat = nformat
         self._keys = keys
+        self._write_enabled = True
 
     def writeable(self):
         return self
@@ -552,7 +643,7 @@ class CategoricalMemField(MemoryField):
     @property
     def data(self):
         if self._value_wrapper is None:
-            self._value_wrapper = MemoryFieldArray(self, self._nformat)
+            self._value_wrapper = MemoryFieldArray(self._nformat)
         return self._value_wrapper
 
     def is_sorted(self):
@@ -584,29 +675,37 @@ class CategoricalMemField(MemoryField):
         result.data.write(values)
         return result
 
-    def apply_filter(self, filter_to_apply, dstfld=None):
-        result = self.data[filter_to_apply]
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.data) == len(result):
-            dstfld.data[:] = result
-        else:
-            dstfld.data.clear()
-            dstfld.data.write(result)
-        return dstfld
+    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+        """
+        Apply a boolean filter to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the filtered data is written to.
 
-    def apply_index(self, index_to_apply, dstfld=None):
-        result = self.data[index_to_apply]
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.data) == len(result):
-            dstfld.data[:] = result
-        else:
-            dstfld.data.clear()
-            dstfld.data.write(result)
-        return dstfld
+        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The filtered field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
+
+    def apply_index(self, index_to_apply, target=None, in_place=False):
+        """
+        Apply an index to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param: index_to_apply: a Field or numpy array that contains the indices
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The reindexed field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def __lt__(self, value):
         return FieldDataOps.less_than(self._session, self, value)
@@ -701,12 +800,7 @@ class IndexedStringField(HDF5Field):
         return IndexedStringField(self._session, self._field, write_enabled=True)
 
     def create_like(self, group, name, timestamp=None):
-        ts = self.timestamp if timestamp is None else timestamp
-        if isinstance(group, h5py.Group):
-            indexed_string_field_constructor(self._session, group, name, ts, self.chunksize)
-            return IndexedStringField(self._session, group[name], write_enabled=True)
-        else:
-            return group.create_indexed_string(name, ts, self.chunksize)
+        return FieldDataOps.indexed_string_create_like(self, group, name, timestamp)
 
     @property
     def indexed(self):
@@ -715,9 +809,10 @@ class IndexedStringField(HDF5Field):
     @property
     def data(self):
         if self._data_wrapper is None:
+
             wrapper =\
                 WriteableIndexedFieldArray if self._write_enabled else ReadOnlyIndexedFieldArray
-            self._data_wrapper = wrapper(self._field, 'index', 'values')
+            self._data_wrapper = wrapper(self.chunksize, self.indices, self.values)
         return self._data_wrapper
 
     def is_sorted(self):
@@ -754,50 +849,38 @@ class IndexedStringField(HDF5Field):
     def get_spans(self):
         return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
 
-    def apply_filter(self, filter_to_apply, dstfld=None):
+    def apply_filter(self, filter_to_apply, target=None, in_place=False):
         """
-        Apply a filter (array of boolean) to the field, return itself if destination field (detfld) is not set.
-        """
-        dest_indices, dest_values = \
-            ops.apply_filter_to_index_values(filter_to_apply,
-                                             self.indices[:], self.values[:])
+        Apply a boolean filter to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the filtered data is written to.
 
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.indices) == len(dest_indices):
-            dstfld.indices[:] = dest_indices
-        else:
-            dstfld.indices.clear()
-            dstfld.indices.write(dest_indices)
-        if len(dstfld.values) == len(dest_values):
-            dstfld.values[:] = dest_values
-        else:
-            dstfld.values.clear()
-            dstfld.values.write(dest_values)
-        return dstfld
+        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The filtered field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_filter_to_indexed_field(self, filter_to_apply, target, in_place)
 
-    def apply_index(self,index_to_apply,dstfld=None):
+
+    def apply_index(self, index_to_apply, target=None, in_place=False):
         """
-        Reindex the current field, return itself if destination field is not set.
+        Apply an index to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param: index_to_apply: a Field or numpy array that contains the indices
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The reindexed field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
-        dest_indices, dest_values = \
-            ops.apply_indices_to_index_values(index_to_apply,
-                                              self.indices[:], self.values[:])
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.indices) == len(dest_indices):
-            dstfld.indices[:] = dest_indices
-        else:
-            dstfld.indices.clear()
-            dstfld.indices.write(dest_indices)
-        if len(dstfld.values) == len(dest_values):
-            dstfld.values[:] = dest_values
-        else:
-            dstfld.values.clear()
-            dstfld.values.write(dest_values)
-        return dstfld
+        return FieldDataOps.apply_index_to_indexed_field(self, index_to_apply, target, in_place)
 
 
 class FixedStringField(HDF5Field):
@@ -837,49 +920,50 @@ class FixedStringField(HDF5Field):
     def get_spans(self):
         return ops.get_spans_for_field(self.data[:])
 
-    def apply_filter(self, filter_to_apply, dstfld=None):
-        array = self.data[:]
-        result = array[filter_to_apply]
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.data) == len(result):
-            dstfld.data[:] = result
-        else:
-            dstfld.data.clear()
-            dstfld.data.write(result)
-        return dstfld
+    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+        """
+        Apply a boolean filter to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the filtered data is written to.
 
+        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The filtered field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
 
-    def apply_index(self, index_to_apply, dstfld=None):
-        array = self.data[:]
-        result = array[index_to_apply]
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.data) == len(result):
-            dstfld.data[:] = result
-        else:
-            dstfld.data.clear()
-            dstfld.data.write(result)
-        return dstfld
+    def apply_index(self, index_to_apply, target=None, in_place=False):
+        """
+        Apply an index to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param: index_to_apply: a Field or numpy array that contains the indices
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The reindexed field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
+
 
 
 class NumericField(HDF5Field):
     def __init__(self, session, group, name=None, mem_only=True, write_enabled=False):
         super().__init__(session, group, name=name, write_enabled=write_enabled)
+        self._nformat = self._field.attrs['nformat']
 
     def writeable(self):
         return NumericField(self._session, self._field, write_enabled=True)
 
     def create_like(self, group, name, timestamp=None):
-        ts = self.timestamp if timestamp is None else timestamp
-        nformat = self._field.attrs['nformat']
-        if isinstance(group, h5py.Group):
-            numeric_field_constructor(self._session, group, name, nformat, ts, self.chunksize)
-            return NumericField(self._session, group[name], write_enabled=True)
-        else:
-            return group.create_numeric(name, nformat, ts, self.chunksize)
+        return FieldDataOps.numeric_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
@@ -902,31 +986,37 @@ class NumericField(HDF5Field):
     def get_spans(self):
         return ops.get_spans_for_field(self.data[:])
 
-    def apply_filter(self, filter_to_apply, dstfld=None):
-        array = self.data[:]
-        result = array[filter_to_apply]
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.data) == len(result):
-            dstfld.data[:] = result
-        else:
-            dstfld.data.clear()
-            dstfld.data.write(result)
-        return dstfld
+    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+        """
+        Apply a boolean filter to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the filtered data is written to.
 
-    def apply_index(self, index_to_apply, dstfld=None):
-        array = self.data[:]
-        result = array[index_to_apply]
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.data) == len(result):
-            dstfld.data[:] = result
-        else:
-            dstfld.data.clear()
-            dstfld.data.write(result)
-        return dstfld
+        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The filtered field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
+
+    def apply_index(self, index_to_apply, target=None, in_place=False):
+        """
+        Apply an index to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param: index_to_apply: a Field or numpy array that contains the indices
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The reindexed field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def __add__(self, second):
         return FieldDataOps.numeric_add(self._session, self, second)
@@ -1069,18 +1159,21 @@ class CategoricalField(HDF5Field):
         result.data.write(values)
         return result
 
-    def apply_filter(self, filter_to_apply, dstfld=None):
-        array = self.data[:]
-        result = array[filter_to_apply]
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.data) == len(result):
-            dstfld.data[:] = result
-        else:
-            dstfld.data.clear()
-            dstfld.data.write(result)
-        return dstfld
+    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+        """
+        Apply a boolean filter to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the filtered data is written to.
+
+        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The filtered field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
 
     def apply_index(self, index_to_apply, dstfld=None):
         array = self.data[:]
@@ -1150,18 +1243,21 @@ class TimestampField(HDF5Field):
     def get_spans(self):
         return ops.get_spans_for_field(self.data[:])
 
-    def apply_filter(self, filter_to_apply, dstfld=None):
-        array = self.data[:]
-        result = array[filter_to_apply]
-        dstfld = self if dstfld is None else dstfld
-        if not dstfld._write_enabled:
-            dstfld = dstfld.writeable()
-        if len(dstfld.data) == len(result):
-            dstfld.data[:] = result
-        else:
-            dstfld.data.clear()
-            dstfld.data.write(result)
-        return dstfld
+    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+        """
+        Apply a boolean filter to this field. This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the filtered data is written to.
+
+        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param: target: if set, this is the field that is written do. This field must be writable.
+        If 'target' is set, 'in_place' must be False.
+        :param: in_place: if True, perform the operation destructively on this field. This field
+        must be writable. If 'in_place' is True, 'target' must be None
+        :return: The filtered field. This is a new field instance unless 'target' is set, in which
+        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
 
     def apply_index(self, index_to_apply, dstfld=None):
         array = self.data[:]
@@ -1455,6 +1551,7 @@ class DateImporter:
 
 
 # Operation implementations
+# =========================
 
 
 def as_field(data, key=None):
@@ -1469,51 +1566,49 @@ def as_field(data, key=None):
         raise NotImplementedError()
 
 
+def argsort(field: Field,
+            dtype: str=None):
+    supported_dtypes = ('int32', 'int64', 'uint32')
+    if dtype not in supported_dtypes:
+        raise ValueError("If set, 'dtype' must be one of {}".format(supported_dtypes))
+    indices = np.argsort(field.data[:])
+
+    f = NumericMemField(None, dtype_to_str(indices.dtype) if dtype is None else dtype)
+    f.data.write(indices)
+    return f
+
+
+def dtype_to_str(dtype):
+    if isinstance(dtype, str):
+        return dtype
+
+    if dtype == bool:
+        return 'bool'
+    elif dtype == np.int8:
+        return 'int8'
+    elif dtype == np.int16:
+        return 'int16'
+    elif dtype == np.int32:
+        return 'int32'
+    elif dtype == np.int64:
+        return 'int64'
+    elif dtype == np.uint8:
+        return 'uint8'
+    elif dtype == np.uint16:
+        return 'uint16'
+    elif dtype == np.uint32:
+        return 'uint32'
+    elif dtype == np.uint64:
+        return 'uint64'
+    elif dtype == np.float32:
+        return 'float32'
+    elif dtype == np.float64:
+        return 'float64'
+
+    raise ValueError("Unsupported dtype '{}'".format(dtype))
+
+
 class FieldDataOps:
-
-    type_converters = {
-        bool: 'bool',
-        np.int8: 'int8',
-        np.int16: 'int16',
-        np.int32: 'int32',
-        np.int64: 'int64',
-        np.uint8: 'uint8',
-        np.uint16: 'uint16',
-        np.uint32: 'uint32',
-        np.uint64: 'uint64',
-        np.float32: 'float32',
-        np.float64: 'float64'
-    }
-
-    @classmethod
-    def dtype_to_str(cls, dtype):
-        if isinstance(dtype, str):
-            return dtype
-
-        if dtype == bool:
-            return 'bool'
-        elif dtype == np.int8:
-            return 'int8'
-        elif dtype == np.int16:
-            return 'int16'
-        elif dtype == np.int32:
-            return 'int32'
-        elif dtype == np.int64:
-            return 'int64'
-        elif dtype == np.uint8:
-            return 'uint8'
-        elif dtype == np.uint16:
-            return 'uint16'
-        elif dtype == np.uint32:
-            return 'uint32'
-        elif dtype == np.uint64:
-            return 'uint64'
-        elif dtype == np.float32:
-            return 'float32'
-        elif dtype == np.float64:
-            return 'float64'
-
-        raise ValueError("Unsupported dtype '{}'".format(dtype))
 
     @classmethod
     def numeric_add(cls, session, first, second):
@@ -1528,7 +1623,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data + second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1545,7 +1640,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data - second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1562,7 +1657,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data * second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1579,7 +1674,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data / second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1596,7 +1691,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data // second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1613,7 +1708,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data % second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1630,9 +1725,9 @@ class FieldDataOps:
             second_data = second
 
         r1, r2 = np.divmod(first_data, second_data)
-        f1 = NumericMemField(session, cls.dtype_to_str(r1.dtype))
+        f1 = NumericMemField(session, dtype_to_str(r1.dtype))
         f1.data.write(r1)
-        f2 = NumericMemField(session, cls.dtype_to_str(r2.dtype))
+        f2 = NumericMemField(session, dtype_to_str(r2.dtype))
         f2.data.write(r2)
         return f1, f2
 
@@ -1649,7 +1744,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data & second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1666,7 +1761,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data ^ second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1683,7 +1778,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data | second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1700,7 +1795,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data < second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1717,7 +1812,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data <= second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1734,7 +1829,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data == second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1751,7 +1846,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data != second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1768,7 +1863,7 @@ class FieldDataOps:
             second_data = second
 
         r = first_data > second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
 
@@ -1785,6 +1880,166 @@ class FieldDataOps:
             second_data = second
 
         r = first_data >= second_data
-        f = NumericMemField(session, cls.dtype_to_str(r.dtype))
+        f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
+
+    @staticmethod
+    def apply_filter_to_indexed_field(source, filter_to_apply, target=None, in_place=False):
+        if in_place is True and target is not None:
+            raise ValueError("if 'in_place is True, 'target' must be None")
+
+        dest_indices, dest_values = \
+            ops.apply_filter_to_index_values(filter_to_apply,
+                                             source.indices[:], source.values[:])
+
+        if in_place:
+            if not source._write_enabled:
+                raise ValueError("This field is marked read-only. Call writeable() on it before "
+                                 "performing in-place filtering")
+            source.indices.clear()
+            source.indices.write(dest_indices)
+            source.values.clear()
+            source.values.write(dest_values)
+            return source
+
+        if target is not None:
+            if len(target.indices) == len(dest_indices):
+                target.indices[:] = dest_indices
+            else:
+                target.indices.clear()
+                target.indices.write(dest_indices)
+            if len(target.values) == len(dest_values):
+                target.values[:] = dest_values
+            else:
+                target.values.clear()
+                target.values.write(dest_values)
+            return target
+        else:
+            mem_field = IndexedStringMemField(source._session, source.chunksize)
+            mem_field.indices.write(dest_indices)
+            mem_field.values.write(dest_values)
+            return mem_field
+
+    @staticmethod
+    def apply_index_to_indexed_field(source, index_to_apply, target=None, in_place=False):
+        if in_place is True and target is not None:
+            raise ValueError("if 'in_place is True, 'target' must be None")
+
+        dest_indices, dest_values = \
+            ops.apply_indices_to_index_values(index_to_apply,
+                                              source.indices[:], source.values[:])
+
+        if in_place:
+            if not source._write_enabled:
+                raise ValueError("This field is marked read-only. Call writeable() on it before "
+                                 "performing in-place filtering")
+            source.indices.clear()
+            source.indices.write(dest_indices)
+            source.values.clear()
+            source.values.write(dest_values)
+            return source
+
+        if target is not None:
+            if len(target.indices) == len(dest_indices):
+                target.indices[:] = dest_indices
+            else:
+                target.indices.clear()
+                target.indices.write(dest_indices)
+            if len(target.values) == len(dest_values):
+                target.values[:] = dest_values
+            else:
+                target.values.clear()
+                target.values.write(dest_values)
+            return target
+        else:
+            mem_field = IndexedStringMemField(source._session, source.chunksize)
+            mem_field.indices.write(dest_indices)
+            mem_field.values.write(dest_values)
+            return mem_field
+
+
+    @staticmethod
+    def apply_filter_to_field(source, filter_to_apply, target=None, in_place=None):
+        if in_place is True and target is not None:
+            raise ValueError("if 'in_place is True, 'target' must be None")
+
+        dest_data = source.data[filter_to_apply]
+
+        if in_place:
+            if not source._write_enabled:
+                raise ValueError("This field is marked read-only. Call writeable() on it before "
+                                 "performing in-place filtering")
+            source.data.clear()
+            source.data.write(dest_data)
+            return source
+
+        if target is not None:
+            if len(target.data) == len(dest_data):
+                target.data[:] = dest_data
+            else:
+                target.data.clear()
+                target.data.write(dest_data)
+        else:
+            mem_field = source.create_like(None, None)
+            mem_field.data.write(dest_data)
+            return mem_field
+
+    @staticmethod
+    def apply_index_to_field(source, index_to_apply, target=None, in_place=None):
+        if in_place is True and target is not None:
+            raise ValueError("if 'in_place is True, 'target' must be None")
+
+        dest_data = source.data[:][index_to_apply]
+
+        if in_place:
+            if not source._write_enabled:
+                raise ValueError("This field is marked read-only. Call writeable() on it before "
+                                 "performing in-place filtering")
+            source.data.clear()
+            source.data.write(dest_data)
+            return source
+
+        if target is not None:
+            if len(target.data) == len(dest_data):
+                target.data[:] = dest_data
+            else:
+                target.data.clear()
+                target.data.write(dest_data)
+        else:
+            mem_field = source.create_like(None, None)
+            mem_field.data.write(dest_data)
+            return mem_field
+
+    @staticmethod
+    def indexed_string_create_like(source, group, name, timestamp):
+        if group is None and name is not None:
+            raise ValueError("if 'group' is None, 'name' must also be 'None'")
+
+        ts = source.timestamp if timestamp is None else timestamp
+
+        if group is None:
+            return IndexedStringMemField(source._session, source.chunksize)
+
+        if isinstance(group, h5py.Group):
+            indexed_string_field_constructor(source._session, group, name, ts, source._chunksize)
+            return IndexedStringField(source._session, group[name], write_enabled=True)
+        else:
+            return group.create_indexed_string(name, ts, source._chunksize)
+
+    @staticmethod
+    def numeric_field_create_like(source, group, name, timestamp):
+        if group is None and name is not None:
+            raise ValueError("if 'group' is None, 'name' must also be 'None'")
+
+        ts = source.timestamp if timestamp is None else timestamp
+        nformat = source._nformat
+
+        if group is None:
+            return NumericMemField(source._session, nformat)
+
+        if isinstance(group, h5py.Group):
+            numeric_field_constructor(source._session, group, name, nformat, ts, source.chunksize)
+            return NumericField(source._session, group[name], write_enabled=True)
+        else:
+            return group.create_numeric(name, nformat, ts, source.chunksize)

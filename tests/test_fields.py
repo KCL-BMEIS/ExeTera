@@ -144,7 +144,7 @@ class TestIsSorted(unittest.TestCase):
 
 class TestIndexedStringFields(unittest.TestCase):
 
-    def test_create_indexed_string(self):
+    def test_filter_indexed_string(self):
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio, "w", "src")
@@ -153,21 +153,34 @@ class TestIndexedStringFields(unittest.TestCase):
             f = fields.IndexedStringImporter(s, hf, 'foo')
             f.write(strings)
             f = s.get(hf['foo'])
-            # f = s.create_indexed_string(hf, 'foo')
             self.assertListEqual([0, 1, 3, 6, 10], f.indices[:].tolist())
 
             f2 = s.create_indexed_string(hf, 'bar')
             s.apply_filter(np.asarray([False, True, True, False]), f, f2)
-            # print(f2.indices[:])
             self.assertListEqual([0, 2, 5], f2.indices[:].tolist())
-            # print(f2.values[:])
             self.assertListEqual([98, 98, 99, 99, 99], f2.values[:].tolist())
-            # print(f2.data[:])
             self.assertListEqual(['bb', 'ccc'], f2.data[:])
-            # print(f2.data[0])
             self.assertEqual('bb', f2.data[0])
-            # print(f2.data[1])
             self.assertEqual('ccc', f2.data[1])
+
+    def test_reindex_indexed_string(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            hf = dst.create_dataframe('src')
+            strings = ['a', 'bb', 'ccc', 'dddd']
+            f = fields.IndexedStringImporter(s, hf, 'foo')
+            f.write(strings)
+            f = s.get(hf['foo'])
+            self.assertListEqual([0, 1, 3, 6, 10], f.indices[:].tolist())
+
+            f2 = s.create_indexed_string(hf, 'bar')
+            s.apply_index(np.asarray([3, 0, 2, 1], dtype=np.int64), f, f2)
+            self.assertListEqual([0, 4, 5, 8, 10], f2.indices[:].tolist())
+            self.assertListEqual([100, 100, 100, 100, 97, 99, 99, 99, 98, 98],
+                                 f2.values[:].tolist())
+            self.assertListEqual(['dddd', 'a', 'ccc', 'bb'], f2.data[:])
+
 
     def test_update_legacy_indexed_string_that_has_uint_values(self):
 
@@ -300,13 +313,13 @@ class TestMemoryFields(unittest.TestCase):
             ds = s.open_dataset(bio, 'w', 'ds')
             df = ds.create_dataframe('df')
 
-            m1 = fields.NumericMemField(s, fields.FieldDataOps.dtype_to_str(a1.dtype))
-            m2 = fields.NumericMemField(s, fields.FieldDataOps.dtype_to_str(a2.dtype))
+            m1 = fields.NumericMemField(s, fields.dtype_to_str(a1.dtype))
+            m2 = fields.NumericMemField(s, fields.dtype_to_str(a2.dtype))
             m1.data.write(a1)
             m2.data.write(a2)
 
-            f1 = df.create_numeric('f1', fields.FieldDataOps.dtype_to_str(a1.dtype))
-            f2 = df.create_numeric('f2', fields.FieldDataOps.dtype_to_str(a2.dtype))
+            f1 = df.create_numeric('f1', fields.dtype_to_str(a1.dtype))
+            f2 = df.create_numeric('f2', fields.dtype_to_str(a2.dtype))
             f1.data.write(a1)
             f2.data.write(a2)
 
@@ -321,14 +334,14 @@ class TestMemoryFields(unittest.TestCase):
             r = function(f1, f2)
             if isinstance(r, tuple):
                 df.create_numeric(
-                    'f3a', fields.FieldDataOps.dtype_to_str(r[0].data.dtype)).data.write(r[0])
+                    'f3a', fields.dtype_to_str(r[0].data.dtype)).data.write(r[0])
                 df.create_numeric(
-                    'f3b', fields.FieldDataOps.dtype_to_str(r[1].data.dtype)).data.write(r[1])
+                    'f3b', fields.dtype_to_str(r[1].data.dtype)).data.write(r[1])
                 test_simple(expected[0], df['f3a'])
                 test_simple(expected[1], df['f3b'])
             else:
                 df.create_numeric(
-                    'f3', fields.FieldDataOps.dtype_to_str(r.data.dtype)).data.write(r)
+                    'f3', fields.dtype_to_str(r.data.dtype)).data.write(r)
                 test_simple(expected, df['f3'])
 
     def test_mixed_field_add(self):
@@ -458,3 +471,200 @@ class TestMemoryFields(unittest.TestCase):
             bar.data.write(mbar)
             print(bar.data[:])
             print(bar.keys)
+
+
+class TestFieldApplyFilter(unittest.TestCase):
+
+    def test_indexed_string_apply_filter(self):
+
+        data = ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+        filt = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0], dtype=bool)
+
+        expected_indices = [0, 1, 3, 6, 10, 10, 14, 17, 19, 20]
+        expected_values = [97, 98, 98, 99, 99, 99, 100, 100, 100, 100,
+                           101, 101, 101, 101, 102, 102, 102, 103, 103, 104]
+        expected_filt_indices = [0, 2, 6, 10, 12]
+        expected_filt_values = [98, 98, 100, 100, 100, 100, 101, 101, 101, 101, 103, 103]
+        expected_filt_data = ['bb', 'dddd', 'eeee', 'gg']
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_indexed_string('foo')
+            f.data.write(data)
+            self.assertListEqual(expected_indices, f.indices[:].tolist())
+            self.assertListEqual(expected_values, f.values[:].tolist())
+            self.assertListEqual(data, f.data[:])
+
+            g = f.apply_filter(filt, in_place=True)
+            self.assertListEqual(expected_filt_indices, f.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, f.values[:].tolist())
+            self.assertListEqual(expected_filt_data, f.data[:])
+
+            mf = fields.IndexedStringMemField(s)
+            mf.data.write(data)
+            self.assertListEqual(expected_indices, mf.indices[:].tolist())
+            self.assertListEqual(expected_values, mf.values[:].tolist())
+            self.assertListEqual(data, mf.data[:])
+
+            mf.apply_filter(filt, in_place=True)
+            self.assertListEqual(expected_filt_indices, mf.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, mf.values[:].tolist())
+            self.assertListEqual(expected_filt_data, mf.data[:])
+
+            b = df.create_indexed_string('bar')
+            b.data.write(data)
+            self.assertListEqual(expected_indices, b.indices[:].tolist())
+            self.assertListEqual(expected_values, b.values[:].tolist())
+            self.assertListEqual(data, b.data[:])
+
+            mb = b.apply_filter(filt)
+            self.assertListEqual(expected_filt_indices, mb.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, mb.values[:].tolist())
+            self.assertListEqual(expected_filt_data, mb.data[:])
+
+    def test_numeric_apply_filter(self):
+        data = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9], dtype=np.int32)
+        filt = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0], dtype=bool)
+        expected = [2, 4, 6, 8]
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_numeric('foo', 'int32')
+            f.data.write(data)
+            self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+            g = f.apply_filter(filt, in_place=True)
+            self.assertListEqual(expected, f.data[:].tolist())
+
+            mf = fields.NumericMemField(s, 'int32')
+            mf.data.write(data)
+            self.assertListEqual(data.tolist(), mf.data[:].tolist())
+
+            mf.apply_filter(filt, in_place=True)
+            self.assertListEqual(expected, mf.data[:].tolist())
+
+            b = df.create_numeric('bar', 'int32')
+            b.data.write(data)
+            self.assertListEqual(data.tolist(), b.data[:].tolist())
+
+            mb = b.apply_filter(filt)
+            self.assertListEqual(expected, mb.data[:].tolist())
+
+
+class TestFieldApplyIndex(unittest.TestCase):
+
+    def test_indexed_string_apply_index(self):
+
+        data = ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+        inds = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
+
+        expected_indices = [0, 1, 3, 6, 10, 10, 14, 17, 19, 20]
+        expected_values = [97, 98, 98, 99, 99, 99, 100, 100, 100, 100,
+                           101, 101, 101, 101, 102, 102, 102, 103, 103, 104]
+        expected_filt_indices = [0, 1, 2, 4, 6, 9, 12, 16, 20, 20]
+        expected_filt_values = [104, 97, 103, 103, 98, 98, 102, 102, 102, 99, 99, 99,
+                                101, 101, 101, 101, 100, 100, 100, 100]
+        expected_filt_data = ['h', 'a', 'gg', 'bb', 'fff', 'ccc', 'eeee', 'dddd', '']
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_indexed_string('foo')
+            f.data.write(data)
+            self.assertListEqual(expected_indices, f.indices[:].tolist())
+            self.assertListEqual(expected_values, f.values[:].tolist())
+            self.assertListEqual(data, f.data[:])
+
+            g = f.apply_index(inds, in_place=True)
+            self.assertListEqual(expected_filt_indices, f.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, f.values[:].tolist())
+            self.assertListEqual(expected_filt_data, f.data[:])
+
+            mf = fields.IndexedStringMemField(s)
+            mf.data.write(data)
+            self.assertListEqual(expected_indices, mf.indices[:].tolist())
+            self.assertListEqual(expected_values, mf.values[:].tolist())
+            self.assertListEqual(data, mf.data[:])
+
+            mf.apply_index(inds, in_place=True)
+            self.assertListEqual(expected_filt_indices, mf.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, mf.values[:].tolist())
+            self.assertListEqual(expected_filt_data, mf.data[:])
+
+            b = df.create_indexed_string('bar')
+            b.data.write(data)
+            self.assertListEqual(expected_indices, b.indices[:].tolist())
+            self.assertListEqual(expected_values, b.values[:].tolist())
+            self.assertListEqual(data, b.data[:])
+
+            mb = b.apply_index(inds)
+            self.assertListEqual(expected_filt_indices, mb.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, mb.values[:].tolist())
+            self.assertListEqual(expected_filt_data, mb.data[:])
+
+    def test_numeric_apply_index(self):
+        data = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9], dtype='int32')
+        indices = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
+        expected = [9, 1, 8, 2, 7, 3, 6, 4, 5]
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_numeric('foo', 'int32')
+            f.data.write(data)
+            self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+            g = f.apply_index(indices, in_place=True)
+            self.assertListEqual(expected, f.data[:].tolist())
+
+            mf = fields.NumericMemField(s, 'int32')
+            mf.data.write(data)
+            self.assertListEqual(data.tolist(), mf.data[:].tolist())
+
+            mf.apply_index(indices, in_place=True)
+            self.assertListEqual(expected, mf.data[:].tolist())
+
+            b = df.create_numeric('bar', 'int32')
+            b.data.write(data)
+            self.assertListEqual(data.tolist(), b.data[:].tolist())
+
+            mb = b.apply_index(indices)
+            self.assertListEqual(expected, mb.data[:].tolist())
+
+
+class TestFieldCreateLike(unittest.TestCase):
+
+    def test_indexed_string_field_create_like(self):
+        data = ['a', 'bb', 'ccc', 'ddd']
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_indexed_string('foo')
+            f.data.write(data)
+            self.assertListEqual(data, f.data[:])
+
+            g = f.create_like(None, None)
+            self.assertIsInstance(g, fields.IndexedStringMemField)
+            self.assertEqual(0, len(g.data))
+
+    def test_numeric_field_create_like(self):
+        data = np.asarray([1, 2, 3, 4], dtype=np.int32)
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_numeric('foo', 'int32')
+            f.data.write(data)
+            self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+            g = f.create_like(None, None)
+            self.assertIsInstance(g, fields.NumericMemField)
+            self.assertEqual(0, len(g.data))

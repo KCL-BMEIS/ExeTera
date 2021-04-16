@@ -215,11 +215,11 @@ class HDF5DataFrame(DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self._columns.items():
                 newfld = field.create_like(ddf, field.name[field.name.index('/', 1)+1:])
-                ddf.add(field.apply_filter(filter_to_apply, dstfld=newfld), name=name)
+                ddf.add(field.apply_filter_to_indexed_field(filter_to_apply, dstfld=newfld), name=name)
             return ddf
         else:
             for field in self._columns.values():
-                field.apply_filter(filter_to_apply)
+                field.apply_filter_to_indexed_field(filter_to_apply)
             return self
 
     def apply_index(self, index_to_apply, ddf=None):
