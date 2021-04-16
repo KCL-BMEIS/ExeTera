@@ -214,12 +214,12 @@ class HDF5DataFrame(DataFrame):
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self._columns.items():
-                newfld = field.create_like(ddf, field.name[field.name.index('/', 1)+1:])
-                ddf.add(field.apply_filter_to_indexed_field(filter_to_apply, dstfld=newfld), name=name)
+                newfld = field.create_like(ddf, name)
+                field.apply_index(filter_to_apply, target=newfld)
             return ddf
         else:
             for field in self._columns.values():
-                field.apply_filter_to_indexed_field(filter_to_apply)
+                field.apply_filter(filter_to_apply, in_place=True)
             return self
 
     def apply_index(self, index_to_apply, ddf=None):
@@ -234,11 +234,10 @@ class HDF5DataFrame(DataFrame):
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self._columns.items():
-                newfld = field.create_like(ddf, field.name[field.name.index('/', 1)+1:])
-                idx = field.apply_index(index_to_apply, dstfld=newfld)
-                ddf.add(idx, name=name)
+                newfld = field.create_like(ddf, name)
+                field.apply_index(index_to_apply, target=newfld)
             return ddf
         else:
             for field in self._columns.values():
-                field.apply_index(index_to_apply)
+                field.apply_index(index_to_apply, in_place=True)
             return self

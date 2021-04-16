@@ -2189,10 +2189,10 @@ class FieldDataOps:
             return IndexedStringMemField(source._session, source.chunksize)
 
         if isinstance(group, h5py.Group):
-            indexed_string_field_constructor(source._session, group, name, ts, source._chunksize)
+            indexed_string_field_constructor(source._session, group, name, ts, source.chunksize)
             return IndexedStringField(source._session, group[name], write_enabled=True)
         else:
-            return group.create_indexed_string(name, ts, source._chunksize)
+            return group.create_indexed_string(name, ts, source.chunksize)
 
     @staticmethod
     def fixed_string_field_create_like(source, group, name, timestamp):
@@ -2247,7 +2247,7 @@ class FieldDataOps:
                                           ts, source.chunksize)
             return CategoricalField(source._session, group[name], write_enabled=True)
         else:
-            return group.create_numeric(name, nformat, keys, ts)
+            return group.create_categorical(name, nformat, keys, ts)
 
     @staticmethod
     def timestamp_field_create_like(source, group, name, timestamp):
