@@ -3,10 +3,10 @@ import unittest
 import h5py
 import numpy as np
 
-from exetera.core import session
+from exetera.core import session,fields
 from exetera.core.abstract_types import DataFrame
 from io import BytesIO
-from exetera.core import data_writer
+from exetera.core.dataset import HDF5Dataset
 
 
 class TestDataSet(unittest.TestCase):
@@ -69,6 +69,28 @@ class TestDataSet(unittest.TestCase):
             self.assertTrue(isinstance(dst['grp1'], DataFrame))
             self.assertEqual([b'a', b'b', b'c', b'd'], dst['grp1']['fs'].data[:].tolist())
 
+    def test_dataste_static_func(self):
+        bio = BytesIO()
+        bio2 = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'r+', 'dst')
+            df = dst.create_dataframe('df')
+            num1 = df.create_numeric('num','uint32')
+            num1.data.write([1,2,3,4])
+
+            ds2 = s.open_dataset(bio2,'r+','ds2')
+            HDF5Dataset.copy(df,ds2,'df2')
+            print(type(ds2['df2']))
+            self.assertTrue(isinstance(ds2['df2'],DataFrame))
+            self.assertTrue(isinstance(ds2['df2']['num'],fields.Field))
+
+            HDF5Dataset.drop(ds2['df2'])
+            self.assertTrue(len(ds2)==0)
+
+            HDF5Dataset.move(df,ds2,'df2')
+            self.assertTrue(len(dst) == 0)
+            self.assertTrue(len(ds2) == 1)
+
     def test_dataframe_create_with_dataframe(self):
 
         iscontents1 = ['a', 'bb', 'ccc', 'dddd']
@@ -129,3 +151,4 @@ class TestDataSet(unittest.TestCase):
             df2['t_foo'].data[:] = np.array(tcontents2, dtype=np.float64)
             self.assertListEqual(tcontents1.tolist(), df1['t_foo'].data[:].tolist())
             self.assertListEqual(tcontents2.tolist(), df2['t_foo'].data[:].tolist())
+

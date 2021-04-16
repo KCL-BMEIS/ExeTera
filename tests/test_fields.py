@@ -191,26 +191,7 @@ class TestIndexedStringFields(unittest.TestCase):
             self.assertListEqual([0, 1, 3, 6, 8, 9, 12], s.get_spans(idx))
 
 
-class TestFieldArray(unittest.TestCase):
 
-    def test_write_part(self):
-        bio = BytesIO()
-        s = session.Session()
-        ds = s.open_dataset(bio, "w", "src")
-        dst = ds.create_dataframe('src')
-        num = s.create_numeric(dst, 'num', 'int32')
-        num.data.write_part(np.arange(10))
-        self.assertListEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], list(num.data[:]))
-
-    def test_clear(self):
-        bio = BytesIO()
-        s = session.Session()
-        ds = s.open_dataset(bio, "w", "src")
-        dst = ds.create_dataframe('src')
-        num = s.create_numeric(dst, 'num', 'int32')
-        num.data.write_part(np.arange(10))
-        num.data.clear()
-        self.assertListEqual([], list(num.data[:]))
 
 
 
