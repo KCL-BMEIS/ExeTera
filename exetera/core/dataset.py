@@ -81,7 +81,7 @@ class HDF5Dataset(Dataset):
         self._dataframes[name] = _dataframe
         return _dataframe
 
-    def add(self, dataframe, name=None):
+    def add(self, dataframe):
         """
         Add an existing dataframe (from other dataset) to this dataset, write the existing group
         attributes and HDF5 datasets to this dataset.
@@ -90,7 +90,7 @@ class HDF5Dataset(Dataset):
         :param name: optional- change the dataframe name.
         :return: None if the operation is successful; otherwise throw Error.
         """
-        dname = dataframe.name if name is None else name
+        dname = dataframe.name
         self._file.create_group(dname)
         h5group = self._file[dname]
         _dataframe = edf.HDF5DataFrame(self, dname, h5group)
@@ -175,16 +175,19 @@ class HDF5Dataset(Dataset):
         """
         if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
-        elif not isinstance(dataframe, edf.DataFrame):
+        if not isinstance(dataframe, edf.DataFrame):
             raise TypeError("The field must be a DataFrame object.")
-        else:
-            if dataframe.dataset == self:  # rename a dataframe
 
-                self._file.move(dataframe.h5group.name, name)
-            else:  # new dataframe from another dataset
-                if self._dataframes.__contains__(name):
-                    self.__delitem__(name)
-                self.add(dataframe, name)
+        if dataframe.dataset == self:  # rename a dataframe
+            del self._dataframes[dataframe.name]
+            dataframe.name = name
+            self._file.move(dataframe.h5group.name, name)
+        else:  # new dataframe from another dataset
+            if self._dataframes.__contains__(name):
+                self.__delitem__(name)
+            dataframe.name = name
+        self.add(dataframe)
+
 
     def __delitem__(self, name: str):
         """

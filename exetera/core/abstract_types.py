@@ -81,7 +81,7 @@ class Dataset(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def add(self, field, name=None):
+    def add(self, field):
         raise NotImplementedError()
 
     @abstractmethod
@@ -135,7 +135,7 @@ class DataFrame(ABC):
     """
 
     @abstractmethod
-    def add(self, field, name=None):
+    def add(self, field):
         raise NotImplementedError()
 
     @abstractmethod
