@@ -1777,8 +1777,8 @@ def dtype_to_str(dtype):
 
 class FieldDataOps:
 
-    @classmethod
-    def numeric_add(cls, session, first, second):
+    @staticmethod
+    def _binary_op(session, first, second, function):
         if isinstance(first, Field):
             first_data = first.data[:]
         else:
@@ -1789,95 +1789,52 @@ class FieldDataOps:
         else:
             second_data = second
 
-        r = first_data + second_data
+        r = function(first_data, second_data)
         f = NumericMemField(session, dtype_to_str(r.dtype))
         f.data.write(r)
         return f
+
+    @classmethod
+    def numeric_add(cls, session, first, second):
+        def function_add(first, second):
+            return first + second
+
+        return cls._binary_op(session, first, second, function_add)
 
     @classmethod
     def numeric_sub(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_sub(first, second):
+            return first - second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data - second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_sub)
 
     @classmethod
     def numeric_mul(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_mul(first, second):
+            return first * second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data * second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_mul)
 
     @classmethod
     def numeric_truediv(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_truediv(first, second):
+            return first / second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data / second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_truediv)
 
     @classmethod
     def numeric_floordiv(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_floordiv(first, second):
+            return first // second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data // second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_floordiv)
 
     @classmethod
     def numeric_mod(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_mod(first, second):
+            return first % second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data % second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_mod)
 
     @classmethod
     def numeric_divmod(cls, session, first, second):
@@ -1900,156 +1857,66 @@ class FieldDataOps:
 
     @classmethod
     def numeric_and(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_and(first, second):
+            return first & second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data & second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_and)
 
     @classmethod
     def numeric_xor(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_xor(first, second):
+            return first ^ second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data ^ second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_xor)
 
     @classmethod
     def numeric_or(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_or(first, second):
+            return first | second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data | second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_or)
 
     @classmethod
     def less_than(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_less_than(first, second):
+            return first < second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data < second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_less_than)
 
     @classmethod
     def less_than_equal(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_less_than_equal(first, second):
+            return first <= second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data <= second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_less_than_equal)
 
     @classmethod
     def equal(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_equal(first, second):
+            return first == second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data == second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_equal)
 
     @classmethod
     def not_equal(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_not_equal(first, second):
+            return first != second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data != second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_not_equal)
 
     @classmethod
     def greater_than(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_greater_than(first, second):
+            return first > second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data > second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_greater_than)
 
     @classmethod
     def greater_than_equal(cls, session, first, second):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
+        def function_greater_than_equal(first, second):
+            return first >= second
 
-        if isinstance(second, Field):
-            second_data = second.data[:]
-        else:
-            second_data = second
-
-        r = first_data >= second_data
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
+        return cls._binary_op(session, first, second, function_greater_than_equal)
 
     @staticmethod
     def apply_filter_to_indexed_field(source, filter_to_apply, target=None, in_place=False):
@@ -2127,7 +1994,7 @@ class FieldDataOps:
 
 
     @staticmethod
-    def apply_filter_to_field(source, filter_to_apply, target=None, in_place=None):
+    def apply_filter_to_field(source, filter_to_apply, target=None, in_place=False):
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
@@ -2153,7 +2020,7 @@ class FieldDataOps:
             return mem_field
 
     @staticmethod
-    def apply_index_to_field(source, index_to_apply, target=None, in_place=None):
+    def apply_index_to_field(source, index_to_apply, target=None, in_place=False):
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
