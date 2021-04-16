@@ -193,6 +193,23 @@ class TestDataFrame(unittest.TestCase):
             df['r6'] = cat1 >= cat2
             self.assertEqual([False, False, True, False, False, True], df['r6'].data[:].tolist())
 
+    def test_datafrmae_static_methods(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('dst')
+            numf = s.create_numeric(df, 'numf', 'int32')
+            numf.data.write([5, 4, 3, 2, 1])
+
+            df2 = dst.create_dataframe('df2')
+            dataframe.HDF5DataFrame.copy(numf, df2,'numf')
+            self.assertListEqual([5, 4, 3, 2, 1], df2['numf'].data[:].tolist())
+            dataframe.HDF5DataFrame.drop(df, numf)
+            self.assertTrue('numf' not in df)
+            dataframe.HDF5DataFrame.move(df2,df2['numf'],df,'numf')
+            self.assertTrue('numf' not in df2)
+            self.assertListEqual([5, 4, 3, 2, 1], df['numf'].data[:].tolist())
+
     def test_dataframe_ops(self):
         bio = BytesIO()
         with session.Session() as s:
