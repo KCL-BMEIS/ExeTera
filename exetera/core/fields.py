@@ -1490,7 +1490,7 @@ class TimestampField(HDF5Field):
     def __eq__(self, value):
         return FieldDataOps.equal(self._session, self, value)
 
-    def __eq__(self, value):
+    def __ne__(self, value):
         return FieldDataOps.not_equal(self._session, self, value)
 
     def __gt__(self, value):

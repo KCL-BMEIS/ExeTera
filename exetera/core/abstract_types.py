@@ -81,7 +81,7 @@ class Dataset(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def add(self, field, name=None):
+    def add(self, field):
         raise NotImplementedError()
 
     @abstractmethod
@@ -100,9 +100,9 @@ class Dataset(ABC):
     def get_dataframe(self, name):
         raise NotImplementedError()
 
-    @abstractmethod
-    def get_name(self, dataframe):
-        raise NotImplementedError()
+    # @abstractmethod
+    # def get_name(self, dataframe):
+    #     raise NotImplementedError()
 
     @abstractmethod
     def __setitem__(self, name, dataframe):
@@ -135,7 +135,7 @@ class DataFrame(ABC):
     """
 
     @abstractmethod
-    def add(self, field, name=None):
+    def add(self, field):
         raise NotImplementedError()
 
     @abstractmethod
@@ -178,9 +178,9 @@ class DataFrame(ABC):
     def get_field(self, name):
         raise NotImplementedError()
 
-    @abstractmethod
-    def get_name(self, field):
-        raise NotImplementedError()
+    # @abstractmethod
+    # def get_name(self, field):
+    #     raise NotImplementedError()
 
     @abstractmethod
     def __setitem__(self, name, field):
