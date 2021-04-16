@@ -137,8 +137,8 @@ class TestDataSet(unittest.TestCase):
             df2['c_foo'].data[:] = ccontents2
             self.assertListEqual(ccontents1.tolist(), df1['c_foo'].data[:].tolist())
             self.assertListEqual(ccontents2.tolist(), df2['c_foo'].data[:].tolist())
-            self.assertDictEqual({1: 'a', 2: 'b'}, df1['c_foo'].keys)
-            self.assertDictEqual({1: 'a', 2: 'b'}, df2['c_foo'].keys)
+            self.assertDictEqual({1: b'a', 2: b'b'}, df1['c_foo'].keys)
+            self.assertDictEqual({1: b'a', 2: b'b'}, df2['c_foo'].keys)
 
             self.assertListEqual(ncontents1.tolist(), df1['n_foo'].data[:].tolist())
             self.assertListEqual(ncontents1.tolist(), df2['n_foo'].data[:].tolist())
