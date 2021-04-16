@@ -47,7 +47,7 @@ class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
         with session.Session() as s:
             with h5py.File(bio, 'w') as src:
                 df = src.create_group('df')
-                f = s.create_categorical(df, 'foo', 'int8', {'a': 1, 'b': 2})
+                f = s.create_categorical(df, 'foo', 'int8', {b'a': 1, b'b': 2})
                 f.data.write(np.array(contents))
 
         with session.Session() as s:
@@ -94,7 +94,7 @@ class TestCreateThenLoadBetweenSessionsNew(unittest.TestCase):
         with session.Session() as s:
             src = s.open_dataset(bio, 'w', 'src')
             df = src.create_dataframe('df')
-            f = s.create_categorical(df, 'foo', 'int8', {'a': 1, 'b': 2})
+            f = s.create_categorical(df, 'foo', 'int8', {b'a': 1, b'b': 2})
             f.data.write(np.array([1, 2, 1, 2]))
 
         with session.Session() as s:
