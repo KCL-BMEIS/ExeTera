@@ -1923,8 +1923,10 @@ class FieldDataOps:
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
+        filter_to_apply_ = val.array_from_field_or_lower('filter_to_apply', filter_to_apply)
+
         dest_indices, dest_values = \
-            ops.apply_filter_to_index_values(filter_to_apply,
+            ops.apply_filter_to_index_values(filter_to_apply_,
                                              source.indices[:], source.values[:])
 
         if in_place:
@@ -1960,8 +1962,10 @@ class FieldDataOps:
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
+        index_to_apply_ = val.array_from_field_or_lower('index_to_apply', index_to_apply)
+
         dest_indices, dest_values = \
-            ops.apply_indices_to_index_values(index_to_apply,
+            ops.apply_indices_to_index_values(index_to_apply_,
                                               source.indices[:], source.values[:])
 
         if in_place:
@@ -2014,6 +2018,7 @@ class FieldDataOps:
             else:
                 target.data.clear()
                 target.data.write(dest_data)
+            return target
         else:
             mem_field = source.create_like(None, None)
             mem_field.data.write(dest_data)
@@ -2040,6 +2045,7 @@ class FieldDataOps:
             else:
                 target.data.clear()
                 target.data.write(dest_data)
+            return target
         else:
             mem_field = source.create_like(None, None)
             mem_field.data.write(dest_data)

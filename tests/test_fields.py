@@ -484,16 +484,34 @@ class TestFieldApplyFilter(unittest.TestCase):
         with session.Session() as s:
             ds = s.open_dataset(bio, 'w', 'ds')
             df = ds.create_dataframe('df')
-            f = df.create_indexed_string('foo')
+            f = df.create_indexed_string('f')
             f.data.write(data)
             self.assertListEqual(expected_indices, f.indices[:].tolist())
             self.assertListEqual(expected_values, f.values[:].tolist())
             self.assertListEqual(data, f.data[:])
 
-            g = f.apply_filter(filt, in_place=True)
+            ff = f.apply_filter(filt, in_place=True)
             self.assertListEqual(expected_filt_indices, f.indices[:].tolist())
             self.assertListEqual(expected_filt_values, f.values[:].tolist())
             self.assertListEqual(expected_filt_data, f.data[:])
+            self.assertListEqual(expected_filt_indices, ff.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, ff.values[:].tolist())
+            self.assertListEqual(expected_filt_data, ff.data[:])
+
+            g = f.create_like(df, 'g')
+            g.data.write(data)
+            fg = f.create_like(df, 'fg')
+            fgr = g.apply_filter(filt, fg)
+            self.assertListEqual(expected_filt_indices, fg.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, fg.values[:].tolist())
+            self.assertListEqual(expected_filt_data, fg.data[:])
+            self.assertListEqual(expected_filt_indices, fgr.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, fgr.values[:].tolist())
+            self.assertListEqual(expected_filt_data, fgr.data[:])
+            fh = g.apply_filter(filt)
+            self.assertListEqual(expected_filt_indices, fh.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, fh.values[:].tolist())
+            self.assertListEqual(expected_filt_data, fh.data[:])
 
             mf = fields.IndexedStringMemField(s)
             mf.data.write(data)
@@ -517,6 +535,47 @@ class TestFieldApplyFilter(unittest.TestCase):
             self.assertListEqual(expected_filt_values, mb.values[:].tolist())
             self.assertListEqual(expected_filt_data, mb.data[:])
 
+    def test_fixed_string_apply_filter(self):
+        data = np.array([b'a', b'bb', b'ccc', b'dddd', b'eeee', b'fff', b'gg', b'h'], dtype='S4')
+        filt = np.array([0, 1, 0, 1, 0, 1, 0, 1], dtype=bool)
+        expected = [b'bb', b'dddd', b'fff', b'h']
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = df.create_fixed_string('foo', 4)
+            f.data.write(data)
+            self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+            ff = f.apply_filter(filt, in_place=True)
+            self.assertListEqual(expected, f.data[:].tolist())
+            self.assertListEqual(expected, ff.data[:].tolist())
+
+            g = f.create_like(df, 'g')
+            g.data.write(data)
+            fg = f.create_like(df, 'fg')
+            fgr = g.apply_filter(filt, fg)
+            self.assertListEqual(expected, fg.data[:].tolist())
+            self.assertListEqual(expected, fgr.data[:].tolist())
+
+            fh = g.apply_filter(filt)
+            self.assertListEqual(expected, fh.data[:].tolist())
+
+            mf = fields.FixedStringMemField(s, 4)
+            mf.data.write(data)
+            self.assertListEqual(data.tolist(), mf.data[:].tolist())
+
+            mf.apply_filter(filt, in_place=True)
+            self.assertListEqual(expected, mf.data[:].tolist())
+
+            b = df.create_fixed_string('bar', 4)
+            b.data.write(data)
+            self.assertListEqual(data.tolist(), b.data[:].tolist())
+
+            mb = b.apply_filter(filt)
+            self.assertListEqual(expected, mb.data[:].tolist())
+
     def test_numeric_apply_filter(self):
         data = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9], dtype=np.int32)
         filt = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0], dtype=bool)
@@ -530,8 +589,19 @@ class TestFieldApplyFilter(unittest.TestCase):
             f.data.write(data)
             self.assertListEqual(data.tolist(), f.data[:].tolist())
 
-            g = f.apply_filter(filt, in_place=True)
+            ff = f.apply_filter(filt, in_place=True)
             self.assertListEqual(expected, f.data[:].tolist())
+            self.assertListEqual(expected, ff.data[:].tolist())
+
+            g = f.create_like(df, 'g')
+            g.data.write(data)
+            fg = f.create_like(df, 'fg')
+            fgr = g.apply_filter(filt, fg)
+            self.assertListEqual(expected, fg.data[:].tolist())
+            self.assertListEqual(expected, fgr.data[:].tolist())
+
+            fh = g.apply_filter(filt)
+            self.assertListEqual(expected, fh.data[:].tolist())
 
             mf = fields.NumericMemField(s, 'int32')
             mf.data.write(data)
@@ -561,8 +631,19 @@ class TestFieldApplyFilter(unittest.TestCase):
             f.data.write(data)
             self.assertListEqual(data.tolist(), f.data[:].tolist())
 
-            g = f.apply_filter(filt, in_place=True)
+            ff = f.apply_filter(filt, in_place=True)
             self.assertListEqual(expected, f.data[:].tolist())
+            self.assertListEqual(expected, ff.data[:].tolist())
+
+            g = f.create_like(df, 'g')
+            g.data.write(data)
+            fg = f.create_like(df, 'fg')
+            fgr = g.apply_filter(filt, fg)
+            self.assertListEqual(expected, fg.data[:].tolist())
+            self.assertListEqual(expected, fgr.data[:].tolist())
+
+            fh = g.apply_filter(filt)
+            self.assertListEqual(expected, fh.data[:].tolist())
 
             mf = fields.CategoricalMemField(s, 'int8', keys)
             mf.data.write(data)
@@ -594,8 +675,19 @@ class TestFieldApplyFilter(unittest.TestCase):
             f.data.write(data)
             self.assertListEqual(data.tolist(), f.data[:].tolist())
 
-            g = f.apply_filter(filt, in_place=True)
+            ff = f.apply_filter(filt, in_place=True)
             self.assertListEqual(expected, f.data[:].tolist())
+            self.assertListEqual(expected, ff.data[:].tolist())
+
+            g = f.create_like(df, 'g')
+            g.data.write(data)
+            fg = f.create_like(df, 'fg')
+            fgr = g.apply_filter(filt, fg)
+            self.assertListEqual(expected, fg.data[:].tolist())
+            self.assertListEqual(expected, fgr.data[:].tolist())
+
+            fh = g.apply_filter(filt)
+            self.assertListEqual(expected, fh.data[:].tolist())
 
             mf = fields.TimestampMemField(s)
             mf.data.write(data)
@@ -638,10 +730,29 @@ class TestFieldApplyIndex(unittest.TestCase):
             self.assertListEqual(expected_values, f.values[:].tolist())
             self.assertListEqual(data, f.data[:])
 
-            g = f.apply_index(inds, in_place=True)
+            ff = f.apply_index(inds, in_place=True)
             self.assertListEqual(expected_filt_indices, f.indices[:].tolist())
             self.assertListEqual(expected_filt_values, f.values[:].tolist())
             self.assertListEqual(expected_filt_data, f.data[:])
+            self.assertListEqual(expected_filt_indices, ff.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, ff.values[:].tolist())
+            self.assertListEqual(expected_filt_data, ff.data[:])
+
+            g = f.create_like(df, 'g')
+            g.data.write(data)
+            fg = f.create_like(df, 'fg')
+            fgr = g.apply_index(inds, fg)
+            self.assertListEqual(expected_filt_indices, fg.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, fg.values[:].tolist())
+            self.assertListEqual(expected_filt_data, fg.data[:])
+            self.assertListEqual(expected_filt_indices, fgr.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, fgr.values[:].tolist())
+            self.assertListEqual(expected_filt_data, fgr.data[:])
+
+            fh = g.apply_index(inds)
+            self.assertListEqual(expected_filt_indices, fh.indices[:].tolist())
+            self.assertListEqual(expected_filt_values, fh.values[:].tolist())
+            self.assertListEqual(expected_filt_data, fh.data[:])
 
             mf = fields.IndexedStringMemField(s)
             mf.data.write(data)
@@ -677,8 +788,19 @@ class TestFieldApplyIndex(unittest.TestCase):
             f.data.write(data)
             self.assertListEqual(data.tolist(), f.data[:].tolist())
 
-            g = f.apply_index(indices, in_place=True)
+            ff = f.apply_index(indices, in_place=True)
             self.assertListEqual(expected, f.data[:].tolist())
+            self.assertListEqual(expected, ff.data[:].tolist())
+
+            g = f.create_like(df, 'g')
+            g.data.write(data)
+            fg = f.create_like(df, 'fg')
+            fgr = g.apply_index(indices, fg)
+            self.assertListEqual(expected, fg.data[:].tolist())
+            self.assertListEqual(expected, fgr.data[:].tolist())
+
+            fh = g.apply_index(indices)
+            self.assertListEqual(expected, fh.data[:].tolist())
 
             mf = fields.FixedStringMemField(s, 4)
             mf.data.write(data)
@@ -706,8 +828,19 @@ class TestFieldApplyIndex(unittest.TestCase):
             f.data.write(data)
             self.assertListEqual(data.tolist(), f.data[:].tolist())
 
-            g = f.apply_index(indices, in_place=True)
+            ff = f.apply_index(indices, in_place=True)
             self.assertListEqual(expected, f.data[:].tolist())
+            self.assertListEqual(expected, ff.data[:].tolist())
+
+            g = f.create_like(df, 'g')
+            g.data.write(data)
+            fg = f.create_like(df, 'fg')
+            fgr = g.apply_index(indices, fg)
+            self.assertListEqual(expected, fg.data[:].tolist())
+            self.assertListEqual(expected, fgr.data[:].tolist())
+
+            fh = g.apply_index(indices)
+            self.assertListEqual(expected, fh.data[:].tolist())
 
             mf = fields.NumericMemField(s, 'int32')
             mf.data.write(data)
@@ -736,8 +869,19 @@ class TestFieldApplyIndex(unittest.TestCase):
             f.data.write(data)
             self.assertListEqual(data.tolist(), f.data[:].tolist())
 
-            g = f.apply_index(indices, in_place=True)
+            ff = f.apply_index(indices, in_place=True)
             self.assertListEqual(expected, f.data[:].tolist())
+            self.assertListEqual(expected, ff.data[:].tolist())
+
+            g = f.create_like(df, 'g')
+            g.data.write(data)
+            fg = f.create_like(df, 'fg')
+            fgr = g.apply_index(indices, fg)
+            self.assertListEqual(expected, fg.data[:].tolist())
+            self.assertListEqual(expected, fgr.data[:].tolist())
+
+            fh = g.apply_index(indices)
+            self.assertListEqual(expected, fh.data[:].tolist())
 
             mf = fields.CategoricalMemField(s, 'int8', keys)
             mf.data.write(data)
@@ -768,8 +912,19 @@ class TestFieldApplyIndex(unittest.TestCase):
             f.data.write(data)
             self.assertListEqual(data.tolist(), f.data[:].tolist())
 
-            g = f.apply_index(indices, in_place=True)
+            ff = f.apply_index(indices, in_place=True)
             self.assertListEqual(expected, f.data[:].tolist())
+            self.assertListEqual(expected, ff.data[:].tolist())
+
+            g = f.create_like(df, 'g')
+            g.data.write(data)
+            fg = f.create_like(df, 'fg')
+            fgr = g.apply_index(indices, fg)
+            self.assertListEqual(expected, fg.data[:].tolist())
+            self.assertListEqual(expected, fgr.data[:].tolist())
+
+            fh = g.apply_index(indices)
+            self.assertListEqual(expected, fh.data[:].tolist())
 
             mf = fields.TimestampMemField(s)
             mf.data.write(data)

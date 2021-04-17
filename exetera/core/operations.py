@@ -151,7 +151,6 @@ def data_iterator(data_field, chunksize=1 << 20):
         for v in range(c[0], c[1]):
             yield data[v]
 
-
 @njit
 def apply_filter_to_index_values(index_filter, indices, values):
     # pass 1 - determine the destination lengths
