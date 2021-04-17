@@ -2136,4 +2136,4 @@ class FieldDataOps:
             timestamp_field_constructor(source._session, group, name, ts, source.chunksize)
             return TimestampField(source._session, group[name], write_enabled=True)
         else:
-            return group.create_numeric(name, ts)
+            return group.create_timestamp(name, ts)

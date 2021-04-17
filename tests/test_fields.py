@@ -958,6 +958,10 @@ class TestFieldCreateLike(unittest.TestCase):
             self.assertIsInstance(g, fields.IndexedStringMemField)
             self.assertEqual(0, len(g.data))
 
+            h = f.create_like(df, "h")
+            self.assertIsInstance(h, fields.IndexedStringField)
+            self.assertEqual(0, len(h.data))
+
     def test_fixed_string_field_create_like(self):
         data = np.asarray([b'a', b'bb', b'ccc', b'dddd'], dtype='S4')
 
@@ -973,6 +977,10 @@ class TestFieldCreateLike(unittest.TestCase):
             self.assertIsInstance(g, fields.FixedStringMemField)
             self.assertEqual(0, len(g.data))
 
+            h = f.create_like(df, "h")
+            self.assertIsInstance(h, fields.FixedStringField)
+            self.assertEqual(0, len(h.data))
+
     def test_numeric_field_create_like(self):
         data = np.asarray([1, 2, 3, 4], dtype=np.int32)
 
@@ -987,6 +995,10 @@ class TestFieldCreateLike(unittest.TestCase):
             g = f.create_like(None, None)
             self.assertIsInstance(g, fields.NumericMemField)
             self.assertEqual(0, len(g.data))
+
+            h = f.create_like(df, "h")
+            self.assertIsInstance(h, fields.NumericField)
+            self.assertEqual(0, len(h.data))
 
     def test_categorical_field_create_like(self):
         data = np.asarray([0, 1, 1, 0], dtype=np.int8)
@@ -1004,6 +1016,10 @@ class TestFieldCreateLike(unittest.TestCase):
             self.assertIsInstance(g, fields.CategoricalMemField)
             self.assertEqual(0, len(g.data))
 
+            h = f.create_like(df, "h")
+            self.assertIsInstance(h, fields.CategoricalField)
+            self.assertEqual(0, len(h.data))
+
     def test_timestamp_field_create_like(self):
         from datetime import datetime as D
         data = [D(2020, 1, 1), D(2021, 5, 18), D(2950, 8, 17), D(1840, 10, 11)]
@@ -1020,3 +1036,7 @@ class TestFieldCreateLike(unittest.TestCase):
             g = f.create_like(None, None)
             self.assertIsInstance(g, fields.TimestampMemField)
             self.assertEqual(0, len(g.data))
+
+            h = f.create_like(df, "h")
+            self.assertIsInstance(h, fields.TimestampField)
+            self.assertEqual(0, len(h.data))
