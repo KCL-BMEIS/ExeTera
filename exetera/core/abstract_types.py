@@ -81,7 +81,7 @@ class Dataset(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def add(self, field):
+    def copy(self, field):
         raise NotImplementedError()
 
     @abstractmethod
