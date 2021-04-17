@@ -2002,7 +2002,7 @@ class FieldDataOps:
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
-        dest_data = source.data[filter_to_apply]
+        dest_data = source.data[:][filter_to_apply]
 
         if in_place:
             if not source._write_enabled:
