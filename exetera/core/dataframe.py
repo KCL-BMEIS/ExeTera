@@ -273,7 +273,7 @@ class HDF5DataFrame(DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self._columns.items():
                 newfld = field.create_like(ddf, name)
-                field.apply_index(filter_to_apply, target=newfld)
+                field.apply_filter(filter_to_apply, target=newfld)
             return ddf
         else:
             for field in self._columns.values():
