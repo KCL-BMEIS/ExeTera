@@ -221,7 +221,7 @@ class Session(AbstractSession):
                 else:
                     r.data[:] = self.apply_index(sorted_index, r)
                 del r
-                print_if_verbose(f"  '{k}' reordered in {time.time() - t1}s")
+            print_if_verbose(f"  '{k}' reordered in {time.time() - t1}s")
         print_if_verbose(f"fields reordered in {time.time() - t0}s")
 
     def dataset_sort_index(self, sort_indices, index=None):
