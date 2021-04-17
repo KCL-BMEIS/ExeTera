@@ -49,10 +49,6 @@ class HDF5Dataset(Dataset):
         """
         return self._session
 
-    def close(self):
-        """Close the HDF5 file operations."""
-        self._file.close()
-
     def create_dataframe(self, name, dataframe: DataFrame = None):
         """
         Create a group object in HDF5 file and a Exetera dataframe in memory.
@@ -80,6 +76,10 @@ class HDF5Dataset(Dataset):
 
         self._dataframes[name] = _dataframe
         return _dataframe
+
+    def close(self):
+        """Close the HDF5 file operations."""
+        self._file.close()
 
     def copy(self, dataframe, name):
         """
@@ -165,16 +165,14 @@ class HDF5Dataset(Dataset):
         if not isinstance(dataframe, edf.DataFrame):
             raise TypeError("The field must be a DataFrame object.")
 
-        if dataframe.dataset == self:  # rename a dataframe
+        if dataframe.dataset == self:
+            # rename a dataframe
             del self._dataframes[dataframe.name]
             dataframe.name = name
             self._file.move(dataframe.h5group.name, name)
-        else:  # new dataframe from another dataset
-            # if self._dataframes.__contains__(name):
-            #     self.__delitem__(name)
-            # dataframe.name = name
+        else:
+            # new dataframe from another dataset
             copy(dataframe, self, name)
-        # self.add(dataframe)
 
     def __delitem__(self, name: str):
         """
@@ -239,10 +237,8 @@ def copy(dataframe: DataFrame, dataset: Dataset, name: str):
         raise ValueError("A dataframe with the the name {} already exists in the "
                          "destination dataset".format(name))
 
-    # TODO: 
-    h5group = dataset._file.create_group(name)
+    _dataframe = dataset.create_dataframe(name)
 
-    _dataframe = edf.HDF5DataFrame(dataset, name, h5group)
     for k, v in dataframe.items():
         f = v.create_like(_dataframe, k)
         if f.indexed:
@@ -250,6 +246,7 @@ def copy(dataframe: DataFrame, dataset: Dataset, name: str):
             f.values.write(v.values[:])
         else:
             f.data.write(v.data[:])
+
     dataset._dataframes[name] = _dataframe
 
 

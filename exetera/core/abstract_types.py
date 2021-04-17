@@ -77,43 +77,54 @@ class Dataset(ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def create_dataframe(self,
+                         name: str,
+                         dataframe: 'DataFrame'):
+        raise NotImplementedError()
+
+    @abstractmethod
     def close(self):
         raise NotImplementedError()
 
     @abstractmethod
-    def copy(self, field):
+    def copy(self,
+             field: 'Field'):
         raise NotImplementedError()
 
     @abstractmethod
-    def __contains__(self, name):
+    def __contains__(self,
+                     name: str):
         raise NotImplementedError()
 
     @abstractmethod
-    def contains_dataframe(self, dataframe):
+    def contains_dataframe(self,
+                           dataframe: 'DataFrame'):
         raise NotImplementedError()
 
     @abstractmethod
-    def __getitem__(self, name):
+    def __getitem__(self,
+                    name: str):
         raise NotImplementedError()
 
     @abstractmethod
-    def get_dataframe(self, name):
-        raise NotImplementedError()
-
-    # @abstractmethod
-    # def get_name(self, dataframe):
-    #     raise NotImplementedError()
-
-    @abstractmethod
-    def __setitem__(self, name, dataframe):
+    def get_dataframe(self,
+                      name: str):
         raise NotImplementedError()
 
     @abstractmethod
-    def __delitem__(self, name):
+    def __setitem__(self,
+                    name: str,
+                    dataframe: 'DataFrame'):
         raise NotImplementedError()
 
     @abstractmethod
-    def delete_dataframe(self, dataframe):
+    def __delitem__(self,
+                    name: str):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def delete_dataframe(self,
+                         dataframe: 'DataFrame'):
         raise NotImplementedError()
 
     @abstractmethod
