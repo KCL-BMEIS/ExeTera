@@ -232,3 +232,27 @@ class TestDataFrame(unittest.TestCase):
             df.apply_filter(filter_to_apply, ddf)
             self.assertEqual([5, 4, 1], ddf['numf'].data[:].tolist())
             self.assertEqual([b'e', b'd', b'a'], ddf['fst'].data[:].tolist())
+
+
+class TestDataFrameApplyFilter(unittest.TestCase):
+
+    def test_apply_filter(self):
+
+        src = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
+        filt = np.array([0, 1, 0, 1, 0, 1, 1, 0], dtype='bool')
+        expected = src[filt].tolist()
+
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            numf = s.create_numeric(df, 'numf', 'int32')
+            numf.data.write(src)
+            df2 = dst.create_dataframe('df2')
+            df2b = df.apply_filter(filt, df2)
+            self.assertListEqual(expected, df2['numf'].data[:].tolist())
+            self.assertListEqual(expected, df2b['numf'].data[:].tolist())
+            self.assertListEqual(src.tolist(), df['numf'].data[:].tolist())
+
+            df.apply_filter(filt)
+            self.assertListEqual(expected, df['numf'].data[:].tolist())
