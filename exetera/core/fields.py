@@ -2079,7 +2079,7 @@ class FieldDataOps:
             return FixedStringMemField(source._session, length)
 
         if isinstance(group, h5py.Group):
-            numeric_field_constructor(source._session, group, name, length, ts, source.chunksize)
+            fixed_string_field_constructor(source._session, group, name, length, ts, source.chunksize)
             return FixedStringField(source._session, group[name], write_enabled=True)
         else:
             return group.create_fixed_string(name, length, ts)

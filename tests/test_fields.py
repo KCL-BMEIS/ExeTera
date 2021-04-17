@@ -1040,3 +1040,86 @@ class TestFieldCreateLike(unittest.TestCase):
             h = f.create_like(df, "h")
             self.assertIsInstance(h, fields.TimestampField)
             self.assertEqual(0, len(h.data))
+
+
+class TestFieldCreateLikeWithGroups(unittest.TestCase):
+
+    def test_indexed_string_field_create_like(self):
+        data = ['a', 'bb', 'ccc', 'ddd']
+
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as ds:
+            with session.Session() as s:
+                df = ds.create_group('df')
+                f = s.create_indexed_string(df, 'foo')
+                f.data.write(data)
+                self.assertListEqual(data, f.data[:])
+
+                g = f.create_like(df, "g")
+                self.assertIsInstance(g, fields.IndexedStringField)
+                self.assertEqual(0, len(g.data))
+
+    def test_fixed_string_field_create_like(self):
+        data = np.asarray([b'a', b'bb', b'ccc', b'dddd'], dtype='S4')
+
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as ds:
+            with session.Session() as s:
+                df = ds.create_group('df')
+                f = s.create_fixed_string(df, 'foo', 4)
+                f.data.write(data)
+                self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+                g = f.create_like(df, "g")
+                self.assertIsInstance(g, fields.FixedStringField)
+                self.assertEqual(0, len(g.data))
+
+    def test_numeric_field_create_like(self):
+        expected = [1, 2, 3, 4]
+        data = np.asarray(expected, dtype=np.int32)
+
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as ds:
+            with session.Session() as s:
+                df = ds.create_group('df')
+                f = s.create_numeric(df, 'foo', 'int32')
+                f.data.write(data)
+                self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+                g = f.create_like(df, "g")
+                self.assertIsInstance(g, fields.NumericField)
+                self.assertEqual(0, len(g.data))
+
+    def test_categorical_field_create_like(self):
+        data = np.asarray([0, 1, 1, 0], dtype=np.int8)
+        key = {b'a': 0, b'b': 1}
+
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as ds:
+            with session.Session() as s:
+                df = ds.create_group('df')
+                f = s.create_categorical(df, 'foo', 'int8', key)
+                f.data.write(data)
+                self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+                g = f.create_like(df, "g")
+                self.assertIsInstance(g, fields.CategoricalField)
+                self.assertEqual(0, len(g.data))
+                self.assertDictEqual({0: b'a', 1: b'b'}, g.keys)
+
+    def test_timestamp_field_create_like(self):
+        from datetime import datetime as D
+        data = [D(2020, 1, 1), D(2021, 5, 18), D(2950, 8, 17), D(1840, 10, 11)]
+        data = np.asarray([d.timestamp() for d in data], dtype=np.float64)
+
+        bio = BytesIO()
+        with h5py.File(bio, 'w') as ds:
+            with session.Session() as s:
+                df = ds.create_group('df')
+                f = s.create_timestamp(df, 'foo')
+                f.data.write(data)
+                self.assertListEqual(data.tolist(), f.data[:].tolist())
+
+                g = f.create_like(df, "g")
+                self.assertIsInstance(g, fields.TimestampField)
+                self.assertEqual(0, len(g.data))
