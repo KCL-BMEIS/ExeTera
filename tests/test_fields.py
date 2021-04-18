@@ -1070,12 +1070,12 @@ class TestFieldApplySpansCount(unittest.TestCase):
                                    lambda df: df.create_timestamp('foo'),
                                    lambda f, p, d: f.apply_spans_last(p, d))
 
-        expected = src_data[[0, 2, 3, 6]].tolist()
+        expected = src_data[[0, 2, 3, 7]].tolist()
         self._test_apply_spans_src(spans, src_data, expected,
                                    lambda df: df.create_timestamp('foo'),
                                    lambda f, p, d: f.apply_spans_min(p, d))
 
-        expected = src_data[[1, 2, 5, 7]].tolist()
+        expected = src_data[[1, 2, 5, 6]].tolist()
         self._test_apply_spans_src(spans, src_data, expected,
                                    lambda df: df.create_timestamp('foo'),
                                    lambda f, p, d: f.apply_spans_max(p, d))
