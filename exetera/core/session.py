@@ -425,7 +425,7 @@ class Session(AbstractSession):
             return results
 
     def _apply_spans_src(self,
-                         predicate: Callable[[np.array, np.array, np.array], None],
+                         predicate: Callable[[np.ndarray, np.ndarray, np.ndarray], None],
                          spans: np.array,
                          target: np.array,
                          dest: Field = None) -> np.array:

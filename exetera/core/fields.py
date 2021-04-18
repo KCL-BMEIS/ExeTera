@@ -9,7 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Union
+from typing import Callable, Optional, Union
 from datetime import datetime, timezone
 
 import numpy as np
@@ -195,6 +195,7 @@ class MemoryFieldArray:
 
     def __len__(self):
         return 0 if self._dataset is None else len(self._dataset)
+
     @property
     def dtype(self):
         return self._dtype
@@ -242,6 +243,10 @@ class ReadOnlyIndexedFieldArray:
         # TODO: this occurs because of the initialized state of an indexed string. It would be better for the
         # index to be initialised as [0]
         return max(len(self._indices)-1, 0)
+
+    @property
+    def dtype(self):
+        return self._dtype
 
     def __getitem__(self, item):
         try:
@@ -307,6 +312,10 @@ class WriteableIndexedFieldArray:
 
     def __len__(self):
         return max(len(self._indices) - 1, 0)
+
+    @property
+    def dtype(self):
+        return self._dtype
 
     def __getitem__(self, item):
         try:
@@ -475,6 +484,17 @@ class IndexedStringMemField(MemoryField):
         """
         return FieldDataOps.apply_index_to_indexed_field(self, index_to_apply, target, in_place)
 
+    def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
+
+    def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
+
+    def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
+
+    def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
 class FixedStringMemField(MemoryField):
     def __init__(self, session, length):
@@ -541,6 +561,18 @@ class FixedStringMemField(MemoryField):
         """
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
+    def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
+
+    def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
+
+    def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
+
+    def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
 
 class NumericMemField(MemoryField):
     def __init__(self, session, nformat):
@@ -603,6 +635,18 @@ class NumericMemField(MemoryField):
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
+
+    def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
+
+    def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
+
+    def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
+
+    def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def __add__(self, second):
         return FieldDataOps.numeric_add(self._session, self, second)
@@ -762,6 +806,18 @@ class CategoricalMemField(MemoryField):
         """
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
+    def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
+
+    def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
+
+    def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
+
+    def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
     def __lt__(self, value):
         return FieldDataOps.less_than(self._session, self, value)
 
@@ -840,6 +896,18 @@ class TimestampMemField(MemoryField):
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
+
+    def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
+
+    def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
+
+    def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
+
+    def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def __add__(self, second):
         return FieldDataOps.numeric_add(self._session, self, second)
@@ -1041,7 +1109,6 @@ class IndexedStringField(HDF5Field):
         """
         return FieldDataOps.apply_filter_to_indexed_field(self, filter_to_apply, target, in_place)
 
-
     def apply_index(self, index_to_apply, target=None, in_place=False):
         """
         Apply an index to this field. This operation doesn't modify the field on which it
@@ -1057,6 +1124,18 @@ class IndexedStringField(HDF5Field):
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_index_to_indexed_field(self, index_to_apply, target, in_place)
+
+    def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
+
+    def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
+
+    def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
+
+    def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
 
 class FixedStringField(HDF5Field):
@@ -1127,6 +1206,18 @@ class FixedStringField(HDF5Field):
         """
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
+    def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
+
+    def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
+
+    def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
+
+    def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
 
 class NumericField(HDF5Field):
     def __init__(self, session, group, name=None, mem_only=True, write_enabled=False):
@@ -1191,6 +1282,18 @@ class NumericField(HDF5Field):
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
+
+    def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
+
+    def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
+
+    def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
+
+    def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def __add__(self, second):
         return FieldDataOps.numeric_add(self._session, self, second)
@@ -1357,6 +1460,18 @@ class CategoricalField(HDF5Field):
         """
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
+    def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
+
+    def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
+
+    def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
+
+    def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
     def __lt__(self, value):
         return FieldDataOps.less_than(self._session, self, value)
 
@@ -1438,6 +1553,18 @@ class TimestampField(HDF5Field):
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
+
+    def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
+
+    def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
+
+    def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
+
+    def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def __add__(self, second):
         return FieldDataOps.numeric_add(self._session, self, second)
@@ -2050,6 +2177,150 @@ class FieldDataOps:
             mem_field = source.create_like(None, None)
             mem_field.data.write(dest_data)
             return mem_field
+
+    @staticmethod
+    def _apply_spans_src(source: Field,
+                         predicate: Callable[[np.ndarray, np.ndarray, np.ndarray], Field],
+                         spans: Union[Field, np.ndarray],
+                         target: Optional[Field] = None,
+                         in_place: bool = False) -> Field:
+
+        if in_place is True and target is not None:
+            raise ValueError("if 'in_place is True, 'target' must be None")
+
+        spans_ = val.array_from_field_or_lower('spans', spans)
+        result_inds = np.zeros(len(spans))
+        results = np.zeros(len(spans)-1, dtype=source.data.dtype)
+        predicate(spans_, source.data[:], results)
+
+        if in_place is True:
+            if not source._write_enabled:
+                raise ValueError("This field is marked read-only. Call writeable() on it before "
+                                 "performing in-place apply_span methods")
+            source.data.clear()
+            source.data.write(results)
+            return source
+
+        if target is None:
+            result_field = source.create_like(None, None)
+            result_field.data.write(results)
+            return result_field
+        else:
+            target.data.clear()
+            target.data.write(results)
+            return target
+
+    @staticmethod
+    def _apply_spans_indexed_src(source: Field,
+                                 predicate: Callable[[np.ndarray, np.ndarray,
+                                                      np.ndarray, np.ndarray], Field],
+                                 spans: Union[Field, np.ndarray],
+                                 target: Optional[Field] = None,
+                                 in_place: bool = False) -> Field:
+
+        if in_place is True and target is not None:
+            raise ValueError("if 'in_place is True, 'target' must be None")
+
+        spans_ = val.array_from_field_or_lower('spans', spans)
+
+        # step 1: get the indices through the index predicate
+        results = np.zeros(len(spans)-1, dtype=np.int64)
+        predicate(spans_, source.indices[:], source.values[:], results)
+
+        # step 2: run apply_index on the source
+        return FieldDataOps.apply_index_to_indexed_field(source, results, target, in_place)
+
+    @staticmethod
+    def _apply_spans_indexed_no_src(source: Field,
+                                    predicate: Callable[[np.ndarray, np.ndarray], Field],
+                                    spans: Union[Field, np.ndarray],
+                                    target: Optional[Field] = None,
+                                    in_place: bool = False) -> Field:
+
+        if in_place is True and target is not None:
+            raise ValueError("if 'in_place is True, 'target' must be None")
+
+        spans_ = val.array_from_field_or_lower('spans', spans)
+
+        # step 1: get the indices through the index predicate
+        results = np.zeros(len(spans)-1, dtype=np.int64)
+        predicate(spans_, results)
+
+        # step 2: run apply_index on the source
+        return FieldDataOps.apply_index_to_indexed_field(source, results, target, in_place)
+
+    @staticmethod
+    def apply_spans_first(source: Field,
+                          spans: Union[Field, np.ndarray],
+                          target: Optional[Field] = None,
+                          in_place: bool = None) -> Field:
+
+        spans_ = val.array_from_field_or_lower('spans', spans)
+        if np.any(spans_[:-1] == spans_[1:]):
+            raise ValueError("cannot perform 'first' on spans with empty entries")
+
+        if source.indexed:
+            return FieldDataOps._apply_spans_indexed_no_src(source,
+                                                            ops.apply_spans_index_of_first,
+                                                            spans_, target, in_place)
+        else:
+            return FieldDataOps._apply_spans_src(source, ops.apply_spans_first, spans_,
+                                                 target, in_place)
+
+    @staticmethod
+    def apply_spans_last(source: Field,
+                         spans: Union[Field, np.ndarray],
+                         target: Optional[Field] = None,
+                         in_place: bool = None) -> Field:
+
+        spans_ = val.array_from_field_or_lower('spans', spans)
+        if np.any(spans_[:-1] == spans_[1:]):
+            raise ValueError("cannot perform 'first' on spans with empty entries")
+
+        if source.indexed:
+            return FieldDataOps._apply_spans_indexed_no_src(source,
+                                                            ops.apply_spans_index_of_last,
+                                                            spans_, target, in_place)
+        else:
+            return FieldDataOps._apply_spans_src(source, ops.apply_spans_last, spans_,
+                                                 target, in_place)
+
+    @staticmethod
+    def apply_spans_min(source: Field,
+                        spans: Union[Field, np.ndarray],
+                        target: Optional[Field] = None,
+                        in_place: bool = None) -> Field:
+
+        spans_ = val.array_from_field_or_lower('spans', spans)
+        if np.any(spans_[:-1] == spans_[1:]):
+            raise ValueError("cannot perform 'first' on spans with empty entries")
+
+        if source.indexed:
+            return FieldDataOps._apply_spans_indexed_src(source,
+                                                         ops.apply_spans_index_of_min_indexed,
+                                                         spans_, target, in_place)
+        else:
+            return FieldDataOps._apply_spans_src(source, ops.apply_spans_min, spans_,
+                                                 target, in_place)
+
+
+    @staticmethod
+    def apply_spans_max(source: Field,
+                        spans: Union[Field, np.ndarray],
+                        target: Optional[Field] = None,
+                        in_place: bool = None) -> Field:
+
+        spans_ = val.array_from_field_or_lower('spans', spans)
+        if np.any(spans_[:-1] == spans_[1:]):
+            raise ValueError("cannot perform 'first' on spans with empty entries")
+
+        if source.indexed:
+            return FieldDataOps._apply_spans_indexed_src(source,
+                                                         ops.apply_spans_index_of_max_indexed,
+                                                         spans_, target, in_place)
+        else:
+            return FieldDataOps._apply_spans_src(source, ops.apply_spans_max, spans_,
+                                                 target, in_place)
 
     @staticmethod
     def indexed_string_create_like(source, group, name, timestamp):

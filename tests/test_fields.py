@@ -704,7 +704,6 @@ class TestFieldApplyFilter(unittest.TestCase):
             self.assertListEqual(expected, mb.data[:].tolist())
 
 
-
 class TestFieldApplyIndex(unittest.TestCase):
 
     def test_indexed_string_apply_index(self):
@@ -939,6 +938,147 @@ class TestFieldApplyIndex(unittest.TestCase):
 
             mb = b.apply_index(indices)
             self.assertListEqual(expected, mb.data[:].tolist())
+
+
+class TestFieldApplySpansCount(unittest.TestCase):
+
+    def _test_apply_spans_src(self, spans, src_data, expected, create_fn, apply_fn):
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f = create_fn(df)
+            f.data.write(src_data)
+
+            actual = apply_fn(f, spans, None)
+            if actual.indexed:
+                self.assertListEqual(expected, actual.data[:])
+            else:
+                self.assertListEqual(expected, actual.data[:].tolist())
+
+    def test_indexed_string_apply_spans(self):
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+        src_data = ['a', 'bb', 'ccc', 'dddd', 'eeee', 'fff', 'gg', 'h']
+
+        expected = ['a', 'ccc', 'dddd', 'gg']
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_indexed_string('foo'),
+                                   lambda f, p, d: f.apply_spans_first(p, d))
+
+        expected = ['bb', 'ccc', 'fff', 'h']
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_indexed_string('foo'),
+                                   lambda f, p, d: f.apply_spans_last(p, d))
+
+        expected = ['a', 'ccc', 'dddd', 'gg']
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_indexed_string('foo'),
+                                   lambda f, p, d: f.apply_spans_min(p, d))
+
+        expected = ['bb', 'ccc', 'fff', 'h']
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_indexed_string('foo'),
+                                   lambda f, p, d: f.apply_spans_max(p, d))
+
+    def test_fixed_string_apply_spans(self):
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+        src_data = [b'a1', b'a2', b'b1', b'c1', b'c2', b'c3', b'd1', b'd2']
+
+        expected = [b'a1', b'b1', b'c1', b'd1']
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_fixed_string('foo', 2),
+                                   lambda f, p, d: f.apply_spans_first(p, d))
+
+        expected = [b'a2', b'b1', b'c3', b'd2']
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_fixed_string('foo', 2),
+                                   lambda f, p, d: f.apply_spans_last(p, d))
+
+        expected = [b'a1', b'b1', b'c1', b'd1']
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_fixed_string('foo', 2),
+                                   lambda f, p, d: f.apply_spans_min(p, d))
+
+        expected = [b'a2', b'b1', b'c3', b'd2']
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_fixed_string('foo', 2),
+                                   lambda f, p, d: f.apply_spans_max(p, d))
+
+    def test_numeric_apply_spans(self):
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+        src_data = [1, 2, 11, 21, 22, 23, 31, 32]
+
+        expected = [1, 11, 21, 31]
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_numeric('foo', 'int32'),
+                                   lambda f, p, d: f.apply_spans_first(p, d))
+
+        expected = [2, 11, 23, 32]
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_numeric('foo', 'int32'),
+                                   lambda f, p, d: f.apply_spans_last(p, d))
+
+        expected = [1, 11, 21, 31]
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_numeric('foo', 'int32'),
+                                   lambda f, p, d: f.apply_spans_min(p, d))
+
+        expected = [2, 11, 23, 32]
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_numeric('foo', 'int32'),
+                                   lambda f, p, d: f.apply_spans_max(p, d))
+
+    def test_categorical_apply_spans(self):
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+        src_data = [0, 1, 2, 0, 1, 2, 0, 1]
+        keys = {b'a': 0, b'b': 1, b'c': 2}
+
+        expected = [0, 2, 0, 0]
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_categorical('foo', 'int8', keys),
+                                   lambda f, p, d: f.apply_spans_first(p, d))
+
+        expected = [1, 2, 2, 1]
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_categorical('foo', 'int8', keys),
+                                   lambda f, p, d: f.apply_spans_last(p, d))
+
+        expected = [0, 2, 0, 0]
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_categorical('foo', 'int8', keys),
+                                   lambda f, p, d: f.apply_spans_min(p, d))
+
+        expected = [1, 2, 2, 1]
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_categorical('foo', 'int8', keys),
+                                   lambda f, p, d: f.apply_spans_max(p, d))
+
+    def test_timestamp_apply_spans(self):
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+        from datetime import datetime as D
+        src_data = [D(2020, 1, 1), D(2021, 5, 18), D(2950, 8, 17), D(1840, 10, 11),
+                    D(2021, 1, 1), D(2022, 5, 18), D(2951, 8, 17), D(1841, 10, 11)]
+        src_data = np.asarray([d.timestamp() for d in src_data], dtype=np.float64)
+
+        expected = src_data[[0, 2, 3, 6]].tolist()
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_timestamp('foo'),
+                                   lambda f, p, d: f.apply_spans_first(p, d))
+
+        expected = src_data[[1, 2, 5, 7]].tolist()
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_timestamp('foo'),
+                                   lambda f, p, d: f.apply_spans_last(p, d))
+
+        expected = src_data[[0, 2, 3, 6]].tolist()
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_timestamp('foo'),
+                                   lambda f, p, d: f.apply_spans_min(p, d))
+
+        expected = src_data[[1, 2, 5, 7]].tolist()
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_timestamp('foo'),
+                                   lambda f, p, d: f.apply_spans_max(p, d))
 
 
 class TestFieldCreateLike(unittest.TestCase):
