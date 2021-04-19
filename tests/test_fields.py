@@ -1094,7 +1094,7 @@ class TestFieldCreateLike(unittest.TestCase):
             f.data.write(data)
             self.assertListEqual(data, f.data[:])
 
-            g = f.create_like(None, None)
+            g = f.create_like()
             self.assertIsInstance(g, fields.IndexedStringMemField)
             self.assertEqual(0, len(g.data))
 
@@ -1113,7 +1113,7 @@ class TestFieldCreateLike(unittest.TestCase):
             f.data.write(data)
             self.assertListEqual(data.tolist(), f.data[:].tolist())
 
-            g = f.create_like(None, None)
+            g = f.create_like()
             self.assertIsInstance(g, fields.FixedStringMemField)
             self.assertEqual(0, len(g.data))
 
@@ -1132,7 +1132,7 @@ class TestFieldCreateLike(unittest.TestCase):
             f.data.write(data)
             self.assertListEqual(data.tolist(), f.data[:].tolist())
 
-            g = f.create_like(None, None)
+            g = f.create_like()
             self.assertIsInstance(g, fields.NumericMemField)
             self.assertEqual(0, len(g.data))
 
@@ -1152,7 +1152,7 @@ class TestFieldCreateLike(unittest.TestCase):
             f.data.write(data)
             self.assertListEqual(data.tolist(), f.data[:].tolist())
 
-            g = f.create_like(None, None)
+            g = f.create_like()
             self.assertIsInstance(g, fields.CategoricalMemField)
             self.assertEqual(0, len(g.data))
 
@@ -1173,7 +1173,7 @@ class TestFieldCreateLike(unittest.TestCase):
             f.data.write(data)
             self.assertListEqual(data.tolist(), f.data[:].tolist())
 
-            g = f.create_like(None, None)
+            g = f.create_like()
             self.assertIsInstance(g, fields.TimestampMemField)
             self.assertEqual(0, len(g.data))
 
