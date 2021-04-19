@@ -2126,10 +2126,13 @@ class FieldDataOps:
 
     @staticmethod
     def apply_filter_to_field(source, filter_to_apply, target=None, in_place=False):
+
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
-        dest_data = source.data[:][filter_to_apply]
+        filter_to_apply_ = val.array_from_field_or_lower('filter_to_apply', filter_to_apply)
+
+        dest_data = source.data[:][filter_to_apply_]
 
         if in_place:
             if not source._write_enabled:
@@ -2156,7 +2159,9 @@ class FieldDataOps:
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
-        dest_data = source.data[:][index_to_apply]
+        index_to_apply_ = val.array_from_field_or_lower('index_to_apply', index_to_apply)
+
+        dest_data = source.data[:][index_to_apply_]
 
         if in_place:
             if not source._write_enabled:

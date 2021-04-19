@@ -1140,18 +1140,30 @@ class Session(AbstractSession):
 
         right_results = list()
         for irf, rf in enumerate(right_fields):
-            rf_raw = val.raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
-            joined_field = ops.safe_map(rf_raw, r_to_l_map, r_to_l_filt)
-            # joined_field = per._safe_map(rf_raw, r_to_l_map, r_to_l_filt)
-            if right_writers is None:
-                right_results.append(joined_field)
+            if isinstance(rf, Field) and rf.indexed:
+                indices, values = ops.safe_map_indexed_values(rf.indices[:], rf.values[:],
+                                                              r_to_l_map, r_to_l_filt)
+                if right_writers is None:
+                    result = fld.IndexedStringMemField(self)
+                    result.indices.write(indices)
+                    result.values.write(values)
+                    right_results.append(result)
+                else:
+                    right_writers[irf].indices.write(indices)
+                    right_writers[irf].values.write(values)
             else:
-                right_writers[irf].data.write(joined_field)
+                rf_raw = val.array_from_field_or_lower('right_fields[{}]'.format(irf), rf)
+                values = ops.safe_map_values(rf_raw, r_to_l_map, r_to_l_filt)
+
+                if right_writers is None:
+                    right_results.append(values)
+                else:
+                    right_writers[irf].data.write(values)
 
         return right_results
 
     def merge_right(self, left_on, right_on,
-                    left_fields=None, left_writers=None):
+                    left_fields=tuple(), left_writers=None):
         l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
@@ -1166,12 +1178,25 @@ class Session(AbstractSession):
 
         left_results = list()
         for ilf, lf in enumerate(left_fields):
-            lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
-            joined_field = ops.safe_map(lf_raw, l_to_r_map, l_to_r_filt)
-            if left_writers is None:
-                left_results.append(joined_field)
+            if isinstance(lf, Field) and lf.indexed:
+                indices, values = ops.safe_map_indexed_values(lf.indices[:], lf.values[:],
+                                                              l_to_r_map, l_to_r_filt)
+                if left_writers is None:
+                    result = fld.IndexedStringMemField(self)
+                    result.indices.write(indices)
+                    result.values.write(values)
+                    left_results.append(result)
+                else:
+                    left_writers[ilf].indices.write(indices)
+                    left_writers[ilf].values.write(values)
             else:
-                left_writers[ilf].data.write(joined_field)
+                lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
+                values = ops.safe_map_values(lf_raw, l_to_r_map, l_to_r_filt)
+
+                if left_writers is None:
+                    left_results.append(values)
+                else:
+                    left_writers[ilf].data.write(values)
 
         return left_results
 
