@@ -1140,20 +1140,28 @@ class Session(AbstractSession):
 
         right_results = list()
         for irf, rf in enumerate(right_fields):
-            if isinstance(rf, Field) and rf.indexed:
-                indices, values = ops.safe_map_indexed_values(rf.indices[:], rf.values[:],
-                                                              r_to_l_map, r_to_l_filt)
-                if right_writers is None:
-                    result = fld.IndexedStringMemField(self)
-                    result.indices.write(indices)
-                    result.values.write(values)
-                    right_results.append(result)
+            if isinstance(rf, Field):
+                if rf.indexed:
+                    indices, values = ops.safe_map_indexed_values(rf.indices[:], rf.values[:],
+                                                                  r_to_l_map, r_to_l_filt)
+                    if right_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].indices.write(indices)
+                        right_writers[irf].values.write(values)
                 else:
-                    right_writers[irf].indices.write(indices)
-                    right_writers[irf].values.write(values)
+                    values = ops.safe_map_values(rf.data[:], r_to_l_map, r_to_l_filt)
+                    if right_writers is None:
+                        result = rf.create_like()
+                        result.data.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].data.write(values)
             else:
-                rf_raw = val.array_from_field_or_lower('right_fields[{}]'.format(irf), rf)
-                values = ops.safe_map_values(rf_raw, r_to_l_map, r_to_l_filt)
+                values = ops.safe_map_values(rf, r_to_l_map, r_to_l_filt)
 
                 if right_writers is None:
                     right_results.append(values)
@@ -1178,20 +1186,28 @@ class Session(AbstractSession):
 
         left_results = list()
         for ilf, lf in enumerate(left_fields):
-            if isinstance(lf, Field) and lf.indexed:
-                indices, values = ops.safe_map_indexed_values(lf.indices[:], lf.values[:],
-                                                              l_to_r_map, l_to_r_filt)
-                if left_writers is None:
-                    result = fld.IndexedStringMemField(self)
-                    result.indices.write(indices)
-                    result.values.write(values)
-                    left_results.append(result)
+            if isinstance(lf, Field):
+                if lf.indexed:
+                    indices, values = ops.safe_map_indexed_values(lf.indices[:], lf.values[:],
+                                                                  l_to_r_map, l_to_r_filt)
+                    if left_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].indices.write(indices)
+                        left_writers[ilf].values.write(values)
                 else:
-                    left_writers[ilf].indices.write(indices)
-                    left_writers[ilf].values.write(values)
+                    values = ops.safe_map_values(lf.data[:], l_to_r_map, l_to_r_filt)
+                    if left_writers is None:
+                        result = lf.create_like()
+                        result.data.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].data.write(values)
             else:
-                lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
-                values = ops.safe_map_values(lf_raw, l_to_r_map, l_to_r_filt)
+                values = ops.safe_map_values(lf, l_to_r_map, l_to_r_filt)
 
                 if left_writers is None:
                     left_results.append(values)
@@ -1218,21 +1234,63 @@ class Session(AbstractSession):
 
         left_results = list()
         for ilf, lf in enumerate(left_fields):
-            lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
-            joined_field = ops.safe_map(lf_raw, l_to_i_map, l_to_i_filt)
-            if left_writers is None:
-                left_results.append(joined_field)
+            if isinstance(lf, Field):
+                if lf.indexed:
+                    indices, values = ops.safe_map_indexed_values(lf.indices[:], lf.values[:],
+                                                                  l_to_i_map, l_to_i_filt)
+                    if left_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].indices.write(indices)
+                        left_writers[ilf].values.write(values)
+                else:
+                    values = ops.safe_map_values(lf.data[:], l_to_i_map, l_to_i_filt)
+                    if left_writers is None:
+                        result = lf.create_like()
+                        result.data.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].data.write(values)
             else:
-                left_writers[ilf].data.write(joined_field)
+                values = ops.safe_map_values(lf, l_to_i_map, l_to_i_filt)
+
+                if left_writers is None:
+                    left_results.append(values)
+                else:
+                    left_writers[ilf].data.write(values)
 
         right_results = list()
         for irf, rf in enumerate(right_fields):
-            rf_raw = val.raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
-            joined_field = ops.safe_map(rf_raw, r_to_i_map, r_to_i_filt)
-            if right_writers is None:
-                right_results.append(joined_field)
+            if isinstance(rf, Field):
+                if rf.indexed:
+                    indices, values = ops.safe_map_indexed_values(rf.indices[:], rf.values[:],
+                                                                  r_to_i_map, r_to_i_filt)
+                    if right_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].indices.write(indices)
+                        right_writers[irf].values.write(values)
+                else:
+                    values = ops.safe_map_values(rf.data[:], r_to_i_map, r_to_i_filt)
+                    if right_writers is None:
+                        result = rf.create_like()
+                        result.data.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].data.write(values)
             else:
-                right_writers[irf].data.write(joined_field)
+                values = ops.safe_map_values(rf, r_to_i_map, r_to_i_filt)
+
+                if right_writers is None:
+                    right_results.append(values)
+                else:
+                    right_writers[irf].data.write(values)
 
         return left_results, right_results
 

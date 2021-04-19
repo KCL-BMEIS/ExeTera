@@ -413,166 +413,138 @@ class TestSessionMerge(unittest.TestCase):
 
 
     def test_merge_indexed_fields_left(self):
+
+        def _perform_inner(l_id, r_id, r_vals, expected):
+            bio1 = BytesIO()
+            bio2 = BytesIO()
+            with session.Session() as s:
+                l_ds = s.open_dataset(bio1, 'w', 'l_ds')
+                l_df = l_ds.create_dataframe('l_df')
+                l_df.create_numeric('id', 'int32').data.write(l_id)
+                r_ds = s.open_dataset(bio2, 'w', 'r_ds')
+
+                r_df = r_ds.create_dataframe('r_df')
+                r_df.create_numeric('id', 'int32').data.write(r_id)
+                r_df.create_indexed_string('vals').data.write(r_vals)
+
+                s.merge_left(left_on=l_df['id'], right_on=r_df['id'],
+                             right_fields=(r_df['vals'],),
+                             right_writers=(l_df.create_indexed_string('vals'),))
+
+                r_df2 = r_ds.create_dataframe('r_df2')
+                r_df2.create_numeric('id', 'int32').data.write(r_id)
+                r_df2.create_indexed_string('vals').data.write(r_vals)
+
+                results = s.merge_left(left_on=l_df['id'], right_on=r_df2['id'],
+                                       right_fields=(r_df2['vals'],))
+
+                self.assertListEqual(expected, l_df['vals'].data[:])
+                self.assertListEqual(expected, results[0].data[:])
+
         l_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
         r_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
         r_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
-
-        bio1 = BytesIO()
-        bio2 = BytesIO()
-        with session.Session() as s:
-            l_ds = s.open_dataset(bio1, 'w', 'l_ds')
-            l_df = l_ds.create_dataframe('l_df')
-            l_df.create_numeric('id', 'int32').data.write(l_id)
-            r_ds = s.open_dataset(bio2, 'w', 'r_ds')
-
-            r_df = r_ds.create_dataframe('r_df')
-            r_df.create_numeric('id', 'int32').data.write(r_id)
-            r_df.create_indexed_string('vals').data.write(r_vals)
-
-            s.merge_left(left_on=l_df['id'], right_on=r_df['id'],
-                         right_fields=(r_df['vals'],),
-                         right_writers=(l_df.create_indexed_string('vals'),))
-
-            r_df2 = r_ds.create_dataframe('r_df2')
-            r_df2.create_numeric('id', 'int32').data.write(r_id)
-            r_df2.create_indexed_string('vals').data.write(r_vals)
-
-            results = s.merge_left(left_on=l_df['id'], right_on=r_df2['id'],
-                                   right_fields=(r_df2['vals'],))
-
-            expected = ['', '', '', 'bb1', 'bb2', 'ccc1', 'ccc2', 'dddd1', '', 'ffffff1', 'ggggggg1']
-            self.assertListEqual(expected, l_df['vals'].data[:])
-            self.assertListEqual(expected, results[0].data[:])
+        expected = ['', '', '', 'bb1', 'bb2', 'ccc1', 'ccc2', 'dddd1', '', 'ffffff1', 'ggggggg1']
+        _perform_inner(l_id, r_id, r_vals, expected)
 
         l_id = l_id[::-1]
         r_id = r_id[::-1]
         r_vals = r_vals[::-1]
-
-        bio1 = BytesIO()
-        bio2 = BytesIO()
-        with session.Session() as s:
-            l_ds = s.open_dataset(bio1, 'w', 'l_ds')
-            l_df = l_ds.create_dataframe('l_df')
-            l_df.create_numeric('id', 'int32').data.write(l_id)
-            r_ds = s.open_dataset(bio2, 'w', 'r_ds')
-
-            r_df = r_ds.create_dataframe('r_df')
-            r_df.create_numeric('id', 'int32').data.write(r_id)
-            r_df.create_indexed_string('vals').data.write(r_vals)
-
-            s.merge_left(left_on=l_df['id'], right_on=r_df['id'],
-                         right_fields=(r_df['vals'],),
-                         right_writers=(l_df.create_indexed_string('vals'),))
-
-            r_df2 = r_ds.create_dataframe('r_df2')
-            r_df2.create_numeric('id', 'int32').data.write(r_id)
-            r_df2.create_indexed_string('vals').data.write(r_vals)
-
-            results = s.merge_left(left_on=l_df['id'], right_on=r_df2['id'],
-                                   right_fields=(r_df2['vals'],))
-
-            expected = ['ggggggg1', 'ffffff1', '', 'dddd1', 'ccc2', 'ccc1', 'bb2', 'bb1', '', '', '']
-            self.assertListEqual(expected, l_df['vals'].data[:])
-            self.assertListEqual(expected, results[0].data[:])
+        expected = ['ggggggg1', 'ffffff1', '', 'dddd1', 'ccc2', 'ccc1', 'bb2', 'bb1', '', '', '']
+        _perform_inner(l_id, r_id, r_vals, expected)
 
 
     def test_merge_indexed_fields_right(self):
+
+        def _perform_test(r_id, l_id, l_vals, expected):
+            bio1 = BytesIO()
+            bio2 = BytesIO()
+            with session.Session() as s:
+                r_ds = s.open_dataset(bio1, 'w', 'r_ds')
+                r_df = r_ds.create_dataframe('r_df')
+                r_df.create_numeric('id', 'int32').data.write(r_id)
+                l_ds = s.open_dataset(bio2, 'w', 'l_ds')
+
+                l_df = l_ds.create_dataframe('l_df')
+                l_df.create_numeric('id', 'int32').data.write(l_id)
+                l_df.create_indexed_string('vals').data.write(l_vals)
+
+                s.merge_right(left_on=l_df['id'], right_on=r_df['id'],
+                             left_fields=(l_df['vals'],),
+                             left_writers=(r_df.create_indexed_string('vals'),))
+
+                l_df2 = l_ds.create_dataframe('l_df2')
+                l_df2.create_numeric('id', 'int32').data.write(l_id)
+                l_df2.create_indexed_string('vals').data.write(l_vals)
+
+                results = s.merge_right(left_on=l_df2['id'], right_on=r_df['id'],
+                                       left_fields=(l_df2['vals'],))
+
+                self.assertListEqual(expected, r_df['vals'].data[:])
+                self.assertListEqual(expected, results[0].data[:])
+
         r_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
         l_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
         l_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
-
-        bio1 = BytesIO()
-        bio2 = BytesIO()
-        with session.Session() as s:
-            r_ds = s.open_dataset(bio1, 'w', 'r_ds')
-            r_df = r_ds.create_dataframe('r_df')
-            r_df.create_numeric('id', 'int32').data.write(r_id)
-            l_ds = s.open_dataset(bio2, 'w', 'l_ds')
-
-            l_df = l_ds.create_dataframe('l_df')
-            l_df.create_numeric('id', 'int32').data.write(l_id)
-            l_df.create_indexed_string('vals').data.write(l_vals)
-
-            s.merge_right(left_on=l_df['id'], right_on=r_df['id'],
-                         left_fields=(l_df['vals'],),
-                         left_writers=(r_df.create_indexed_string('vals'),))
-
-            l_df2 = l_ds.create_dataframe('l_df2')
-            l_df2.create_numeric('id', 'int32').data.write(l_id)
-            l_df2.create_indexed_string('vals').data.write(l_vals)
-
-            results = s.merge_right(left_on=l_df2['id'], right_on=r_df['id'],
-                                   left_fields=(l_df2['vals'],))
-
-            expected = ['', '', '', 'bb1', 'bb2', 'ccc1', 'ccc2', 'dddd1', '', 'ffffff1', 'ggggggg1']
-            self.assertListEqual(expected, r_df['vals'].data[:])
-            self.assertListEqual(expected, results[0].data[:])
+        expected = ['', '', '', 'bb1', 'bb2', 'ccc1', 'ccc2', 'dddd1', '', 'ffffff1', 'ggggggg1']
+        _perform_test(r_id, l_id, l_vals, expected)
 
         r_id = r_id[::-1]
         l_id = l_id[::-1]
         l_vals = l_vals[::-1]
-
-        bio1 = BytesIO()
-        bio2 = BytesIO()
-        with session.Session() as s:
-            r_ds = s.open_dataset(bio1, 'w', 'r_ds')
-            r_df = r_ds.create_dataframe('r_df')
-            r_df.create_numeric('id', 'int32').data.write(r_id)
-            l_ds = s.open_dataset(bio2, 'w', 'l_ds')
-
-            l_df = l_ds.create_dataframe('l_df')
-            l_df.create_numeric('id', 'int32').data.write(l_id)
-            l_df.create_indexed_string('vals').data.write(l_vals)
-
-            s.merge_right(left_on=l_df['id'], right_on=r_df['id'],
-                          left_fields=(l_df['vals'],),
-                          left_writers=(r_df.create_indexed_string('vals'),))
-
-            l_df2 = l_ds.create_dataframe('l_df2')
-            l_df2.create_numeric('id', 'int32').data.write(l_id)
-            l_df2.create_indexed_string('vals').data.write(l_vals)
-
-            results = s.merge_right(left_on=l_df2['id'], right_on=r_df['id'],
-                                    left_fields=(l_df2['vals'],))
-
-            expected = ['ggggggg1', 'ffffff1', '', 'dddd1', 'ccc2', 'ccc1', 'bb2', 'bb1', '', '', '']
-            self.assertListEqual(expected, r_df['vals'].data[:])
-            self.assertListEqual(expected, results[0].data[:])
+        expected = ['ggggggg1', 'ffffff1', '', 'dddd1', 'ccc2', 'ccc1', 'bb2', 'bb1', '', '', '']
+        _perform_test(r_id, l_id, l_vals, expected)
 
 
-    # def test_ordered_merge_indexed_fields(self):
-    #     l_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
-    #     r_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
-    #     r_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
-    #     bio1 = BytesIO()
-    #     bio2 = BytesIO()
-    #     with session.Session() as s:
-    #         l_ds = s.open_dataset(bio1, 'w', 'l_ds')
-    #         l_df = l_ds.create_dataframe('l_df')
-    #         l_df.create_numeric('id', 'int32').data.write(l_id)
-    #         r_ds = s.open_dataset(bio2, 'w', 'r_ds')
-    #
-    #         r_df = r_ds.create_dataframe('r_df')
-    #         r_df.create_numeric('id', 'int32').data.write(r_id)
-    #         r_df.create_indexed_string('vals').data.write(r_vals)
-    #         r_indices = s.dataset_sort_index((r_df['id'],))
-    #         r_df.apply_index(r_indices)
-    #         print(r_df['id'].data[:])
-    #         print(r_df['vals'].data[:])
-    #
-    #         s.ordered_merge_left(left_on=l_df['id'], right_on=r_df['id'],
-    #                              right_field_sources=(r_df['vals'],),
-    #                              left_field_sinks=(l_df.create_indexed_string('vals'),))
-    #
-    #         r_df2 = r_ds.create_dataframe('r_df2')
-    #         r_df2.create_numeric('id', 'int32').data.write(r_id)
-    #         r_df2.create_indexed_string('vals').data.write(r_vals)
-    #
-    #         results = s.ordered_merge_left(left_on=l_df['id'], right_on=r_df2['id'],
-    #                                        right_field_sources=(r_df2['vals'],))
-    #
-    #         print(l_df['vals'].data[:])
-    #         print(results[0].data[:])
+    def test_merge_indexed_fields_inner(self):
+
+        def _perform_inner(r_id, r_vals, l_id, l_vals, l_expected, r_expected):
+            bio1 = BytesIO()
+            with session.Session() as s:
+                ds = s.open_dataset(bio1, 'w', 'r_ds')
+                r_df = ds.create_dataframe('r_df')
+                r_df.create_numeric('id', 'int32').data.write(r_id)
+                r_df.create_indexed_string('vals').data.write(r_vals)
+
+                l_df = ds.create_dataframe('l_df')
+                l_df.create_numeric('id', 'int32').data.write(l_id)
+                l_df.create_indexed_string('vals').data.write(l_vals)
+
+                i_df = ds.create_dataframe('i_df')
+                i_df.create_numeric('l_id', 'int32')
+                i_df.create_numeric('r_id', 'int32')
+                i_df.create_indexed_string('l_vals')
+                i_df.create_indexed_string('r_vals')
+                s.merge_inner(left_on=l_df['id'], right_on=r_df['id'],
+                              left_fields=(l_df['id'], l_df['vals'],),
+                              left_writers=(i_df['l_id'], i_df['l_vals']),
+                              right_fields=(r_df['id'], r_df['vals']),
+                              right_writers=(i_df['r_id'], i_df['r_vals']))
+                print(i_df['l_id'].data[:])
+                print(i_df['r_id'].data[:])
+                print(i_df['l_vals'].data[:])
+                print(i_df['r_vals'].data[:])
+
+                results = s.merge_inner(left_on=l_df['id'], right_on=r_df['id'],
+                                        left_fields=(l_df['id'], l_df['vals']),
+                                        right_fields=(r_df['id'], r_df['vals']))
+                print(results)
+
+                expected = ['', '', '', 'bb1', 'bb2', 'ccc1', 'ccc2', 'dddd1', '', 'ffffff1', 'ggggggg1']
+                # self.assertListEqual(expected, r_df['vals'].data[:])
+                # self.assertListEqual(expected, results[0].data[:])
+
+        r_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
+        r_vals = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven']
+        l_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
+        l_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
+        _perform_inner(r_id, r_vals, l_id, l_vals, None, None)
+
+        r_id = r_id[::-1]
+        r_vals = r_vals[::-1]
+        l_id = l_id[::-1]
+        l_vals = l_vals[::-1]
+        _perform_inner(r_id, r_vals, l_id, l_vals, None, None)
 
 
 class TestSessionJoin(unittest.TestCase):

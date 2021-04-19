@@ -174,9 +174,9 @@ class HDF5DataFrame(DataFrame):
         :param name: The name of field to get.
         """
         if not isinstance(name, str):
-            raise TypeError("The name must be a str object.")
+            raise TypeError("The name must be of type str but is of type '{}'".format(str))
         elif not self.__contains__(name):
-            raise ValueError("Can not find the name from this dataframe.")
+            raise ValueError("There is no field named '{}' in this dataframe".format(name))
         else:
             return self._columns[name]
 
@@ -201,7 +201,7 @@ class HDF5DataFrame(DataFrame):
 
     def __setitem__(self, name, field):
         if not isinstance(name, str):
-            raise TypeError("The name must be a str object.")
+            raise TypeError("The name must be of type str but is of type '{}'".format(str))
         if not isinstance(field, fld.Field):
             raise TypeError("The field must be a Field object.")
         nfield = field.create_like(self, name)
@@ -214,7 +214,7 @@ class HDF5DataFrame(DataFrame):
 
     def __delitem__(self, name):
         if not self.__contains__(name=name):
-            raise ValueError("This dataframe does not contain the name to delete.")
+            raise ValueError("There is no field named '{}' in this dataframe".format(name))
         else:
             del self._h5group[name]
             del self._columns[name]
