@@ -143,7 +143,8 @@ def generate_period_offset_map(periods: Sequence[datetime]
 
 
 def get_period_offsets(periods_by_day: ArrayLike,
-                       days: ArrayLike
+                       days: ArrayLike,
+                       in_range: Optional[ArrayLike] = None
                        ) -> ArrayLike:
     """
     Given a ``periods_by_day``, a numpy array of days mapping to periods and ``days``, a numpy array of days to be mapped to
@@ -181,5 +182,11 @@ def get_period_offsets(periods_by_day: ArrayLike,
             days.dtype not in (np.int8, np.int16, np.int32, np.int64):
         raise ValueError("'days' must be a numpy array of a signed integer type")
 
-    periods = periods_by_day[days]
+    if in_range is None:
+        periods = periods_by_day[days]
+    else:
+        periods = np.where(in_range, days, 0)
+        periods = periods_by_day[periods]
+        periods = np.where(in_range, periods, -1)
+
     return periods
