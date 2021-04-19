@@ -221,7 +221,7 @@ class Session(AbstractSession):
                 else:
                     r.data[:] = self.apply_index(sorted_index, r)
                 del r
-                print_if_verbose(f"  '{k}' reordered in {time.time() - t1}s")
+            print_if_verbose(f"  '{k}' reordered in {time.time() - t1}s")
         print_if_verbose(f"fields reordered in {time.time() - t0}s")
 
     def dataset_sort_index(self, sort_indices, index=None):
@@ -270,12 +270,12 @@ class Session(AbstractSession):
         writer_ = None
         if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
-        if isinstance(src, fld.IndexedStringField):
+        if isinstance(src, Field):
             newfld = src.apply_filter(filter_to_apply_, writer_)
-            return newfld.indices, newfld.values
-        elif isinstance(src, Field):
-            newfld = src.apply_filter(filter_to_apply_, writer_)
-            return newfld.data[:]
+            if src.indexed:
+                return newfld.indices[:], newfld.values[:]
+            else:
+                return newfld.data[:]
         # elif isinstance(src, df.datafrme):
         else:
             reader_ = val.array_from_parameter(self, 'reader', src)
@@ -299,14 +299,20 @@ class Session(AbstractSession):
         writer_ = None
         if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
-        if isinstance(src, fld.IndexedStringField):
-            dest_indices, dest_values = \
-                ops.apply_indices_to_index_values(index_to_apply_,
-                                                  src.indices[:], src.values[:])
-            return dest_indices, dest_values
-        elif isinstance(src, Field):
+        if isinstance(src, Field):
             newfld = src.apply_index(index_to_apply_, writer_)
-            return newfld.data[:]
+            if src.indexed:
+                return newfld.indices[:], newfld.values[:]
+            else:
+                return newfld.data[:]
+        # if src.indexed:
+        #     dest_indices, dest_values = \
+        #         ops.apply_indices_to_index_values(index_to_apply_,
+        #                                           src.indices[:], src.values[:])
+        #     return dest_indices, dest_values
+        # elif isinstance(src, Field):
+        #     newfld = src.apply_index(index_to_apply_, writer_)
+        #     return newfld.data[:]
         else:
             reader_ = val.array_from_parameter(self, 'reader', src)
             result = reader_[index_to_apply]
@@ -419,7 +425,7 @@ class Session(AbstractSession):
             return results
 
     def _apply_spans_src(self,
-                         predicate: Callable[[np.array, np.array, np.array], None],
+                         predicate: Callable[[np.ndarray, np.ndarray, np.ndarray], None],
                          spans: np.array,
                          target: np.array,
                          dest: Field = None) -> np.array:

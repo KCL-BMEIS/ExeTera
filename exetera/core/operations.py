@@ -151,7 +151,6 @@ def data_iterator(data_field, chunksize=1 << 20):
         for v in range(c[0], c[1]):
             yield data[v]
 
-
 @njit
 def apply_filter_to_index_values(index_filter, indices, values):
     # pass 1 - determine the destination lengths
@@ -276,6 +275,84 @@ def apply_spans_index_of_min(spans, src_array, dest_array):
             dest_array[i] = cur
         else:
             dest_array[i] = cur + src_array[cur:next].argmin()
+
+    return dest_array
+
+
+@njit
+def apply_spans_index_of_min_indexed(spans, src_indices, src_values, dest_array):
+    for i in range(len(spans)-1):
+        cur = spans[i]
+        next = spans[i+1]
+
+        if next - cur == 1:
+            dest_array[i] = cur
+        else:
+            minind = cur
+            minstart = src_indices[cur]
+            minend = src_indices[cur+1]
+            minlen = minend - minstart
+            for j in range(cur+1, next):
+                curstart = src_indices[j]
+                curend = src_indices[j+1]
+                curlen = curend - curstart
+                shortlen = min(curlen, minlen)
+                found = False
+                for k in range(shortlen):
+                    if src_values[curstart+k] < src_values[minstart+k]:
+                        minind = j
+                        minstart = curstart
+                        minend = curend
+                        found = True
+                        break
+                    elif src_values[curstart+k] > src_values[minstart+k]:
+                        found = True
+                        break
+                if not found and curlen < minlen:
+                    minind = j
+                    minstart = curstart
+                    minend = curend
+
+            dest_array[i] = minind
+
+    return dest_array
+
+
+@njit
+def apply_spans_index_of_max_indexed(spans, src_indices, src_values, dest_array):
+    for i in range(len(spans)-1):
+        cur = spans[i]
+        next = spans[i+1]
+
+        if next - cur == 1:
+            dest_array[i] = cur
+        else:
+            minind = cur
+            minstart = src_indices[cur]
+            minend = src_indices[cur+1]
+            minlen = minend - minstart
+            for j in range(cur+1, next):
+                curstart = src_indices[j]
+                curend = src_indices[j+1]
+                curlen = curend - curstart
+                shortlen = min(curlen, minlen)
+                found = False
+                for k in range(shortlen):
+                    if src_values[curstart+k] > src_values[minstart+k]:
+                        minind = j
+                        minstart = curstart
+                        minlen = curend - curstart
+                        found = True
+                        break
+                    elif src_values[curstart+k] < src_values[minstart+k]:
+                        found = True
+                        break
+                if not found and curlen > minlen:
+                    minind = j
+                    minstart = curstart
+                    minlen = curend - curstart
+
+            dest_array[i] = minind
 
     return dest_array
 

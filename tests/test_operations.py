@@ -57,7 +57,20 @@ class TestSafeMap(unittest.TestCase):
             np.asarray([1, 8, 2, 7, ops.INVALID_INDEX, 0, 9, 1, 8]),
             np.asarray([3, 45, 6, 36, 0, 1, 55, 3, 45]), 0)
 
+
 class TestAggregation(unittest.TestCase):
+
+    def test_apply_spans_indexed_field(self):
+        indices = np.asarray([0, 2, 4, 7, 10, 12, 14, 16, 18, 20, 22, 24], dtype=np.int32)
+        values = np.frombuffer(b'a1a2a2ab2ab2b1c1c2d2d1e1', dtype=np.int8)
+        spans = np.asarray([0, 3, 6, 8, 10, 11], dtype=np.int32)
+        dest = np.zeros(len(spans)-1, dtype=np.int32)
+
+        ops.apply_spans_index_of_min_indexed(spans, indices, values, dest)
+        self.assertListEqual(dest.tolist(), [0, 5, 6, 9, 10])
+
+        ops.apply_spans_index_of_max_indexed(spans, indices, values, dest)
+        self.assertListEqual(dest.tolist(), [2, 3, 7, 8, 10])
 
     def test_non_indexed_apply_spans(self):
         values = np.asarray([1, 2, 3, 3, 2, 1, 1, 2, 2, 1, 1], dtype=np.int32)
@@ -138,6 +151,7 @@ class TestAggregation(unittest.TestCase):
         expected = np.array([1, 2, 3, ops.INVALID_INDEX, 4, 6, ops.INVALID_INDEX, 7],
                             dtype=np.int64)
         self.assertTrue(np.array_equal(results, expected))
+
 
     def test_ordered_map_to_right_right_unique(self):
         raw_ids = [0, 1, 2, 3, 5, 6, 7, 9]

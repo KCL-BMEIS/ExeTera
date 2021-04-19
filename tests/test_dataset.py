@@ -3,10 +3,10 @@ import unittest
 import h5py
 import numpy as np
 
-from exetera.core import session,fields
+from exetera.core import session, fields
 from exetera.core.abstract_types import DataFrame
 from io import BytesIO
-from exetera.core.dataset import HDF5Dataset
+from exetera.core.dataset import HDF5Dataset, copy, drop, move
 
 
 class TestDataSet(unittest.TestCase):
@@ -56,7 +56,7 @@ class TestDataSet(unittest.TestCase):
             fs = df2.create_fixed_string('fs', 1)
             fs.data.write([b'a', b'b', b'c', b'd'])
 
-            dst.add(df2)
+            dst.copy(df2, 'df2')
             self.assertTrue(isinstance(dst['df2'], DataFrame))
             self.assertEqual([b'a', b'b', b'c', b'd'], dst['df2']['fs'].data[:].tolist())
 
@@ -64,10 +64,32 @@ class TestDataSet(unittest.TestCase):
             self.assertTrue(len(dst.keys()) == 1)
             self.assertTrue(len(dst._file.keys()) == 1)
 
-            # set dataframe
-            dst['grp1'] = df2
-            self.assertTrue(isinstance(dst['grp1'], DataFrame))
-            self.assertEqual([b'a', b'b', b'c', b'd'], dst['grp1']['fs'].data[:].tolist())
+            # set dataframe (this is a copy between datasets
+            dst['df3'] = df2
+            self.assertTrue(isinstance(dst['df3'], DataFrame))
+            self.assertEqual([b'a', b'b', b'c', b'd'], dst['df3']['fs'].data[:].tolist())
+
+    def test_dataset_static_func(self):
+        bio = BytesIO()
+        bio2 = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'r+', 'dst')
+            df = dst.create_dataframe('df')
+            num1 = df.create_numeric('num', 'uint32')
+            num1.data.write([1, 2, 3, 4])
+
+            ds2 = s.open_dataset(bio2, 'r+', 'ds2')
+            copy(df, ds2, 'df2')
+            print(type(ds2['df2']))
+            self.assertTrue(isinstance(ds2['df2'], DataFrame))
+            self.assertTrue(isinstance(ds2['df2']['num'], fields.Field))
+
+            drop(ds2['df2'])
+            self.assertTrue(len(ds2) == 0)
+
+            move(df, ds2, 'df2')
+            self.assertTrue(len(dst) == 0)
+            self.assertTrue(len(ds2) == 1)
 
     def test_dataste_static_func(self):
         bio = BytesIO()
@@ -151,4 +173,3 @@ class TestDataSet(unittest.TestCase):
             df2['t_foo'].data[:] = np.array(tcontents2, dtype=np.float64)
             self.assertListEqual(tcontents1.tolist(), df1['t_foo'].data[:].tolist())
             self.assertListEqual(tcontents2.tolist(), df2['t_foo'].data[:].tolist())
-

@@ -596,10 +596,11 @@ def _values_from_reader_or_ndarray(name, field):
 
 # TODO: handle usage of reader
 def filter_duplicate_fields(field):
-
-    filter_ = np.ones(len(field), dtype=bool)
-    _filter_duplicate_fields(field, filter_)
+    field_ = val.array_from_field_or_lower('field', field)
+    filter_ = np.ones(len(field_), dtype=bool)
+    _filter_duplicate_fields(field_, filter_)
     return filter_
+
 
 def _filter_duplicate_fields(field, filter):
     seen_ids = dict()
