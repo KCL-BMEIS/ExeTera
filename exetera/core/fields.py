@@ -2147,7 +2147,11 @@ class FieldDataOps:
                 target.data.write(dest_data)
             return target
         else:
+<<<<<<< HEAD
             mem_field = source.create_like()
+=======
+            mem_field = source.create_like(None, None)
+>>>>>>> master
             mem_field.data.write(dest_data)
             return mem_field
 
@@ -2174,7 +2178,11 @@ class FieldDataOps:
                 target.data.write(dest_data)
             return target
         else:
+<<<<<<< HEAD
             mem_field = source.create_like()
+=======
+            mem_field = source.create_like(None, None)
+>>>>>>> master
             mem_field.data.write(dest_data)
             return mem_field
 
@@ -2202,7 +2210,11 @@ class FieldDataOps:
             return source
 
         if target is None:
+<<<<<<< HEAD
             result_field = source.create_like()
+=======
+            result_field = source.create_like(None, None)
+>>>>>>> master
             result_field.data.write(results)
             return result_field
         else:
