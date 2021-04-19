@@ -36,9 +36,10 @@ class HDF5Dataset(Dataset):
         self._dataframes = dict()
 
         for group in self._file.keys():
-            h5group = self._file[group]
-            dataframe = edf.HDF5DataFrame(self, group, h5group=h5group)
-            self._dataframes[group] = dataframe
+            if group not in ('trash'):
+                h5group = self._file[group]
+                dataframe = edf.HDF5DataFrame(self, group, h5group=h5group)
+                self._dataframes[group] = dataframe
 
     @property
     def session(self):
