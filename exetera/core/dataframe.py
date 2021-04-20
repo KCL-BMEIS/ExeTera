@@ -84,7 +84,8 @@ class HDF5DataFrame(DataFrame):
             nfield.data.write(field.data[:])
         self._columns[dname] = nfield
 
-    def drop(self, name):
+    def drop(self,
+             name: str):
         del self._columns[name]
         del self._h5group[name]
 
