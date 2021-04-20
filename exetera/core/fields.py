@@ -407,7 +407,7 @@ class IndexedStringMemField(MemoryField):
     def writeable(self):
         return self
 
-    def create_like(self, group, name, timestamp=None):
+    def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.indexed_string_create_like(group, name, timestamp)
 
     @property
@@ -508,7 +508,7 @@ class FixedStringMemField(MemoryField):
     def writeable(self):
         return FixedStringField(self._session, self._field, write_enabled=True)
 
-    def create_like(self, group, name, timestamp=None):
+    def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.fixed_string_field_create_like(self, group, name, timestamp)
 
     @property
@@ -583,7 +583,7 @@ class NumericMemField(MemoryField):
     def writeable(self):
         return self
 
-    def create_like(self, group, name, timestamp=None):
+    def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.numeric_field_create_like(self, group, name, timestamp)
 
     @property
@@ -736,7 +736,7 @@ class CategoricalMemField(MemoryField):
     def writeable(self):
         return self
 
-    def create_like(self, group, name, timestamp=None):
+    def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.categorical_field_create_like(self, group, name, timestamp)
 
     @property
@@ -844,7 +844,7 @@ class TimestampMemField(MemoryField):
     def writeable(self):
         return TimestampField(self._session, self._field, write_enabled=True)
 
-    def create_like(self, group, name, timestamp=None):
+    def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.timestamp_field_create_like(self, group, name, timestamp)
 
     @property
@@ -1043,7 +1043,7 @@ class IndexedStringField(HDF5Field):
     def writeable(self):
         return IndexedStringField(self._session, self._field, write_enabled=True)
 
-    def create_like(self, group, name, timestamp=None):
+    def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.indexed_string_create_like(self, group, name, timestamp)
 
     @property
@@ -1150,7 +1150,8 @@ class FixedStringField(HDF5Field):
     def writeable(self):
         return FixedStringField(self._session, self._field, write_enabled=True)
 
-    def create_like(self, group, name, timestamp=None):
+
+    def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.fixed_string_field_create_like(self, group, name, timestamp)
 
     @property
@@ -1227,7 +1228,7 @@ class NumericField(HDF5Field):
     def writeable(self):
         return NumericField(self._session, self._field, write_enabled=True)
 
-    def create_like(self, group, name, timestamp=None):
+    def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.numeric_field_create_like(self, group, name, timestamp)
 
     @property
@@ -1383,7 +1384,7 @@ class CategoricalField(HDF5Field):
     def writeable(self):
         return CategoricalField(self._session, self._field, write_enabled=True)
 
-    def create_like(self, group, name, timestamp=None):
+    def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.categorical_field_create_like(self, group, name, timestamp)
 
     @property
@@ -1498,7 +1499,7 @@ class TimestampField(HDF5Field):
     def writeable(self):
         return TimestampField(self._session, self._field, write_enabled=True)
 
-    def create_like(self, group, name, timestamp=None):
+    def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.timestamp_field_create_like(self, group, name, timestamp)
 
     @property
@@ -2147,7 +2148,7 @@ class FieldDataOps:
                 target.data.write(dest_data)
             return target
         else:
-            mem_field = source.create_like(None, None)
+            mem_field = source.create_like()
             mem_field.data.write(dest_data)
             return mem_field
 
@@ -2174,7 +2175,7 @@ class FieldDataOps:
                 target.data.write(dest_data)
             return target
         else:
-            mem_field = source.create_like(None, None)
+            mem_field = source.create_like()
             mem_field.data.write(dest_data)
             return mem_field
 
@@ -2202,7 +2203,7 @@ class FieldDataOps:
             return source
 
         if target is None:
-            result_field = source.create_like(None, None)
+            result_field = source.create_like()
             result_field.data.write(results)
             return result_field
         else:

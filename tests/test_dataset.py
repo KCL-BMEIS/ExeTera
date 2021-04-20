@@ -91,28 +91,6 @@ class TestDataSet(unittest.TestCase):
             self.assertTrue(len(dst) == 0)
             self.assertTrue(len(ds2) == 1)
 
-    def test_dataste_static_func(self):
-        bio = BytesIO()
-        bio2 = BytesIO()
-        with session.Session() as s:
-            dst = s.open_dataset(bio, 'r+', 'dst')
-            df = dst.create_dataframe('df')
-            num1 = df.create_numeric('num','uint32')
-            num1.data.write([1,2,3,4])
-
-            ds2 = s.open_dataset(bio2,'r+','ds2')
-            HDF5Dataset.copy(df,ds2,'df2')
-            print(type(ds2['df2']))
-            self.assertTrue(isinstance(ds2['df2'],DataFrame))
-            self.assertTrue(isinstance(ds2['df2']['num'],fields.Field))
-
-            HDF5Dataset.drop(ds2['df2'])
-            self.assertTrue(len(ds2)==0)
-
-            HDF5Dataset.move(df,ds2,'df2')
-            self.assertTrue(len(dst) == 0)
-            self.assertTrue(len(ds2) == 1)
-
     def test_dataframe_create_with_dataframe(self):
 
         iscontents1 = ['a', 'bb', 'ccc', 'dddd']

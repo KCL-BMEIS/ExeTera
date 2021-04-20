@@ -300,42 +300,42 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, in_place=True)
             return self
 
-    @staticmethod
-    def copy(field: fld.Field, dataframe: DataFrame, name: str):
-        """
-        Copy a field to another dataframe as well as underlying dataset.
 
-        :param field: The source field to copy.
-        :param dataframe: The destination dataframe to copy to.
-        :param name: The name of field under destination dataframe.
-        """
-        dfield = field.create_like(dataframe, name)
-        if field.indexed:
-            dfield.indices.write(field.indices[:])
-            dfield.values.write(field.values[:])
-        else:
-            dfield.data.write(field.data[:])
-        dataframe.columns[name] = dfield
+def copy(field: fld.Field, dataframe: DataFrame, name: str):
+    """
+    Copy a field to another dataframe as well as underlying dataset.
 
-    @staticmethod
-    def drop(dataframe: DataFrame, field: fld.Field):
-        """
-        Drop a field from a dataframe.
+    :param field: The source field to copy.
+    :param dataframe: The destination dataframe to copy to.
+    :param name: The name of field under destination dataframe.
+    """
+    dfield = field.create_like(dataframe, name)
+    if field.indexed:
+        dfield.indices.write(field.indices[:])
+        dfield.values.write(field.values[:])
+    else:
+        dfield.data.write(field.data[:])
+    dataframe.columns[name] = dfield
 
-        :param dataframe: The dataframe where field is located.
-        :param field: The field to delete.
-        """
-        dataframe.delete_field(field)
 
-    @staticmethod
-    def move(src_df: DataFrame, field: fld.Field, dest_df: DataFrame, name: str):
-        """
-        Move a field to another dataframe as well as underlying dataset.
+def drop(dataframe: DataFrame, field: fld.Field):
+    """
+    Drop a field from a dataframe.
 
-        :param src_df: The source dataframe where the field is located.
-        :param field: The field to move.
-        :param dest_df: The destination dataframe to move to.
-        :param name: The name of field under destination dataframe.
-        """
-        HDF5DataFrame.copy(field, dest_df, name)
-        HDF5DataFrame.drop(src_df, field)
+    :param dataframe: The dataframe where field is located.
+    :param field: The field to delete.
+    """
+    dataframe.delete_field(field)
+
+
+def move(src_df: DataFrame, field: fld.Field, dest_df: DataFrame, name: str):
+    """
+    Move a field to another dataframe as well as underlying dataset.
+
+    :param src_df: The source dataframe where the field is located.
+    :param field: The field to move.
+    :param dest_df: The destination dataframe to move to.
+    :param name: The name of field under destination dataframe.
+    """
+    HDF5DataFrame.copy(field, dest_df, name)
+    HDF5DataFrame.drop(src_df, field)

@@ -36,9 +36,10 @@ class HDF5Dataset(Dataset):
         self._dataframes = dict()
 
         for group in self._file.keys():
-            h5group = self._file[group]
-            dataframe = edf.HDF5DataFrame(self, group, h5group=h5group)
-            self._dataframes[group] = dataframe
+            if group not in ('trash',):
+                h5group = self._file[group]
+                dataframe = edf.HDF5DataFrame(self, group, h5group=h5group)
+                self._dataframes[group] = dataframe
 
     @property
     def session(self):
@@ -163,6 +164,7 @@ class HDF5Dataset(Dataset):
             raise TypeError("The name must be a str object.")
         if not isinstance(dataframe, edf.DataFrame):
             raise TypeError("The field must be a DataFrame object.")
+
         if dataframe.dataset == self:
             # rename a dataframe
             del self._dataframes[dataframe.name]
