@@ -184,3 +184,61 @@ def all_same_basic_type(name, fields):
         for f in fields[1:]:
             if not isinstance(f, np.ndarray):
                 raise ValueError(msg)
+
+
+def validate_key_field_consistency(lname, rname, lkey, rkey):
+    left_tuple = isinstance(lkey, tuple)
+    right_tuple = isinstance(rkey, tuple)
+    if left_tuple ^ right_tuple:
+        raise ValueError("Either none or both of '{}' and '{}' "
+                         "must be tuples".format(lname, rname))
+    if left_tuple and len(lkey) != len(rkey):
+        raise ValueError("'{}' and '{}' must be the same length, but are of length "
+                         "{} and {} respectively".format(lname, rname, len(lkey), len(rkey)))
+
+
+def validate_and_get_key_fields(side, df, key):
+    if isinstance(key, tuple):
+        fields = []
+        for ik, k in enumerate(key):
+            dfk = df[k] if isinstance(k, str) else df[k]
+            if dfk.indexed:
+                if dfk.name is None:
+                    raise ValueError("'{}': field at position {} is indexed; indexed fields"
+                                     " cannot be used as keys".format(side, ik))
+                else:
+                    raise ValueError("'{}': field '{}' at position {} is indexed; "
+                                     "indexed fields cannot be used "
+                                     "as keys".format(side, dfk.name, ik))
+            fields.append(dfk)
+        return tuple(fields)
+    else:
+        field = df[key] if isinstance(key, str) else df[key]
+        if field.indexed:
+            raise ValueError("'{}': field is indexed; indexed fields cannot be "
+                             "used as keys".format(side))
+        return field
+
+
+def validate_key_lengths(side, df, key):
+    lens = set()
+    if isinstance(key, tuple):
+        for k in key:
+            lens.add(len(k.data))
+            if len(lens) > 1:
+                raise ValueError("'{}' keys are consistent lengths. The following "
+                                 "lengths were observed: {}".format(side, lens))
+    else:
+        lens.add(len(key.data))
+    return lens
+
+
+def validate_field_lengths(side, lens, df, names=None):
+    if names is None:
+        names = df.keys()
+    for n in names:
+        lens.add(len(df[n].data))
+    if len(lens) > 1:
+        raise ValueError("'{}' fields are inconsistent lengths. The following "
+                         "lengths were observed: {}".format(side, lens))
+    return lens

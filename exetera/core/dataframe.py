@@ -15,6 +15,7 @@ import pandas as pd
 from exetera.core.abstract_types import Dataset, DataFrame
 from exetera.core import fields as fld
 from exetera.core import operations as ops
+from exetera.core import validation as val
 import h5py
 
 
@@ -349,27 +350,114 @@ def move(field: fld.Field, dest_df: DataFrame, name: str):
 def merge(left: DataFrame,
           right: DataFrame,
           dest: DataFrame,
-          left_on: Union[str, fld.Field],
-          right_on: Union[str, fld.Field],
+          left_on: Union[Tuple[Union[str, fld.Field]], str, fld.Field],
+          right_on: Union[Tuple[Union[str, fld.Field]], str, fld.Field],
           left_fields: Optional[Sequence[str]] = None,
           right_fields: Optional[Sequence[str]] = None,
           left_suffix: str = '_l',
           right_suffix: str = '_r',
           how='left'):
+    """
+    Merge 'left' and 'right' DataFrames into a destination dataset. The merge is a database-style
+    join operation, in any of the following modes ("left", "right", "inner", "outer"). This
+    method closely follows the Pandas 'merge' functionality.
 
-    left_on_ = left[left_on] if isinstance(left_on, str) else left_on
-    right_on_ = right[right_on] if isinstance(right_on, str) else right_on
-    if len(left_on_.data) < (2 << 30) and len(right_on_.data) < (2 << 30):
+    The join is performed using the fields specified by 'left_on' and 'right_on'; these can either
+    be strings or fields; if they strings then they refer to fields that must exist in the
+    corresponding dataframe.
+
+    You can optionally set 'left_fields' and / or 'right_fields' if you want to have only a subset
+    of fields joined from the left and right dataframes. If you don't want any fields to be joined
+    from a given dataframe, you can pass an empty list.
+
+    Fields are written to the destination dataframe. If the field names clash, they will get
+    appended with the strings specified in 'left_suffix' and 'right_suffix' respectively.
+
+    :params left: The left dataframe
+    :params right: The right dataframe
+    :left_on: The field corresponding to the left key used to perform the join. This is either the
+    the name of the field, or a field object. If it is a field object, it can be from another
+    dataframe but it must be the same length as the fields being joined. This can also be a tuple
+    of such values when performing joins on compound keys
+    :right_on: The field corresponding to the right key used to perform the join. This is either
+    the name of the field, or a field object. If it is a field object, it can be from another
+    dataframe but it must be the same length as the fields being joined. This can also be a tuple
+    of such values when performing joins on compound keys
+    :left_fields: Optional parameter listing which fields are to be joined from the left table. If
+    this is not set, all fields from the left table are joined
+    :right_fields: Optional parameter listing which fields are to be joined from the right table.
+    If this is not set, all fields from the right table are joined
+    :left_suffix: A string to be appended to fields from the left table if they clash with fields
+    from the right table.
+    :right_suffix: A string to be appended to fields from the right table if they clash with fields
+    from the left table.
+    :how: Optional parameter specifying the merge mode. It must be one of ('left', 'right',
+    'inner', 'outer' or 'cross). If not set, the 'left' join is performed.
+
+    """
+
+    if not isinstance(left, DataFrame):
+        raise ValueError("'left' must be a DataFrame but is of type '{}'".format(type(left)))
+
+    if not isinstance(right, DataFrame):
+        raise ValueError("'right' must be a DataFrame but is of type '{}'".format(type(right)))
+
+    supported_modes = ('left', 'right', 'inner', 'outer', 'cross')
+    if how not in supported_modes:
+        raise ValueError("'how' must be one of {} but is {}".format(supported_modes, how))
+
+    # check that left_on and right_on are mutually compatible
+    val.validate_key_field_consistency('left_on', 'right_on', left_on, right_on)
+
+    # check that fields are of the correct field type
+    left_on_fields = val.validate_and_get_key_fields('left_on', left, left_on)
+    right_on_fields = val.validate_and_get_key_fields('right_on', right, right_on)
+
+    # check the consistency of field lengths
+    left_lens = val.validate_key_lengths('left_on', left, left_on_fields)
+    right_lens = val.validate_key_lengths('right_on', right, right_on_fields)
+
+    # check consistency of fields with key lengths
+    val.validate_field_lengths('left', left_lens, left, left_fields)
+    val.validate_field_lengths('right', right_lens, right, right_fields)
+
+    left_len = list(left_lens)[0]
+    right_len = list(right_lens)[0]
+
+    if left_len < (2 << 30) and right_len < (2 << 30):
         index_dtype = np.int32
     else:
         index_dtype = np.int64
 
+    left_df_dict = {}
+    right_df_dict = {}
+    left_on_keys = []
+    right_on_keys = []
+    if isinstance(left_on_fields, tuple):
+        for i_f, f in enumerate(left_on_fields):
+            key = 'l_k_{}'.format(i_f)
+            left_df_dict[key] = f.data[:]
+            left_on_keys.append(key)
+        l_key = tuple(left_on_keys)
+        for i_f, f in enumerate(right_on_fields):
+            key = 'r_k_{}'.format(i_f)
+            right_df_dict[key] = f.data[:]
+            right_on_keys.append(key)
+        r_key = tuple(right_on_keys)
+    else:
+        l_key = 'l_k'
+        left_df_dict[l_key] = left_on_fields.data[:]
+        r_key = 'r_k'
+        right_df_dict[r_key] = right_on_fields.data[:]
+
+    left_df_dict['l_i'] = np.arange(left_len, dtype=index_dtype)
+    right_df_dict['r_i'] = np.arange(right_len, dtype=index_dtype)
     # create the merging dataframes, using only the fields involved in the merge
-    l_df = pd.DataFrame({'l_k': left_on_.data[:],
-                         'l_i': np.arange(len(left_on_.data), dtype=index_dtype)})
-    r_df = pd.DataFrame({'r_k': right_on_.data[:],
-                         'r_i': np.arange(len(right_on_.data), dtype=index_dtype)})
-    df = pd.merge(left=l_df, right=r_df, left_on='l_k', right_on='r_k', how=how)
+    l_df = pd.DataFrame(left_df_dict)
+    r_df = pd.DataFrame(right_df_dict)
+
+    df = pd.merge(left=l_df, right=r_df, left_on=l_key, right_on=r_key, how=how)
+
     l_to_d_map = df['l_i'].to_numpy(dtype=np.int32)
     l_to_d_filt = np.logical_not(df['l_i'].isnull()).to_numpy()
     r_to_d_map = df['r_i'].to_numpy(dtype=np.int32)
@@ -378,22 +466,6 @@ def merge(left: DataFrame,
     # perform the mapping
     left_fields_ = left.keys() if left_fields is None else left_fields
     right_fields_ = right.keys() if right_fields is None else right_fields
-    for f in right_fields_:
-        dest_f = f
-        if f in left_fields_:
-            dest_f += right_suffix
-        r = right[f]
-        d = r.create_like(dest, dest_f)
-        if r.indexed:
-            i, v = ops.safe_map_indexed_values(r.indices[:], r.values[:], r_to_d_map, r_to_d_filt)
-            d.indices.write(i)
-            d.values.write(v)
-        else:
-            v = ops.safe_map_values(r.data[:], r_to_d_map, r_to_d_filt)
-            d.data.write(v)
-    if np.all(r_to_d_filt) == False:
-        d = dest.create_numeric('valid'+right_suffix, 'bool')
-        d.data.write(r_to_d_filt)
 
     for f in left_fields_:
         dest_f = f
@@ -411,3 +483,20 @@ def merge(left: DataFrame,
     if np.all(l_to_d_filt) == False:
         d = dest.create_numeric('valid'+left_suffix, 'bool')
         d.data.write(l_to_d_filt)
+
+    for f in right_fields_:
+        dest_f = f
+        if f in left_fields_:
+            dest_f += right_suffix
+        r = right[f]
+        d = r.create_like(dest, dest_f)
+        if r.indexed:
+            i, v = ops.safe_map_indexed_values(r.indices[:], r.values[:], r_to_d_map, r_to_d_filt)
+            d.indices.write(i)
+            d.values.write(v)
+        else:
+            v = ops.safe_map_values(r.data[:], r_to_d_map, r_to_d_filt)
+            d.data.write(v)
+    if np.all(r_to_d_filt) == False:
+        d = dest.create_numeric('valid'+right_suffix, 'bool')
+        d.data.write(r_to_d_filt)
