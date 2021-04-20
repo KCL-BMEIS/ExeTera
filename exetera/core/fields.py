@@ -23,6 +23,15 @@ from exetera.core import validation as val
 
 class HDF5Field(Field):
     def __init__(self, session, group, name=None, write_enabled=False):
+        """
+        Construct a HDF5 file based Field. This construction is not used directly, rather, should be called from
+        specific field types, e.g. NumericField.
+
+        :param session: The session instance.
+        :param group: The HDF5 Group object.
+        :param name: The name of this field if not specified in group.
+        :param write_enabled: A read-only/read-write switch.
+        """
         super().__init__()
 
         if name is None:
@@ -71,6 +80,12 @@ class HDF5Field(Field):
 class MemoryField(Field):
 
     def __init__(self, session):
+        """
+        Construct a field stored in memory only, often used when perform arithmetic/comparison operations from storage
+        based fields, e.g. field3 = field1 + field2 will create a memory field during add operation and assign to field3.
+
+        :param session: The session instance.
+        """
         super().__init__()
         self._session = session
         self._write_enabled = True
@@ -109,8 +124,18 @@ class MemoryField(Field):
         raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
 
 
+# Field arrays
+# ============
+
+
 class ReadOnlyFieldArray:
     def __init__(self, field, dataset_name):
+        """
+        Construct a readonly FieldArray which used as the wrapper of data in Fields (apart from IndexedStringFields).
+
+        :param field: The HDF5 group object used as storage.
+        :param dataset_name: The name of the dataset object in HDF5, normally use 'values'
+        """
         self._field = field
         self._name = dataset_name
         self._dataset = field[dataset_name]
@@ -146,11 +171,14 @@ class ReadOnlyFieldArray:
                               "for a writeable copy of the field")
 
 
-# Field arrays
-# ============
-
 class WriteableFieldArray:
     def __init__(self, field, dataset_name):
+        """
+        Construct a read/write FieldArray which used as the wrapper of data in Field.
+
+        :param field: The HDF5 group object used as storage.
+        :param dataset_name: The name of the dataset object in HDF5, normally use 'values'
+        """
         self._field = field
         self._name = dataset_name
         self._dataset = field[dataset_name]
@@ -188,8 +216,12 @@ class WriteableFieldArray:
 
 
 class MemoryFieldArray:
-
     def __init__(self, dtype):
+        """
+        Construct a memory based FieldArray which used as the wrapper of data in Field. The data is stored in numpy array.
+
+        :param dtype: The data type for construct the numpy array.
+        """
         self._dtype = dtype
         self._dataset = None
 
@@ -235,6 +267,13 @@ class MemoryFieldArray:
 
 class ReadOnlyIndexedFieldArray:
     def __init__(self, field, indices, values):
+        """
+        Construct a IndexFieldArray which used as the wrapper of data in IndexedStringField.
+
+        :param field: The HDF5 group object for store the data.
+        :param indices: The indices of the IndexedStringField.
+        :param values: The values of the IndexedStringField.
+        """
         self._field = field
         self._indices = indices
         self._values = values
@@ -496,6 +535,7 @@ class IndexedStringMemField(MemoryField):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+
 class FixedStringMemField(MemoryField):
     def __init__(self, session, length):
         super().__init__(session)
@@ -578,7 +618,6 @@ class NumericMemField(MemoryField):
     def __init__(self, session, nformat):
         super().__init__(session)
         self._nformat = nformat
-
 
     def writeable(self):
         return self
