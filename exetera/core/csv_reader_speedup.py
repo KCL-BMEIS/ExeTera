@@ -79,22 +79,28 @@ def file_read_line_fast_csv(source):
     with open(source) as f:
         header = csv.DictReader(f)
         count_columns = len(header.fieldnames)
-        content = f.read()
-        count_rows = content.count('\n') + 1
+        
+        count_rows = sum(1 for _ in f) # w/o header row
 
-    content = np.fromfile(source, dtype='|S1')#np.uint8)
-    column_inds = np.zeros((count_columns, count_rows), dtype=np.int64)
-    column_vals = np.zeros((count_columns, count_rows * 25), dtype=np.uint8)
-
+        #content = f.read()
+        # count_rows = content.count('\n') + 1  # +1: for the case that last line doesn't have \n
+        
+    column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
+    # change it to longest key 
+    column_vals = np.zeros((count_columns, count_rows * 100), dtype=np.uint8)
 
     ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
     SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
     NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
 
+    #print(lineterminator.tobytes())
+    #print("hello")
+    #CARRIAGE_RETURN_VALUE = np.frombuffer(b'\r', dtype='S1')[0][0]
+    print("test")
     with Timer("my_fast_csv_reader_int"):
-
         content = np.fromfile(source, dtype=np.uint8)
         my_fast_csv_reader_int(content, column_inds, column_vals, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE)
+
 
     return column_inds, column_vals
 
@@ -154,7 +160,10 @@ def make_test_data(count, schema):
 
 @njit
 def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separator_value, newline_value):
-    colcount = len(column_inds[0])
+    colcount = len(column_inds)
+    maxrowcount = len(column_inds[0]) - 1  # minus extra index 0 row that created for column_inds
+    print('colcount', colcount)
+    print('maxrowcount', maxrowcount)
 
     index = np.int64(0)
     line_start = np.int64(0)
@@ -169,6 +178,7 @@ def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separ
     end_line = False
     escaped_literal_candidate = False
     cur_cell_start = column_inds[col_index, row_index] if row_index >= 0 else 0
+
     cur_cell_char_count = 0
     while True:
         write_char = False
@@ -176,13 +186,14 @@ def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separ
         end_line = False
 
         c = source[index]
+
         if c == separator_value:
             if not escaped:
                 end_cell = True
             else:
                 write_char = True
 
-        elif c == newline_value:
+        elif c == newline_value :
             if not escaped:
                 end_cell = True
                 end_line = True
@@ -197,13 +208,24 @@ def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separ
             column_vals[col_index, cur_cell_start + cur_cell_char_count] = c
             cur_cell_char_count += 1
 
+            # if col_index == 5:
+            #     print('%%%%%%')
+            #     print(c)
+
         if end_cell:
             if row_index >= 0:
-                column_inds[col_index, row_index+1] = cur_cell_start + cur_cell_char_count
+                column_inds[col_index, row_index + 1] = cur_cell_start + cur_cell_char_count
+                # print("========")
+                # print(col_index, row_index + 1, column_vals.shape)
+                # print(column_inds)
+                # print(column_vals)
+                # print("========")
             if end_line:
                 row_index += 1
                 col_index = 0
-
+                # print('~~~~~~~~~~~')
+                # print(col_index, row_index)
+                # print('~~~~~~~~~~~')
             else:
                 col_index += 1
 
@@ -213,59 +235,16 @@ def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separ
         index += 1
 
         if index == len(source):
+            if col_index == colcount - 1: #and row_index == maxrowcount - 1:
+                # print('excuese me')
+                column_inds[col_index, row_index + 1] = cur_cell_start + cur_cell_char_count
+
+            # print('source', source, 'len_source', len(source), len(source))
+            # print('index', cur_cell_start + cur_cell_char_count)
+            # print('break',col_index, row_index)
             break
 
 
-"""
-original categories:
-"one", "two", "three", "four", "five"
-0    , 1    , 2      , 3     , 4
-
-sorted categories
-"five", "four", "one", "three", "two"
-
-sorted category map
-4, 3, 0, 2, 1
-
-lengths of sorted categories
-4, 4, 3, 5, 3
-
-sorted category indexed string
-
-scindex = [0, 4, 8, 11, 16, 19]
-scvalues = [fivefouronethreetwo]
-
-col_inds = value_index[col_index,...]
-
-def my_fast_categorical_mapper(...):
-    for e in range(len(rows_read)-1):
-        key_start = value_inds[col_index, e]
-        key_end = value_inds[col_index, e+1]
-        key_len = key_end - key_start
-    
-        for i in range(1, len(scindex)):
-            skeylen = scindex[i] - scindex[i - 1]
-            if skeylen == len(key):
-                index = i
-                for j in range(keylen):
-                    entry_start = scindex[i-1]
-                    if value_inds[col_index, key_start + j] != scvalues[entry_start + j]:
-                        index = -1
-                        break
-    
-            if index != -1:
-                destination_vals[e] = index
-               
-                    
-                
-            
-            
-
-
-
-
-
-"""
 
 if __name__ == "__main__":
     main()
