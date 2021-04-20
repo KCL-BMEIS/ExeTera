@@ -6,7 +6,7 @@ import numpy as np
 from exetera.core import session, fields
 from exetera.core.abstract_types import DataFrame
 from io import BytesIO
-from exetera.core.dataset import HDF5Dataset, copy, drop, move
+from exetera.core.dataset import HDF5Dataset, copy, move
 
 
 class TestDataSet(unittest.TestCase):
@@ -84,7 +84,7 @@ class TestDataSet(unittest.TestCase):
             self.assertTrue(isinstance(ds2['df2'], DataFrame))
             self.assertTrue(isinstance(ds2['df2']['num'], fields.Field))
 
-            drop(ds2['df2'])
+            ds2.drop('df2')
             self.assertTrue(len(ds2) == 0)
 
             move(df, ds2, 'df2')
