@@ -251,15 +251,6 @@ def copy(dataframe: DataFrame, dataset: Dataset, name: str):
     dataset._dataframes[name] = _dataframe
 
 
-def drop(dataframe: DataFrame):
-    """
-    Delete a dataframe by HDF5DataFrame.drop(ds['df1']).
-
-    :param dataframe: The dataframe to delete.
-    """
-    dataframe._dataset.delete_dataframe(dataframe)
-
-
 def move(dataframe: DataFrame, dataset: Dataset, name:str):
     """
     Move a dataframe to another dataset via HDF5DataFrame.move(ds1['df1'], ds2, 'df1']).

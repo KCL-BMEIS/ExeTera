@@ -8,9 +8,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional, Sequence, Tuple, Union
+import numpy as np
+import pandas as pd
 
 from exetera.core.abstract_types import Dataset, DataFrame
 from exetera.core import fields as fld
+from exetera.core import operations as ops
 import h5py
 
 
@@ -328,16 +332,6 @@ def copy(field: fld.Field, dataframe: DataFrame, name: str):
     dataframe.columns[name] = dfield
 
 
-# def drop(dataframe: DataFrame, field: fld.Field):
-#     """
-#     Drop a field from a dataframe.
-#
-#     :param dataframe: The dataframe where field is located.
-#     :param field: The field to delete.
-#     """
-#     dataframe.delete_field(field)
-
-
 def move(field: fld.Field, dest_df: DataFrame, name: str):
     """
     Move a field to another dataframe as well as underlying dataset.
@@ -349,3 +343,70 @@ def move(field: fld.Field, dest_df: DataFrame, name: str):
     """
     copy(field, dest_df, name)
     field.dataframe.drop(field.name)
+
+
+def merge(left: DataFrame,
+          right: DataFrame,
+          dest: DataFrame,
+          left_on: Union[str, fld.Field],
+          right_on: Union[str, fld.Field],
+          left_fields: Optional[Sequence[str]] = None,
+          right_fields: Optional[Sequence[str]] = None,
+          left_suffix: str = '_l',
+          right_suffix: str = '_r',
+          how='left'):
+
+    left_on_ = left[left_on] if isinstance(left_on, str) else left_on
+    right_on_ = right[right_on] if isinstance(right_on, str) else right_on
+    if len(left_on_.data) < (2 << 30) and len(right_on_.data) < (2 << 30):
+        index_dtype = np.int32
+    else:
+        index_dtype = np.int64
+
+    # create the merging dataframes, using only the fields involved in the merge
+    l_df = pd.DataFrame({'l_k': left_on_.data[:],
+                         'l_i': np.arange(len(left_on_.data), dtype=index_dtype)})
+    r_df = pd.DataFrame({'r_k': right_on_.data[:],
+                         'r_i': np.arange(len(right_on_.data), dtype=index_dtype)})
+    df = pd.merge(left=l_df, right=r_df, left_on='l_k', right_on='r_k', how=how)
+    l_to_d_map = df['l_i'].to_numpy(dtype=np.int32)
+    l_to_d_filt = np.logical_not(df['l_i'].isnull()).to_numpy()
+    r_to_d_map = df['r_i'].to_numpy(dtype=np.int32)
+    r_to_d_filt = np.logical_not(df['r_i'].isnull()).to_numpy()
+
+    # perform the mapping
+    left_fields_ = left.keys() if left_fields is None else left_fields
+    right_fields_ = right.keys() if right_fields is None else right_fields
+    for f in right_fields_:
+        dest_f = f
+        if f in left_fields_:
+            dest_f += right_suffix
+        r = right[f]
+        d = r.create_like(dest, dest_f)
+        if r.indexed:
+            i, v = ops.safe_map_indexed_values(r.indices[:], r.values[:], r_to_d_map, r_to_d_filt)
+            d.indices.write(i)
+            d.values.write(v)
+        else:
+            v = ops.safe_map_values(r.data[:], r_to_d_map, r_to_d_filt)
+            d.data.write(v)
+    if np.all(r_to_d_filt) == False:
+        d = dest.create_numeric('valid'+right_suffix, 'bool')
+        d.data.write(r_to_d_filt)
+
+    for f in left_fields_:
+        dest_f = f
+        if f in right_fields_:
+            dest_f += left_suffix
+        l = left[f]
+        d = l.create_like(dest, dest_f)
+        if l.indexed:
+            i, v = ops.safe_map_indexed_values(l.indices[:], l.values[:], l_to_d_map, l_to_d_filt)
+            d.indices.write(i)
+            d.values.write(v)
+        else:
+            v = ops.safe_map_values(l.data[:], l_to_d_map, l_to_d_filt)
+            d.data.write(v)
+    if np.all(l_to_d_filt) == False:
+        d = dest.create_numeric('valid'+left_suffix, 'bool')
+        d.data.write(l_to_d_filt)

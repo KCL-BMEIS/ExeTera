@@ -257,3 +257,28 @@ class TestDataFrameApplyFilter(unittest.TestCase):
 
             df.apply_filter(filt)
             self.assertListEqual(expected, df['numf'].data[:].tolist())
+
+
+class TestDataFrameMerge(unittest.TestCase):
+
+    def tests_merge_left(self):
+
+        l_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
+        r_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
+        r_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
+        expected = ['', '', '', 'bb1', 'bb2', 'ccc1', 'ccc2', 'dddd1', '', 'ffffff1', 'ggggggg1']
+
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            ldf = dst.create_dataframe('ldf')
+            rdf = dst.create_dataframe('rdf')
+            ldf.create_numeric('l_id', 'int32').data.write(l_id)
+            rdf.create_numeric('r_id', 'int32').data.write(r_id)
+            rdf.create_indexed_string('r_vals').data.write(r_vals)
+            ddf = dst.create_dataframe('ddf')
+            dataframe.merge(ldf, rdf, ddf, 'l_id', 'r_id', how='left')
+            self.assertEqual(expected, ddf['r_vals'].data[:])
+            valid_if_equal = (ddf['l_id'].data[:] == ddf['r_id'].data[:]) | \
+                             np.logical_not(ddf['valid_r'].data[:])
+            self.assertTrue(np.all(valid_if_equal))
