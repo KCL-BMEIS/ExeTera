@@ -200,6 +200,11 @@ class HDF5Dataset(Dataset):
         else:
             self.__delitem__(name)
 
+    def drop(self,
+             name: str):
+        del self._dataframes[name]
+        del self._file[name]
+
     def keys(self):
         """Return all dataframe names in this dataset."""
         return self._dataframes.keys()
@@ -250,15 +255,6 @@ def copy(dataframe: DataFrame, dataset: Dataset, name: str):
     dataset._dataframes[name] = _dataframe
 
 
-def drop(dataframe: DataFrame):
-    """
-    Delete a dataframe by HDF5DataFrame.drop(ds['df1']).
-
-    :param dataframe: The dataframe to delete.
-    """
-    dataframe._dataset.delete_dataframe(dataframe)
-
-
 def move(dataframe: DataFrame, dataset: Dataset, name:str):
     """
     Move a dataframe to another dataset via HDF5DataFrame.move(ds1['df1'], ds2, 'df1']).
@@ -270,5 +266,4 @@ def move(dataframe: DataFrame, dataset: Dataset, name:str):
     :param name: The name of dataframe in destination dataset.
     """
     copy(dataframe, dataset, name)
-    drop(dataframe)
-
+    dataframe.dataset.drop(dataframe.name)

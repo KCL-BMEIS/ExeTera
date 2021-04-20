@@ -8,9 +8,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional, Sequence, Tuple, Union
+import numpy as np
+import pandas as pd
 
 from exetera.core.abstract_types import Dataset, DataFrame
 from exetera.core import fields as fld
+from exetera.core import operations as ops
 import h5py
 
 
@@ -80,6 +84,11 @@ class HDF5DataFrame(DataFrame):
             nfield.data.write(field.data[:])
         self._columns[dname] = nfield
 
+    def drop(self,
+             name: str):
+        del self._columns[name]
+        del self._h5group[name]
+
     def create_group(self, name):
         """
         Create a group object in HDF5 file for field to use. Please note, this function is for
@@ -91,22 +100,13 @@ class HDF5DataFrame(DataFrame):
         self._h5group.create_group(name)
         return self._h5group[name]
 
-    def create_numeric(self, name, nformat, timestamp=None, chunksize=None):
-        """
-        Create a numeric type field.
-        """
-        fld.numeric_field_constructor(self._dataset.session, self, name, nformat, timestamp, chunksize)
-        field = fld.NumericField(self._dataset.session, self._h5group[name],
-                                 write_enabled=True)
-        self._columns[name] = field
-        return self._columns[name]
-
     def create_indexed_string(self, name, timestamp=None, chunksize=None):
         """
         Create a indexed string type field.
         """
-        fld.indexed_string_field_constructor(self._dataset.session, self, name, timestamp, chunksize)
-        field = fld.IndexedStringField(self._dataset.session, self._h5group[name],
+        fld.indexed_string_field_constructor(self._dataset.session, self, name,
+                                             timestamp, chunksize)
+        field = fld.IndexedStringField(self._dataset.session, self._h5group[name], self, name,
                                        write_enabled=True)
         self._columns[name] = field
         return self._columns[name]
@@ -115,9 +115,21 @@ class HDF5DataFrame(DataFrame):
         """
         Create a fixed string type field.
         """
-        fld.fixed_string_field_constructor(self._dataset.session, self, name, length, timestamp, chunksize)
-        field = fld.FixedStringField(self._dataset.session, self._h5group[name],
+        fld.fixed_string_field_constructor(self._dataset.session, self, name,
+                                           length, timestamp, chunksize)
+        field = fld.FixedStringField(self._dataset.session, self._h5group[name], self, name,
                                      write_enabled=True)
+        self._columns[name] = field
+        return self._columns[name]
+
+    def create_numeric(self, name, nformat, timestamp=None, chunksize=None):
+        """
+        Create a numeric type field.
+        """
+        fld.numeric_field_constructor(self._dataset.session, self, name,
+                                      nformat, timestamp, chunksize)
+        field = fld.NumericField(self._dataset.session, self._h5group[name], self, name,
+                                 write_enabled=True)
         self._columns[name] = field
         return self._columns[name]
 
@@ -127,7 +139,7 @@ class HDF5DataFrame(DataFrame):
         """
         fld.categorical_field_constructor(self._dataset.session, self, name, nformat, key,
                                           timestamp, chunksize)
-        field = fld.CategoricalField(self._dataset.session, self._h5group[name],
+        field = fld.CategoricalField(self._dataset.session, self._h5group[name], self, name,
                                      write_enabled=True)
         self._columns[name] = field
         return self._columns[name]
@@ -136,8 +148,9 @@ class HDF5DataFrame(DataFrame):
         """
         Create a timestamp type field.
         """
-        fld.timestamp_field_constructor(self._dataset.session, self, name, timestamp, chunksize)
-        field = fld.TimestampField(self._dataset.session, self._h5group[name],
+        fld.timestamp_field_constructor(self._dataset.session, self, name,
+                                        timestamp, chunksize)
+        field = fld.TimestampField(self._dataset.session, self._h5group[name], self, name,
                                    write_enabled=True)
         self._columns[name] = field
         return self._columns[name]
@@ -174,9 +187,9 @@ class HDF5DataFrame(DataFrame):
         :param name: The name of field to get.
         """
         if not isinstance(name, str):
-            raise TypeError("The name must be a str object.")
+            raise TypeError("The name must be of type str but is of type '{}'".format(str))
         elif not self.__contains__(name):
-            raise ValueError("Can not find the name from this dataframe.")
+            raise ValueError("There is no field named '{}' in this dataframe".format(name))
         else:
             return self._columns[name]
 
@@ -201,7 +214,7 @@ class HDF5DataFrame(DataFrame):
 
     def __setitem__(self, name, field):
         if not isinstance(name, str):
-            raise TypeError("The name must be a str object.")
+            raise TypeError("The name must be of type str but is of type '{}'".format(str))
         if not isinstance(field, fld.Field):
             raise TypeError("The field must be a Field object.")
         nfield = field.create_like(self, name)
@@ -214,7 +227,7 @@ class HDF5DataFrame(DataFrame):
 
     def __delitem__(self, name):
         if not self.__contains__(name=name):
-            raise ValueError("This dataframe does not contain the name to delete.")
+            raise ValueError("There is no field named '{}' in this dataframe".format(name))
         else:
             del self._h5group[name]
             del self._columns[name]
@@ -225,7 +238,9 @@ class HDF5DataFrame(DataFrame):
 
         :param field: The field to delete from this dataframe.
         """
-        name = field.name[field.name.index('/', 1)+1:]
+        if field.dataframe != self:
+            raise ValueError("This field is owned by a different dataframe")
+        name = field.name
         if name is None:
             raise ValueError("This dataframe does not contain the field to delete.")
         else:
@@ -318,17 +333,7 @@ def copy(field: fld.Field, dataframe: DataFrame, name: str):
     dataframe.columns[name] = dfield
 
 
-def drop(dataframe: DataFrame, field: fld.Field):
-    """
-    Drop a field from a dataframe.
-
-    :param dataframe: The dataframe where field is located.
-    :param field: The field to delete.
-    """
-    dataframe.delete_field(field)
-
-
-def move(src_df: DataFrame, field: fld.Field, dest_df: DataFrame, name: str):
+def move(field: fld.Field, dest_df: DataFrame, name: str):
     """
     Move a field to another dataframe as well as underlying dataset.
 
@@ -338,4 +343,71 @@ def move(src_df: DataFrame, field: fld.Field, dest_df: DataFrame, name: str):
     :param name: The name of field under destination dataframe.
     """
     copy(field, dest_df, name)
-    drop(src_df, field)
+    field.dataframe.drop(field.name)
+
+
+def merge(left: DataFrame,
+          right: DataFrame,
+          dest: DataFrame,
+          left_on: Union[str, fld.Field],
+          right_on: Union[str, fld.Field],
+          left_fields: Optional[Sequence[str]] = None,
+          right_fields: Optional[Sequence[str]] = None,
+          left_suffix: str = '_l',
+          right_suffix: str = '_r',
+          how='left'):
+
+    left_on_ = left[left_on] if isinstance(left_on, str) else left_on
+    right_on_ = right[right_on] if isinstance(right_on, str) else right_on
+    if len(left_on_.data) < (2 << 30) and len(right_on_.data) < (2 << 30):
+        index_dtype = np.int32
+    else:
+        index_dtype = np.int64
+
+    # create the merging dataframes, using only the fields involved in the merge
+    l_df = pd.DataFrame({'l_k': left_on_.data[:],
+                         'l_i': np.arange(len(left_on_.data), dtype=index_dtype)})
+    r_df = pd.DataFrame({'r_k': right_on_.data[:],
+                         'r_i': np.arange(len(right_on_.data), dtype=index_dtype)})
+    df = pd.merge(left=l_df, right=r_df, left_on='l_k', right_on='r_k', how=how)
+    l_to_d_map = df['l_i'].to_numpy(dtype=np.int32)
+    l_to_d_filt = np.logical_not(df['l_i'].isnull()).to_numpy()
+    r_to_d_map = df['r_i'].to_numpy(dtype=np.int32)
+    r_to_d_filt = np.logical_not(df['r_i'].isnull()).to_numpy()
+
+    # perform the mapping
+    left_fields_ = left.keys() if left_fields is None else left_fields
+    right_fields_ = right.keys() if right_fields is None else right_fields
+    for f in right_fields_:
+        dest_f = f
+        if f in left_fields_:
+            dest_f += right_suffix
+        r = right[f]
+        d = r.create_like(dest, dest_f)
+        if r.indexed:
+            i, v = ops.safe_map_indexed_values(r.indices[:], r.values[:], r_to_d_map, r_to_d_filt)
+            d.indices.write(i)
+            d.values.write(v)
+        else:
+            v = ops.safe_map_values(r.data[:], r_to_d_map, r_to_d_filt)
+            d.data.write(v)
+    if np.all(r_to_d_filt) == False:
+        d = dest.create_numeric('valid'+right_suffix, 'bool')
+        d.data.write(r_to_d_filt)
+
+    for f in left_fields_:
+        dest_f = f
+        if f in right_fields_:
+            dest_f += left_suffix
+        l = left[f]
+        d = l.create_like(dest, dest_f)
+        if l.indexed:
+            i, v = ops.safe_map_indexed_values(l.indices[:], l.values[:], l_to_d_map, l_to_d_filt)
+            d.indices.write(i)
+            d.values.write(v)
+        else:
+            v = ops.safe_map_values(l.data[:], l_to_d_map, l_to_d_filt)
+            d.data.write(v)
+    if np.all(l_to_d_filt) == False:
+        d = dest.create_numeric('valid'+left_suffix, 'bool')
+        d.data.write(l_to_d_filt)

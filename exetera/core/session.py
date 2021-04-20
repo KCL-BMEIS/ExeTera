@@ -865,7 +865,7 @@ class Session(AbstractSession):
         }
 
         fieldtype = field.attrs['fieldtype'].split(',')[0]
-        return fieldtype_map[fieldtype](self, field)
+        return fieldtype_map[fieldtype](self, field, None, field.name)
 
     def create_like(self, field, dest_group, dest_name, timestamp=None, chunksize=None):
         """
@@ -914,7 +914,7 @@ class Session(AbstractSession):
 
         if isinstance(group, h5py.Group):
             fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
-            return fld.IndexedStringField(self, group[name], write_enabled=True)
+            return fld.IndexedStringField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_indexed_string(name, timestamp, chunksize)
 
@@ -939,7 +939,7 @@ class Session(AbstractSession):
                                  "{} was passed to it".format(type(group)))
         if isinstance(group, h5py.Group):
             fld.fixed_string_field_constructor(self, group, name, length, timestamp, chunksize)
-            return fld.FixedStringField(self, group[name], write_enabled=True)
+            return fld.FixedStringField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_fixed_string(name, length, timestamp, chunksize)
 
@@ -969,7 +969,7 @@ class Session(AbstractSession):
 
         if isinstance(group, h5py.Group):
             fld.categorical_field_constructor(self, group, name, nformat, key, timestamp, chunksize)
-            return fld.CategoricalField(self, group[name], write_enabled=True)
+            return fld.CategoricalField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_categorical(name, nformat, key, timestamp, chunksize)
 
@@ -997,7 +997,7 @@ class Session(AbstractSession):
 
         if isinstance(group, h5py.Group):
             fld.numeric_field_constructor(self, group, name, nformat, timestamp, chunksize)
-            return fld.NumericField(self, group[name], write_enabled=True)
+            return fld.NumericField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_numeric(name, nformat, timestamp, chunksize)
 
@@ -1015,7 +1015,7 @@ class Session(AbstractSession):
 
         if isinstance(group, h5py.Group):
             fld.timestamp_field_constructor(self, group, name, timestamp, chunksize)
-            return fld.TimestampField(self, group[name], write_enabled=True)
+            return fld.TimestampField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_timestamp(name, timestamp, chunksize)
 
@@ -1140,18 +1140,38 @@ class Session(AbstractSession):
 
         right_results = list()
         for irf, rf in enumerate(right_fields):
-            rf_raw = val.raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
-            joined_field = ops.safe_map(rf_raw, r_to_l_map, r_to_l_filt)
-            # joined_field = per._safe_map(rf_raw, r_to_l_map, r_to_l_filt)
-            if right_writers is None:
-                right_results.append(joined_field)
+            if isinstance(rf, Field):
+                if rf.indexed:
+                    indices, values = ops.safe_map_indexed_values(rf.indices[:], rf.values[:],
+                                                                  r_to_l_map, r_to_l_filt)
+                    if right_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].indices.write(indices)
+                        right_writers[irf].values.write(values)
+                else:
+                    values = ops.safe_map_values(rf.data[:], r_to_l_map, r_to_l_filt)
+                    if right_writers is None:
+                        result = rf.create_like()
+                        result.data.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].data.write(values)
             else:
-                right_writers[irf].data.write(joined_field)
+                values = ops.safe_map_values(rf, r_to_l_map, r_to_l_filt)
+
+                if right_writers is None:
+                    right_results.append(values)
+                else:
+                    right_writers[irf].data.write(values)
 
         return right_results
 
     def merge_right(self, left_on, right_on,
-                    left_fields=None, left_writers=None):
+                    left_fields=tuple(), left_writers=None):
         l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
@@ -1166,12 +1186,33 @@ class Session(AbstractSession):
 
         left_results = list()
         for ilf, lf in enumerate(left_fields):
-            lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
-            joined_field = ops.safe_map(lf_raw, l_to_r_map, l_to_r_filt)
-            if left_writers is None:
-                left_results.append(joined_field)
+            if isinstance(lf, Field):
+                if lf.indexed:
+                    indices, values = ops.safe_map_indexed_values(lf.indices[:], lf.values[:],
+                                                                  l_to_r_map, l_to_r_filt)
+                    if left_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].indices.write(indices)
+                        left_writers[ilf].values.write(values)
+                else:
+                    values = ops.safe_map_values(lf.data[:], l_to_r_map, l_to_r_filt)
+                    if left_writers is None:
+                        result = lf.create_like()
+                        result.data.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].data.write(values)
             else:
-                left_writers[ilf].data.write(joined_field)
+                values = ops.safe_map_values(lf, l_to_r_map, l_to_r_filt)
+
+                if left_writers is None:
+                    left_results.append(values)
+                else:
+                    left_writers[ilf].data.write(values)
 
         return left_results
 
@@ -1193,21 +1234,63 @@ class Session(AbstractSession):
 
         left_results = list()
         for ilf, lf in enumerate(left_fields):
-            lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
-            joined_field = ops.safe_map(lf_raw, l_to_i_map, l_to_i_filt)
-            if left_writers is None:
-                left_results.append(joined_field)
+            if isinstance(lf, Field):
+                if lf.indexed:
+                    indices, values = ops.safe_map_indexed_values(lf.indices[:], lf.values[:],
+                                                                  l_to_i_map, l_to_i_filt)
+                    if left_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].indices.write(indices)
+                        left_writers[ilf].values.write(values)
+                else:
+                    values = ops.safe_map_values(lf.data[:], l_to_i_map, l_to_i_filt)
+                    if left_writers is None:
+                        result = lf.create_like()
+                        result.data.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].data.write(values)
             else:
-                left_writers[ilf].data.write(joined_field)
+                values = ops.safe_map_values(lf, l_to_i_map, l_to_i_filt)
+
+                if left_writers is None:
+                    left_results.append(values)
+                else:
+                    left_writers[ilf].data.write(values)
 
         right_results = list()
         for irf, rf in enumerate(right_fields):
-            rf_raw = val.raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
-            joined_field = ops.safe_map(rf_raw, r_to_i_map, r_to_i_filt)
-            if right_writers is None:
-                right_results.append(joined_field)
+            if isinstance(rf, Field):
+                if rf.indexed:
+                    indices, values = ops.safe_map_indexed_values(rf.indices[:], rf.values[:],
+                                                                  r_to_i_map, r_to_i_filt)
+                    if right_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].indices.write(indices)
+                        right_writers[irf].values.write(values)
+                else:
+                    values = ops.safe_map_values(rf.data[:], r_to_i_map, r_to_i_filt)
+                    if right_writers is None:
+                        result = rf.create_like()
+                        result.data.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].data.write(values)
             else:
-                right_writers[irf].data.write(joined_field)
+                values = ops.safe_map_values(rf, r_to_i_map, r_to_i_filt)
+
+                if right_writers is None:
+                    right_results.append(values)
+                else:
+                    right_writers[irf].data.write(values)
 
         return left_results, right_results
 

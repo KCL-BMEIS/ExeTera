@@ -22,31 +22,38 @@ from exetera.core import operations as ops
 from exetera.core import validation as val
 
 class HDF5Field(Field):
-    def __init__(self, session, group, name=None, write_enabled=False):
+    def __init__(self, session, group, dataframe, name=None, write_enabled=False):
         """
         Construct a HDF5 file based Field. This construction is not used directly, rather, should be called from
         specific field types, e.g. NumericField.
 
         :param session: The session instance.
         :param group: The HDF5 Group object.
+        :param dataframe: The dataframe this field belongs to.
         :param name: The name of this field if not specified in group.
         :param write_enabled: A read-only/read-write switch.
         """
         super().__init__()
 
-        if name is None:
-            field = group
-        else:
-            field = group[name]
+        # if name is None:
+        #     field = group
+        # else:
+        #     field = group[name]
         self._session = session
-        self._field = field
+        self._field = group
+        self._name = name
         self._fieldtype = self._field.attrs['fieldtype']
+        self._dataframe = dataframe
         self._write_enabled = write_enabled
         self._value_wrapper = None
 
     @property
     def name(self):
-        return self._field.name
+        return self._name
+
+    @property
+    def dataframe(self):
+        return self._dataframe
 
     @property
     def timestamp(self):
@@ -93,6 +100,10 @@ class MemoryField(Field):
 
     @property
     def name(self):
+        return None
+
+    @property
+    def dataframe(self):
         return None
 
     @property
@@ -546,7 +557,7 @@ class FixedStringMemField(MemoryField):
         self._length = length
 
     def writeable(self):
-        return FixedStringField(self._session, self._field, write_enabled=True)
+        return self
 
     def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.fixed_string_field_create_like(self, group, name, timestamp)
@@ -881,7 +892,7 @@ class TimestampMemField(MemoryField):
         super().__init__(session)
 
     def writeable(self):
-        return TimestampField(self._session, self._field, write_enabled=True)
+        return self
 
     def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.timestamp_field_create_like(self, group, name, timestamp)
@@ -1072,15 +1083,17 @@ def timestamp_field_constructor(session, group, name, timestamp=None, chunksize=
 
 
 class IndexedStringField(HDF5Field):
-    def __init__(self, session, group, name=None, write_enabled=False):
-        super().__init__(session, group, name=name, write_enabled=write_enabled)
+    def __init__(self, session, group, dataframe, name=None, write_enabled=False):
+        super().__init__(session, group, dataframe, name=name, write_enabled=write_enabled)
         self._session = session
+        self._dataframe = None
         self._data_wrapper = None
         self._index_wrapper = None
         self._value_wrapper = None
 
     def writeable(self):
-        return IndexedStringField(self._session, self._field, write_enabled=True)
+        return IndexedStringField(self._session, self._field, self._dataframe, self._name,
+                                  write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.indexed_string_create_like(self, group, name, timestamp)
@@ -1178,8 +1191,8 @@ class IndexedStringField(HDF5Field):
 
 
 class FixedStringField(HDF5Field):
-    def __init__(self, session, group, name=None, write_enabled=False):
-        super().__init__(session, group, name=name, write_enabled=write_enabled)
+    def __init__(self, session, group, dataframe, name=None, write_enabled=False):
+        super().__init__(session, group, dataframe, name=name, write_enabled=write_enabled)
         # TODO: caution; we may want to consider the issues with long-lived field instances getting
         # out of sync with their stored counterparts. Maybe a revision number of the stored field
         # is required that we can check to see if we are out of date. That or just make this a
@@ -1187,7 +1200,8 @@ class FixedStringField(HDF5Field):
         self._length = self._field.attrs['strlen']
 
     def writeable(self):
-        return FixedStringField(self._session, self._field, write_enabled=True)
+        return FixedStringField(self._session, self._field, self._dataframe, self._name,
+                                write_enabled=True)
 
 
     def create_like(self, group=None, name=None, timestamp=None):
@@ -1260,12 +1274,12 @@ class FixedStringField(HDF5Field):
 
 
 class NumericField(HDF5Field):
-    def __init__(self, session, group, name=None, mem_only=True, write_enabled=False):
-        super().__init__(session, group, name=name, write_enabled=write_enabled)
+    def __init__(self, session, group, dataframe, name, write_enabled=False):
+        super().__init__(session, group, dataframe, name=name, write_enabled=write_enabled)
         self._nformat = self._field.attrs['nformat']
 
     def writeable(self):
-        return NumericField(self._session, self._field, write_enabled=True)
+        return NumericField(self._session, self._field, None, self._name, write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.numeric_field_create_like(self, group, name, timestamp)
@@ -1415,13 +1429,13 @@ class NumericField(HDF5Field):
 
 
 class CategoricalField(HDF5Field):
-    def __init__(self, session, group,
-                 name=None, write_enabled=False):
-        super().__init__(session, group, name=name, write_enabled=write_enabled)
+    def __init__(self, session, group, dataframe, name=None, write_enabled=False):
+        super().__init__(session, group, dataframe, name=name, write_enabled=write_enabled)
         self._nformat = self._field.attrs['nformat'] if 'nformat' in self._field.attrs else 'int8'
 
     def writeable(self):
-        return CategoricalField(self._session, self._field, write_enabled=True)
+        return CategoricalField(self._session, self._field, self._dataframe, self._name,
+                                write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.categorical_field_create_like(self, group, name, timestamp)
@@ -1532,11 +1546,12 @@ class CategoricalField(HDF5Field):
 
 
 class TimestampField(HDF5Field):
-    def __init__(self, session, group, name=None, write_enabled=False):
-        super().__init__(session, group, name=name, write_enabled=write_enabled)
+    def __init__(self, session, group, dataframe, name=None, write_enabled=False):
+        super().__init__(session, group, dataframe, name=name, write_enabled=write_enabled)
 
     def writeable(self):
-        return TimestampField(self._session, self._field, write_enabled=True)
+        return TimestampField(self._session, self._field, self._dataframe, self._name,
+                              write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.timestamp_field_create_like(self, group, name, timestamp)
@@ -1818,7 +1833,8 @@ class DateTimeImporter:
         if optional is True:
             filter_name = '{}_set'.format(name)
             numeric_field_constructor(group, filter_name, 'bool', timestamp, chunksize)
-            self._filter_field = NumericField(session, group, filter_name, write_enabled=True)
+            self._filter_field = NumericField(session, group, None, filter_name,
+                                              write_enabled=True)
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype='U32')
@@ -1860,7 +1876,8 @@ class DateImporter:
             filter_name = '{}_set'.format(name)
             numeric_field_constructor(session, group, filter_name, 'bool',
                                       timestamp, chunksize)
-            self._filter_field = NumericField(session, group, filter_name, write_enabled=True)
+            self._filter_field = NumericField(session, group, None, filter_name,
+                                              write_enabled=True)
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype='U10')
@@ -2166,10 +2183,13 @@ class FieldDataOps:
 
     @staticmethod
     def apply_filter_to_field(source, filter_to_apply, target=None, in_place=False):
+
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
-        dest_data = source.data[:][filter_to_apply]
+        filter_to_apply_ = val.array_from_field_or_lower('filter_to_apply', filter_to_apply)
+
+        dest_data = source.data[:][filter_to_apply_]
 
         if in_place:
             if not source._write_enabled:
@@ -2196,7 +2216,9 @@ class FieldDataOps:
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
-        dest_data = source.data[:][index_to_apply]
+        index_to_apply_ = val.array_from_field_or_lower('index_to_apply', index_to_apply)
+
+        dest_data = source.data[:][index_to_apply_]
 
         if in_place:
             if not source._write_enabled:
@@ -2374,7 +2396,7 @@ class FieldDataOps:
 
         if isinstance(group, h5py.Group):
             indexed_string_field_constructor(source._session, group, name, ts, source.chunksize)
-            return IndexedStringField(source._session, group[name], write_enabled=True)
+            return IndexedStringField(source._session, group[name], None, name, write_enabled=True)
         else:
             return group.create_indexed_string(name, ts, source.chunksize)
 
@@ -2391,7 +2413,7 @@ class FieldDataOps:
 
         if isinstance(group, h5py.Group):
             fixed_string_field_constructor(source._session, group, name, length, ts, source.chunksize)
-            return FixedStringField(source._session, group[name], write_enabled=True)
+            return FixedStringField(source._session, group[name], None, name, write_enabled=True)
         else:
             return group.create_fixed_string(name, length, ts)
 
@@ -2408,7 +2430,7 @@ class FieldDataOps:
 
         if isinstance(group, h5py.Group):
             numeric_field_constructor(source._session, group, name, nformat, ts, source.chunksize)
-            return NumericField(source._session, group[name], write_enabled=True)
+            return NumericField(source._session, group[name], None, name, write_enabled=True)
         else:
             return group.create_numeric(name, nformat, ts)
 
@@ -2429,7 +2451,7 @@ class FieldDataOps:
         if isinstance(group, h5py.Group):
             categorical_field_constructor(source._session, group, name, nformat, keys,
                                           ts, source.chunksize)
-            return CategoricalField(source._session, group[name], write_enabled=True)
+            return CategoricalField(source._session, group[name], None, name, write_enabled=True)
         else:
             return group.create_categorical(name, nformat, keys, ts)
 
@@ -2445,6 +2467,6 @@ class FieldDataOps:
 
         if isinstance(group, h5py.Group):
             timestamp_field_constructor(source._session, group, name, ts, source.chunksize)
-            return TimestampField(source._session, group[name], write_enabled=True)
+            return TimestampField(source._session, group[name], None, name, write_enabled=True)
         else:
             return group.create_timestamp(name, ts)
