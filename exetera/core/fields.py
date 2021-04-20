@@ -516,7 +516,7 @@ class FixedStringMemField(MemoryField):
         self._length = length
 
     def writeable(self):
-        return FixedStringField(self._session, self._field, None, write_enabled=True)
+        return self
 
     def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.fixed_string_field_create_like(self, group, name, timestamp)
@@ -852,7 +852,7 @@ class TimestampMemField(MemoryField):
         super().__init__(session)
 
     def writeable(self):
-        return TimestampField(self._session, self._field, write_enabled=True)
+        return self
 
     def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.timestamp_field_create_like(self, group, name, timestamp)
@@ -1052,7 +1052,8 @@ class IndexedStringField(HDF5Field):
         self._value_wrapper = None
 
     def writeable(self):
-        return IndexedStringField(self._session, self._field, None, write_enabled=True)
+        return IndexedStringField(self._session, self._field, self._dataframe, self._name,
+                                  write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.indexed_string_create_like(self, group, name, timestamp)
@@ -1159,7 +1160,8 @@ class FixedStringField(HDF5Field):
         self._length = self._field.attrs['strlen']
 
     def writeable(self):
-        return FixedStringField(self._session, self._field, None, write_enabled=True)
+        return FixedStringField(self._session, self._field, self._dataframe, self._name,
+                                write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.fixed_string_field_create_like(self, group, name, timestamp)
@@ -1391,7 +1393,8 @@ class CategoricalField(HDF5Field):
         self._nformat = self._field.attrs['nformat'] if 'nformat' in self._field.attrs else 'int8'
 
     def writeable(self):
-        return CategoricalField(self._session, self._field, write_enabled=True)
+        return CategoricalField(self._session, self._field, self._dataframe, self._name,
+                                write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.categorical_field_create_like(self, group, name, timestamp)
@@ -1506,7 +1509,8 @@ class TimestampField(HDF5Field):
         super().__init__(session, group, dataframe, name=name, write_enabled=write_enabled)
 
     def writeable(self):
-        return TimestampField(self._session, self._field, write_enabled=True)
+        return TimestampField(self._session, self._field, self._dataframe, self._name,
+                              write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.timestamp_field_create_like(self, group, name, timestamp)
