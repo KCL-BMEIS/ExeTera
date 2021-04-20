@@ -337,5 +337,5 @@ def move(src_df: DataFrame, field: fld.Field, dest_df: DataFrame, name: str):
     :param dest_df: The destination dataframe to move to.
     :param name: The name of field under destination dataframe.
     """
-    HDF5DataFrame.copy(field, dest_df, name)
-    HDF5DataFrame.drop(src_df, field)
+    copy(field, dest_df, name)
+    drop(src_df, field)

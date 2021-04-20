@@ -202,11 +202,11 @@ class TestDataFrame(unittest.TestCase):
             numf.data.write([5, 4, 3, 2, 1])
 
             df2 = dst.create_dataframe('df2')
-            dataframe.HDF5DataFrame.copy(numf, df2,'numf')
+            dataframe.copy(numf, df2,'numf')
             self.assertListEqual([5, 4, 3, 2, 1], df2['numf'].data[:].tolist())
-            dataframe.HDF5DataFrame.drop(df, numf)
+            dataframe.drop(df, numf)
             self.assertTrue('numf' not in df)
-            dataframe.HDF5DataFrame.move(df2,df2['numf'],df,'numf')
+            dataframe.move(df2,df2['numf'],df,'numf')
             self.assertTrue('numf' not in df2)
             self.assertListEqual([5, 4, 3, 2, 1], df['numf'].data[:].tolist())
 
