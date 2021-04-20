@@ -865,7 +865,7 @@ class Session(AbstractSession):
         }
 
         fieldtype = field.attrs['fieldtype'].split(',')[0]
-        return fieldtype_map[fieldtype](self, field)
+        return fieldtype_map[fieldtype](self, field, None, field.name)
 
     def create_like(self, field, dest_group, dest_name, timestamp=None, chunksize=None):
         """
@@ -914,7 +914,7 @@ class Session(AbstractSession):
 
         if isinstance(group, h5py.Group):
             fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
-            return fld.IndexedStringField(self, group[name], write_enabled=True)
+            return fld.IndexedStringField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_indexed_string(name, timestamp, chunksize)
 
@@ -939,7 +939,7 @@ class Session(AbstractSession):
                                  "{} was passed to it".format(type(group)))
         if isinstance(group, h5py.Group):
             fld.fixed_string_field_constructor(self, group, name, length, timestamp, chunksize)
-            return fld.FixedStringField(self, group[name], write_enabled=True)
+            return fld.FixedStringField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_fixed_string(name, length, timestamp, chunksize)
 
@@ -969,7 +969,7 @@ class Session(AbstractSession):
 
         if isinstance(group, h5py.Group):
             fld.categorical_field_constructor(self, group, name, nformat, key, timestamp, chunksize)
-            return fld.CategoricalField(self, group[name], write_enabled=True)
+            return fld.CategoricalField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_categorical(name, nformat, key, timestamp, chunksize)
 
@@ -997,7 +997,7 @@ class Session(AbstractSession):
 
         if isinstance(group, h5py.Group):
             fld.numeric_field_constructor(self, group, name, nformat, timestamp, chunksize)
-            return fld.NumericField(self, group[name], write_enabled=True)
+            return fld.NumericField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_numeric(name, nformat, timestamp, chunksize)
 
@@ -1015,7 +1015,7 @@ class Session(AbstractSession):
 
         if isinstance(group, h5py.Group):
             fld.timestamp_field_constructor(self, group, name, timestamp, chunksize)
-            return fld.TimestampField(self, group[name], write_enabled=True)
+            return fld.TimestampField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_timestamp(name, timestamp, chunksize)
 

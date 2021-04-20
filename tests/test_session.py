@@ -361,14 +361,20 @@ class TestSessionMerge(unittest.TestCase):
 
         bio = BytesIO()
         with session.Session() as s:
-            dst = s.open_dataset(bio,'w','dst')
-            hf=dst.create_dataframe('dst')
-            l_id_f = s.create_fixed_string(hf, 'l_id', 1); l_id_f.data.write(l_id)
-            l_vals_f = s.create_numeric(hf, 'l_vals_f', 'int32'); l_vals_f.data.write(l_vals)
-            l_vals_2_f = s.create_numeric(hf, 'l_vals_2_f', 'int32'); l_vals_2_f.data.write(l_vals_2)
-            r_id_f = s.create_fixed_string(hf, 'r_id', 1); r_id_f.data.write(r_id)
-            r_vals_f = s.create_numeric(hf, 'r_vals_f', 'int32'); r_vals_f.data.write(r_vals)
-            r_vals_2_f = s.create_numeric(hf, 'r_vals_2_f', 'int32'); r_vals_2_f.data.write(r_vals_2)
+            dst = s.open_dataset(bio, 'w', 'dst')
+            hf = dst.create_dataframe('dst')
+            l_id_f = s.create_fixed_string(hf, 'l_id', 1)
+            l_id_f.data.write(l_id)
+            l_vals_f = s.create_numeric(hf, 'l_vals_f', 'int32')
+            l_vals_f.data.write(l_vals)
+            l_vals_2_f = s.create_numeric(hf, 'l_vals_2_f', 'int32')
+            l_vals_2_f.data.write(l_vals_2)
+            r_id_f = s.create_fixed_string(hf, 'r_id', 1)
+            r_id_f.data.write(r_id)
+            r_vals_f = s.create_numeric(hf, 'r_vals_f', 'int32')
+            r_vals_f.data.write(r_vals)
+            r_vals_2_f = s.create_numeric(hf, 'r_vals_2_f', 'int32')
+            r_vals_2_f.data.write(r_vals_2)
             i_l_vals_f = s.create_numeric(hf, 'i_l_vals_f', 'int32')
             i_l_vals_2_f = s.create_numeric(hf, 'i_l_vals_2_f', 'int32')
             i_r_vals_f = s.create_numeric(hf, 'i_r_vals_f', 'int32')
@@ -1004,7 +1010,7 @@ class TestSessionFields(unittest.TestCase):
             np.random.seed(12345678)
             values = np.random.randint(low=0, high=1000000, size=100000000)
             fields.numeric_field_constructor(s, hf, 'a', 'int32')
-            a = fields.NumericField(s, hf['a'], write_enabled=True)
+            a = fields.NumericField(s, hf['a'], None, 'a', write_enabled=True)
             a.data.write(values)
 
             total = np.sum(a.data[:])
@@ -1026,7 +1032,7 @@ class TestSessionFields(unittest.TestCase):
             values = np.random.randint(low=0, high=3, size=100000000)
             fields.categorical_field_constructor(s, hf, 'a', 'int8',
                                                  {'foo': 0, 'bar': 1, 'boo': 2})
-            a = fields.CategoricalField(s, hf['a'], write_enabled=True)
+            a = fields.CategoricalField(s, hf['a'], None, 'a', write_enabled=True)
             a.data.write(values)
 
             total = np.sum(a.data[:])
@@ -1044,7 +1050,7 @@ class TestSessionFields(unittest.TestCase):
             values = np.random.randint(low=0, high=4, size=1000000)
             svalues = [b''.join([b'x'] * v) for v in values]
             fields.fixed_string_field_constructor(s, hf, 'a', 8)
-            a = fields.FixedStringField(s, hf['a'], write_enabled=True)
+            a = fields.FixedStringField(s, hf['a'], None, 'a', write_enabled=True)
             a.data.write(svalues)
 
             total = np.unique(a.data[:])
@@ -1068,7 +1074,7 @@ class TestSessionFields(unittest.TestCase):
             values = np.random.randint(low=0, high=4, size=200000)
             svalues = [''.join(['x'] * v) for v in values]
             fields.indexed_string_field_constructor(s, hf, 'a', 8)
-            a = fields.IndexedStringField(s, hf['a'], write_enabled=True)
+            a = fields.IndexedStringField(s, hf['a'], None, 'a', write_enabled=True)
             a.data.write(svalues)
 
             total = np.unique(a.data[:])

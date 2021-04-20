@@ -27,6 +27,11 @@ class Field(ABC):
 
     @property
     @abstractmethod
+    def dataframe(self):
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
     def chunksize(self):
         raise NotImplementedError()
 

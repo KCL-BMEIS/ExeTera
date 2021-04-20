@@ -80,6 +80,10 @@ class HDF5DataFrame(DataFrame):
             nfield.data.write(field.data[:])
         self._columns[dname] = nfield
 
+    def drop(self, name):
+        del self._columns[name]
+        del self._h5group[name]
+
     def create_group(self, name):
         """
         Create a group object in HDF5 file for field to use. Please note, this function is for
@@ -91,22 +95,13 @@ class HDF5DataFrame(DataFrame):
         self._h5group.create_group(name)
         return self._h5group[name]
 
-    def create_numeric(self, name, nformat, timestamp=None, chunksize=None):
-        """
-        Create a numeric type field.
-        """
-        fld.numeric_field_constructor(self._dataset.session, self, name, nformat, timestamp, chunksize)
-        field = fld.NumericField(self._dataset.session, self._h5group[name],
-                                 write_enabled=True)
-        self._columns[name] = field
-        return self._columns[name]
-
     def create_indexed_string(self, name, timestamp=None, chunksize=None):
         """
         Create a indexed string type field.
         """
-        fld.indexed_string_field_constructor(self._dataset.session, self, name, timestamp, chunksize)
-        field = fld.IndexedStringField(self._dataset.session, self._h5group[name],
+        fld.indexed_string_field_constructor(self._dataset.session, self, name,
+                                             timestamp, chunksize)
+        field = fld.IndexedStringField(self._dataset.session, self._h5group[name], self, name,
                                        write_enabled=True)
         self._columns[name] = field
         return self._columns[name]
@@ -115,9 +110,21 @@ class HDF5DataFrame(DataFrame):
         """
         Create a fixed string type field.
         """
-        fld.fixed_string_field_constructor(self._dataset.session, self, name, length, timestamp, chunksize)
-        field = fld.FixedStringField(self._dataset.session, self._h5group[name],
+        fld.fixed_string_field_constructor(self._dataset.session, self, name,
+                                           length, timestamp, chunksize)
+        field = fld.FixedStringField(self._dataset.session, self._h5group[name], self, name,
                                      write_enabled=True)
+        self._columns[name] = field
+        return self._columns[name]
+
+    def create_numeric(self, name, nformat, timestamp=None, chunksize=None):
+        """
+        Create a numeric type field.
+        """
+        fld.numeric_field_constructor(self._dataset.session, self, name,
+                                      nformat, timestamp, chunksize)
+        field = fld.NumericField(self._dataset.session, self._h5group[name], self, name,
+                                 write_enabled=True)
         self._columns[name] = field
         return self._columns[name]
 
@@ -127,7 +134,7 @@ class HDF5DataFrame(DataFrame):
         """
         fld.categorical_field_constructor(self._dataset.session, self, name, nformat, key,
                                           timestamp, chunksize)
-        field = fld.CategoricalField(self._dataset.session, self._h5group[name],
+        field = fld.CategoricalField(self._dataset.session, self._h5group[name], self, name,
                                      write_enabled=True)
         self._columns[name] = field
         return self._columns[name]
@@ -136,8 +143,9 @@ class HDF5DataFrame(DataFrame):
         """
         Create a timestamp type field.
         """
-        fld.timestamp_field_constructor(self._dataset.session, self, name, timestamp, chunksize)
-        field = fld.TimestampField(self._dataset.session, self._h5group[name],
+        fld.timestamp_field_constructor(self._dataset.session, self, name,
+                                        timestamp, chunksize)
+        field = fld.TimestampField(self._dataset.session, self._h5group[name], self, name,
                                    write_enabled=True)
         self._columns[name] = field
         return self._columns[name]
@@ -225,7 +233,9 @@ class HDF5DataFrame(DataFrame):
 
         :param field: The field to delete from this dataframe.
         """
-        name = field.name[field.name.index('/', 1)+1:]
+        if field.dataframe != self:
+            raise ValueError("This field is owned by a different dataframe")
+        name = field.name
         if name is None:
             raise ValueError("This dataframe does not contain the field to delete.")
         else:
@@ -300,42 +310,42 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, in_place=True)
             return self
 
-    @staticmethod
-    def copy(field: fld.Field, dataframe: DataFrame, name: str):
-        """
-        Copy a field to another dataframe as well as underlying dataset.
 
-        :param field: The source field to copy.
-        :param dataframe: The destination dataframe to copy to.
-        :param name: The name of field under destination dataframe.
-        """
-        dfield = field.create_like(dataframe, name)
-        if field.indexed:
-            dfield.indices.write(field.indices[:])
-            dfield.values.write(field.values[:])
-        else:
-            dfield.data.write(field.data[:])
-        dataframe.columns[name] = dfield
+def copy(field: fld.Field, dataframe: DataFrame, name: str):
+    """
+    Copy a field to another dataframe as well as underlying dataset.
 
-    @staticmethod
-    def drop(dataframe: DataFrame, field: fld.Field):
-        """
-        Drop a field from a dataframe.
+    :param field: The source field to copy.
+    :param dataframe: The destination dataframe to copy to.
+    :param name: The name of field under destination dataframe.
+    """
+    dfield = field.create_like(dataframe, name)
+    if field.indexed:
+        dfield.indices.write(field.indices[:])
+        dfield.values.write(field.values[:])
+    else:
+        dfield.data.write(field.data[:])
+    dataframe.columns[name] = dfield
 
-        :param dataframe: The dataframe where field is located.
-        :param field: The field to delete.
-        """
-        dataframe.delete_field(field)
 
-    @staticmethod
-    def move(src_df: DataFrame, field: fld.Field, dest_df: DataFrame, name: str):
-        """
-        Move a field to another dataframe as well as underlying dataset.
+# def drop(dataframe: DataFrame, field: fld.Field):
+#     """
+#     Drop a field from a dataframe.
+#
+#     :param dataframe: The dataframe where field is located.
+#     :param field: The field to delete.
+#     """
+#     dataframe.delete_field(field)
 
-        :param src_df: The source dataframe where the field is located.
-        :param field: The field to move.
-        :param dest_df: The destination dataframe to move to.
-        :param name: The name of field under destination dataframe.
-        """
-        HDF5DataFrame.copy(field, dest_df, name)
-        HDF5DataFrame.drop(src_df, field)
+
+def move(field: fld.Field, dest_df: DataFrame, name: str):
+    """
+    Move a field to another dataframe as well as underlying dataset.
+
+    :param src_df: The source dataframe where the field is located.
+    :param field: The field to move.
+    :param dest_df: The destination dataframe to move to.
+    :param name: The name of field under destination dataframe.
+    """
+    copy(field, dest_df, name)
+    field.dataframe.drop(field.name)
