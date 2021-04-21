@@ -79,7 +79,7 @@ def journal_table(session, schema, old_src, new_src, src_pk, result):
         old_f = session.get(old_src[k])
         new_f = session.get(new_src[k])
         print(k)
-        if isinstance(old_f, flds.IndexedStringField):
+        if old_f.indexed:
             old_f_i_, old_f_v_ = session.apply_index(old_sorted_index, old_f)
             new_f_i_, new_f_v_ = session.apply_index(new_sorted_index, new_f)
             ops.compare_indexed_rows_for_journalling(old_map, new_map,
@@ -115,7 +115,7 @@ def journal_table(session, schema, old_src, new_src, src_pk, result):
         old_f = session.get(old_src[k])
         new_f = session.get(new_src[k])
         print(k)
-        if isinstance(old_f, flds.IndexedStringField):
+        if old_f.indexed:
             old_f_i_, old_f_v_ = session.apply_index(old_sorted_index, old_f)
             new_f_i_, new_f_v_ = session.apply_index(new_sorted_index, new_f)
             dest_i_ = np.zeros(merged_length + 1, old_f_i_.dtype)

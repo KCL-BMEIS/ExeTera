@@ -343,7 +343,7 @@ def read_fields_from_hdf5(file_name, field_count):
         with utils.Timer("reading {} fields from dataset".format(field_count)):
             for f in range(field_count):
                 field = s.get(hf['patients'][fields[f]])
-                if isinstance(field, flds.IndexedStringField):
+                if field.indexed:
                     indices = field.indices[:]
                     values = field.values[:]
                 else:

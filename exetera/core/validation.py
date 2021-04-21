@@ -135,7 +135,7 @@ def raw_array_from_parameter(datastore, name, field):
 def array_from_parameter(session, name, field):
     if isinstance(field, h5py.Group):
         return session.get(field).data[:]
-    elif isinstance(field, flds.IndexedStringField):
+    elif field.indexed:
         return field.indices[:],field.values[:]
     elif isinstance(field, flds.Field):
         return field.data[:]

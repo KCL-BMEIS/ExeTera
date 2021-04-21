@@ -741,10 +741,10 @@ class OptionalDateImporter:
         # TODO: use a timestamp writer instead of a datetime writer and do the conversion here
         self.date.write_part(values)
         if self.create_day_field:
-            days=self._get_days(values)
+            days = self._get_days(values)
             self.datestr.write_part(days)
         if self.dateset is not None:
-            flags=self._get_flags(values)
+            flags = self._get_flags(values)
             self.dateset.write_part(flags)
 
     def _get_days(self, values):

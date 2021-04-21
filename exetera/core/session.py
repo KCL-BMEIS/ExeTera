@@ -220,7 +220,7 @@ class Session(AbstractSession):
                 del w
             else:
                 r = self.get(src_group[k]).writeable()
-                if isinstance(r, fld.IndexedStringField):
+                if r.indexed:
                     i, v = self.apply_index(sorted_index, r)
                     r.indices[:] = i
                     r.values[:] = v
@@ -580,9 +580,9 @@ class Session(AbstractSession):
                            src_chunksize=None,
                            dest_chunksize=None,
                            chunksize_mult=None):
-        if not isinstance(target, fld.IndexedStringField):
+        if not target.indexed:
             raise ValueError(f"'target' must be one of 'IndexedStringField' but is {type(target)}")
-        if not isinstance(dest, fld.IndexedStringField):
+        if not dest.indexed:
             raise ValueError(f"'dest' must be one of 'IndexedStringField' but is {type(dest)}")
 
         src_chunksize = target.chunksize if src_chunksize is None else src_chunksize
@@ -748,9 +748,9 @@ class Session(AbstractSession):
         Please use the merge or ordered_merge functions instead.
         """
 
-        if isinstance(destination_pkey, fld.IndexedStringField):
+        if destination_pkey.indexed:
             raise ValueError("'destination_pkey' must not be an indexed string field")
-        if isinstance(fkey_indices, fld.IndexedStringField):
+        if fkey_indices.indexed:
             raise ValueError("'fkey_indices' must not be an indexed string field")
         if isinstance(values_to_join, rw.IndexedStringReader):
             raise ValueError("Joins on indexed string fields are not supported")
