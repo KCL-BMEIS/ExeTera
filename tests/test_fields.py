@@ -535,6 +535,9 @@ class TestFieldApplyFilter(unittest.TestCase):
             self.assertListEqual(expected_filt_values, mb.values[:].tolist())
             self.assertListEqual(expected_filt_data, mb.data[:])
 
+            df2 = ds.create_dataframe("filter")
+
+
     def test_fixed_string_apply_filter(self):
         data = np.array([b'a', b'bb', b'ccc', b'dddd', b'eeee', b'fff', b'gg', b'h'], dtype='S4')
         filt = np.array([0, 1, 0, 1, 0, 1, 0, 1], dtype=bool)

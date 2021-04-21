@@ -361,14 +361,20 @@ class TestSessionMerge(unittest.TestCase):
 
         bio = BytesIO()
         with session.Session() as s:
-            dst = s.open_dataset(bio,'w','dst')
-            hf=dst.create_dataframe('dst')
-            l_id_f = s.create_fixed_string(hf, 'l_id', 1); l_id_f.data.write(l_id)
-            l_vals_f = s.create_numeric(hf, 'l_vals_f', 'int32'); l_vals_f.data.write(l_vals)
-            l_vals_2_f = s.create_numeric(hf, 'l_vals_2_f', 'int32'); l_vals_2_f.data.write(l_vals_2)
-            r_id_f = s.create_fixed_string(hf, 'r_id', 1); r_id_f.data.write(r_id)
-            r_vals_f = s.create_numeric(hf, 'r_vals_f', 'int32'); r_vals_f.data.write(r_vals)
-            r_vals_2_f = s.create_numeric(hf, 'r_vals_2_f', 'int32'); r_vals_2_f.data.write(r_vals_2)
+            dst = s.open_dataset(bio, 'w', 'dst')
+            hf = dst.create_dataframe('dst')
+            l_id_f = s.create_fixed_string(hf, 'l_id', 1)
+            l_id_f.data.write(l_id)
+            l_vals_f = s.create_numeric(hf, 'l_vals_f', 'int32')
+            l_vals_f.data.write(l_vals)
+            l_vals_2_f = s.create_numeric(hf, 'l_vals_2_f', 'int32')
+            l_vals_2_f.data.write(l_vals_2)
+            r_id_f = s.create_fixed_string(hf, 'r_id', 1)
+            r_id_f.data.write(r_id)
+            r_vals_f = s.create_numeric(hf, 'r_vals_f', 'int32')
+            r_vals_f.data.write(r_vals)
+            r_vals_2_f = s.create_numeric(hf, 'r_vals_2_f', 'int32')
+            r_vals_2_f.data.write(r_vals_2)
             i_l_vals_f = s.create_numeric(hf, 'i_l_vals_f', 'int32')
             i_l_vals_2_f = s.create_numeric(hf, 'i_l_vals_2_f', 'int32')
             i_r_vals_f = s.create_numeric(hf, 'i_r_vals_f', 'int32')
@@ -410,6 +416,136 @@ class TestSessionMerge(unittest.TestCase):
         self.assertTrue(np.array_equal(actual[0][1], l_vals_2_exp))
         self.assertTrue(np.array_equal(actual[1][0], r_vals_exp))
         self.assertTrue(np.array_equal(actual[1][1], r_vals_2_exp))
+
+
+    def test_merge_indexed_fields_left(self):
+
+        def _perform_inner(l_id, r_id, r_vals, expected):
+            bio1 = BytesIO()
+            bio2 = BytesIO()
+            with session.Session() as s:
+                l_ds = s.open_dataset(bio1, 'w', 'l_ds')
+                l_df = l_ds.create_dataframe('l_df')
+                l_df.create_numeric('id', 'int32').data.write(l_id)
+                r_ds = s.open_dataset(bio2, 'w', 'r_ds')
+
+                r_df = r_ds.create_dataframe('r_df')
+                r_df.create_numeric('id', 'int32').data.write(r_id)
+                r_df.create_indexed_string('vals').data.write(r_vals)
+
+                s.merge_left(left_on=l_df['id'], right_on=r_df['id'],
+                             right_fields=(r_df['vals'],),
+                             right_writers=(l_df.create_indexed_string('vals'),))
+
+                r_df2 = r_ds.create_dataframe('r_df2')
+                r_df2.create_numeric('id', 'int32').data.write(r_id)
+                r_df2.create_indexed_string('vals').data.write(r_vals)
+
+                results = s.merge_left(left_on=l_df['id'], right_on=r_df2['id'],
+                                       right_fields=(r_df2['vals'],))
+
+                self.assertListEqual(expected, l_df['vals'].data[:])
+                self.assertListEqual(expected, results[0].data[:])
+
+        l_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
+        r_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
+        r_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
+        expected = ['', '', '', 'bb1', 'bb2', 'ccc1', 'ccc2', 'dddd1', '', 'ffffff1', 'ggggggg1']
+        _perform_inner(l_id, r_id, r_vals, expected)
+
+        l_id = l_id[::-1]
+        r_id = r_id[::-1]
+        r_vals = r_vals[::-1]
+        expected = ['ggggggg1', 'ffffff1', '', 'dddd1', 'ccc2', 'ccc1', 'bb2', 'bb1', '', '', '']
+        _perform_inner(l_id, r_id, r_vals, expected)
+
+
+    def test_merge_indexed_fields_right(self):
+
+        def _perform_test(r_id, l_id, l_vals, expected):
+            bio1 = BytesIO()
+            bio2 = BytesIO()
+            with session.Session() as s:
+                r_ds = s.open_dataset(bio1, 'w', 'r_ds')
+                r_df = r_ds.create_dataframe('r_df')
+                r_df.create_numeric('id', 'int32').data.write(r_id)
+                l_ds = s.open_dataset(bio2, 'w', 'l_ds')
+
+                l_df = l_ds.create_dataframe('l_df')
+                l_df.create_numeric('id', 'int32').data.write(l_id)
+                l_df.create_indexed_string('vals').data.write(l_vals)
+
+                s.merge_right(left_on=l_df['id'], right_on=r_df['id'],
+                             left_fields=(l_df['vals'],),
+                             left_writers=(r_df.create_indexed_string('vals'),))
+
+                l_df2 = l_ds.create_dataframe('l_df2')
+                l_df2.create_numeric('id', 'int32').data.write(l_id)
+                l_df2.create_indexed_string('vals').data.write(l_vals)
+
+                results = s.merge_right(left_on=l_df2['id'], right_on=r_df['id'],
+                                       left_fields=(l_df2['vals'],))
+
+                self.assertListEqual(expected, r_df['vals'].data[:])
+                self.assertListEqual(expected, results[0].data[:])
+
+        r_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
+        l_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
+        l_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
+        expected = ['', '', '', 'bb1', 'bb2', 'ccc1', 'ccc2', 'dddd1', '', 'ffffff1', 'ggggggg1']
+        _perform_test(r_id, l_id, l_vals, expected)
+
+        r_id = r_id[::-1]
+        l_id = l_id[::-1]
+        l_vals = l_vals[::-1]
+        expected = ['ggggggg1', 'ffffff1', '', 'dddd1', 'ccc2', 'ccc1', 'bb2', 'bb1', '', '', '']
+        _perform_test(r_id, l_id, l_vals, expected)
+
+
+    def test_merge_indexed_fields_inner(self):
+
+        def _perform_inner(r_id, r_vals, l_id, l_vals, l_expected, r_expected):
+            bio1 = BytesIO()
+            with session.Session() as s:
+                ds = s.open_dataset(bio1, 'w', 'r_ds')
+                r_df = ds.create_dataframe('r_df')
+                r_df.create_numeric('id', 'int32').data.write(r_id)
+                r_df.create_indexed_string('vals').data.write(r_vals)
+
+                l_df = ds.create_dataframe('l_df')
+                l_df.create_numeric('id', 'int32').data.write(l_id)
+                l_df.create_indexed_string('vals').data.write(l_vals)
+
+                i_df = ds.create_dataframe('i_df')
+                i_df.create_numeric('l_id', 'int32')
+                i_df.create_numeric('r_id', 'int32')
+                i_df.create_indexed_string('l_vals')
+                i_df.create_indexed_string('r_vals')
+                s.merge_inner(left_on=l_df['id'], right_on=r_df['id'],
+                              left_fields=(l_df['id'], l_df['vals'],),
+                              left_writers=(i_df['l_id'], i_df['l_vals']),
+                              right_fields=(r_df['id'], r_df['vals']),
+                              right_writers=(i_df['r_id'], i_df['r_vals']))
+
+                results = s.merge_inner(left_on=l_df['id'], right_on=r_df['id'],
+                                        left_fields=(l_df['id'], l_df['vals']),
+                                        right_fields=(r_df['id'], r_df['vals']))
+
+                expected = ['', '', '', 'bb1', 'bb2', 'ccc1', 'ccc2', 'dddd1', '', 'ffffff1', 'ggggggg1']
+                # self.assertListEqual(expected, r_df['vals'].data[:])
+                # self.assertListEqual(expected, results[0].data[:])
+
+        r_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
+        r_vals = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven']
+        l_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
+        l_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
+        _perform_inner(r_id, r_vals, l_id, l_vals, None, None)
+
+        r_id = r_id[::-1]
+        r_vals = r_vals[::-1]
+        l_id = l_id[::-1]
+        l_vals = l_vals[::-1]
+        _perform_inner(r_id, r_vals, l_id, l_vals, None, None)
 
 
 class TestSessionJoin(unittest.TestCase):
@@ -869,7 +1005,7 @@ class TestSessionFields(unittest.TestCase):
             np.random.seed(12345678)
             values = np.random.randint(low=0, high=1000000, size=100000000)
             fields.numeric_field_constructor(s, hf, 'a', 'int32')
-            a = fields.NumericField(s, hf['a'], write_enabled=True)
+            a = fields.NumericField(s, hf['a'], None, 'a', write_enabled=True)
             a.data.write(values)
 
             total = np.sum(a.data[:])
@@ -891,7 +1027,7 @@ class TestSessionFields(unittest.TestCase):
             values = np.random.randint(low=0, high=3, size=100000000)
             fields.categorical_field_constructor(s, hf, 'a', 'int8',
                                                  {'foo': 0, 'bar': 1, 'boo': 2})
-            a = fields.CategoricalField(s, hf['a'], write_enabled=True)
+            a = fields.CategoricalField(s, hf['a'], None, 'a', write_enabled=True)
             a.data.write(values)
 
             total = np.sum(a.data[:])
@@ -909,7 +1045,7 @@ class TestSessionFields(unittest.TestCase):
             values = np.random.randint(low=0, high=4, size=1000000)
             svalues = [b''.join([b'x'] * v) for v in values]
             fields.fixed_string_field_constructor(s, hf, 'a', 8)
-            a = fields.FixedStringField(s, hf['a'], write_enabled=True)
+            a = fields.FixedStringField(s, hf['a'], None, 'a', write_enabled=True)
             a.data.write(svalues)
 
             total = np.unique(a.data[:])
@@ -933,7 +1069,7 @@ class TestSessionFields(unittest.TestCase):
             values = np.random.randint(low=0, high=4, size=200000)
             svalues = [''.join(['x'] * v) for v in values]
             fields.indexed_string_field_constructor(s, hf, 'a', 8)
-            a = fields.IndexedStringField(s, hf['a'], write_enabled=True)
+            a = fields.IndexedStringField(s, hf['a'], None, 'a', write_enabled=True)
             a.data.write(svalues)
 
             total = np.unique(a.data[:])
@@ -989,7 +1125,7 @@ class TestSessionImporters(unittest.TestCase):
     def test_fixed_string_importer(self):
         bio = BytesIO()
         with session.Session() as s:
-            dst=s.open_dataset(bio,'r+','dst')
+            dst = s.open_dataset(bio, 'r+', 'dst')
             hf=dst.create_dataframe('hf')
             values = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
                       '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
@@ -1024,7 +1160,7 @@ class TestSessionImporters(unittest.TestCase):
         from datetime import datetime
         bio = BytesIO()
         with session.Session() as s:
-            dst = s.open_dataset(bio,'r+','dst')
+            dst = s.open_dataset(bio,'r+', 'dst')
             hf = dst.create_dataframe('hf')
             values = ['2020-05-10', '2020-05-12', '2020-05-12', '2020-05-15']
             im = fields.DateImporter(s, hf, 'x')

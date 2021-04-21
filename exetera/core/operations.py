@@ -23,7 +23,7 @@ def chunks(length, chunksize=1 << 20):
 
 def safe_map(field, map_field, map_filter, empty_value=None):
     if isinstance(field, Field):
-        if isinstance(field, fields.IndexedStringField):
+        if field.indexed:
             return safe_map_indexed_values(
                 field.indices[:], field.values[:], map_field, map_filter, empty_value)
         else:
@@ -61,7 +61,8 @@ def safe_map_indexed_values(data_indices, data_values, map_field, map_filter, em
             dst = offset
             dse = offset + empty_value_len
             i_result[i+1] = dse
-            v_result[dst:dse] = empty_value
+            if empty_value is not None:
+                v_result[dst:dse] = empty_value
             offset += dse - dst
 
     return i_result, v_result

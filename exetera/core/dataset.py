@@ -16,6 +16,17 @@ from exetera.core import dataframe as edf
 
 
 class HDF5Dataset(Dataset):
+    """
+    Dataset is the means which which you interact with an ExeTera datastore. These are created
+    and loaded through `Session.open_dataset`, rather than being constructed directly.
+
+    Datasets are composed of one or more DataFrame objects and the means by which DataFrames
+    are interacted with.
+
+    For a detailed explanation of Dataset along with examples of its use, please refer to the
+    wiki documentation at
+    https://github.com/KCL-BMEIS/ExeTera/wiki/Dataset-API
+    """
 
     def __init__(self, session, dataset_path, mode, name):
         """
@@ -201,6 +212,11 @@ class HDF5Dataset(Dataset):
         else:
             self.__delitem__(name)
 
+    def drop(self,
+             name: str):
+        del self._dataframes[name]
+        del self._file[name]
+
     def keys(self):
         """Return all dataframe names in this dataset."""
         return self._dataframes.keys()
@@ -251,15 +267,6 @@ def copy(dataframe: DataFrame, dataset: Dataset, name: str):
     dataset._dataframes[name] = _dataframe
 
 
-def drop(dataframe: DataFrame):
-    """
-    Delete a dataframe by HDF5DataFrame.drop(ds['df1']).
-
-    :param dataframe: The dataframe to delete.
-    """
-    dataframe._dataset.delete_dataframe(dataframe)
-
-
 def move(dataframe: DataFrame, dataset: Dataset, name:str):
     """
     Move a dataframe to another dataset via HDF5DataFrame.move(ds1['df1'], ds2, 'df1']).
@@ -271,5 +278,4 @@ def move(dataframe: DataFrame, dataset: Dataset, name:str):
     :param name: The name of dataframe in destination dataset.
     """
     copy(dataframe, dataset, name)
-    drop(dataframe)
-
+    dataframe.dataset.drop(dataframe.name)

@@ -135,9 +135,9 @@ def raw_array_from_parameter(datastore, name, field):
 def array_from_parameter(session, name, field):
     if isinstance(field, h5py.Group):
         return session.get(field).data[:]
-    elif isinstance(field, flds.IndexedStringField):
-        return field.indices[:],field.values[:]
-    elif isinstance(field, flds.Field):
+    elif isinstance(field, Field):
+        if field.indexed:
+            return field.indices[:], field.values[:]
         return field.data[:]
     elif isinstance(field, np.ndarray):
         return field
@@ -184,3 +184,106 @@ def all_same_basic_type(name, fields):
         for f in fields[1:]:
             if not isinstance(f, np.ndarray):
                 raise ValueError(msg)
+
+
+def validate_key_field_consistency(lname, rname, lkey, rkey):
+    left_tuple = isinstance(lkey, tuple)
+    right_tuple = isinstance(rkey, tuple)
+    if left_tuple ^ right_tuple:
+        raise ValueError("Either none or both of '{}' and '{}' "
+                         "must be tuples".format(lname, rname))
+    if left_tuple and len(lkey) != len(rkey):
+        raise ValueError("'{}' and '{}' must be the same length, but are of length "
+                         "{} and {} respectively".format(lname, rname, len(lkey), len(rkey)))
+
+
+def validate_and_get_key_fields(side, df, key):
+    if isinstance(key, tuple):
+        fields = []
+        for ik, k in enumerate(key):
+            dfk = df[k] if isinstance(k, str) else df[k]
+            if dfk.indexed:
+                if dfk.name is None:
+                    raise ValueError("'{}': field at position {} is indexed; indexed fields"
+                                     " cannot be used as keys".format(side, ik))
+                else:
+                    raise ValueError("'{}': field '{}' at position {} is indexed; "
+                                     "indexed fields cannot be used "
+                                     "as keys".format(side, dfk.name, ik))
+            fields.append(dfk)
+        return tuple(fields)
+    else:
+        field = df[key] if isinstance(key, str) else df[key]
+        if field.indexed:
+            raise ValueError("'{}': field is indexed; indexed fields cannot be "
+                             "used as keys".format(side))
+        return field
+
+
+def validate_key_lengths(side, df, key):
+    lens = set()
+    if isinstance(key, tuple):
+        for k in key:
+            lens.add(len(k.data))
+            if len(lens) > 1:
+                raise ValueError("'{}' keys are consistent lengths. The following "
+                                 "lengths were observed: {}".format(side, lens))
+    else:
+        lens.add(len(key.data))
+    return lens
+
+
+def validate_field_lengths(side, lens, df, names=None):
+    if names is None:
+        names = df.keys()
+    for n in names:
+        lens.add(len(df[n].data))
+    if len(lens) > 1:
+        raise ValueError("'{}' fields are inconsistent lengths. The following "
+                         "lengths were observed: {}".format(side, lens))
+    return lens
+
+def validate_and_normalize_categorical_key(param_name, key):
+    if len(key) == 0:
+        raise ValueError("'{}' cannot be empty".format(param_name))
+    key_types = set()
+    value_types = set()
+    for k, v in key.items():
+        key_types.add(type(k))
+        value_types.add(type(v))
+
+    if len(key_types) > 1:
+        raise ValueError("'{}' has inconsistent key types {}".format(param_name, key_types))
+    if len(value_types) > 1:
+        raise ValueError("'{}' has inconsistent value types {}".format(param_name, value_types))
+
+    items = list(key.items())
+    key_type = items[0][0]
+    value_type = items[0][1]
+
+    if not isinstance(key_type, (str, bytes, int)) and not np.issubdtype(key_type, np.number):
+        raise ValueError("'{}': Unexpected dictionary key type; must be str, bytes or int "
+                         " but is {}".format(param_name, type(key_type)))
+    if not isinstance(value_type, (str, bytes, int)) and not np.issubdtype(value_type, np.number):
+        raise ValueError("'{}': Unexpected dictionary value type; must be str, bytes or int "
+                         " but is {}".format(param_name, type(value_type)))
+
+    if isinstance(key_type, (str, bytes)):
+        if not isinstance(value_type, int) and not np.issubdtype(value_type, np.number):
+            raise ValueError("'{}': if keys are of type str or bytes then values must be of "
+                             "type int but are of type {}".format(param_name, type(value_type)))
+    elif isinstance(value_type, (str, bytes)):
+        if not isinstance(key_type, int) and not np.issubdtype(key_type, np.number):
+            raise ValueError("'{}': if values are of type str or bytes then keys must be of "
+                             "type int but are of type {}".format(param_name, type(key_type)))
+    if not isinstance(key_type, (str, bytes)):
+        # flip the dictionary
+        if isinstance(key_type, str):
+            return {v: k.encode() for k, v, in key}
+        else:
+            return {v: k for k, v in key}
+    else:
+        if isinstance(value_type, str):
+            return {k: v.encode() for k, v, in key}
+        else:
+            return key

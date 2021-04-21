@@ -27,6 +27,11 @@ class Field(ABC):
 
     @property
     @abstractmethod
+    def dataframe(self):
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
     def chunksize(self):
         raise NotImplementedError()
 
@@ -145,8 +150,22 @@ class DataFrame(ABC):
     DataFrame is a table of data that contains a list of Fields (columns)
     """
 
+    @property
+    @abstractmethod
+    def columns(self):
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
+    def dataset(self):
+        raise NotImplementedError()
+
     @abstractmethod
     def add(self, field):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def drop(self, name: str):
         raise NotImplementedError()
 
     @abstractmethod
@@ -414,10 +433,6 @@ class AbstractSession(ABC):
 
     @abstractmethod
     def chunks(self, length, chunksize=None):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def process(self, inputs, outputs, predicate):
         raise NotImplementedError()
 
     @abstractmethod

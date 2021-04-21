@@ -9,7 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, IO, Tuple, Union
+from typing import Callable, IO, Optional, Tuple, Union
 import os
 import uuid
 from datetime import datetime, timezone
@@ -32,6 +32,12 @@ from exetera.core import dataframe as df
 
 
 class Session(AbstractSession):
+    """
+    Session is the top-level object that is used to create and open ExeTera Datasets. It also
+    provides operations that can be performed on Fields. For a more detailed explanation of
+    Session and examples of its usage, please refer to
+    https://github.com/KCL-BMEIS/ExeTera/wiki/Session-API
+    """
 
     def __init__(self,
                  chunksize: int = ops.DEFAULT_CHUNKSIZE,
@@ -214,7 +220,7 @@ class Session(AbstractSession):
                 del w
             else:
                 r = self.get(src_group[k]).writeable()
-                if isinstance(r, fld.IndexedStringField):
+                if r.indexed:
                     i, v = self.apply_index(sorted_index, r)
                     r.indices[:] = i
                     r.values[:] = v
@@ -574,9 +580,9 @@ class Session(AbstractSession):
                            src_chunksize=None,
                            dest_chunksize=None,
                            chunksize_mult=None):
-        if not isinstance(target, fld.IndexedStringField):
+        if not target.indexed:
             raise ValueError(f"'target' must be one of 'IndexedStringField' but is {type(target)}")
-        if not isinstance(dest, fld.IndexedStringField):
+        if not dest.indexed:
             raise ValueError(f"'dest' must be one of 'IndexedStringField' but is {type(dest)}")
 
         src_chunksize = target.chunksize if src_chunksize is None else src_chunksize
@@ -742,9 +748,9 @@ class Session(AbstractSession):
         Please use the merge or ordered_merge functions instead.
         """
 
-        if isinstance(destination_pkey, fld.IndexedStringField):
+        if isinstance(destination_pkey, Field) and destination_pkey.indexed:
             raise ValueError("'destination_pkey' must not be an indexed string field")
-        if isinstance(fkey_indices, fld.IndexedStringField):
+        if isinstance(fkey_indices, Field) and fkey_indices.indexed:
             raise ValueError("'fkey_indices' must not be an indexed string field")
         if isinstance(values_to_join, rw.IndexedStringReader):
             raise ValueError("Joins on indexed string fields are not supported")
@@ -865,7 +871,7 @@ class Session(AbstractSession):
         }
 
         fieldtype = field.attrs['fieldtype'].split(',')[0]
-        return fieldtype_map[fieldtype](self, field)
+        return fieldtype_map[fieldtype](self, field, None, field.name)
 
     def create_like(self, field, dest_group, dest_name, timestamp=None, chunksize=None):
         """
@@ -914,7 +920,7 @@ class Session(AbstractSession):
 
         if isinstance(group, h5py.Group):
             fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
-            return fld.IndexedStringField(self, group[name], write_enabled=True)
+            return fld.IndexedStringField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_indexed_string(name, timestamp, chunksize)
 
@@ -939,7 +945,7 @@ class Session(AbstractSession):
                                  "{} was passed to it".format(type(group)))
         if isinstance(group, h5py.Group):
             fld.fixed_string_field_constructor(self, group, name, length, timestamp, chunksize)
-            return fld.FixedStringField(self, group[name], write_enabled=True)
+            return fld.FixedStringField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_fixed_string(name, length, timestamp, chunksize)
 
@@ -969,7 +975,7 @@ class Session(AbstractSession):
 
         if isinstance(group, h5py.Group):
             fld.categorical_field_constructor(self, group, name, nformat, key, timestamp, chunksize)
-            return fld.CategoricalField(self, group[name], write_enabled=True)
+            return fld.CategoricalField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_categorical(name, nformat, key, timestamp, chunksize)
 
@@ -997,7 +1003,7 @@ class Session(AbstractSession):
 
         if isinstance(group, h5py.Group):
             fld.numeric_field_constructor(self, group, name, nformat, timestamp, chunksize)
-            return fld.NumericField(self, group[name], write_enabled=True)
+            return fld.NumericField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_numeric(name, nformat, timestamp, chunksize)
 
@@ -1015,16 +1021,39 @@ class Session(AbstractSession):
 
         if isinstance(group, h5py.Group):
             fld.timestamp_field_constructor(self, group, name, timestamp, chunksize)
-            return fld.TimestampField(self, group[name], write_enabled=True)
+            return fld.TimestampField(self, group[name], None, name, write_enabled=True)
         else:
             return group.create_timestamp(name, timestamp, chunksize)
 
-    def get_or_create_group(self, group, name):
+    def get_or_create_group(self,
+                            group: Union[h5py.Group, h5py.File],
+                            name: str):
+        """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+
+        """
         if name in group:
             return group[name]
         return group.create_group(name)
 
-    def chunks(self, length, chunksize=None):
+    def chunks(self,
+               length: int,
+               chunksize: Optional[int] = None):
+        """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+        'chunks' is a convenience method that, given an overall length and a chunksize, will yield
+        a set of ranges for the chunks in question.
+        ie.
+        chunks(1048576, 500000) -> (0, 500000), (500000, 1000000), (1000000, 1048576)
+
+        :params length: The range to be split into chunks
+        :params chunksize: Optional parameter detailing the size of each chunk. If not set, the
+        chunksize that the Session was initialized with is used.
+        """
         if chunksize is None:
             chunksize = self.chunksize
         cur = 0
@@ -1033,47 +1062,64 @@ class Session(AbstractSession):
             yield cur, next
             cur = next
 
-    def process(self, inputs, outputs, predicate):
-
-        # TODO: modifying the dictionaries in place is not great
-        input_readers = dict()
-        for k, v in inputs.items():
-            if isinstance(v, rw.Reader):
-                input_readers[k] = v
-            else:
-                input_readers[k] = self.get(v)
-        output_writers = dict()
-        output_arrays = dict()
-        for k, v in outputs.items():
-            if isinstance(v, rw.Writer):
-                output_writers[k] = v
-            else:
-                raise ValueError("'outputs': all values must be 'Writers'")
-
-        reader = next(iter(input_readers.values()))
-        input_length = len(reader)
-        writer = next(iter(output_writers.values()))
-        chunksize = writer.chunksize
-        required_chunksize = min(input_length, chunksize)
-        for k, v in outputs.items():
-            output_arrays[k] = output_writers[k].chunk_factory(required_chunksize)
-
-        for c in self.chunks(input_length, chunksize):
-            kwargs = dict()
-
-            for k, v in inputs.items():
-                kwargs[k] = v[c[0]:c[1]]
-            for k, v in output_arrays.items():
-                kwargs[k] = v[:c[1] - c[0]]
-            predicate(**kwargs)
-
-            # TODO: write back to the writer
-            for k in output_arrays.keys():
-                output_writers[k].write_part(kwargs[k])
-        for k, v in output_writers.items():
-            output_writers[k].flush()
+    # def process(self,
+    #             inputs,
+    #             outputs,
+    #             predicate):
+    #     """
+    #     Note: this function is deprecated, and provided only for compatibility with existing scripts.
+    #     It will be removed in a future version.
+    #     """
+    #
+    #     # TODO: modifying the dictionaries in place is not great
+    #     input_readers = dict()
+    #     for k, v in inputs.items():
+    #         if isinstance(v, fld.Field):
+    #             input_readers[k] = v
+    #         else:
+    #             input_readers[k] = self.get(v)
+    #     output_writers = dict()
+    #     output_arrays = dict()
+    #     for k, v in outputs.items():
+    #         if isinstance(v, fld.Field):
+    #             output_writers[k] = v
+    #         else:
+    #             raise ValueError("'outputs': all values must be 'Writers'")
+    #
+    #     reader = next(iter(input_readers.values()))
+    #     input_length = len(reader)
+    #     writer = next(iter(output_writers.values()))
+    #     chunksize = writer.chunksize
+    #     required_chunksize = min(input_length, chunksize)
+    #     for k, v in outputs.items():
+    #         output_arrays[k] = output_writers[k].chunk_factory(required_chunksize)
+    #
+    #     for c in self.chunks(input_length, chunksize):
+    #         kwargs = dict()
+    #
+    #         for k, v in inputs.items():
+    #             kwargs[k] = v.data[c[0]:c[1]]
+    #         for k, v in output_arrays.items():
+    #             kwargs[k] = v.data[:c[1] - c[0]]
+    #         predicate(**kwargs)
+    #
+    #         # TODO: write back to the writer
+    #         for k in output_arrays.keys():
+    #             output_writers[k].data.write_part(kwargs[k])
+    #     for k, v in output_writers.items():
+    #         output_writers[k].data.complete()
 
     def get_index(self, target, foreign_key, destination=None):
+        """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+        Please make use of Dataframe.merge functionality instead. This method can be emulated by
+        adding an index (via np.arange) to a dataframe, performing a merge and then fetching the
+        mapped index field.
+
+        'get_index' maps a primary key ('target') into the space of a foreign key ('foreign_key').
+        """
         print('  building patient_id index')
         t0 = time.time()
         target_lookup = dict()
@@ -1106,18 +1152,6 @@ class Session(AbstractSession):
         else:
             return foreign_key_index
 
-    def get_trash_group(self, group):
-
-        group_names = group.name[1:].split('/')
-
-        while True:
-            id = str(uuid.uuid4())
-            try:
-                result = group.create_group(f"/trash/{'/'.join(group_names[:-1])}/{id}")
-                return result
-            except KeyError:
-                pass
-
     def temp_filename(self):
         uid = str(uuid.uuid4())
         while os.path.exists(uid + '.hdf5'):
@@ -1126,6 +1160,20 @@ class Session(AbstractSession):
 
     def merge_left(self, left_on, right_on,
                    right_fields=tuple(), right_writers=None):
+        """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+        Please use DataFrame.merge instead.
+
+        Perform a database-style left join on right_fields, outputting the result to right_writers,
+        if set.
+        :param left_on: The key to perform the join on on the left hand side
+        :param right_on: The key to perform the join on on the right hand side
+        :param right_fields: The fields to be mapped from right to left
+        :param right_writers: Optional parameter providing the fields to which the mapped data should
+        be written. If this is not set, the mapped data is returned as numpy arrays and lists instead.
+        """
         l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
@@ -1140,18 +1188,53 @@ class Session(AbstractSession):
 
         right_results = list()
         for irf, rf in enumerate(right_fields):
-            rf_raw = val.raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
-            joined_field = ops.safe_map(rf_raw, r_to_l_map, r_to_l_filt)
-            # joined_field = per._safe_map(rf_raw, r_to_l_map, r_to_l_filt)
-            if right_writers is None:
-                right_results.append(joined_field)
+            if isinstance(rf, Field):
+                if rf.indexed:
+                    indices, values = ops.safe_map_indexed_values(rf.indices[:], rf.values[:],
+                                                                  r_to_l_map, r_to_l_filt)
+                    if right_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].indices.write(indices)
+                        right_writers[irf].values.write(values)
+                else:
+                    values = ops.safe_map_values(rf.data[:], r_to_l_map, r_to_l_filt)
+                    if right_writers is None:
+                        result = rf.create_like()
+                        result.data.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].data.write(values)
             else:
-                right_writers[irf].data.write(joined_field)
+                values = ops.safe_map_values(rf, r_to_l_map, r_to_l_filt)
+
+                if right_writers is None:
+                    right_results.append(values)
+                else:
+                    right_writers[irf].data.write(values)
 
         return right_results
 
     def merge_right(self, left_on, right_on,
-                    left_fields=None, left_writers=None):
+                    left_fields=tuple(), left_writers=None):
+        """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+        Please use DataFrame.merge instead.
+
+        Perform a database-style right join on left_fields, outputting the result to left_writers,
+        if set.
+        :param left_on: The key to perform the join on on the left hand side
+        :param right_on: The key to perform the join on on the right hand side
+        :param left_fields: The fields to be mapped from right to left
+        :param left_writers: Optional parameter providing the fields to which the mapped data should
+        be written. If this is not set, the mapped data is returned as numpy arrays and lists instead.
+        """
+
         l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
@@ -1166,17 +1249,55 @@ class Session(AbstractSession):
 
         left_results = list()
         for ilf, lf in enumerate(left_fields):
-            lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
-            joined_field = ops.safe_map(lf_raw, l_to_r_map, l_to_r_filt)
-            if left_writers is None:
-                left_results.append(joined_field)
+            if isinstance(lf, Field):
+                if lf.indexed:
+                    indices, values = ops.safe_map_indexed_values(lf.indices[:], lf.values[:],
+                                                                  l_to_r_map, l_to_r_filt)
+                    if left_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].indices.write(indices)
+                        left_writers[ilf].values.write(values)
+                else:
+                    values = ops.safe_map_values(lf.data[:], l_to_r_map, l_to_r_filt)
+                    if left_writers is None:
+                        result = lf.create_like()
+                        result.data.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].data.write(values)
             else:
-                left_writers[ilf].data.write(joined_field)
+                values = ops.safe_map_values(lf, l_to_r_map, l_to_r_filt)
+
+                if left_writers is None:
+                    left_results.append(values)
+                else:
+                    left_writers[ilf].data.write(values)
 
         return left_results
 
     def merge_inner(self, left_on, right_on,
                     left_fields=None, left_writers=None, right_fields=None, right_writers=None):
+        """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+        
+        Please use DataFrame.merge instead.
+
+        Perform a database-style inner join on left_fields, outputting the result to left_writers,
+        if set.
+        :param left_on: The key to perform the join on on the left hand side
+        :param right_on: The key to perform the join on on the right hand side
+        :param left_fields: The fields to be mapped from left to inner
+        :param left_writers: Optional parameter providing the fields to which the mapped data should
+        be written. If this is not set, the mapped data is returned as numpy arrays and lists instead.
+        :param right_fields: The fields to be mapped from right to inner
+        :param right_writers: Optional parameter providing the fields to which the mapped data should
+        be written. If this is not set, the mapped data is returned as numpy arrays and lists instead.
+        """
         l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
@@ -1193,21 +1314,63 @@ class Session(AbstractSession):
 
         left_results = list()
         for ilf, lf in enumerate(left_fields):
-            lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
-            joined_field = ops.safe_map(lf_raw, l_to_i_map, l_to_i_filt)
-            if left_writers is None:
-                left_results.append(joined_field)
+            if isinstance(lf, Field):
+                if lf.indexed:
+                    indices, values = ops.safe_map_indexed_values(lf.indices[:], lf.values[:],
+                                                                  l_to_i_map, l_to_i_filt)
+                    if left_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].indices.write(indices)
+                        left_writers[ilf].values.write(values)
+                else:
+                    values = ops.safe_map_values(lf.data[:], l_to_i_map, l_to_i_filt)
+                    if left_writers is None:
+                        result = lf.create_like()
+                        result.data.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].data.write(values)
             else:
-                left_writers[ilf].data.write(joined_field)
+                values = ops.safe_map_values(lf, l_to_i_map, l_to_i_filt)
+
+                if left_writers is None:
+                    left_results.append(values)
+                else:
+                    left_writers[ilf].data.write(values)
 
         right_results = list()
         for irf, rf in enumerate(right_fields):
-            rf_raw = val.raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
-            joined_field = ops.safe_map(rf_raw, r_to_i_map, r_to_i_filt)
-            if right_writers is None:
-                right_results.append(joined_field)
+            if isinstance(rf, Field):
+                if rf.indexed:
+                    indices, values = ops.safe_map_indexed_values(rf.indices[:], rf.values[:],
+                                                                  r_to_i_map, r_to_i_filt)
+                    if right_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].indices.write(indices)
+                        right_writers[irf].values.write(values)
+                else:
+                    values = ops.safe_map_values(rf.data[:], r_to_i_map, r_to_i_filt)
+                    if right_writers is None:
+                        result = rf.create_like()
+                        result.data.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].data.write(values)
             else:
-                right_writers[irf].data.write(joined_field)
+                values = ops.safe_map_values(rf, r_to_i_map, r_to_i_filt)
+
+                if right_writers is None:
+                    right_results.append(values)
+                else:
+                    right_writers[irf].data.write(values)
 
         return left_results, right_results
 
@@ -1249,7 +1412,7 @@ class Session(AbstractSession):
     def ordered_merge_left(self, left_on, right_on, right_field_sources=tuple(), left_field_sinks=None,
                            left_to_right_map=None, left_unique=False, right_unique=False):
         """
-        Generate the results of a left join apply it to the fields described in the tuple
+        Generate the results of a left join and apply it to the fields described in the tuple
         'left_field_sources'. If 'left_field_sinks' is set, the mapped values are written
         to the fields / arrays set there.
         Note: in order to achieve best scalability, you should use groups / fields rather
@@ -1325,7 +1488,7 @@ class Session(AbstractSession):
                             left_field_sources=tuple(), right_field_sinks=None,
                             right_to_left_map=None, left_unique=False, right_unique=False):
         """
-        Generate the results of a right join apply it to the fields described in the tuple
+        Generate the results of a right join and apply it to the fields described in the tuple
         'right_field_sources'. If 'right_field_sinks' is set, the mapped values are written
         to the fields / arrays set there.
         Note: in order to achieve best scalability, you should use groups / fields rather
@@ -1353,7 +1516,28 @@ class Session(AbstractSession):
                             left_field_sources=tuple(), left_field_sinks=None,
                             right_field_sources=tuple(), right_field_sinks=None,
                             left_unique=False, right_unique=False):
-
+        """
+        Generate the results of an inner join and apply it to the fields described in the tuple
+        'right_field_sources'. If 'right_field_sinks' is set, the mapped values are written
+        to the fields / arrays set there.
+        Note: in order to achieve best scalability, you should use groups / fields rather
+        than numpy arrays and provide a tuple of groups/fields to right_field_sinks, so
+        that the session and compute the merge and apply the mapping in a streaming
+        fashion.
+        :param left_on: the group/field/numba array that contains the left key values
+        :param right_on: the group/field/numba array that contains the right key values
+        :param right_to_left_map: a group/field/numba array that the map is written to. If
+        it is a numba array, it must be the size of the resulting merge
+        :param right_field_sources: a tuple of group/fields/numba arrays that contain the
+        fields to be joined
+        :param right_field_sinks: optional - a tuple of group/fields/numba arrays that
+        the mapped fields should be written to
+        :param left_unique: a hint to indicate whether the 'left_on' field contains unique
+        values
+        :param right_unique: a hint to indicate whether the 'right_on' field contains
+        unique values
+        :return: If right_field_sinks is not set, a tuple of the output fields is returned
+        """
         if left_field_sinks is not None:
             if len(left_field_sources) != len(left_field_sinks):
                 msg = ("{} and {} should be of the same length but are length {} and {} "

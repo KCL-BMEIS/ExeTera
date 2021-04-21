@@ -42,7 +42,8 @@ class TestDataFrame(unittest.TestCase):
             # del & del by field
             del df['numf']
             self.assertFalse('numf' in df)
-            df.delete_field(cat)
+            with self.assertRaises(ValueError, msg="This field is owned by a different dataframe"):
+                df.delete_field(cat)
             self.assertFalse(df.contains_field(cat))
 
     def test_dataframe_create_numeric(self):
@@ -126,16 +127,12 @@ class TestDataFrame(unittest.TestCase):
             a.data.clear()
             a.data.write(strs)
 
-            # print(strs[:10])
             self.assertListEqual(
                 ['xxxy', 'xxy', 'xxxy', 'y', 'xy', 'y', 'xxxy', 'xxxy', 'xy', 'y'], strs[:10])
-            # print(a.indices[:10])
             self.assertListEqual([0, 4, 7, 11, 12, 14, 15, 19, 23, 25],
                                  a.indices[:10].tolist())
-            # print(a.values[:10])
             self.assertListEqual(
                 [120, 120, 120, 121, 120, 120, 121, 120, 120, 120], a.values[:10].tolist())
-            # print(a.data[:10])
             self.assertListEqual(
                 ['xxxy', 'xxy', 'xxxy', 'y', 'xy', 'y', 'xxxy', 'xxxy', 'xy', 'y'], a.data[:10])
 
@@ -193,7 +190,7 @@ class TestDataFrame(unittest.TestCase):
             df['r6'] = cat1 >= cat2
             self.assertEqual([False, False, True, False, False, True], df['r6'].data[:].tolist())
 
-    def test_datafrmae_static_methods(self):
+    def test_dataframe_static_methods(self):
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio, 'w', 'dst')
@@ -202,11 +199,11 @@ class TestDataFrame(unittest.TestCase):
             numf.data.write([5, 4, 3, 2, 1])
 
             df2 = dst.create_dataframe('df2')
-            dataframe.HDF5DataFrame.copy(numf, df2,'numf')
+            dataframe.copy(numf, df2,'numf')
             self.assertListEqual([5, 4, 3, 2, 1], df2['numf'].data[:].tolist())
-            dataframe.HDF5DataFrame.drop(df, numf)
+            df.drop('numf')
             self.assertTrue('numf' not in df)
-            dataframe.HDF5DataFrame.move(df2,df2['numf'],df,'numf')
+            dataframe.move(df2['numf'], df, 'numf')
             self.assertTrue('numf' not in df2)
             self.assertListEqual([5, 4, 3, 2, 1], df['numf'].data[:].tolist())
 
@@ -256,3 +253,128 @@ class TestDataFrameApplyFilter(unittest.TestCase):
 
             df.apply_filter(filt)
             self.assertListEqual(expected, df['numf'].data[:].tolist())
+
+
+class TestDataFrameMerge(unittest.TestCase):
+
+    def tests_merge_left(self):
+
+        l_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
+        r_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
+        r_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
+        expected = ['', '', '', 'bb1', 'bb2', 'ccc1', 'ccc2', 'dddd1', '', 'ffffff1', 'ggggggg1']
+
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            ldf = dst.create_dataframe('ldf')
+            rdf = dst.create_dataframe('rdf')
+            ldf.create_numeric('l_id', 'int32').data.write(l_id)
+            rdf.create_numeric('r_id', 'int32').data.write(r_id)
+            rdf.create_indexed_string('r_vals').data.write(r_vals)
+            ddf = dst.create_dataframe('ddf')
+            dataframe.merge(ldf, rdf, ddf, 'l_id', 'r_id', how='left')
+            self.assertEqual(expected, ddf['r_vals'].data[:])
+            valid_if_equal = (ddf['l_id'].data[:] == ddf['r_id'].data[:]) | \
+                             np.logical_not(ddf['valid_r'].data[:])
+            self.assertTrue(np.all(valid_if_equal))
+
+
+    def tests_merge_right(self):
+
+        r_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
+        l_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
+        l_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
+        expected = ['', '', '', 'bb1', 'bb2', 'ccc1', 'ccc2', 'dddd1', '', 'ffffff1', 'ggggggg1']
+
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            ldf = dst.create_dataframe('ldf')
+            rdf = dst.create_dataframe('rdf')
+            ldf.create_numeric('l_id', 'int32').data.write(l_id)
+            ldf.create_indexed_string('l_vals').data.write(l_vals)
+            rdf.create_numeric('r_id', 'int32').data.write(r_id)
+            ddf = dst.create_dataframe('ddf')
+            dataframe.merge(ldf, rdf, ddf, 'l_id', 'r_id', how='right')
+            self.assertEqual(expected, ddf['l_vals'].data[:])
+            valid_if_equal = (ddf['l_id'].data[:] == ddf['r_id'].data[:]) | \
+                             np.logical_not(ddf['valid_l'].data[:])
+            self.assertTrue(np.all(valid_if_equal))
+
+    def tests_merge_inner(self):
+
+        r_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
+        l_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
+        r_vals = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven']
+        l_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
+        expected_left = ['bb1', 'bb2', 'ccc1', 'ccc2', '', '', 'dddd1', 'ggggggg1', 'ffffff1']
+        expected_right = ['two', 'two', 'three', 'three', 'zero', 'zero', 'four', 'seven', 'six']
+
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            ldf = dst.create_dataframe('ldf')
+            rdf = dst.create_dataframe('rdf')
+            ldf.create_numeric('l_id', 'int32').data.write(l_id)
+            ldf.create_indexed_string('l_vals').data.write(l_vals)
+            rdf.create_numeric('r_id', 'int32').data.write(r_id)
+            rdf.create_indexed_string('r_vals').data.write(r_vals)
+            ddf = dst.create_dataframe('ddf')
+            dataframe.merge(ldf, rdf, ddf, 'l_id', 'r_id', how='inner')
+            self.assertEqual(expected_left, ddf['l_vals'].data[:])
+            self.assertEqual(expected_right, ddf['r_vals'].data[:])
+
+    def tests_merge_outer(self):
+
+        r_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
+        l_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
+        r_vals = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven']
+        l_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
+        expected_left = ['bb1', 'bb2', 'ccc1', 'ccc2', '', '', 'dddd1', 'ggggggg1', 'ffffff1',
+                         '', '']
+        expected_right = ['two', 'two', 'three', 'three', 'zero', 'zero', 'four', 'seven', 'six',
+                          'one', 'five']
+
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            ldf = dst.create_dataframe('ldf')
+            rdf = dst.create_dataframe('rdf')
+            ldf.create_numeric('l_id', 'int32').data.write(l_id)
+            ldf.create_indexed_string('l_vals').data.write(l_vals)
+            rdf.create_numeric('r_id', 'int32').data.write(r_id)
+            rdf.create_indexed_string('r_vals').data.write(r_vals)
+            ddf = dst.create_dataframe('ddf')
+            dataframe.merge(ldf, rdf, ddf, 'l_id', 'r_id', how='outer')
+            self.assertEqual(expected_left, ddf['l_vals'].data[:])
+            self.assertEqual(expected_right, ddf['r_vals'].data[:])
+
+
+    def tests_merge_left_compound_key(self):
+
+        l_id_1 = np.asarray([0, 0, 0, 0, 1, 1, 1, 1], dtype='int32')
+        l_id_2 = np.asarray([0, 1, 2, 3, 0, 1, 2, 3], dtype='int32')
+        r_id_1 = np.asarray([0, 1, 0, 1, 0, 1, 0, 1], dtype='int32')
+        r_id_2 = np.asarray([0, 0, 1, 1, 2, 2, 3, 3], dtype='int32')
+        l_vals = ['00', '01', '02', '03', '10', '11', '12', '13']
+        r_vals = ['00', '10', '01', '11', '02', '12', '03', '13']
+        expected = ['00', '01', '02', '03', '10', '11', '12', '13']
+
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            ldf = dst.create_dataframe('ldf')
+            rdf = dst.create_dataframe('rdf')
+            ldf.create_numeric('l_id_1', 'int32').data.write(l_id_1)
+            ldf.create_numeric('l_id_2', 'int32').data.write(l_id_2)
+            ldf.create_indexed_string('l_vals').data.write(l_vals)
+            rdf.create_numeric('r_id_1', 'int32').data.write(r_id_1)
+            rdf.create_numeric('r_id_2', 'int32').data.write(r_id_2)
+            rdf.create_indexed_string('r_vals').data.write(r_vals)
+            ddf = dst.create_dataframe('ddf')
+            dataframe.merge(ldf, rdf, ddf, ('l_id_1', 'l_id_2'), ('r_id_1', 'r_id_2'), how='left')
+            self.assertEqual(expected, ddf['l_vals'].data[:])
+            self.assertEqual(expected, ddf['r_vals'].data[:])
+            self.assertEqual(ddf['l_id_1'].data[:].tolist(), ddf['r_id_1'].data[:].tolist())
+            self.assertEqual(ddf['r_id_2'].data[:].tolist(), ddf['r_id_2'].data[:].tolist())
