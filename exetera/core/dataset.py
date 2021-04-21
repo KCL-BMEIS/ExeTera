@@ -56,6 +56,7 @@ class HDF5Dataset(Dataset):
     def session(self):
         """
         The session property interface.
+        
         :return: The _session instance.
         """
         return self._session

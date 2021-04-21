@@ -201,7 +201,6 @@ class TestDataFrame(unittest.TestCase):
             df2 = dst.create_dataframe('df2')
             dataframe.copy(numf, df2,'numf')
             self.assertListEqual([5, 4, 3, 2, 1], df2['numf'].data[:].tolist())
-
             df.drop('numf')
             self.assertTrue('numf' not in df)
             dataframe.move(df2['numf'], df, 'numf')
