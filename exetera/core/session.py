@@ -748,9 +748,9 @@ class Session(AbstractSession):
         Please use the merge or ordered_merge functions instead.
         """
 
-        if destination_pkey.indexed:
+        if isinstance(destination_pkey, Field) and destination_pkey.indexed:
             raise ValueError("'destination_pkey' must not be an indexed string field")
-        if fkey_indices.indexed:
+        if isinstance(fkey_indices, Field) and fkey_indices.indexed:
             raise ValueError("'fkey_indices' must not be an indexed string field")
         if isinstance(values_to_join, rw.IndexedStringReader):
             raise ValueError("Joins on indexed string fields are not supported")
