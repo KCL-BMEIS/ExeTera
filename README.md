@@ -68,6 +68,8 @@ See the wiki for detailed examples of how to interact with the hdf5 datastore.
 
 ## Changes
 
+The Changelog can now be found on the [wiki](https://github.com/KCL-BMEIS/ExeTera/wiki/ChangeLog)
+
 ### v0.3.2 -> v0.4
 
 * Separation of all covid-specific functionality out to [https://github.com/KCL-BMEIS/ExeTeraCovid.git](https://github.com/KCL-BMEIS/ExeTeraCovid.git)
