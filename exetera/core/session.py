@@ -14,10 +14,9 @@ import os
 import uuid
 from datetime import datetime, timezone
 import time
-import warnings
+
 import numpy as np
 import pandas as pd
-
 import h5py
 
 from exetera.core.abstract_types import Field, AbstractSession
