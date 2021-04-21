@@ -79,15 +79,19 @@ def file_read_line_fast_csv(source):
     with open(source) as f:
         header = csv.DictReader(f)
         count_columns = len(header.fieldnames)
-        
+
         count_rows = sum(1 for _ in f) # w/o header row
 
-        #content = f.read()
+        f.seek(0)
+        print(f.read())
         # count_rows = content.count('\n') + 1  # +1: for the case that last line doesn't have \n
         
     column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
     # change it to longest key 
     column_vals = np.zeros((count_columns, count_rows * 100), dtype=np.uint8)
+
+    print('====initialize=====')
+    print(column_inds, column_vals)
 
     ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
     SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
@@ -96,75 +100,25 @@ def file_read_line_fast_csv(source):
     #print(lineterminator.tobytes())
     #print("hello")
     #CARRIAGE_RETURN_VALUE = np.frombuffer(b'\r', dtype='S1')[0][0]
-    print("test")
-    with Timer("my_fast_csv_reader_int"):
+    # print("test")
+    with Timer("my_fast_csv_reader"):
         content = np.fromfile(source, dtype=np.uint8)
-        my_fast_csv_reader_int(content, column_inds, column_vals, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE)
+        print(content)
+        my_fast_csv_reader(content, column_inds, column_vals, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE)
 
-
+    print('======after csv reader====')
+    print(column_inds)
+    print(column_vals)
     return column_inds, column_vals
 
 
-def get_cell(row,col, column_inds, column_vals):
-    start_row_index = column_inds[col][row]
-    end_row_index = column_inds[col][row+1]
-    return column_vals[col][start_row_index:end_row_index].tobytes()
-
-
-def make_test_data(count, schema):
-    """
-    [ {'name':name, 'type':'cat'|'float'|'fixed', 'values':(vals)} ]
-    """
-    import pandas as pd
-    rng = np.random.RandomState(12345678)
-    columns = {}
-    for s in schema:
-        if s['type'] == 'cat':
-            vals = s['vals']
-            arr = rng.randint(low=0, high=len(vals), size=count)
-            larr = [None] * count
-            for i in range(len(arr)):
-                larr[i] = vals[arr[i]]
-            columns[s['name']] = larr
-        elif s['type'] == 'float':
-            arr = rng.uniform(size=count)
-            columns[s['name']] = arr
-
-    df = pd.DataFrame(columns)
-    df.to_csv('/home/ben/covid/benchmark_csv.csv', index_label='index')
-
-
-def make_test_data(count, schema):
-    """
-    [ {'name':name, 'type':'cat'|'float'|'fixed', 'values':(vals)} ]
-    """
-    import pandas as pd
-    rng = np.random.RandomState(12345678)
-    columns = {}
-    for s in schema:
-        if s['type'] == 'cat':
-            vals = s['vals']
-            arr = rng.randint(low=0, high=len(vals), size=count)
-            larr = [None] * count
-            for i in range(len(arr)):
-                larr[i] = vals[arr[i]]
-            columns[s['name']] = larr
-        elif s['type'] == 'float':
-            arr = rng.uniform(size=count)
-            columns[s['name']] = arr
-
-    df = pd.DataFrame(columns)
-    df.to_csv('/home/ben/covid/benchmark_csv.csv', index_label='index')
-
-
-
 @njit
-def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separator_value, newline_value):
+def my_fast_csv_reader(source, column_inds, column_vals, escape_value, separator_value, newline_value):
     colcount = len(column_inds)
     maxrowcount = len(column_inds[0]) - 1  # minus extra index 0 row that created for column_inds
     print('colcount', colcount)
     print('maxrowcount', maxrowcount)
-
+    
     index = np.int64(0)
     line_start = np.int64(0)
     cell_start_idx = np.int64(0)
@@ -208,10 +162,6 @@ def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separ
             column_vals[col_index, cur_cell_start + cur_cell_char_count] = c
             cur_cell_char_count += 1
 
-            # if col_index == 5:
-            #     print('%%%%%%')
-            #     print(c)
-
         if end_cell:
             if row_index >= 0:
                 column_inds[col_index, row_index + 1] = cur_cell_start + cur_cell_char_count
@@ -236,14 +186,80 @@ def my_fast_csv_reader_int(source, column_inds, column_vals, escape_value, separ
 
         if index == len(source):
             if col_index == colcount - 1: #and row_index == maxrowcount - 1:
-                # print('excuese me')
                 column_inds[col_index, row_index + 1] = cur_cell_start + cur_cell_char_count
 
-            # print('source', source, 'len_source', len(source), len(source))
+            # print('source', source, 'len_source', len(source))
             # print('index', cur_cell_start + cur_cell_char_count)
-            # print('break',col_index, row_index)
+            # print('break', col_index, row_index)
             break
 
+
+@njit           
+def my_fast_categorical_mapper(chunk, i_c, column_ids, column_vals, cat_keys, cat_index, cat_values):
+    pos = 0
+    for row_idx in range(len(column_ids[i_c]) - 1):
+        # Finds length, which we use to lookup potential matches
+        key_start = column_ids[i_c, row_idx]
+        key_end = column_ids[i_c, row_idx + 1]
+        key_len = key_end - key_start
+
+        print('key_start', key_start, 'key_end', key_end)
+
+        for i in range(len(cat_index) - 1):
+            sc_key_len = cat_index[i + 1] - cat_index[i]
+
+            if key_len != sc_key_len:
+                continue
+
+            index = i
+            for j in range(key_len):
+                entry_start = cat_index[i]
+                if column_vals[i_c, key_start + j] != cat_keys[entry_start + j]:
+                    index = -1
+                    break
+
+            if index != -1:
+                chunk[row_idx] = cat_values[index]
+
+    pos = row_idx + 1
+    return pos
+
+
+def get_byte_map(string_map):
+    # sort by length of key first, and then sort alphabetically
+    sorted_string_map = {k: v for k, v in sorted(string_map.items(), key=lambda item: (len(item[0]), item[0]))}
+    sorted_string_key = [(len(k), np.frombuffer(k.encode(), dtype=np.uint8), v) for k, v in sorted_string_map.items()]
+    sorted_string_values = list(sorted_string_map.values())
+    
+    # assign byte_map_key_lengths, byte_map_value
+    byte_map_key_lengths = np.zeros(len(sorted_string_map), dtype=np.uint8)
+    byte_map_value = np.zeros(len(sorted_string_map), dtype=np.uint8)
+
+    for i, (length, _, v)  in enumerate(sorted_string_key):
+        byte_map_key_lengths[i] = length
+        byte_map_value[i] = v
+
+    # assign byte_map_keys, byte_map_key_indices
+    byte_map_keys = np.zeros(sum(byte_map_key_lengths), dtype=np.uint8)
+    byte_map_key_indices = np.zeros(len(sorted_string_map)+1, dtype=np.uint8)
+    
+    idx_pointer = 0
+    for i, (_, b_key, _) in enumerate(sorted_string_key):   
+        for b in b_key:
+            byte_map_keys[idx_pointer] = b
+            idx_pointer += 1
+
+        byte_map_key_indices[i + 1] = idx_pointer  
+
+    byte_map = [byte_map_keys, byte_map_key_lengths, byte_map_key_indices, byte_map_value]
+    return byte_map
+
+
+
+def get_cell(row,col, column_inds, column_vals):
+    start_row_index = column_inds[col][row]
+    end_row_index = column_inds[col][row+1]
+    return column_vals[col][start_row_index:end_row_index].tobytes()
 
 
 if __name__ == "__main__":
