@@ -21,7 +21,20 @@ import h5py
 
 class HDF5DataFrame(DataFrame):
     """
-    DataFrame that utilising HDF5 file as storage.
+    DataFrame is the means which which you interact with an ExeTera datastore. These are created
+    and loaded through `Dataset.create_dataframe`, and other methods, rather than being constructed
+    directly.
+
+    DataFrames closely resemble Pandas DataFrames, but with a number of key differences:
+    1. Instead of Series, DataFrames are composed of Field objects
+    2. DataFrames can store fields of differing lengths, although all fields must be of the same
+    length when performing certain operations such as merges.
+    3. ExeTera DataFrames do not (yet) have the ability to create filtered views onto an underlying
+    DataFrame, although this functionality will be added in upcoming releases
+
+    For a detailed explanation of DataFrame along with examples of its use, please refer to the
+    wiki documentation at
+    https://github.com/KCL-BMEIS/ExeTera/wiki/DataFrame-API
     """
     def __init__(self,
                  dataset: Dataset,
@@ -70,7 +83,8 @@ class HDF5DataFrame(DataFrame):
         """
         return self._h5group
 
-    def add(self, field):
+    def add(self,
+            field: fld.Field):
         """
         Add a field to this dataframe as well as the HDF5 Group.
 
@@ -90,7 +104,8 @@ class HDF5DataFrame(DataFrame):
         del self._columns[name]
         del self._h5group[name]
 
-    def create_group(self, name):
+    def create_group(self,
+                     name: str):
         """
         Create a group object in HDF5 file for field to use. Please note, this function is for
         backwards compatibility with older scripts and should not be used in the general case.
@@ -101,9 +116,14 @@ class HDF5DataFrame(DataFrame):
         self._h5group.create_group(name)
         return self._h5group[name]
 
-    def create_indexed_string(self, name, timestamp=None, chunksize=None):
+    def create_indexed_string(self,
+                              name: str,
+                              timestamp: Optional[str] = None,
+                              chunksize: Optional[int] = None):
         """
         Create a indexed string type field.
+        Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#indexedstringfield for
+        a detailed description of indexed string fields
         """
         fld.indexed_string_field_constructor(self._dataset.session, self, name,
                                              timestamp, chunksize)
@@ -112,9 +132,15 @@ class HDF5DataFrame(DataFrame):
         self._columns[name] = field
         return self._columns[name]
 
-    def create_fixed_string(self, name, length, timestamp=None, chunksize=None):
+    def create_fixed_string(self,
+                            name: str,
+                            length: int,
+                            timestamp: Optional[str] = None,
+                            chunksize: Optional[int] = None):
         """
         Create a fixed string type field.
+        Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#fixedstringfield for
+        a detailed description of fixed string fields
         """
         fld.fixed_string_field_constructor(self._dataset.session, self, name,
                                            length, timestamp, chunksize)
@@ -123,9 +149,15 @@ class HDF5DataFrame(DataFrame):
         self._columns[name] = field
         return self._columns[name]
 
-    def create_numeric(self, name, nformat, timestamp=None, chunksize=None):
+    def create_numeric(self,
+                       name: str,
+                       nformat: int,
+                       timestamp: Optional[str] = None,
+                       chunksize: Optional[int] = None):
         """
         Create a numeric type field.
+        Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#numericfield for
+        a detailed description of numeric fields
         """
         fld.numeric_field_constructor(self._dataset.session, self, name,
                                       nformat, timestamp, chunksize)
@@ -134,9 +166,16 @@ class HDF5DataFrame(DataFrame):
         self._columns[name] = field
         return self._columns[name]
 
-    def create_categorical(self, name, nformat, key, timestamp=None, chunksize=None):
+    def create_categorical(self,
+                           name: str,
+                           nformat: int,
+                           key: dict,
+                           timestamp: Optional[str] = None,
+                           chunksize: Optional[int] = None):
         """
         Create a categorical type field.
+        Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#categoricalfield for
+        a detailed description of indexed string fields
         """
         fld.categorical_field_constructor(self._dataset.session, self, name, nformat, key,
                                           timestamp, chunksize)
@@ -145,9 +184,14 @@ class HDF5DataFrame(DataFrame):
         self._columns[name] = field
         return self._columns[name]
 
-    def create_timestamp(self, name, timestamp=None, chunksize=None):
+    def create_timestamp(self,
+                         name: str,
+                         timestamp: Optional[str] = None,
+                         chunksize: Optional[int] = None):
         """
         Create a timestamp type field.
+        Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#timestampfield for
+        a detailed description of timestamp fields
         """
         fld.timestamp_field_constructor(self._dataset.session, self, name,
                                         timestamp, chunksize)
@@ -160,7 +204,9 @@ class HDF5DataFrame(DataFrame):
         """
         check if dataframe contains a field, by the field name
 
-        :param name: the name of the field to check,return a bool
+        :param name: the name of the field to check
+        :return: A boolean value indicating whether this DataFrame contains a Field with the
+        name in question
         """
         if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
@@ -201,17 +247,6 @@ class HDF5DataFrame(DataFrame):
         :param name: The name of field to get.
         """
         return self.__getitem__(name)
-
-    # def get_name(self, field):
-    #     """
-    #     Get the name of the field in dataframe.
-    #     """
-    #     if not isinstance(field, fld.Field):
-    #         raise TypeError("The field argument must be a Field object.")
-    #     for name, v in self._columns.items():
-    #         if id(field) == id(v):
-    #             return name
-    #     return None
 
     def __setitem__(self, name, field):
         if not isinstance(name, str):

@@ -242,3 +242,48 @@ def validate_field_lengths(side, lens, df, names=None):
         raise ValueError("'{}' fields are inconsistent lengths. The following "
                          "lengths were observed: {}".format(side, lens))
     return lens
+
+def validate_and_normalize_categorical_key(param_name, key):
+    if len(key) == 0:
+        raise ValueError("'{}' cannot be empty".format(param_name))
+    key_types = set()
+    value_types = set()
+    for k, v in key.items():
+        key_types.add(type(k))
+        value_types.add(type(v))
+
+    if len(key_types) > 1:
+        raise ValueError("'{}' has inconsistent key types {}".format(param_name, key_types))
+    if len(value_types) > 1:
+        raise ValueError("'{}' has inconsistent value types {}".format(param_name, value_types))
+
+    items = list(key.items())
+    key_type = items[0][0]
+    value_type = items[0][1]
+
+    if not isinstance(key_type, (str, bytes, int)) and not np.issubdtype(key_type, np.number):
+        raise ValueError("'{}': Unexpected dictionary key type; must be str, bytes or int "
+                         " but is {}".format(param_name, type(key_type)))
+    if not isinstance(value_type, (str, bytes, int)) and not np.issubdtype(value_type, np.number):
+        raise ValueError("'{}': Unexpected dictionary value type; must be str, bytes or int "
+                         " but is {}".format(param_name, type(value_type)))
+
+    if isinstance(key_type, (str, bytes)):
+        if not isinstance(value_type, int) and not np.issubdtype(value_type, np.number):
+            raise ValueError("'{}': if keys are of type str or bytes then values must be of "
+                             "type int but are of type {}".format(param_name, type(value_type)))
+    elif isinstance(value_type, (str, bytes)):
+        if not isinstance(key_type, int) and not np.issubdtype(key_type, np.number):
+            raise ValueError("'{}': if values are of type str or bytes then keys must be of "
+                             "type int but are of type {}".format(param_name, type(key_type)))
+    if not isinstance(key_type, (str, bytes)):
+        # flip the dictionary
+        if isinstance(key_type, str):
+            return {v: k.encode() for k, v, in key}
+        else:
+            return {v: k for k, v in key}
+    else:
+        if isinstance(value_type, str):
+            return {k: v.encode() for k, v, in key}
+        else:
+            return key

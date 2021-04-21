@@ -32,6 +32,12 @@ from exetera.core import dataframe as df
 
 
 class Session(AbstractSession):
+    """
+    Session is the top-level object that is used to create and open ExeTera Datasets. It also
+    provides operations that can be performed on Fields. For a more detailed explanation of
+    Session and examples of its usage, please refer to
+    https://github.com/KCL-BMEIS/ExeTera/wiki/Session-API
+    """
 
     def __init__(self,
                  chunksize: int = ops.DEFAULT_CHUNKSIZE,
