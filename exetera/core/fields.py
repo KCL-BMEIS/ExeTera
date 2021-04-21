@@ -1066,8 +1066,9 @@ def categorical_field_constructor(session, group, name, nformat, key,
     field.attrs['fieldtype'] = 'categorical,{}'.format(nformat)
     field.attrs['nformat'] = nformat
     DataWriter.write(field, 'values', [], 0, nformat)
-    key_values = [v for k, v in key.items()]
-    key_names = [k for k, v in key.items()]
+    key_ = val.validate_and_normalize_categorical_key('key', key)
+    key_values = [v for k, v in key_.items()]
+    key_names = [k for k, v in key_.items()]
     DataWriter.write(field, 'key_values', key_values, len(key_values), 'int8')
     DataWriter.write(field, 'key_names', key_names, len(key_names), h5py.special_dtype(vlen=str))
 
@@ -1202,7 +1203,6 @@ class FixedStringField(HDF5Field):
     def writeable(self):
         return FixedStringField(self._session, self._field, self._dataframe, self._name,
                                 write_enabled=True)
-
 
     def create_like(self, group=None, name=None, timestamp=None):
         return FieldDataOps.fixed_string_field_create_like(self, group, name, timestamp)

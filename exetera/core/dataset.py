@@ -16,6 +16,17 @@ from exetera.core import dataframe as edf
 
 
 class HDF5Dataset(Dataset):
+    """
+    Dataset is the means which which you interact with an ExeTera datastore. These are created
+    and loaded through `Session.open_dataset`, rather than being constructed directly.
+
+    Datasets are composed of one or more DataFrame objects and the means by which DataFrames
+    are interacted with.
+
+    For a detailed explanation of Dataset along with examples of its use, please refer to the
+    wiki documentation at
+    https://github.com/KCL-BMEIS/ExeTera/wiki/Dataset-API
+    """
 
     def __init__(self, session, dataset_path, mode, name):
         """

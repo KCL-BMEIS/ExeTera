@@ -526,15 +526,10 @@ class TestSessionMerge(unittest.TestCase):
                               left_writers=(i_df['l_id'], i_df['l_vals']),
                               right_fields=(r_df['id'], r_df['vals']),
                               right_writers=(i_df['r_id'], i_df['r_vals']))
-                print(i_df['l_id'].data[:])
-                print(i_df['r_id'].data[:])
-                print(i_df['l_vals'].data[:])
-                print(i_df['r_vals'].data[:])
 
                 results = s.merge_inner(left_on=l_df['id'], right_on=r_df['id'],
                                         left_fields=(l_df['id'], l_df['vals']),
                                         right_fields=(r_df['id'], r_df['vals']))
-                print(results)
 
                 expected = ['', '', '', 'bb1', 'bb2', 'ccc1', 'ccc2', 'dddd1', '', 'ffffff1', 'ggggggg1']
                 # self.assertListEqual(expected, r_df['vals'].data[:])
@@ -1130,7 +1125,7 @@ class TestSessionImporters(unittest.TestCase):
     def test_fixed_string_importer(self):
         bio = BytesIO()
         with session.Session() as s:
-            dst=s.open_dataset(bio,'r+','dst')
+            dst = s.open_dataset(bio, 'r+', 'dst')
             hf=dst.create_dataframe('hf')
             values = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
                       '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
@@ -1165,7 +1160,7 @@ class TestSessionImporters(unittest.TestCase):
         from datetime import datetime
         bio = BytesIO()
         with session.Session() as s:
-            dst = s.open_dataset(bio,'r+','dst')
+            dst = s.open_dataset(bio,'r+', 'dst')
             hf = dst.create_dataframe('hf')
             values = ['2020-05-10', '2020-05-12', '2020-05-12', '2020-05-15']
             im = fields.DateImporter(s, hf, 'x')

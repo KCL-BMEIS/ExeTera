@@ -15,12 +15,26 @@ import pandas as pd
 from exetera.core.abstract_types import Dataset, DataFrame
 from exetera.core import fields as fld
 from exetera.core import operations as ops
+from exetera.core import validation as val
 import h5py
 
 
 class HDF5DataFrame(DataFrame):
     """
-    DataFrame that utilising HDF5 file as storage.
+    DataFrame is the means which which you interact with an ExeTera datastore. These are created
+    and loaded through `Dataset.create_dataframe`, and other methods, rather than being constructed
+    directly.
+
+    DataFrames closely resemble Pandas DataFrames, but with a number of key differences:
+    1. Instead of Series, DataFrames are composed of Field objects
+    2. DataFrames can store fields of differing lengths, although all fields must be of the same
+    length when performing certain operations such as merges.
+    3. ExeTera DataFrames do not (yet) have the ability to create filtered views onto an underlying
+    DataFrame, although this functionality will be added in upcoming releases
+
+    For a detailed explanation of DataFrame along with examples of its use, please refer to the
+    wiki documentation at
+    https://github.com/KCL-BMEIS/ExeTera/wiki/DataFrame-API
     """
     def __init__(self,
                  dataset: Dataset,
@@ -69,7 +83,8 @@ class HDF5DataFrame(DataFrame):
         """
         return self._h5group
 
-    def add(self, field):
+    def add(self,
+            field: fld.Field):
         """
         Add a field to this dataframe as well as the HDF5 Group.
 
@@ -89,7 +104,8 @@ class HDF5DataFrame(DataFrame):
         del self._columns[name]
         del self._h5group[name]
 
-    def create_group(self, name):
+    def create_group(self,
+                     name: str):
         """
         Create a group object in HDF5 file for field to use. Please note, this function is for
         backwards compatibility with older scripts and should not be used in the general case.
@@ -100,9 +116,14 @@ class HDF5DataFrame(DataFrame):
         self._h5group.create_group(name)
         return self._h5group[name]
 
-    def create_indexed_string(self, name, timestamp=None, chunksize=None):
+    def create_indexed_string(self,
+                              name: str,
+                              timestamp: Optional[str] = None,
+                              chunksize: Optional[int] = None):
         """
         Create a indexed string type field.
+        Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#indexedstringfield for
+        a detailed description of indexed string fields
         """
         fld.indexed_string_field_constructor(self._dataset.session, self, name,
                                              timestamp, chunksize)
@@ -111,9 +132,15 @@ class HDF5DataFrame(DataFrame):
         self._columns[name] = field
         return self._columns[name]
 
-    def create_fixed_string(self, name, length, timestamp=None, chunksize=None):
+    def create_fixed_string(self,
+                            name: str,
+                            length: int,
+                            timestamp: Optional[str] = None,
+                            chunksize: Optional[int] = None):
         """
         Create a fixed string type field.
+        Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#fixedstringfield for
+        a detailed description of fixed string fields
         """
         fld.fixed_string_field_constructor(self._dataset.session, self, name,
                                            length, timestamp, chunksize)
@@ -122,9 +149,15 @@ class HDF5DataFrame(DataFrame):
         self._columns[name] = field
         return self._columns[name]
 
-    def create_numeric(self, name, nformat, timestamp=None, chunksize=None):
+    def create_numeric(self,
+                       name: str,
+                       nformat: int,
+                       timestamp: Optional[str] = None,
+                       chunksize: Optional[int] = None):
         """
         Create a numeric type field.
+        Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#numericfield for
+        a detailed description of numeric fields
         """
         fld.numeric_field_constructor(self._dataset.session, self, name,
                                       nformat, timestamp, chunksize)
@@ -133,9 +166,16 @@ class HDF5DataFrame(DataFrame):
         self._columns[name] = field
         return self._columns[name]
 
-    def create_categorical(self, name, nformat, key, timestamp=None, chunksize=None):
+    def create_categorical(self,
+                           name: str,
+                           nformat: int,
+                           key: dict,
+                           timestamp: Optional[str] = None,
+                           chunksize: Optional[int] = None):
         """
         Create a categorical type field.
+        Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#categoricalfield for
+        a detailed description of indexed string fields
         """
         fld.categorical_field_constructor(self._dataset.session, self, name, nformat, key,
                                           timestamp, chunksize)
@@ -144,9 +184,14 @@ class HDF5DataFrame(DataFrame):
         self._columns[name] = field
         return self._columns[name]
 
-    def create_timestamp(self, name, timestamp=None, chunksize=None):
+    def create_timestamp(self,
+                         name: str,
+                         timestamp: Optional[str] = None,
+                         chunksize: Optional[int] = None):
         """
         Create a timestamp type field.
+        Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#timestampfield for
+        a detailed description of timestamp fields
         """
         fld.timestamp_field_constructor(self._dataset.session, self, name,
                                         timestamp, chunksize)
@@ -159,7 +204,9 @@ class HDF5DataFrame(DataFrame):
         """
         check if dataframe contains a field, by the field name
 
-        :param name: the name of the field to check,return a bool
+        :param name: the name of the field to check
+        :return: A boolean value indicating whether this DataFrame contains a Field with the
+        name in question
         """
         if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
@@ -200,17 +247,6 @@ class HDF5DataFrame(DataFrame):
         :param name: The name of field to get.
         """
         return self.__getitem__(name)
-
-    # def get_name(self, field):
-    #     """
-    #     Get the name of the field in dataframe.
-    #     """
-    #     if not isinstance(field, fld.Field):
-    #         raise TypeError("The field argument must be a Field object.")
-    #     for name, v in self._columns.items():
-    #         if id(field) == id(v):
-    #             return name
-    #     return None
 
     def __setitem__(self, name, field):
         if not isinstance(name, str):
@@ -349,27 +385,114 @@ def move(field: fld.Field, dest_df: DataFrame, name: str):
 def merge(left: DataFrame,
           right: DataFrame,
           dest: DataFrame,
-          left_on: Union[str, fld.Field],
-          right_on: Union[str, fld.Field],
+          left_on: Union[Tuple[Union[str, fld.Field]], str, fld.Field],
+          right_on: Union[Tuple[Union[str, fld.Field]], str, fld.Field],
           left_fields: Optional[Sequence[str]] = None,
           right_fields: Optional[Sequence[str]] = None,
           left_suffix: str = '_l',
           right_suffix: str = '_r',
           how='left'):
+    """
+    Merge 'left' and 'right' DataFrames into a destination dataset. The merge is a database-style
+    join operation, in any of the following modes ("left", "right", "inner", "outer"). This
+    method closely follows the Pandas 'merge' functionality.
 
-    left_on_ = left[left_on] if isinstance(left_on, str) else left_on
-    right_on_ = right[right_on] if isinstance(right_on, str) else right_on
-    if len(left_on_.data) < (2 << 30) and len(right_on_.data) < (2 << 30):
+    The join is performed using the fields specified by 'left_on' and 'right_on'; these can either
+    be strings or fields; if they strings then they refer to fields that must exist in the
+    corresponding dataframe.
+
+    You can optionally set 'left_fields' and / or 'right_fields' if you want to have only a subset
+    of fields joined from the left and right dataframes. If you don't want any fields to be joined
+    from a given dataframe, you can pass an empty list.
+
+    Fields are written to the destination dataframe. If the field names clash, they will get
+    appended with the strings specified in 'left_suffix' and 'right_suffix' respectively.
+
+    :params left: The left dataframe
+    :params right: The right dataframe
+    :left_on: The field corresponding to the left key used to perform the join. This is either the
+    the name of the field, or a field object. If it is a field object, it can be from another
+    dataframe but it must be the same length as the fields being joined. This can also be a tuple
+    of such values when performing joins on compound keys
+    :right_on: The field corresponding to the right key used to perform the join. This is either
+    the name of the field, or a field object. If it is a field object, it can be from another
+    dataframe but it must be the same length as the fields being joined. This can also be a tuple
+    of such values when performing joins on compound keys
+    :left_fields: Optional parameter listing which fields are to be joined from the left table. If
+    this is not set, all fields from the left table are joined
+    :right_fields: Optional parameter listing which fields are to be joined from the right table.
+    If this is not set, all fields from the right table are joined
+    :left_suffix: A string to be appended to fields from the left table if they clash with fields
+    from the right table.
+    :right_suffix: A string to be appended to fields from the right table if they clash with fields
+    from the left table.
+    :how: Optional parameter specifying the merge mode. It must be one of ('left', 'right',
+    'inner', 'outer' or 'cross). If not set, the 'left' join is performed.
+
+    """
+
+    if not isinstance(left, DataFrame):
+        raise ValueError("'left' must be a DataFrame but is of type '{}'".format(type(left)))
+
+    if not isinstance(right, DataFrame):
+        raise ValueError("'right' must be a DataFrame but is of type '{}'".format(type(right)))
+
+    supported_modes = ('left', 'right', 'inner', 'outer', 'cross')
+    if how not in supported_modes:
+        raise ValueError("'how' must be one of {} but is {}".format(supported_modes, how))
+
+    # check that left_on and right_on are mutually compatible
+    val.validate_key_field_consistency('left_on', 'right_on', left_on, right_on)
+
+    # check that fields are of the correct field type
+    left_on_fields = val.validate_and_get_key_fields('left_on', left, left_on)
+    right_on_fields = val.validate_and_get_key_fields('right_on', right, right_on)
+
+    # check the consistency of field lengths
+    left_lens = val.validate_key_lengths('left_on', left, left_on_fields)
+    right_lens = val.validate_key_lengths('right_on', right, right_on_fields)
+
+    # check consistency of fields with key lengths
+    val.validate_field_lengths('left', left_lens, left, left_fields)
+    val.validate_field_lengths('right', right_lens, right, right_fields)
+
+    left_len = list(left_lens)[0]
+    right_len = list(right_lens)[0]
+
+    if left_len < (2 << 30) and right_len < (2 << 30):
         index_dtype = np.int32
     else:
         index_dtype = np.int64
 
+    left_df_dict = {}
+    right_df_dict = {}
+    left_on_keys = []
+    right_on_keys = []
+    if isinstance(left_on_fields, tuple):
+        for i_f, f in enumerate(left_on_fields):
+            key = 'l_k_{}'.format(i_f)
+            left_df_dict[key] = f.data[:]
+            left_on_keys.append(key)
+        l_key = tuple(left_on_keys)
+        for i_f, f in enumerate(right_on_fields):
+            key = 'r_k_{}'.format(i_f)
+            right_df_dict[key] = f.data[:]
+            right_on_keys.append(key)
+        r_key = tuple(right_on_keys)
+    else:
+        l_key = 'l_k'
+        left_df_dict[l_key] = left_on_fields.data[:]
+        r_key = 'r_k'
+        right_df_dict[r_key] = right_on_fields.data[:]
+
+    left_df_dict['l_i'] = np.arange(left_len, dtype=index_dtype)
+    right_df_dict['r_i'] = np.arange(right_len, dtype=index_dtype)
     # create the merging dataframes, using only the fields involved in the merge
-    l_df = pd.DataFrame({'l_k': left_on_.data[:],
-                         'l_i': np.arange(len(left_on_.data), dtype=index_dtype)})
-    r_df = pd.DataFrame({'r_k': right_on_.data[:],
-                         'r_i': np.arange(len(right_on_.data), dtype=index_dtype)})
-    df = pd.merge(left=l_df, right=r_df, left_on='l_k', right_on='r_k', how=how)
+    l_df = pd.DataFrame(left_df_dict)
+    r_df = pd.DataFrame(right_df_dict)
+
+    df = pd.merge(left=l_df, right=r_df, left_on=l_key, right_on=r_key, how=how)
+
     l_to_d_map = df['l_i'].to_numpy(dtype=np.int32)
     l_to_d_filt = np.logical_not(df['l_i'].isnull()).to_numpy()
     r_to_d_map = df['r_i'].to_numpy(dtype=np.int32)
@@ -378,22 +501,6 @@ def merge(left: DataFrame,
     # perform the mapping
     left_fields_ = left.keys() if left_fields is None else left_fields
     right_fields_ = right.keys() if right_fields is None else right_fields
-    for f in right_fields_:
-        dest_f = f
-        if f in left_fields_:
-            dest_f += right_suffix
-        r = right[f]
-        d = r.create_like(dest, dest_f)
-        if r.indexed:
-            i, v = ops.safe_map_indexed_values(r.indices[:], r.values[:], r_to_d_map, r_to_d_filt)
-            d.indices.write(i)
-            d.values.write(v)
-        else:
-            v = ops.safe_map_values(r.data[:], r_to_d_map, r_to_d_filt)
-            d.data.write(v)
-    if np.all(r_to_d_filt) == False:
-        d = dest.create_numeric('valid'+right_suffix, 'bool')
-        d.data.write(r_to_d_filt)
 
     for f in left_fields_:
         dest_f = f
@@ -411,3 +518,20 @@ def merge(left: DataFrame,
     if np.all(l_to_d_filt) == False:
         d = dest.create_numeric('valid'+left_suffix, 'bool')
         d.data.write(l_to_d_filt)
+
+    for f in right_fields_:
+        dest_f = f
+        if f in left_fields_:
+            dest_f += right_suffix
+        r = right[f]
+        d = r.create_like(dest, dest_f)
+        if r.indexed:
+            i, v = ops.safe_map_indexed_values(r.indices[:], r.values[:], r_to_d_map, r_to_d_filt)
+            d.indices.write(i)
+            d.values.write(v)
+        else:
+            v = ops.safe_map_values(r.data[:], r_to_d_map, r_to_d_filt)
+            d.data.write(v)
+    if np.all(r_to_d_filt) == False:
+        d = dest.create_numeric('valid'+right_suffix, 'bool')
+        d.data.write(r_to_d_filt)
