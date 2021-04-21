@@ -80,7 +80,6 @@ class TestDataSet(unittest.TestCase):
 
             ds2 = s.open_dataset(bio2, 'r+', 'ds2')
             copy(df, ds2, 'df2')
-            print(type(ds2['df2']))
             self.assertTrue(isinstance(ds2['df2'], DataFrame))
             self.assertTrue(isinstance(ds2['df2']['num'], fields.Field))
 

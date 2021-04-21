@@ -127,16 +127,12 @@ class TestDataFrame(unittest.TestCase):
             a.data.clear()
             a.data.write(strs)
 
-            # print(strs[:10])
             self.assertListEqual(
                 ['xxxy', 'xxy', 'xxxy', 'y', 'xy', 'y', 'xxxy', 'xxxy', 'xy', 'y'], strs[:10])
-            # print(a.indices[:10])
             self.assertListEqual([0, 4, 7, 11, 12, 14, 15, 19, 23, 25],
                                  a.indices[:10].tolist())
-            # print(a.values[:10])
             self.assertListEqual(
                 [120, 120, 120, 121, 120, 120, 121, 120, 120, 120], a.values[:10].tolist())
-            # print(a.data[:10])
             self.assertListEqual(
                 ['xxxy', 'xxy', 'xxxy', 'y', 'xy', 'y', 'xxxy', 'xxxy', 'xy', 'y'], a.data[:10])
 
@@ -301,7 +297,6 @@ class TestDataFrameMerge(unittest.TestCase):
             rdf.create_numeric('r_id', 'int32').data.write(r_id)
             ddf = dst.create_dataframe('ddf')
             dataframe.merge(ldf, rdf, ddf, 'l_id', 'r_id', how='right')
-            print(ddf.keys())
             self.assertEqual(expected, ddf['l_vals'].data[:])
             valid_if_equal = (ddf['l_id'].data[:] == ddf['r_id'].data[:]) | \
                              np.logical_not(ddf['valid_l'].data[:])

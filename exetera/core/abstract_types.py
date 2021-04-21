@@ -436,10 +436,6 @@ class AbstractSession(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def process(self, inputs, outputs, predicate):
-        raise NotImplementedError()
-
-    @abstractmethod
     def get_index(self, target, foreign_key, destination=None):
         raise NotImplementedError()
 
