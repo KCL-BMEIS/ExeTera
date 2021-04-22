@@ -117,7 +117,6 @@ class TestDataSet(unittest.TestCase):
             df1.create_timestamp('t_foo').data.write(tcontents1)
 
             df2 = ds.create_dataframe('df2', dataframe=df1)
-
             self.assertListEqual(iscontents1, df1['is_foo'].data[:])
             self.assertListEqual(iscontents1, df2['is_foo'].data[:])
             df2['is_foo'].data.clear()
