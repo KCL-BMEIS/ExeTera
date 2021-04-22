@@ -248,9 +248,9 @@ class DataFrame(ABC):
     def __len__(self):
         raise NotImplementedError()
 
-    @abstractmethod
-    def get_spans(self):
-        raise NotImplementedError()
+    # @abstractmethod
+    # def get_spans(self):
+    #     raise NotImplementedError()
 
     @abstractmethod
     def apply_filter(self, filter_to_apply, ddf=None):
