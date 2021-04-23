@@ -314,7 +314,29 @@ class HDF5DataFrame(DataFrame):
 
     def rename(self,
                field: Union[str, Mapping[str, str]],
-               field_to: Optional[str] = None):
+               field_to: Optional[str] = None) -> None:
+        """
+        Rename provides you with the means to rename fields within a dataframe. You can specify either
+        a single field to be renamed or you can provide a dictionary with a set of fields to be
+        renamed.
+
+        ```
+        # rename a single field
+        df.rename('a', 'b')
+
+        # rename multiple fields
+        df.rename({'a': 'b', 'b': 'c', 'c': 'a'})
+        ```
+
+        Field renaming can fail if the resulting set of renamed fields would have name clashes. If
+        this is the case, none of the rename operations go ahead and the dataframe remains unmodified.
+        :param field: Either a string or a dictionary of name pairs, each of which is the existing
+        field name and the destination field name
+        :param field_to: Optional parameter containing a string, if `field` is a string. If 'field'
+        is a dictionary, parameter should not be set.
+        Field references remain valid after this operation and reflect their renaming.
+        :return: None
+        """
 
         if not isinstance(field, (str, dict)):
             raise ValueError("'field' must be of type str or dict but is {}").format(type(field))

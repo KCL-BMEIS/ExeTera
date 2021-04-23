@@ -39,30 +39,55 @@ class HDF5Field(Field):
 
     @property
     def valid(self):
+        """
+        Returns whether the field is a valid field object. Fields can become invalid as a result
+        of certain operations, such as a field being moved from one dataframe to another. A field
+        that is invalid with throw exceptions if any other operation is performed on them.
+        """
         return self._valid_reference
 
     @property
     def name(self):
+        """
+        The name of the field within a dataframe, if the field belongs to a dataframe
+        """
         self._ensure_valid()
         return self._field.name.split('/')[-1]
 
     @property
     def dataframe(self):
+        """
+        The owning dataframe of this field, or None if the field is now owned by a dataframe
+        """
         self._ensure_valid()
         return self._dataframe
 
     @property
     def timestamp(self):
+        """
+        The timestamp representing the field creation time. This is the time at which the data
+        for this field was added to the dataset, rather than the point at which the field wrapper
+        was created.
+        """
         self._ensure_valid()
         return self._field.attrs['timestamp']
 
     @property
     def chunksize(self):
+        """
+        The chunksize for the field. This is not generally required for users, and may be
+        ignored depending on the storage medium.
+        """
         self._ensure_valid()
         return self._field.attrs['chunksize']
 
     @property
     def indexed(self):
+        """
+        Whether the field is an indexed field or not. Indexed fields store their data internally
+        as index and value arrays for efficiency, as well as making it accessible through the data
+        property.
+        """
         self._ensure_valid()
         return False
 
@@ -1071,11 +1096,19 @@ class IndexedStringField(HDF5Field):
         self._value_wrapper = None
 
     def writeable(self):
+        """
+        Indicates whether this field permits write operations. By default, dataframe fields
+        are read-only in order to protect accidental writes to datasets
+        """
         self._ensure_valid()
         return IndexedStringField(self._session, self._field, self._dataframe,
                                   write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
+        """
+        Create an empty field of the same type as this field.
+        
+        """
         self._ensure_valid()
         return FieldDataOps.indexed_string_create_like(self, group, name, timestamp)
 
