@@ -301,17 +301,6 @@ class HDF5DataFrame(DataFrame):
     def __len__(self):
         return len(self._columns)
 
-    # def get_spans(self):
-    #     """
-    #     Return the name and spans of each field as a dictionary.
-    #
-    #     :returns: A dictionary of (field_name, field_spans).
-    #     """
-    #     spans = {}
-    #     for name, field in self._columns.items():
-    #         spans[name] = field.get_spans()
-    #     return spans
-
     def rename(self,
                field: Union[str, Mapping[str, str]],
                field_to: Optional[str] = None) -> None:
@@ -398,7 +387,6 @@ class HDF5DataFrame(DataFrame):
                 name = final_renames[k]
                 f = intermediate_columns[k]
                 self._h5group.move(k, name)
-                # del self._columns[k]
                 final_columns[name] = f
             else:
                 final_columns[k] = f

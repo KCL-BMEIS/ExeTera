@@ -1107,7 +1107,7 @@ class IndexedStringField(HDF5Field):
     def create_like(self, group=None, name=None, timestamp=None):
         """
         Create an empty field of the same type as this field.
-        
+
         """
         self._ensure_valid()
         return FieldDataOps.indexed_string_create_like(self, group, name, timestamp)
