@@ -8,7 +8,7 @@ from exetera.core import persistence as per
 from exetera.core import dataframe
 
 
-class TestDataFrame(unittest.TestCase):
+class TestDataFrameCreateFields(unittest.TestCase):
 
     def test_dataframe_init(self):
         bio = BytesIO()
@@ -229,6 +229,111 @@ class TestDataFrame(unittest.TestCase):
             df.apply_filter(filter_to_apply, ddf)
             self.assertEqual([5, 4, 1], ddf['numf'].data[:].tolist())
             self.assertEqual([b'e', b'd', b'a'], ddf['fst'].data[:].tolist())
+
+
+class TestDataFrameRename(unittest.TestCase):
+
+    def test_rename_1(self):
+
+        a = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
+        b = np.array([8, 7, 6, 5, 4, 3, 2, 1], dtype='int32')
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            fa = df.create_numeric('fa', 'int32').data.write(a)
+            fb = df.create_numeric('fb', 'int32').data.write(b)
+            df.rename('fa', 'fc')
+            self.assertFalse('fa' in df)
+            self.assertTrue('fb' in df)
+            self.assertTrue('fc' in df)
+
+    def test_rename_should_not_clash(self):
+        a = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
+        b = np.array([8, 7, 6, 5, 4, 3, 2, 1], dtype='int32')
+        c = np.array([8, 1, 7, 2, 6, 3, 5, 4], dtype='int32')
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            fa = df.create_numeric('fa', 'int32').data.write(a)
+            fb = df.create_numeric('fb', 'int32').data.write(b)
+            fc = df.create_numeric('fc', 'int32').data.write(c)
+            fa = df['fa']
+            df.rename({'fa': 'fb', 'fb': 'fc', 'fc': 'fa'})
+            self.assertListEqual(['fb', 'fc', 'fa'], list(df.keys()))
+            self.assertEqual('fb', fa.name)
+            self.assertTrue('fa' in df)
+            self.assertTrue('fb' in df)
+            self.assertTrue('fc' in df)
+            self.assertEqual('fa', df['fa'].name)
+            self.assertEqual('fb', df['fb'].name)
+            self.assertEqual('fc', df['fc'].name)
+
+    def test_rename_should_clash(self):
+        a = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
+        b = np.array([8, 7, 6, 5, 4, 3, 2, 1], dtype='int32')
+        c = np.array([8, 1, 7, 2, 6, 3, 5, 4], dtype='int32')
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            fa = df.create_numeric('fa', 'int32').data.write(a)
+            fb = df.create_numeric('fb', 'int32').data.write(b)
+            fc = df.create_numeric('fc', 'int32').data.write(c)
+            fa = df['fa']
+            with self.assertRaises(ValueError):
+                df.rename({'fa': 'fc'})
+            self.assertListEqual(['fa', 'fb', 'fc'], list(df.keys()))
+            self.assertTrue('fa' in df)
+            self.assertTrue('fb' in df)
+            self.assertTrue('fc' in df)
+            self.assertEqual('fa', df['fa'].name)
+            self.assertEqual('fb', df['fb'].name)
+            self.assertEqual('fc', df['fc'].name)
+
+class TestDataFrameCopyMove(unittest.TestCase):
+
+    def test_move_same_dataframe(self):
+
+        sa = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
+        sb = np.array([8, 7, 6, 5, 4, 3, 2, 1], dtype='int32')
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df1 = ds.create_dataframe('df1')
+            df1.create_numeric('fa', 'int32').data.write(sa)
+            df1.create_numeric('fb', 'int32').data.write(sb)
+            fa = df1['fa']
+            fc = dataframe.move(df1['fa'], df1, 'fc')
+            print(fa.name, fa.data[:])
+            self.assertEqual('fc', fc.name)
+            self.assertEqual('fb', df1['fb'].name)
+
+    def test_move_different_dataframe(self):
+
+        sa = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
+        sb = np.array([8, 7, 6, 5, 4, 3, 2, 1], dtype='int32')
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df1 = ds.create_dataframe('df1')
+            df1.create_numeric('fa', 'int32').data.write(sa)
+            df1.create_numeric('fb', 'int32').data.write(sb)
+            df2 = ds.create_dataframe('df2')
+            df2.create_numeric('fb', 'int32').data.write(sb)
+            fa = df1['fa']
+            fc = dataframe.move(df1['fa'], df2, 'fc')
+            with self.assertRaises(ValueError, msg="This field no longer refers to a valid "
+                                                   "underlying field object"):
+                _ = fa.name
+            self.assertEqual('fc', fc.name)
+            self.assertEqual('fb', df1['fb'].name)
 
 
 class TestDataFrameApplyFilter(unittest.TestCase):

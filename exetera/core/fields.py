@@ -22,7 +22,7 @@ from exetera.core import operations as ops
 from exetera.core import validation as val
 
 class HDF5Field(Field):
-    def __init__(self, session, group, dataframe, name=None, write_enabled=False):
+    def __init__(self, session, group, dataframe, write_enabled=False):
         super().__init__()
 
         # if name is None:
@@ -31,30 +31,64 @@ class HDF5Field(Field):
         #     field = group[name]
         self._session = session
         self._field = group
-        self._name = name
         self._fieldtype = self._field.attrs['fieldtype']
         self._dataframe = dataframe
         self._write_enabled = write_enabled
         self._value_wrapper = None
+        self._valid_reference = True
+
+    @property
+    def valid(self):
+        """
+        Returns whether the field is a valid field object. Fields can become invalid as a result
+        of certain operations, such as a field being moved from one dataframe to another. A field
+        that is invalid with throw exceptions if any other operation is performed on them.
+        """
+        return self._valid_reference
 
     @property
     def name(self):
-        return self._name
+        """
+        The name of the field within a dataframe, if the field belongs to a dataframe
+        """
+        self._ensure_valid()
+        return self._field.name.split('/')[-1]
 
     @property
     def dataframe(self):
+        """
+        The owning dataframe of this field, or None if the field is now owned by a dataframe
+        """
+        self._ensure_valid()
         return self._dataframe
 
     @property
     def timestamp(self):
+        """
+        The timestamp representing the field creation time. This is the time at which the data
+        for this field was added to the dataset, rather than the point at which the field wrapper
+        was created.
+        """
+        self._ensure_valid()
         return self._field.attrs['timestamp']
 
     @property
     def chunksize(self):
+        """
+        The chunksize for the field. This is not generally required for users, and may be
+        ignored depending on the storage medium.
+        """
+        self._ensure_valid()
         return self._field.attrs['chunksize']
 
     @property
     def indexed(self):
+        """
+        Whether the field is an indexed field or not. Indexed fields store their data internally
+        as index and value arrays for efficiency, as well as making it accessible through the data
+        property.
+        """
+        self._ensure_valid()
         return False
 
     def __bool__(self):
@@ -62,6 +96,7 @@ class HDF5Field(Field):
         #   if f:
         # rather than
         #   if f is not None:
+        self._ensure_valid()
         return True
 
     def get_spans(self):
@@ -73,6 +108,10 @@ class HDF5Field(Field):
     def apply_index(self, index_to_apply, dstfld=None):
         raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
 
+    def _ensure_valid(self):
+        if not self._valid_reference:
+            raise ValueError("This field no longer refers to a valid underlying field object")
+
 
 class MemoryField(Field):
 
@@ -81,6 +120,10 @@ class MemoryField(Field):
         self._session = session
         self._write_enabled = True
         self._value_wrapper = None
+
+    @property
+    def valid(self):
+        return True
 
     @property
     def name(self):
@@ -1044,8 +1087,8 @@ def timestamp_field_constructor(session, group, name, timestamp=None, chunksize=
 
 
 class IndexedStringField(HDF5Field):
-    def __init__(self, session, group, dataframe, name=None, write_enabled=False):
-        super().__init__(session, group, dataframe, name=name, write_enabled=write_enabled)
+    def __init__(self, session, group, dataframe, write_enabled=False):
+        super().__init__(session, group, dataframe, write_enabled=write_enabled)
         self._session = session
         self._dataframe = None
         self._data_wrapper = None
@@ -1053,18 +1096,30 @@ class IndexedStringField(HDF5Field):
         self._value_wrapper = None
 
     def writeable(self):
-        return IndexedStringField(self._session, self._field, self._dataframe, self._name,
+        """
+        Indicates whether this field permits write operations. By default, dataframe fields
+        are read-only in order to protect accidental writes to datasets
+        """
+        self._ensure_valid()
+        return IndexedStringField(self._session, self._field, self._dataframe,
                                   write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
+        """
+        Create an empty field of the same type as this field.
+
+        """
+        self._ensure_valid()
         return FieldDataOps.indexed_string_create_like(self, group, name, timestamp)
 
     @property
     def indexed(self):
+        self._ensure_valid()
         return True
 
     @property
     def data(self):
+        self._ensure_valid()
         if self._data_wrapper is None:
 
             wrapper =\
@@ -1073,6 +1128,7 @@ class IndexedStringField(HDF5Field):
         return self._data_wrapper
 
     def is_sorted(self):
+        self._ensure_valid()
         if len(self) < 2:
             return True
 
@@ -1088,6 +1144,7 @@ class IndexedStringField(HDF5Field):
 
     @property
     def indices(self):
+        self._ensure_valid()
         if self._index_wrapper is None:
             wrapper = WriteableFieldArray if self._write_enabled else ReadOnlyFieldArray
             self._index_wrapper = wrapper(self._field, 'index')
@@ -1095,15 +1152,18 @@ class IndexedStringField(HDF5Field):
 
     @property
     def values(self):
+        self._ensure_valid()
         if self._value_wrapper is None:
             wrapper = WriteableFieldArray if self._write_enabled else ReadOnlyFieldArray
             self._value_wrapper = wrapper(self._field, 'values')
         return self._value_wrapper
 
     def __len__(self):
+        self._ensure_valid()
         return len(self.data)
 
     def get_spans(self):
+        self._ensure_valid()
         return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
 
     def apply_filter(self, filter_to_apply, target=None, in_place=False):
@@ -1120,6 +1180,7 @@ class IndexedStringField(HDF5Field):
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
+        self._ensure_valid()
         return FieldDataOps.apply_filter_to_indexed_field(self, filter_to_apply, target, in_place)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
@@ -1136,24 +1197,29 @@ class IndexedStringField(HDF5Field):
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
+        self._ensure_valid()
         return FieldDataOps.apply_index_to_indexed_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
 
 class FixedStringField(HDF5Field):
-    def __init__(self, session, group, dataframe, name=None, write_enabled=False):
-        super().__init__(session, group, dataframe, name=name, write_enabled=write_enabled)
+    def __init__(self, session, group, dataframe, write_enabled=False):
+        super().__init__(session, group, dataframe, write_enabled=write_enabled)
         # TODO: caution; we may want to consider the issues with long-lived field instances getting
         # out of sync with their stored counterparts. Maybe a revision number of the stored field
         # is required that we can check to see if we are out of date. That or just make this a
@@ -1161,14 +1227,17 @@ class FixedStringField(HDF5Field):
         self._length = self._field.attrs['strlen']
 
     def writeable(self):
-        return FixedStringField(self._session, self._field, self._dataframe, self._name,
+        self._ensure_valid()
+        return FixedStringField(self._session, self._field, self._dataframe,
                                 write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
+        self._ensure_valid()
         return FieldDataOps.fixed_string_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
+        self._ensure_valid()
         if self._value_wrapper is None:
             if self._write_enabled:
                 self._value_wrapper = WriteableFieldArray(self._field, 'values')
@@ -1177,15 +1246,18 @@ class FixedStringField(HDF5Field):
         return self._value_wrapper
 
     def is_sorted(self):
+        self._ensure_valid()
         if len(self) < 2:
             return True
         data = self.data[:]
         return np.all(np.char.compare_chararrays(data[:-1], data[1:], "<=", False))
 
     def __len__(self):
+        self._ensure_valid()
         return len(self.data)
 
     def get_spans(self):
+        self._ensure_valid()
         return ops.get_spans_for_field(self.data[:])
 
     def apply_filter(self, filter_to_apply, target=None, in_place=False):
@@ -1202,6 +1274,7 @@ class FixedStringField(HDF5Field):
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
+        self._ensure_valid()
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
@@ -1218,34 +1291,42 @@ class FixedStringField(HDF5Field):
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
+        self._ensure_valid()
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
 
 class NumericField(HDF5Field):
-    def __init__(self, session, group, dataframe, name, write_enabled=False):
-        super().__init__(session, group, dataframe, name=name, write_enabled=write_enabled)
+    def __init__(self, session, group, dataframe, write_enabled=False):
+        super().__init__(session, group, dataframe, write_enabled=write_enabled)
         self._nformat = self._field.attrs['nformat']
 
     def writeable(self):
-        return NumericField(self._session, self._field, None, self._name, write_enabled=True)
+        self._ensure_valid()
+        return NumericField(self._session, self._field, None, write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
+        self._ensure_valid()
         return FieldDataOps.numeric_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
+        self._ensure_valid()
         if self._value_wrapper is None:
             if self._write_enabled:
                 self._value_wrapper = WriteableFieldArray(self._field, 'values')
@@ -1254,15 +1335,18 @@ class NumericField(HDF5Field):
         return self._value_wrapper
 
     def is_sorted(self):
+        self._ensure_valid()
         if len(self) < 2:
             return True
         data = self.data[:]
         return np.all(data[:-1] <= data[1:])
 
     def __len__(self):
+        self._ensure_valid()
         return len(self.data)
 
     def get_spans(self):
+        self._ensure_valid()
         return ops.get_spans_for_field(self.data[:])
 
     def apply_filter(self, filter_to_apply, target=None, in_place=False):
@@ -1279,6 +1363,7 @@ class NumericField(HDF5Field):
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
+        self._ensure_valid()
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
@@ -1295,113 +1380,147 @@ class NumericField(HDF5Field):
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
+        self._ensure_valid()
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def __add__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_add(self._session, self, second)
 
     def __radd__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_add(self._session, first, self)
 
     def __sub__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_sub(self._session, self, second)
 
     def __rsub__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_sub(self._session, first, self)
 
     def __mul__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_mul(self._session, self, second)
 
     def __rmul__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_mul(self._session, first, self)
 
     def __truediv__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_truediv(self._session, self, second)
 
     def __rtruediv__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_truediv(self._session, first, self)
 
     def __floordiv__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_floordiv(self._session, self, second)
 
     def __rfloordiv__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_floordiv(self._session, first, self)
 
     def __mod__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_mod(self._session, self, second)
 
     def __rmod__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_mod(self._session, first, self)
 
     def __divmod__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_divmod(self._session, self, second)
 
     def __rdivmod__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_divmod(self._session, first, self)
 
     def __and__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_and(self._session, self, second)
 
     def __rand__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_and(self._session, first, self)
 
     def __xor__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_xor(self._session, self, second)
 
     def __rxor__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_xor(self._session, first, self)
 
     def __or__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_or(self._session, self, second)
 
     def __ror__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_or(self._session, first, self)
 
     def __lt__(self, value):
+        self._ensure_valid()
         return FieldDataOps.less_than(self._session, self, value)
 
     def __le__(self, value):
+        self._ensure_valid()
         return FieldDataOps.less_than_equal(self._session, self, value)
 
     def __eq__(self, value):
+        self._ensure_valid()
         return FieldDataOps.equal(self._session, self, value)
 
     def __ne__(self, value):
+        self._ensure_valid()
         return FieldDataOps.not_equal(self._session, self, value)
 
     def __gt__(self, value):
+        self._ensure_valid()
         return FieldDataOps.greater_than(self._session, self, value)
 
     def __ge__(self, value):
+        self._ensure_valid()
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
 
 class CategoricalField(HDF5Field):
-    def __init__(self, session, group, dataframe, name=None, write_enabled=False):
-        super().__init__(session, group, dataframe, name=name, write_enabled=write_enabled)
+    def __init__(self, session, group, dataframe, write_enabled=False):
+        super().__init__(session, group, dataframe, write_enabled=write_enabled)
         self._nformat = self._field.attrs['nformat'] if 'nformat' in self._field.attrs else 'int8'
 
     def writeable(self):
-        return CategoricalField(self._session, self._field, self._dataframe, self._name,
+        self._ensure_valid()
+        return CategoricalField(self._session, self._field, self._dataframe,
                                 write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
+        self._ensure_valid()
         return FieldDataOps.categorical_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
+        self._ensure_valid()
         if self._value_wrapper is None:
             if self._write_enabled:
                 self._value_wrapper = WriteableFieldArray(self._field, 'values')
@@ -1410,31 +1529,37 @@ class CategoricalField(HDF5Field):
         return self._value_wrapper
 
     def is_sorted(self):
+        self._ensure_valid()
         if len(self) < 2:
             return True
         data = self.data[:]
         return np.all(data[:-1] <= data[1:])
 
     def __len__(self):
+        self._ensure_valid()
         return len(self.data)
 
     def get_spans(self):
+        self._ensure_valid()
         return ops.get_spans_for_field(self.data[:])
 
     @property
     def nformat(self):
+        self._ensure_valid()
         return self._nformat
 
     # Note: key is presented as value: str, even though the dictionary must be presented
     # as str: value
     @property
     def keys(self):
+        self._ensure_valid()
         kv = self._field['key_values']
         kn = self._field['key_names']
         keys = dict(zip(kv, kn))
         return keys
 
     def remap(self, key_map, new_key):
+        self._ensure_valid()
         values = self.data[:]
         for k in key_map:
             values = np.where(values == k[0], k[1], values)
@@ -1456,6 +1581,7 @@ class CategoricalField(HDF5Field):
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
+        self._ensure_valid()
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
@@ -1472,52 +1598,66 @@ class CategoricalField(HDF5Field):
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
+        self._ensure_valid()
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def __lt__(self, value):
+        self._ensure_valid()
         return FieldDataOps.less_than(self._session, self, value)
 
     def __le__(self, value):
+        self._ensure_valid()
         return FieldDataOps.less_than_equal(self._session, self, value)
 
     def __eq__(self, value):
+        self._ensure_valid()
         return FieldDataOps.equal(self._session, self, value)
 
     def __ne__(self, value):
+        self._ensure_valid()
         return FieldDataOps.not_equal(self._session, self, value)
 
     def __gt__(self, value):
+        self._ensure_valid()
         return FieldDataOps.greater_than(self._session, self, value)
 
     def __ge__(self, value):
+        self._ensure_valid()
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
 
 class TimestampField(HDF5Field):
-    def __init__(self, session, group, dataframe, name=None, write_enabled=False):
-        super().__init__(session, group, dataframe, name=name, write_enabled=write_enabled)
+    def __init__(self, session, group, dataframe, write_enabled=False):
+        super().__init__(session, group, dataframe, write_enabled=write_enabled)
 
     def writeable(self):
-        return TimestampField(self._session, self._field, self._dataframe, self._name,
+        self._ensure_valid()
+        return TimestampField(self._session, self._field, self._dataframe,
                               write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
+        self._ensure_valid()
         return FieldDataOps.timestamp_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
+        self._ensure_valid()
         if self._value_wrapper is None:
             if self._write_enabled:
                 self._value_wrapper = WriteableFieldArray(self._field, 'values')
@@ -1526,15 +1666,18 @@ class TimestampField(HDF5Field):
         return self._value_wrapper
 
     def is_sorted(self):
+        self._ensure_valid()
         if len(self) < 2:
             return True
         data = self.data[:]
         return np.all(data[:-1] <= data[1:])
 
     def __len__(self):
+        self._ensure_valid()
         return len(self.data)
 
     def get_spans(self):
+        self._ensure_valid()
         return ops.get_spans_for_field(self.data[:])
 
     def apply_filter(self, filter_to_apply, target=None, in_place=False):
@@ -1551,6 +1694,7 @@ class TimestampField(HDF5Field):
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
+        self._ensure_valid()
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
@@ -1567,78 +1711,103 @@ class TimestampField(HDF5Field):
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
         case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
+        self._ensure_valid()
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def __add__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_add(self._session, self, second)
 
     def __radd__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_add(self._session, first, self)
 
     def __sub__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_sub(self._session, self, second)
 
     def __rsub__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_sub(self._session, first, self)
 
     def __mul__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_mul(self._session, self, second)
 
     def __rmul__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_mul(self._session, first, self)
 
     def __truediv__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_truediv(self._session, self, second)
 
     def __rtruediv__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_truediv(self._session, first, self)
 
     def __floordiv__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_floordiv(self._session, self, second)
 
     def __rfloordiv__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_floordiv(self._session, first, self)
 
     def __mod__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_mod(self._session, self, second)
 
     def __rmod__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_mod(self._session, first, self)
 
     def __divmod__(self, second):
+        self._ensure_valid()
         return FieldDataOps.numeric_divmod(self._session, self, second)
 
     def __rdivmod__(self, first):
+        self._ensure_valid()
         return FieldDataOps.numeric_divmod(self._session, first, self)
 
     def __lt__(self, value):
+        self._ensure_valid()
         return FieldDataOps.less_than(self._session, self, value)
 
     def __le__(self, value):
+        self._ensure_valid()
         return FieldDataOps.less_than_equal(self._session, self, value)
 
     def __eq__(self, value):
+        self._ensure_valid()
         return FieldDataOps.equal(self._session, self, value)
 
     def __ne__(self, value):
+        self._ensure_valid()
         return FieldDataOps.not_equal(self._session, self, value)
 
     def __gt__(self, value):
+        self._ensure_valid()
         return FieldDataOps.greater_than(self._session, self, value)
 
     def __ge__(self, value):
+        self._ensure_valid()
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
 
@@ -2356,7 +2525,7 @@ class FieldDataOps:
 
         if isinstance(group, h5py.Group):
             indexed_string_field_constructor(source._session, group, name, ts, source.chunksize)
-            return IndexedStringField(source._session, group[name], None, name, write_enabled=True)
+            return IndexedStringField(source._session, group[name], None, write_enabled=True)
         else:
             return group.create_indexed_string(name, ts, source.chunksize)
 
@@ -2373,7 +2542,7 @@ class FieldDataOps:
 
         if isinstance(group, h5py.Group):
             fixed_string_field_constructor(source._session, group, name, length, ts, source.chunksize)
-            return FixedStringField(source._session, group[name], None, name, write_enabled=True)
+            return FixedStringField(source._session, group[name], None, write_enabled=True)
         else:
             return group.create_fixed_string(name, length, ts)
 
@@ -2390,7 +2559,7 @@ class FieldDataOps:
 
         if isinstance(group, h5py.Group):
             numeric_field_constructor(source._session, group, name, nformat, ts, source.chunksize)
-            return NumericField(source._session, group[name], None, name, write_enabled=True)
+            return NumericField(source._session, group[name], None, write_enabled=True)
         else:
             return group.create_numeric(name, nformat, ts)
 
@@ -2411,7 +2580,7 @@ class FieldDataOps:
         if isinstance(group, h5py.Group):
             categorical_field_constructor(source._session, group, name, nformat, keys,
                                           ts, source.chunksize)
-            return CategoricalField(source._session, group[name], None, name, write_enabled=True)
+            return CategoricalField(source._session, group[name], None, write_enabled=True)
         else:
             return group.create_categorical(name, nformat, keys, ts)
 
@@ -2427,6 +2596,6 @@ class FieldDataOps:
 
         if isinstance(group, h5py.Group):
             timestamp_field_constructor(source._session, group, name, ts, source.chunksize)
-            return TimestampField(source._session, group[name], None, name, write_enabled=True)
+            return TimestampField(source._session, group[name], None, write_enabled=True)
         else:
             return group.create_timestamp(name, ts)

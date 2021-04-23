@@ -114,7 +114,7 @@ class TestCreateThenLoadBetweenSessionsNew(unittest.TestCase):
             df = src['df']
             f = df['foo']
             self.assertIsNotNone(f)
-            self.assertEqual('/df/foo', f.name)
+            self.assertEqual('foo', f.name)
 
             f2 = s.get(df['foo'])
 
@@ -1005,7 +1005,7 @@ class TestSessionFields(unittest.TestCase):
             np.random.seed(12345678)
             values = np.random.randint(low=0, high=1000000, size=100000000)
             fields.numeric_field_constructor(s, hf, 'a', 'int32')
-            a = fields.NumericField(s, hf['a'], None, 'a', write_enabled=True)
+            a = fields.NumericField(s, hf['a'], None, write_enabled=True)
             a.data.write(values)
 
             total = np.sum(a.data[:])
@@ -1027,7 +1027,7 @@ class TestSessionFields(unittest.TestCase):
             values = np.random.randint(low=0, high=3, size=100000000)
             fields.categorical_field_constructor(s, hf, 'a', 'int8',
                                                  {'foo': 0, 'bar': 1, 'boo': 2})
-            a = fields.CategoricalField(s, hf['a'], None, 'a', write_enabled=True)
+            a = fields.CategoricalField(s, hf['a'], None, write_enabled=True)
             a.data.write(values)
 
             total = np.sum(a.data[:])
@@ -1045,7 +1045,7 @@ class TestSessionFields(unittest.TestCase):
             values = np.random.randint(low=0, high=4, size=1000000)
             svalues = [b''.join([b'x'] * v) for v in values]
             fields.fixed_string_field_constructor(s, hf, 'a', 8)
-            a = fields.FixedStringField(s, hf['a'], None, 'a', write_enabled=True)
+            a = fields.FixedStringField(s, hf['a'], None, write_enabled=True)
             a.data.write(svalues)
 
             total = np.unique(a.data[:])
@@ -1069,7 +1069,7 @@ class TestSessionFields(unittest.TestCase):
             values = np.random.randint(low=0, high=4, size=200000)
             svalues = [''.join(['x'] * v) for v in values]
             fields.indexed_string_field_constructor(s, hf, 'a', 8)
-            a = fields.IndexedStringField(s, hf['a'], None, 'a', write_enabled=True)
+            a = fields.IndexedStringField(s, hf['a'], None, write_enabled=True)
             a.data.write(svalues)
 
             total = np.unique(a.data[:])
