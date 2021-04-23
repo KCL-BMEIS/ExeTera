@@ -314,7 +314,7 @@ class HDF5DataFrame(DataFrame):
 
     def rename(self,
                field: Union[str, Mapping[str, str]],
-               field_to: Optional[None] = None):
+               field_to: Optional[str] = None):
 
         if not isinstance(field, (str, dict)):
             raise ValueError("'field' must be of type str or dict but is {}").format(type(field))
@@ -331,7 +331,7 @@ class HDF5DataFrame(DataFrame):
 
         # check that we aren't creating ambiguity with the sequence of renames
         # --------------------------------------------------------------------
-        keys = set(dict_.keys())
+        keys = set(self._columns.keys())
 
         # first, remove the keys being renamed from the keyset
         for k in dict_.keys():

@@ -249,7 +249,7 @@ class TestDataFrameRename(unittest.TestCase):
             self.assertTrue('fb' in df)
             self.assertTrue('fc' in df)
 
-    def test_clashing_rename(self):
+    def test_rename_should_not_clash(self):
         a = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
         b = np.array([8, 7, 6, 5, 4, 3, 2, 1], dtype='int32')
         c = np.array([8, 1, 7, 2, 6, 3, 5, 4], dtype='int32')
@@ -272,6 +272,28 @@ class TestDataFrameRename(unittest.TestCase):
             self.assertEqual('fb', df['fb'].name)
             self.assertEqual('fc', df['fc'].name)
 
+    def test_rename_should_clash(self):
+        a = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
+        b = np.array([8, 7, 6, 5, 4, 3, 2, 1], dtype='int32')
+        c = np.array([8, 1, 7, 2, 6, 3, 5, 4], dtype='int32')
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            fa = df.create_numeric('fa', 'int32').data.write(a)
+            fb = df.create_numeric('fb', 'int32').data.write(b)
+            fc = df.create_numeric('fc', 'int32').data.write(c)
+            fa = df['fa']
+            with self.assertRaises(ValueError):
+                df.rename({'fa': 'fc'})
+            self.assertListEqual(['fa', 'fb', 'fc'], list(df.keys()))
+            self.assertTrue('fa' in df)
+            self.assertTrue('fb' in df)
+            self.assertTrue('fc' in df)
+            self.assertEqual('fa', df['fa'].name)
+            self.assertEqual('fb', df['fb'].name)
+            self.assertEqual('fc', df['fc'].name)
 
 class TestDataFrameCopyMove(unittest.TestCase):
 
