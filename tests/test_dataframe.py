@@ -273,6 +273,47 @@ class TestDataFrameRename(unittest.TestCase):
             self.assertEqual('fc', df['fc'].name)
 
 
+class TestDataFrameCopyMove(unittest.TestCase):
+
+    def test_move_same_dataframe(self):
+
+        sa = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
+        sb = np.array([8, 7, 6, 5, 4, 3, 2, 1], dtype='int32')
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df1 = ds.create_dataframe('df1')
+            df1.create_numeric('fa', 'int32').data.write(sa)
+            df1.create_numeric('fb', 'int32').data.write(sb)
+            fa = df1['fa']
+            fc = dataframe.move(df1['fa'], df1, 'fc')
+            print(fa.name, fa.data[:])
+            self.assertEqual('fc', fc.name)
+            self.assertEqual('fb', df1['fb'].name)
+
+    def test_move_different_dataframe(self):
+
+        sa = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
+        sb = np.array([8, 7, 6, 5, 4, 3, 2, 1], dtype='int32')
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df1 = ds.create_dataframe('df1')
+            df1.create_numeric('fa', 'int32').data.write(sa)
+            df1.create_numeric('fb', 'int32').data.write(sb)
+            df2 = ds.create_dataframe('df2')
+            df2.create_numeric('fb', 'int32').data.write(sb)
+            fa = df1['fa']
+            fc = dataframe.move(df1['fa'], df2, 'fc')
+            with self.assertRaises(ValueError, msg="This field no longer refers to a valid "
+                                                   "underlying field object"):
+                _ = fa.name
+            self.assertEqual('fc', fc.name)
+            self.assertEqual('fb', df1['fb'].name)
+
+
 class TestDataFrameApplyFilter(unittest.TestCase):
 
     def test_apply_filter(self):

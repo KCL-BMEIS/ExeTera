@@ -17,6 +17,11 @@ class Field(ABC):
 
     @property
     @abstractmethod
+    def valid(self):
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
     def name(self):
         raise NotImplementedError()
 

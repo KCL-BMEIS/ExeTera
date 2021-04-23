@@ -440,6 +440,7 @@ def copy(field: fld.Field, dataframe: DataFrame, name: str):
     else:
         dfield.data.write(field.data[:])
     dataframe.columns[name] = dfield
+    return dataframe[name]
 
 
 def move(field: fld.Field, dest_df: DataFrame, name: str):
@@ -451,8 +452,14 @@ def move(field: fld.Field, dest_df: DataFrame, name: str):
     :param dest_df: The destination dataframe to move to.
     :param name: The name of field under destination dataframe.
     """
-    copy(field, dest_df, name)
-    field.dataframe.drop(field.name)
+    if field.dataframe == dest_df:
+        dest_df.rename(field.name, name)
+        return field
+    else:
+        copy(field, dest_df, name)
+        field.dataframe.drop(field.name)
+        field._valid_reference = False
+        return dest_df[name]
 
 
 def merge(left: DataFrame,
