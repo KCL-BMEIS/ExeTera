@@ -1409,6 +1409,9 @@ class NumericField(HDF5Field):
     def __ror__(self, first):
         return FieldDataOps.numeric_or(self._session, first, self)
 
+    def __invert__(self):
+        return FieldDataOps.logical_not(self._session, self)
+
     def __lt__(self, value):
         return FieldDataOps.less_than(self._session, self, value)
 
@@ -1978,6 +1981,18 @@ class FieldDataOps:
         f.data.write(r)
         return f
 
+    @staticmethod
+    def _unary_op(session, first, function):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        r = function(first_data)
+        f = NumericMemField(session, dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
     @classmethod
     def numeric_add(cls, session, first, second):
         def function_add(first, second):
@@ -2059,6 +2074,13 @@ class FieldDataOps:
             return first | second
 
         return cls._binary_op(session, first, second, function_or)
+
+    @classmethod
+    def logical_not(cls, session, first):
+        def function_logical_not(first):
+            return np.logical_not(first)
+
+        return cls._unary_op(session, first, function_logical_not)
 
     @classmethod
     def less_than(cls, session, first, second):
