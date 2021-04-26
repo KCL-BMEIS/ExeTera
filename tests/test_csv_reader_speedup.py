@@ -7,20 +7,22 @@ import pandas as pd
 
 
 TEST_SCHEMA = [{'name': 'a', 'type': 'cat', 'vals': ('','a', 'bb', 'ccc', 'dddd', 'eeeee'), 
-                    'strings_to_values': {'':0,'a':1, 'bb':2, 'ccc':3, 'dddd':4, 'eeeee':5}},]
-                # {'name': 'b', 'type': 'float'},
-                # {'name': 'c', 'type': 'cat', 'vals': ('', '', '', '', '', 'True', 'False'),  
-                #                              'strings_to_values': {"": 0, "False": 1, "True": 2}},
-                # {'name': 'd', 'type': 'float'},
-                # {'name': 'e', 'type': 'float'},
-                # {'name': 
-                # 'f', 'type': 'cat', 'vals': ('', '', '', '', '', 'True', 'False'),
-                #                              'strings_to_values': {"": 0, "False": 1, "True": 2}},
-                # {'name': 'g', 'type': 'cat', 'vals': ('', '', '', '', 'True', 'False'),
-                #                              'strings_to_values': {"": 0, "False": 1, "True": 2}},
-                # {'name': 'h', 'type': 'cat', 'vals': ('', '', '', 'No', 'Yes'),
-                #                              'strings_to_values': {"": 0, "No": 1, "Yes": 2}}]
+                    'strings_to_values': {'':0,'a':1, 'bb':2, 'ccc':3, 'dddd':4, 'eeeee':5}},
+                {'name': 'b', 'type': 'int'},
+                {'name': 'c', 'type': 'cat', 'vals': ('', '', '', '', '', 'True', 'False'),  
+                                             'strings_to_values': {"": 0, "False": 1, "True": 2}},
+                {'name': 'd', 'type': 'int'},
+                {'name': 'e', 'type': 'int'},
+                {'name': 'f', 'type': 'cat', 'vals': ('', '', '', '', '', 'True', 'False'),
+                                             'strings_to_values': {"": 0, "False": 1, "True": 2}},
+                {'name': 'g', 'type': 'cat', 'vals': ('', '', '', '', 'True', 'False'),
+                                             'strings_to_values': {"": 0, "False": 1, "True": 2}},
+                {'name': 'h', 'type': 'cat', 'vals': ('', '', '', 'No', 'Yes'),
+                                             'strings_to_values': {"": 0, "No": 1, "Yes": 2}}]
 
+ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
+SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
+NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
 
 class DummyWriter:
     def __init__(self):
@@ -57,6 +59,9 @@ class TestFastCSVReader(TestCase):
             elif s['type'] == 'float':
                 arr = rng.uniform(size=count)
                 columns[s['name']] = arr
+            elif s['type'] == 'int':
+                arr = rng.randint(10, size = count)
+                columns[s['name']] = arr
 
         # create csv file 
         df = pd.DataFrame(columns)
@@ -78,30 +83,38 @@ class TestFastCSVReader(TestCase):
 
 
     def test_csv_fast_correctness(self):
-        file_lines, chunk_size = 3, 10
+        # TODO: 
+        file_lines, chunk_size = 3, 100
 
         self.fd_csv, self.csv_file_name = tempfile.mkstemp(suffix='.csv')
-        df, cat_columns_v, categorical_map_list = self._make_test_data(file_lines, TEST_SCHEMA, self.csv_file_name)
+        df, _, _, _ = self._make_test_data(file_lines, TEST_SCHEMA, self.csv_file_name)
 
         count_columns = len(list(df))
+        count_rows = chunk_size // 10
         
-        column_inds = np.zeros((count_columns, 30 + 1), dtype=np.int64) # add one more row for initial index 0
-        column_vals = np.zeros((count_columns, 3 * 100), dtype=np.uint8)
-        print('====== initialize =====')
-        print(column_inds)
-        print(column_vals)
+        column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
+        column_vals = np.zeros((count_columns, count_rows * 100), dtype=np.uint8)
+        # print('====== initialize =====')
+        # print(column_inds)
+        # print(column_vals)
         
         # fast csv reader reads chunk size of file content
         content = np.fromfile(self.csv_file_name, dtype=np.uint8)
-        output = my_fast_csv_reader(content, column_inds, column_vals, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE)
+        offset, written_row_count = my_fast_csv_reader(content, column_inds, column_vals, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE)
+        self.assertEqual(offset, 70)
+        self.assertEqual(written_row_count, 3)
         
-        print(column_inds, column_vals)
+        self.assertListEqual(list(column_inds[0][:written_row_count + 1]), [0, 3, 5, 9])
+        self.assertListEqual(list(column_inds[1][:written_row_count + 1]), [0, 1, 2, 3])
+        self.assertListEqual(list(column_vals[0][:9]), [99, 99, 99, 98, 98, 100, 100, 100, 100])
+        self.assertListEqual(list(column_vals[1][:3]), [49, 48, 49])
+
         #my_fast_csv_reader(csv_file_name)
 
 
 
     def test_read_file_using_fast_csv_reader_file_lines_smaller_than_chunk_size(self):
-        file_lines, chunk_size = 3, 10
+        file_lines, chunk_size = 3, 100
 
         self.fd_csv, self.csv_file_name = tempfile.mkstemp(suffix='.csv')
         df, cat_columns_v, categorical_map_list, writer_list = self._make_test_data(file_lines, TEST_SCHEMA, self.csv_file_name)
@@ -110,15 +123,16 @@ class TestFastCSVReader(TestCase):
         
         field_names = list(df)
         for i_c, field in enumerate(field_names):
-            data = writer_list[i_c].data
-            self.assertEqual(len(data), len(cat_columns_v[field]))
-            self.assertListEqual(data, cat_columns_v[field])
+            if categorical_map_list[i_c] is not None:
+                data = writer_list[i_c].data
+                self.assertEqual(len(data), len(cat_columns_v[field]))
+                self.assertListEqual(data, cat_columns_v[field])
 
         os.close(self.fd_csv)
         
 
     def test_read_file_using_fast_csv_reader_file_lines_larger_than_chunk_size(self):
-        file_lines, chunk_size = 105, 10
+        file_lines, chunk_size = 1050, 100
 
         self.fd_csv, self.csv_file_name = tempfile.mkstemp(suffix='.csv')
         df, cat_columns_v, categorical_map_list, writer_list = self._make_test_data(file_lines, TEST_SCHEMA, self.csv_file_name)
@@ -127,9 +141,10 @@ class TestFastCSVReader(TestCase):
         
         field_names = list(df)
         for i_c, field in enumerate(field_names):
-            data = writer_list[i_c].data
-            self.assertEqual(len(data), len(cat_columns_v[field]))
-            self.assertListEqual(data, cat_columns_v[field])
+            if categorical_map_list[i_c] is not None:
+                data = writer_list[i_c].data
+                self.assertEqual(len(data), len(cat_columns_v[field]))
+                self.assertListEqual(data, cat_columns_v[field])
             
         os.close(self.fd_csv)
 
@@ -158,4 +173,4 @@ class TestFastCSVReader(TestCase):
     #         self.assertListEqual(chunk, cat_columns_v[field])
 
     #     # delete the temp csv file
-    #     os.close(self.fd_csv)
+    #     os.close(self.fd_csv)74
