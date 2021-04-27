@@ -22,7 +22,7 @@ from exetera.core import operations as ops
 from exetera.core import validation as val
 
 class HDF5Field(Field):
-    def __init__(self, session, group, dataframe, name=None, write_enabled=False):
+    def __init__(self, session, group, dataframe, write_enabled=False):
         """
         Construct a HDF5 file based Field. This construction is not used directly, rather, should be called from
         specific field types, e.g. NumericField.
@@ -30,7 +30,6 @@ class HDF5Field(Field):
         :param session: The session instance.
         :param group: The HDF5 Group object.
         :param dataframe: The dataframe this field belongs to.
-        :param name: The name of this field if not specified in group.
         :param write_enabled: A read-only/read-write switch.
         """
         super().__init__()
