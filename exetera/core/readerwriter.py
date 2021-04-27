@@ -32,15 +32,15 @@ class IndexedStringReader(Reader):
                 start = item.start if item.start is not None else 0
                 stop = item.stop if item.stop is not None else len(self.field['index']) - 1
                 step = item.step
-                #TODO: validate slice
-                index = self.field['index'][start:stop+1]
+                # TODO: validate slice
+                index = self.field['index'][start:stop + 1]
                 bytestr = self.field['values'][index[0]:index[-1]]
-                results = [None] * (len(index)-1)
+                results = [None] * (len(index) - 1)
                 startindex = start
                 for ir in range(len(results)):
-                    results[ir] =\
-                        bytestr[index[ir]-np.int64(startindex):
-                                index[ir+1]-np.int64(startindex)].tobytes().decode()
+                    results[ir] = \
+                        bytestr[index[ir] - np.int64(startindex):
+                                index[ir + 1] - np.int64(startindex)].tobytes().decode()
                 return results
         except Exception as e:
             print("{}: unexpected exception {}".format(self.field.name, e))
@@ -59,7 +59,7 @@ class IndexedStringReader(Reader):
     def sort(self, index, writer):
         field_index = self.field['index'][:]
         field_values = self.field['values'][:]
-        r_field_index, r_field_values =\
+        r_field_index, r_field_values = \
             pers._apply_sort_to_index_values(index, field_index, field_values)
         writer.write_raw(r_field_index, r_field_values)
 
@@ -248,11 +248,7 @@ class IndexedStringWriter(Writer):
             self.ever_written = True
 
         for s in values:
-            if isinstance(s, str):
-                evalue = s.encode()
-            else:
-                evalue = s
-
+            evalue = s.encode()
             for v in evalue:
                 self.values[self.value_index] = v
                 self.value_index += 1
@@ -422,7 +418,7 @@ class NumericImporter:
         self.flag_writer = None
         if create_flag_field:
             self.flag_writer = NumericWriter(datastore, group, f"{name}{flag_field_suffix}",
-                                                            'bool', timestamp, write_mode)
+                                             'bool', timestamp, write_mode)
         self.field_name = name
         self.parser = parser
         self.invalid_value = invalid_value
@@ -443,24 +439,27 @@ class NumericImporter:
         validity = np.zeros(len(values), dtype='bool')
         for i in range(len(values)):
             valid, value = self.parser(values[i], self.invalid_value)
+
             elements[i] = value
             validity[i] = valid
-            
-            if self.validation_mode == 'strict' and not valid: 
-                if self._is_blank(values[i]):
-                    raise ValueError(f"Numeric value in the field '{self.field_name}' can not be empty in strict mode")  
-                else:        
-                    raise ValueError(f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
 
-            if self.validation_mode == 'allow_empty' and not self._is_blank(values[i]) and not valid:
-                raise ValueError(f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i]}")
+            if self.validation_mode == 'strict' and not valid:
+                if self._is_blank_str(values[i]):
+                    raise ValueError(f"Numeric value in the field '{self.field_name}' can not be empty in strict mode")
+                else:
+                    raise ValueError(
+                        f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
+
+            if self.validation_mode == 'allow_empty' and not self._is_blank_str(values[i]) and not valid:
+                raise ValueError(
+                    f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
 
         self.data_writer.write_part(elements)
         if self.flag_writer is not None:
             self.flag_writer.write_part(validity)
 
-    def _is_blank(self, value):
-        return (isinstance(value, str) and value.strip() == '') or value == b''
+    def _is_blank_str(self, value):
+        return type(value) == str and value.strip() == ''
 
     def flush(self):
         self.data_writer.flush()
@@ -552,7 +551,7 @@ class DateTimeImporter:
         self.create_day_field = create_day_field
         if create_day_field:
             self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
-                                            '10', timestamp, write_mode)
+                                             '10', timestamp, write_mode)
         self.datetimeset = None
         if optional:
             self.datetimeset = NumericWriter(datastore, group, f"{name}_set",
@@ -566,11 +565,11 @@ class DateTimeImporter:
         self.datetime.write_part(values)
 
         if self.create_day_field:
-            days=self._get_days(values)
+            days = self._get_days(values)
             self.datestr.write_part(days)
 
         if self.datetimeset is not None:
-            flags=self._get_flags(values)
+            flags = self._get_flags(values)
             self.datetimeset.write_part(flags)
 
     def _get_days(self, values):
@@ -731,10 +730,10 @@ class OptionalDateImporter:
         self.create_day_field = create_day_field
         if create_day_field:
             self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
-                                            '10', timestamp, write_mode)
+                                             '10', timestamp, write_mode)
         self.dateset = None
         if optional:
-            self.dateset =\
+            self.dateset = \
                 NumericWriter(datastore, group, f"{name}_set", 'bool', timestamp, write_mode)
 
     def chunk_factory(self, length):
