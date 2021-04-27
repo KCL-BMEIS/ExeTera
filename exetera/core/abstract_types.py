@@ -17,6 +17,11 @@ class Field(ABC):
 
     @property
     @abstractmethod
+    def valid(self):
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
     def name(self):
         raise NotImplementedError()
 
@@ -208,10 +213,6 @@ class DataFrame(ABC):
     def get_field(self, name):
         raise NotImplementedError()
 
-    # @abstractmethod
-    # def get_name(self, field):
-    #     raise NotImplementedError()
-
     @abstractmethod
     def __setitem__(self, name, field):
         raise NotImplementedError()
@@ -246,10 +247,6 @@ class DataFrame(ABC):
 
     @abstractmethod
     def __len__(self):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def get_spans(self):
         raise NotImplementedError()
 
     @abstractmethod

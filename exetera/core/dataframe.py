@@ -8,7 +8,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional, Sequence, Tuple, Union
+from typing import Mapping, Optional, Sequence, Tuple, Union
+from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
@@ -54,7 +55,7 @@ class HDF5DataFrame(DataFrame):
         """
 
         self.name = name
-        self._columns = dict()
+        self._columns = OrderedDict()
         self._dataset = dataset
         self._h5group = h5group
 
@@ -67,7 +68,7 @@ class HDF5DataFrame(DataFrame):
         The columns property interface. Columns is a dictionary to store the fields by (field_name, field_object).
         The field_name is field.name without prefix '/' and HDF5 group name.
         """
-        return dict(self._columns)
+        return OrderedDict(self._columns)
 
     @property
     def dataset(self):
@@ -127,7 +128,7 @@ class HDF5DataFrame(DataFrame):
         """
         fld.indexed_string_field_constructor(self._dataset.session, self, name,
                                              timestamp, chunksize)
-        field = fld.IndexedStringField(self._dataset.session, self._h5group[name], self, name,
+        field = fld.IndexedStringField(self._dataset.session, self._h5group[name], self,
                                        write_enabled=True)
         self._columns[name] = field
         return self._columns[name]
@@ -144,7 +145,7 @@ class HDF5DataFrame(DataFrame):
         """
         fld.fixed_string_field_constructor(self._dataset.session, self, name,
                                            length, timestamp, chunksize)
-        field = fld.FixedStringField(self._dataset.session, self._h5group[name], self, name,
+        field = fld.FixedStringField(self._dataset.session, self._h5group[name], self,
                                      write_enabled=True)
         self._columns[name] = field
         return self._columns[name]
@@ -161,7 +162,7 @@ class HDF5DataFrame(DataFrame):
         """
         fld.numeric_field_constructor(self._dataset.session, self, name,
                                       nformat, timestamp, chunksize)
-        field = fld.NumericField(self._dataset.session, self._h5group[name], self, name,
+        field = fld.NumericField(self._dataset.session, self._h5group[name], self,
                                  write_enabled=True)
         self._columns[name] = field
         return self._columns[name]
@@ -179,7 +180,7 @@ class HDF5DataFrame(DataFrame):
         """
         fld.categorical_field_constructor(self._dataset.session, self, name, nformat, key,
                                           timestamp, chunksize)
-        field = fld.CategoricalField(self._dataset.session, self._h5group[name], self, name,
+        field = fld.CategoricalField(self._dataset.session, self._h5group[name], self,
                                      write_enabled=True)
         self._columns[name] = field
         return self._columns[name]
@@ -195,7 +196,7 @@ class HDF5DataFrame(DataFrame):
         """
         fld.timestamp_field_constructor(self._dataset.session, self, name,
                                         timestamp, chunksize)
-        field = fld.TimestampField(self._dataset.session, self._h5group[name], self, name,
+        field = fld.TimestampField(self._dataset.session, self._h5group[name], self,
                                    write_enabled=True)
         self._columns[name] = field
         return self._columns[name]
@@ -211,7 +212,7 @@ class HDF5DataFrame(DataFrame):
         if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
         else:
-            return self._columns.__contains__(name)
+            return name in self._columns
 
     def contains_field(self, field):
         """
@@ -300,16 +301,98 @@ class HDF5DataFrame(DataFrame):
     def __len__(self):
         return len(self._columns)
 
-    def get_spans(self):
+    def rename(self,
+               field: Union[str, Mapping[str, str]],
+               field_to: Optional[str] = None) -> None:
         """
-        Return the name and spans of each field as a dictionary.
+        Rename provides you with the means to rename fields within a dataframe. You can specify either
+        a single field to be renamed or you can provide a dictionary with a set of fields to be
+        renamed.
 
-        :returns: A dictionary of (field_name, field_spans).
+        ```
+        # rename a single field
+        df.rename('a', 'b')
+
+        # rename multiple fields
+        df.rename({'a': 'b', 'b': 'c', 'c': 'a'})
+        ```
+
+        Field renaming can fail if the resulting set of renamed fields would have name clashes. If
+        this is the case, none of the rename operations go ahead and the dataframe remains unmodified.
+        :param field: Either a string or a dictionary of name pairs, each of which is the existing
+        field name and the destination field name
+        :param field_to: Optional parameter containing a string, if `field` is a string. If 'field'
+        is a dictionary, parameter should not be set.
+        Field references remain valid after this operation and reflect their renaming.
+        :return: None
         """
-        spans = {}
-        for name, field in self._columns.items():
-            spans[name] = field.get_spans()
-        return spans
+
+        if not isinstance(field, (str, dict)):
+            raise ValueError("'field' must be of type str or dict but is {}").format(type(field))
+
+        dict_ = None
+        if isinstance(field, dict):
+            if field_to is not None:
+                raise ValueError("'field_to' can only be set when 'field' is a single column name")
+            dict_ = field
+        else:
+            if field_to is None:
+                raise ValueError("'field_to' must be set if 'field' is a column name")
+            dict_ = {field: field_to}
+
+        # check that we aren't creating ambiguity with the sequence of renames
+        # --------------------------------------------------------------------
+        keys = set(self._columns.keys())
+
+        # first, remove the keys being renamed from the keyset
+        for k in dict_.keys():
+            keys.remove(k)
+
+        # second, add them in one by one to ensure that they don't clash
+        clashes = set()
+        for v in dict_.values():
+            if v in keys:
+                clashes.add(v)
+            keys.add(v)
+
+        if len(clashes) > 0:
+            raise ValueError("The attempted rename cannot be performed as it creates the "
+                             "following name clashes: {}".format(clashes))
+
+        def get_unique_name(name, keys):
+            while name in keys:
+                name += '_'
+            return name
+
+        # from here, we know there are no name clashes, but we might still have intermediate
+        # clashes, so perform two renames where necessary
+        final_renames = dict()
+        intermediate_columns = OrderedDict()
+
+        for k, f in self._columns.items():
+            if k in dict_:
+                uname = get_unique_name(dict_[k], self._columns)
+                if uname != k:
+                    final_renames[uname] = dict_[k]
+
+                self._h5group.move(k, uname)
+                intermediate_columns[uname] = f
+            else:
+                intermediate_columns[k] = f
+
+        final_columns = OrderedDict()
+
+        for k, f in intermediate_columns.items():
+            if k in final_renames:
+                name = final_renames[k]
+                f = intermediate_columns[k]
+                self._h5group.move(k, name)
+                final_columns[name] = f
+            else:
+                final_columns[k] = f
+
+        self._columns = final_columns
+
 
     def apply_filter(self, filter_to_apply, ddf=None):
         """
@@ -367,6 +450,7 @@ def copy(field: fld.Field, dataframe: DataFrame, name: str):
     else:
         dfield.data.write(field.data[:])
     dataframe.columns[name] = dfield
+    return dataframe[name]
 
 
 def move(field: fld.Field, dest_df: DataFrame, name: str):
@@ -378,8 +462,14 @@ def move(field: fld.Field, dest_df: DataFrame, name: str):
     :param dest_df: The destination dataframe to move to.
     :param name: The name of field under destination dataframe.
     """
-    copy(field, dest_df, name)
-    field.dataframe.drop(field.name)
+    if field.dataframe == dest_df:
+        dest_df.rename(field.name, name)
+        return field
+    else:
+        copy(field, dest_df, name)
+        field.dataframe.drop(field.name)
+        field._valid_reference = False
+        return dest_df[name]
 
 
 def merge(left: DataFrame,
