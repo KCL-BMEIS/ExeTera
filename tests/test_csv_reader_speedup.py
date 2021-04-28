@@ -1,5 +1,6 @@
 from unittest import TestCase
-from exetera.core.csv_reader_speedup import my_fast_csv_reader, file_read_line_fast_csv, get_byte_map, my_fast_categorical_mapper, read_file_using_fast_csv_reader
+from exetera.core.csv_reader_speedup import my_fast_csv_reader, file_read_line_fast_csv, get_byte_map, my_fast_categorical_mapper, read_file_using_fast_csv_reader, get_file_stat, \
+                                            ESCAPE_VALUE,SEPARATOR_VALUE,NEWLINE_VALUE,WHITE_SPACE_VALUE
 import tempfile
 import numpy as np
 import os
@@ -20,9 +21,12 @@ TEST_SCHEMA = [{'name': 'a', 'type': 'cat', 'vals': ('','a', 'bb', 'ccc', 'dddd'
                 {'name': 'h', 'type': 'cat', 'vals': ('', '', '', 'No', 'Yes'),
                                              'strings_to_values': {"": 0, "No": 1, "Yes": 2}}]
 
+
+
 ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
 SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
 NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
+WHITE_SPACE_VALUE = np.frombuffer(b' ', dtype='S1')[0][0]
 
 class DummyWriter:
     def __init__(self):
@@ -82,25 +86,96 @@ class TestFastCSVReader(TestCase):
         return df, cat_columns_v, categorical_map_list, writer_list
 
 
+    def test_escape_well_formed_csv(self):
+        TEST_CSV_CONTENTS = '\n'.join((
+            'id, f1, f2, f3',
+            '1, "abc", "a""b""c", """ab"""'
+        ))
+        
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+        with open(csv_file_name, 'w') as fcsv:
+            fcsv.write(TEST_CSV_CONTENTS)
+            fcsv.write('\n')
+
+        total_byte_size, count_columns, count_rows, val_row_count, val_threshold = get_file_stat(csv_file_name, chunk_size=10)
+
+        column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
+        column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
+        
+        content = np.fromfile(csv_file_name, dtype=np.uint8)    
+
+        _, written_row_count = my_fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        self.assertEqual(written_row_count, 1)
+        self.assertEqual(column_inds[1, 1], 3)
+        self.assertEqual(column_inds[2, 1], 5)
+        self.assertEqual(column_inds[3, 1], 4)
+
+        os.close(fd_csv)
+
+
+    def test_escape_bad_formed_csv_1(self):
+        TEST_CSV_CONTENTS = '\n'.join((
+            'id, f1 ',
+            '1, abc"',
+        ))
+        
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+        with open(csv_file_name, 'w') as fcsv:
+            fcsv.write(TEST_CSV_CONTENTS)
+
+        total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(csv_file_name, chunk_size=10)
+        column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
+        column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
+        
+        content = np.fromfile(csv_file_name, dtype=np.uint8)
+
+        try:
+            my_fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        except Exception as e:
+            self.assertEqual(str(e), 'double quote should start at the beginning of the cell')
+        finally:
+            os.close(fd_csv)
+
+
+    def test_escape_bad_formed_csv_2(self):
+        TEST_CSV_CONTENTS = '\n'.join((
+            'id, f1 ',
+            '1, "abc"de',
+        ))
+        
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+        with open(csv_file_name, 'w') as fcsv:
+            fcsv.write(TEST_CSV_CONTENTS)
+
+        total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(csv_file_name, chunk_size=10)
+        column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
+        column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
+        
+        content = np.fromfile(csv_file_name, dtype=np.uint8)
+
+        try:
+            my_fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        except Exception as e:
+            self.assertEqual(str(e), 'invalid double quote')
+        finally:
+            os.close(fd_csv)       
+                                
+
     def test_csv_fast_correctness(self):
-        # TODO: 
         file_lines, chunk_size = 3, 100
 
-        self.fd_csv, self.csv_file_name = tempfile.mkstemp(suffix='.csv')
-        df, _, _, _ = self._make_test_data(file_lines, TEST_SCHEMA, self.csv_file_name)
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+        df, _, _, _ = self._make_test_data(file_lines, TEST_SCHEMA, csv_file_name)
 
-        count_columns = len(list(df))
-        count_rows = chunk_size // 10
+        total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(csv_file_name, chunk_size=chunk_size)
+        column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
+        column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
+
+        val_threshold = int(count_rows * 10 * 0.8)
         
-        column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
-        column_vals = np.zeros((count_columns, count_rows * 100), dtype=np.uint8)
-        # print('====== initialize =====')
-        # print(column_inds)
-        # print(column_vals)
-        
-        # fast csv reader reads chunk size of file content
-        content = np.fromfile(self.csv_file_name, dtype=np.uint8)
-        offset, written_row_count = my_fast_csv_reader(content, column_inds, column_vals, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE)
+        content = np.fromfile(csv_file_name, dtype=np.uint8)
+        offset, written_row_count = my_fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+
         self.assertEqual(offset, 70)
         self.assertEqual(written_row_count, 3)
         
@@ -109,17 +184,16 @@ class TestFastCSVReader(TestCase):
         self.assertListEqual(list(column_vals[0][:9]), [99, 99, 99, 98, 98, 100, 100, 100, 100])
         self.assertListEqual(list(column_vals[1][:3]), [49, 48, 49])
 
-        #my_fast_csv_reader(csv_file_name)
-
+        os.close(fd_csv)
 
 
     def test_read_file_using_fast_csv_reader_file_lines_smaller_than_chunk_size(self):
         file_lines, chunk_size = 3, 100
 
-        self.fd_csv, self.csv_file_name = tempfile.mkstemp(suffix='.csv')
-        df, cat_columns_v, categorical_map_list, writer_list = self._make_test_data(file_lines, TEST_SCHEMA, self.csv_file_name)
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+        df, cat_columns_v, categorical_map_list, writer_list = self._make_test_data(file_lines, TEST_SCHEMA, csv_file_name)
 
-        read_file_using_fast_csv_reader(source = self.csv_file_name, chunk_size=chunk_size, categorical_map_list = categorical_map_list, writer_list = writer_list)
+        read_file_using_fast_csv_reader(source = csv_file_name, chunk_size=chunk_size, categorical_map_list = categorical_map_list, writer_list = writer_list)
         
         field_names = list(df)
         for i_c, field in enumerate(field_names):
@@ -128,16 +202,16 @@ class TestFastCSVReader(TestCase):
                 self.assertEqual(len(data), len(cat_columns_v[field]))
                 self.assertListEqual(data, cat_columns_v[field])
 
-        os.close(self.fd_csv)
+        os.close(fd_csv)
         
 
     def test_read_file_using_fast_csv_reader_file_lines_larger_than_chunk_size(self):
-        file_lines, chunk_size = 1050, 100
+        file_lines, chunk_size = 3, 100
 
-        self.fd_csv, self.csv_file_name = tempfile.mkstemp(suffix='.csv')
-        df, cat_columns_v, categorical_map_list, writer_list = self._make_test_data(file_lines, TEST_SCHEMA, self.csv_file_name)
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+        df, cat_columns_v, categorical_map_list, writer_list = self._make_test_data(file_lines, TEST_SCHEMA, csv_file_name)
 
-        read_file_using_fast_csv_reader(source = self.csv_file_name, chunk_size=chunk_size, categorical_map_list = categorical_map_list, writer_list = writer_list)
+        read_file_using_fast_csv_reader(source = csv_file_name, chunk_size=chunk_size, categorical_map_list = categorical_map_list, writer_list = writer_list)
         
         field_names = list(df)
         for i_c, field in enumerate(field_names):
@@ -146,31 +220,4 @@ class TestFastCSVReader(TestCase):
                 self.assertEqual(len(data), len(cat_columns_v[field]))
                 self.assertListEqual(data, cat_columns_v[field])
             
-        os.close(self.fd_csv)
-
-
-    # def test_file_lines_smaller_than_chunk_size(self):
-    #     file_lines, chunk_size = 3, 10
-
-    #     # create temp csv file
-    #     self.fd_csv, self.csv_file_name = tempfile.mkstemp(suffix='.csv')
-    #     df, cat_columns_v, categorical_map_list = self._make_test_data(file_lines, TEST_SCHEMA, self.csv_file_name)
-
-    #     column_inds, column_vals = file_read_line_fast_csv(self.csv_file_name)
-        
-    #     field_to_use = list(df)
-    #     for i_c, field in enumerate(field_to_use):
-    #         if categorical_map_list[i_c] is None:
-    #             continue
-
-    #         cat_keys, _, cat_index, cat_values = categorical_map_list[i_c]
-    #         print(cat_keys, cat_index, cat_values)
-
-    #         chunk = np.zeros(chunk_size, dtype=np.uint8)
-    #         pos = my_fast_categorical_mapper(chunk, i_c, column_inds, column_vals, cat_keys, cat_index, cat_values)
-    #         chunk = list(chunk[:pos])
-
-    #         self.assertListEqual(chunk, cat_columns_v[field])
-
-    #     # delete the temp csv file
-    #     os.close(self.fd_csv)74
+        os.close(fd_csv)

@@ -17,24 +17,6 @@ class Timer:
         print(self.end_msg + f' {time.time() - self.t0} seconds')
 
 
-# def generate_test_arrays(count):
-#     strings = [b'one', b'two', b'three', b'four', b'five', b'six', b'seven']
-#     raw_values = np.random.RandomState(12345678).randint(low=1, high=7, size=count)
-#     total_len = 0
-#     for r in raw_values:
-#         total_len += len(strings[r])
-#     indices = np.zeros(count+1, dtype=np.int64)
-#     values = np.zeros(total_len, dtype=np.int8)
-#     for i_r, r in enumerate(raw_values):
-#         indices[i_r+1] = indices[i_r] + len(strings[r])
-#         for i_c in range(len(strings[r])):
-#             values[indices[i_r]+i_c] = strings[r][i_c]
-#
-#     for i_r in range(20):
-#         start, end = indices[i_r], indices[i_r+1]
-#         print(values[start:end].tobytes())
-
-
 def main():
     # generate_test_arrays(1000)
     col_dicts = [{'name': 'a', 'type': 'cat', 'vals': ('a', 'bb', 'ccc', 'dddd', 'eeeee')},
@@ -112,81 +94,101 @@ def file_read_line_fast_csv(source):
     return column_inds, column_vals
 
 
-def read_file_using_fast_csv_reader(source):
+# def read_file_using_fast_csv_reader(source):
+
+#     with open(source) as f:
+#         header = csv.DictReader(f)
+#         count_columns = len(header.fieldnames)
+
+#         count_rows = sum(1 for _ in f) # w/o header row
+
+#         # f.seek(0)
+#         # print(f.read())
+#         # count_rows = content.count('\n') + 1  # +1: for the case that last line doesn't have \n
+        
+#     column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
+#     # change it to longest key 
+#     column_vals = np.zeros((count_columns, count_rows * 100), dtype=np.uint8)
+
+#     print('====initialize=====')
+#     print(column_inds, column_vals)
+
+#     ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
+#     SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
+#     NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
+
+#     #print(lineterminator.tobytes())
+#     #print("hello")
+#     #CARRIAGE_RETURN_VALUE = np.frombuffer(b'\r', dtype='S1')[0][0]
+
+#     with Timer("my_fast_csv_reader"):
+#         content = np.fromfile(source, dtype=np.uint8)
+#         print(content)
+#         my_fast_csv_reader(content, column_inds, column_vals, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE)
+
+#     print('======after csv reader====')
+#     print(column_inds)
+#     print(column_vals)
+#     return column_inds, column_vals
+
+ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
+SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
+NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
+WHITE_SPACE_VALUE = np.frombuffer(b' ', dtype='S1')[0][0]
+#CARRIAGE_RETURN_VALUE = np.frombuffer(b'\r', dtype='S1')[0][0]
+
+def get_file_stat(source, chunk_size):
+    with open(source, 'rb') as f:
+        f.seek(0,2)
+        total_byte_size = f.tell()
+        print('total_byte_size', total_byte_size)
 
     with open(source) as f:
         header = csv.DictReader(f)
         count_columns = len(header.fieldnames)
+        avg_line_length = len(f.readline()) * 10
+    
+    count_rows = max(chunk_size // count_columns * avg_line_length, 5)
+    print('count_columns', count_columns, 'count_rows', count_rows)
 
-        count_rows = sum(1 for _ in f) # w/o header row
-
-        # f.seek(0)
-        # print(f.read())
-        # count_rows = content.count('\n') + 1  # +1: for the case that last line doesn't have \n
-        
-    column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
-    # change it to longest key 
-    column_vals = np.zeros((count_columns, count_rows * 100), dtype=np.uint8)
-
-    print('====initialize=====')
-    print(column_inds, column_vals)
-
-    ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
-    SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
-    NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
-
-    #print(lineterminator.tobytes())
-    #print("hello")
-    #CARRIAGE_RETURN_VALUE = np.frombuffer(b'\r', dtype='S1')[0][0]
-    # print("test")
-    with Timer("my_fast_csv_reader"):
-        content = np.fromfile(source, dtype=np.uint8)
-        print(content)
-        my_fast_csv_reader(content, column_inds, column_vals, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE)
-
-    print('======after csv reader====')
-    print(column_inds)
-    print(column_vals)
-    return column_inds, column_vals
+    val_row_count = count_rows * avg_line_length
+    val_threshold = int(count_rows * avg_line_length * 0.8)
+    
+    return total_byte_size, count_columns, count_rows, val_row_count, val_threshold
 
 
 def read_file_using_fast_csv_reader(source, chunk_size, categorical_map_list, writer_list=None):
 
-    with open(source) as f:
-        header = csv.DictReader(f)
-        count_columns = len(header.fieldnames)
-
-    count_rows = chunk_size // 10 
-    print('count_columns', count_columns, 'count_rows', count_rows)
-    threshold = int(chunk_size * 0.8) 
-
-    ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
-    SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
-    NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
-    #CARRIAGE_RETURN_VALUE = np.frombuffer(b'\r', dtype='S1')[0][0]
+    total_byte_size, count_columns, count_rows, val_row_count, val_threshold = get_file_stat(source, chunk_size)
 
     with Timer("my_fast_csv_reader"):
-
-        resut = []
-
         chunk_index = 0
         hasHeader = True
-        while True:
+
+        while chunk_index < total_byte_size:
             # initialize column_inds, column_vals
             column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
-            column_vals = np.zeros((count_columns, count_rows * 10), dtype=np.uint8)
+            column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
             # print('====== initialize =====')
             # print(column_inds)
             # print(column_vals)
 
             # fast csv reader reads chunk size of file content
             content = np.fromfile(source, count=chunk_size, offset=chunk_index, dtype=np.uint8)
-            print('content', content)
-            offset_pos, written_row_count = my_fast_csv_reader(content, column_inds, column_vals, hasHeader, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE)
-            print('====== after csv reader =====')
-            print('chunk_index', chunk_index)
-            print('offset_pos', offset_pos)
-            print('written_row_count', written_row_count)
+            len_content = content.shape[0]
+            if len_content == 0:
+                break
+            # print('len_content', len_content)
+            if chunk_index + len_content == total_byte_size and content[-1] != NEWLINE_VALUE:
+                content = np.append(content, NEWLINE_VALUE)
+                print('hello')
+                print('content', content)
+
+            offset_pos, written_row_count = my_fast_csv_reader(content, column_inds, column_vals, hasHeader, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+            # print('====== after csv reader =====')
+            # print('chunk_index', chunk_index)
+            # print('offset_pos', offset_pos)
+            # print('written_row_count', written_row_count)
             print(column_inds)
             print(column_vals)
 
@@ -194,46 +196,48 @@ def read_file_using_fast_csv_reader(source, chunk_size, categorical_map_list, wr
             hasHeader = False
 
             chunk = None
-            for i_c, field in enumerate(header.fieldnames):
-                print("@@@@@@@@@@@@@@@@@@@", i_c)
+            for i_c in range(count_columns):
                 if categorical_map_list[i_c] is not None:
                     cat_keys, _, cat_index, cat_values = categorical_map_list[i_c]
                     print(cat_keys, cat_index, cat_values)
 
                     chunk = np.zeros(written_row_count, dtype=np.uint8)
-                    size = my_fast_categorical_mapper(chunk, i_c, column_inds, column_vals, cat_keys, cat_index, cat_values)
+                    my_fast_categorical_mapper(chunk, i_c, column_inds, column_vals, cat_keys, cat_index, cat_values)
+
+                    # print('chunk', chunk)
 
                     if writer_list and writer_list[i_c] and chunk is not None: 
                         writer_list[i_c].write_part(chunk)
 
-            if len(content) < chunk_size or offset_pos == 0:
-                break
 
 @njit
-def my_fast_csv_reader(source, column_inds, column_vals, hasHeader, escape_value, separator_value, newline_value ):
+def my_fast_csv_reader(source, column_inds, column_vals, hasHeader, val_threshold, escape_value, separator_value, newline_value, whitespace_value ):
     colcount = len(column_inds)
     maxrowcount = len(column_inds[0]) - 1  # minus extra index 0 row that created for column_inds
     print('colcount', colcount)
     print('maxrowcount', maxrowcount)
     print('hasHeader', hasHeader)
+    print('content', source)
     
     index = np.int64(0)
     index_for_end_line = np.int64(0)
-    row_idx_for_end_line = np.int64(-1) if hasHeader else np.int64(0)
-    line_start = np.int64(0)
-    cell_start_idx = np.int64(0)
-    cell_end_idx = np.int64(0)
+    
     col_index = np.int64(0)
     row_index = np.int64(-1) if hasHeader else np.int64(0)
-    current_char_count = np.int32(0)
+    print("has header", hasHeader)
+    print('initial row_index', row_index)
 
     escaped = False
     end_cell = False
     end_line = False
     escaped_literal_candidate = False
-    cur_cell_start = column_inds[col_index, row_index] if row_index >= 0 else 0
 
-    cur_cell_char_count = 0
+    cur_cell_char_count = np.int32(0)
+    cur_cell_start = column_inds[col_index, row_index] if row_index >= 0 else 0
+    index_for_cur_cell_start = np.int64(0)
+
+    is_column_inds_full = False
+    is_column_vals_full = False
 
     while True:
         write_char = False
@@ -241,6 +245,7 @@ def my_fast_csv_reader(source, column_inds, column_vals, hasHeader, escape_value
         end_line = False
 
         c = source[index]
+        # print('c', c)
 
         if c == separator_value:
             if not escaped:
@@ -248,16 +253,38 @@ def my_fast_csv_reader(source, column_inds, column_vals, hasHeader, escape_value
             else:
                 write_char = True
 
-        elif c == newline_value :
+        elif c == newline_value:
+            # \n \n - last line may have two newline_value
+            while index + 1 < len(source) and source[index] + 1 == newline_value:
+                index += 1
+
             if not escaped:
                 end_cell = True
                 end_line = True
                 index_for_end_line = index
-                row_idx_for_end_line = row_index
             else:
                 write_char = True
+
         elif c == escape_value:
-            escaped = not escaped
+            # ,"... - start of an escaped cell
+            # ...", - end of an escaped cell
+            # ...""... - literal quote character
+            # otherwise error
+            if not escaped:
+                if index != index_for_cur_cell_start:
+                    raise Exception('double quote should start at the beginning of the cell')
+
+                escaped = True
+            else:   
+                if escaped_literal_candidate:
+                    write_char = True
+                    escaped_literal_candidate = False
+                elif index + 1 < len(source) and source[index + 1] == escape_value:
+                    escaped_literal_candidate = True
+                elif index + 1 < len(source) and source[index + 1] != separator_value and source[index + 1] != newline_value:
+                    raise Exception('invalid double quote')
+                else:
+                    escaped = False
         else:
             write_char = True
 
@@ -273,34 +300,43 @@ def my_fast_csv_reader(source, column_inds, column_vals, hasHeader, escape_value
                 # print(column_inds)
                 # print(column_vals)
                 # print("========")
+
+                if cur_cell_char_count + cur_cell_char_count > val_threshold:
+                    is_column_vals_full = True
+
             if end_line:
                 row_index += 1
                 col_index = 0
                 # print('~~~~~~~~~~~')
                 # print(col_index, row_index)
                 # print('~~~~~~~~~~~')
+                if row_index == maxrowcount:
+                    is_column_inds_full = True
+
             else:
                 col_index += 1
 
             cur_cell_start = column_inds[col_index, row_index]
             cur_cell_char_count = 0
+            while index + 1 < len(source) and source[index + 1] == whitespace_value:
+                index += 1
+            index_for_cur_cell_start = index + 1
 
         index += 1
 
-        if index == len(source):
+        if index == len(source) or is_column_inds_full or is_column_vals_full:
             # print('end_line', end_line)
             # print('offset_pos', index_for_end_line + 1)
-            # what about last cell in the last line w/o newline?????
             next_pos = index_for_end_line + 1
-            written_row_count = row_idx_for_end_line + 1
-            return next_pos, written_row_count
+            written_row_count = row_index
+
+            return next_pos, written_row_count 
 
 
 @njit           
 def my_fast_categorical_mapper(chunk, i_c, column_ids, column_vals, cat_keys, cat_index, cat_values):
-    size = 0
+    # size = 0
     for row_idx in range(len(column_ids[i_c]) - 1):
-        # Finds length, which we use to lookup potential matches
         key_start = column_ids[i_c, row_idx]
         key_end = column_ids[i_c, row_idx + 1]
         key_len = key_end - key_start
@@ -321,9 +357,9 @@ def my_fast_categorical_mapper(chunk, i_c, column_ids, column_vals, cat_keys, ca
 
             if index != -1:
                 chunk[row_idx] = cat_values[index]
-                size += 1
+                # size += 1
 
-    return size
+    # return size
 
 
 def get_byte_map(string_map):
