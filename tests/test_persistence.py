@@ -739,24 +739,6 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
             a = np.asarray([0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2])
             self.assertTrue(np.array_equal(np.asarray([0, 7, 14, 22]), s.get_spans(field=a)))
 
-        bio = BytesIO()
-        src = session.open_dataset(bio, 'w', 'src')
-        df = src.create_dataframe('df')
-        num = df.create_numeric('num', 'int32')
-        num.data.write([1, 1, 2, 2, 3, 3, 4])
-
-        num2 = df.create_numeric('num2', 'int32')
-        num2.data.write([1, 1, 2, 3, 3, 3, 4])
-        session.close_dataset('src')
-
-        with h5py.File(bio, 'r') as src:
-            num = datastore.get_reader(src['df']['num'])
-            spans = datastore.get_spans(field=num)
-            self.assertListEqual([0, 2, 4, 6, 7],spans[:].tolist())
-            num2 = datastore.get_reader(src['df']['num2'])
-            spans = datastore.get_spans(fields=(num, num2))
-            self.assertListEqual([0, 2, 3, 4, 6, 7], spans[:].tolist())
-
     def test_get_spans_single_field_string(self):
         datastore = persistence.DataStore(10)
         session = Session()
@@ -787,15 +769,22 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
             a = np.asarray([b'aa', b'bb', b'cc'], dtype='S2')
             self.assertTrue(np.array_equal(np.asarray([0, 1, 2, 3]), s.get_spans(field=a)))
 
+    def test_get_spans_from_datastore_reader(self):
         bio = BytesIO()
-        src = session.open_dataset(bio, 'w', 'src')
-        df = src.create_dataframe('df')
-        fst = df.create_fixed_string('fst', 1)
-        fst.data.write([b'a', b'a', b'b', b'c', b'c', b'c', b'd', b'd', b'd'])
-        fst2 = df.create_fixed_string('fst2', 1)
-        fst2.data.write([b'a', b'a', b'b', b'c', b'c', b'c', b'd', b'd', b'd'])
-        session.close_dataset('src')
+        with Session() as session:
+            src = session.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            fst = df.create_fixed_string('fst', 1)
+            fst.data.write([b'a', b'a', b'b', b'c', b'c', b'c', b'd', b'd', b'd'])
+            fst2 = df.create_fixed_string('fst2', 1)
+            fst2.data.write([b'a', b'a', b'b', b'c', b'c', b'c', b'd', b'd', b'd'])
+            num = df.create_numeric('num', 'int32')
+            num.data.write([1, 1, 2, 2, 3, 3, 4])
+            num2 = df.create_numeric('num2', 'int32')
+            num2.data.write([1, 1, 2, 3, 3, 3, 4])
+            session.close_dataset('src')
 
+        datastore = persistence.DataStore(10)
         with h5py.File(bio, 'r') as src:
             fst = datastore.get_reader(src['df']['fst'])
             spans = datastore.get_spans(field=fst)
@@ -803,6 +792,12 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
             fst2 = datastore.get_reader(src['df']['fst2'])
             spans = datastore.get_spans(fields=(fst, fst2))
             self.assertListEqual([0, 2, 3, 6, 9], spans[:].tolist())
+            num = datastore.get_reader(src['df']['num'])
+            spans = datastore.get_spans(field=num)
+            self.assertListEqual([0, 2, 4, 6, 7], spans[:].tolist())
+            num2 = datastore.get_reader(src['df']['num2'])
+            spans = datastore.get_spans(fields=(num, num2))
+            self.assertListEqual([0, 2, 3, 4, 6, 7], spans[:].tolist())
 
     def test_apply_spans_count(self):
         spans = np.asarray([0, 1, 3, 4, 7, 8, 12, 14])
