@@ -68,7 +68,7 @@ def safe_map_indexed_values(data_indices, data_values, map_field, map_filter, em
     return i_result, v_result
 
 
-#@njit
+@njit
 def safe_map_values(data_field, map_field, map_filter, empty_value=None):
     result = np.zeros_like(map_field, dtype=data_field.dtype)
     empty_val = result[0] if empty_value is None else empty_value
@@ -444,7 +444,7 @@ def apply_spans_index_of_last_filter(spans, dest_array, filter_array):
     return dest_array, filter_array
 
 
-#@njit
+@njit
 def apply_spans_count(spans, dest_array):
     for i in range(len(spans)-1):
         dest_array[i] = np.int64(spans[i+1] - spans[i])
