@@ -256,6 +256,21 @@ class TestMemoryFieldCreateLike(unittest.TestCase):
             foo2.data.write(mfoo)
             self.assertListEqual([2, 3, 4, 5], foo2.data[:].tolist())
 
+    def test_numeric_as_type(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            foo = df.create_numeric('foo', 'int32')
+            foo.data.write(np.array([65, 66, 67, 68, 97, 98, 99, 100]))
+            newf = foo.astype('fixedstring', length=2)
+            self.assertListEqual(['AB', 'CD', 'ab', 'cd'], newf.data[:].tolist())
+
+            foo.data.clear()
+            foo.data.write([0, 0, 1, 1, 1, 2, 2, 2])
+            newf = foo.astype('categorical', key={'foo': 0, 'bar': 1, 'boo': 2})
+            self.assertListEqual([0, 0, 1, 1, 1, 2, 2, 2], newf.data[:].tolist())
+
 
 class TestMemoryFields(unittest.TestCase):
 

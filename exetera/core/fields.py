@@ -1444,6 +1444,8 @@ class NumericField(HDF5Field):
             fld = CategoricalMemField(self._session, 'uint8', key)
             fld.data.write(self.data[:])
             return fld
+        else:
+            raise NotImplementedError("The type {} is not convertible.".format(type))
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
         self._ensure_valid()
