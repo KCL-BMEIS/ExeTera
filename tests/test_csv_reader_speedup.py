@@ -1,6 +1,6 @@
 from unittest import TestCase
-from exetera.core.csv_reader_speedup import my_fast_csv_reader, file_read_line_fast_csv, get_byte_map, my_fast_categorical_mapper, read_file_using_fast_csv_reader, get_file_stat, \
-                                            ESCAPE_VALUE,SEPARATOR_VALUE,NEWLINE_VALUE,WHITE_SPACE_VALUE
+from exetera.core.csv_reader_speedup import my_fast_csv_reader, get_byte_map, read_file_using_fast_csv_reader, get_file_stat, \
+                                            ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE
 import tempfile
 import numpy as np
 import os
@@ -106,9 +106,9 @@ class TestFastCSVReader(TestCase):
 
         _, written_row_count = my_fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
         self.assertEqual(written_row_count, 1)
-        self.assertEqual(column_inds[1, 1], 3)
-        self.assertEqual(column_inds[2, 1], 5)
-        self.assertEqual(column_inds[3, 1], 4)
+        self.assertEqual(column_inds[1, 1], 3)  # abc
+        self.assertEqual(column_inds[2, 1], 5)  # a"b"c
+        self.assertEqual(column_inds[3, 1], 4)  # "ab"
 
         os.close(fd_csv)
 
@@ -170,8 +170,6 @@ class TestFastCSVReader(TestCase):
         total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(csv_file_name, chunk_size=chunk_size)
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
         column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
-
-        val_threshold = int(count_rows * 10 * 0.8)
         
         content = np.fromfile(csv_file_name, dtype=np.uint8)
         offset, written_row_count = my_fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
@@ -206,7 +204,7 @@ class TestFastCSVReader(TestCase):
         
 
     def test_read_file_using_fast_csv_reader_file_lines_larger_than_chunk_size(self):
-        file_lines, chunk_size = 3, 100
+        file_lines, chunk_size = 1053, 100
 
         fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
         df, cat_columns_v, categorical_map_list, writer_list = self._make_test_data(file_lines, TEST_SCHEMA, csv_file_name)
