@@ -1422,6 +1422,29 @@ class NumericField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
+    def astype(self, type, **kwargs):
+        if type == 'indexedstring':
+            raise NotImplementedError()
+        elif type == 'fixedstring':
+            if 'length' not in kwargs.keys():
+                raise ValueError("Please provide the length for fixed string field.")
+            else:
+                length = kwargs['length']
+            fld = FixedStringMemField(self._session, length)
+            result = np.zeros(int(len(self)/length), dtype = "U"+str(length))
+            for i in range(0, len(self), length):
+                result[int(i/length)] = ''.join([chr(i) for i in self.data[i:i+length]])
+            fld.data.write(result)
+            return fld
+        elif type == 'categorical':
+            if 'key' not in kwargs.keys():
+                raise ValueError("Please provide the key for categorical field.")
+            else:
+                key = kwargs['key']
+            fld = CategoricalMemField(self._session, 'uint8', key)
+            fld.data.write(self.data[:])
+            return fld
+
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
         self._ensure_valid()
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
