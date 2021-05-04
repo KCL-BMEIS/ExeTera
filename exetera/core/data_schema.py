@@ -87,7 +87,7 @@ new_field_importers = {
     'numeric': lambda typestr, parser, default, vmode, is_flag, flag_suffix:
         lambda ds, g, n, ts: rw.NumericImporter(ds, g, n, typestr, parser, default, vmode, is_flag, flag_suffix, ts),
     'categorical': lambda stv, oor=None:
-        lambda ds, g, n, ts: rw.CategoricalWriter(ds, g, n, stv, ts) if oor is None else
+        lambda ds, g, n, ts: rw.CategoricalImporter(ds, g, n, stv, ts) if oor is None else
         rw.LeakyCategoricalImporter(ds, g, n, stv, oor, ts)
 }
 

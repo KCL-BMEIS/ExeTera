@@ -89,35 +89,34 @@ chunk_sizes = {
 #     except ValueError:
 #         return None
 
+from numba import njit
+
+@njit
 def try_str_to_float_to_int(value, invalid=0):
     try:
-        v = int(float(value))
-        return True, v
-    except ValueError:
+        return True, int(float(value))
+    except Exception:
         return False, invalid
 
-
+@njit
 def try_str_to_int(value, invalid=0):
     try:
-        v = int(value)
-        return True, v
-    except ValueError:
+        return True, int(value)
+    except Exception:
         return False, invalid
 
-
+@njit
 def try_str_to_bool(value, invalid=0):
     try:
-        v = bool(strtobool(value))
-        return True, v
-    except ValueError:
+        return True, bool(strtobool(value))
+    except Exception:
         return False, invalid
 
-
+@njit
 def try_str_to_float(value, invalid=0):
     try:
-        v = float(value)
-        return True, v
-    except ValueError:
+        return True, float(value)
+    except Exception:
         return False, invalid
 
 
