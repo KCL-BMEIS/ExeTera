@@ -848,16 +848,22 @@ class DataStore:
 
 
     def get_spans(self, field=None, fields=None):
-        if fields is not None:
-            if isinstance(fields[0], fld.Field):
-                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(), fields[1].get_spans())
-            if isinstance(fields[0], np.ndarray):
-                return ops._get_spans_for_2_fields(fields[0], fields[1])
+        if field is None and fields is None:
+            raise ValueError("One of 'field' and 'fields' must be set")
+        if field is not None and fields is not None:
+            raise ValueError("Only one of 'field' and 'fields' may be set")
+        raw_field = None
+        raw_fields = None
+        if field is not None:
+            val._check_is_reader_or_ndarray('field', field)
+            raw_field = field[:] if isinstance(field, rw.Reader) else field
+            return ops.get_spans_for_field(raw_field)
         else:
-            if isinstance(field, fld.Field):
-                return field.get_spans()
-            if isinstance(field, np.ndarray):
-                return ops.get_spans_for_field(field)
+            raw_fields = []
+            for f in fields:
+                val._check_is_reader_or_ndarray('elements of tuple/list fields', f)
+                raw_fields.append(f[:] if isinstance(f, rw.Reader) else f)
+            return ops._get_spans_for_2_fields(raw_fields[0], raw_fields[1])
 
 
 
