@@ -2492,8 +2492,8 @@ class FieldDataOps:
                                                             ops.apply_spans_index_of_first,
                                                             spans_, target, in_place)
         else:
-            return FieldDataOps._apply_spans_src(source, ops.apply_spans_first, spans_, None,
-                                                 target, in_place)
+            return FieldDataOps._apply_spans_src(source, ops.apply_spans_first,
+                                                 spans_, None, target, in_place)
 
     @staticmethod
     def apply_spans_last(source: Field,
@@ -2510,8 +2510,8 @@ class FieldDataOps:
                                                             ops.apply_spans_index_of_last,
                                                             spans_, target, in_place)
         else:
-            return FieldDataOps._apply_spans_src(source, ops.apply_spans_last, spans_, None,
-                                                 target, in_place)
+            return FieldDataOps._apply_spans_src(source, ops.apply_spans_last,
+                                                 spans_, None, target, in_place)
 
     @staticmethod
     def apply_spans_min(source: Field,
@@ -2528,8 +2528,8 @@ class FieldDataOps:
                                                          ops.apply_spans_index_of_min_indexed,
                                                          spans_, target, in_place)
         else:
-            return FieldDataOps._apply_spans_src(source, ops.apply_spans_min, spans_, None,
-                                                 target, in_place)
+            return FieldDataOps._apply_spans_src(source, ops.apply_spans_min,
+                                                 spans_, None, target, in_place)
 
 
     @staticmethod
@@ -2547,8 +2547,8 @@ class FieldDataOps:
                                                          ops.apply_spans_index_of_max_indexed,
                                                          spans_, target, in_place)
         else:
-            return FieldDataOps._apply_spans_src(source, ops.apply_spans_max, spans_, None,
-                                                 target, in_place)
+            return FieldDataOps._apply_spans_src(source, ops.apply_spans_max,
+                                                 spans_, None, target, in_place)
 
     @staticmethod
     def apply_spans_count_distinct(source: Field,
@@ -2563,15 +2563,19 @@ class FieldDataOps:
         if source.indexed:
             raise ValueError("'source' cannot be an indexed field")
 
-        if ops.sorted_within_spans(spans, source.data[:]):
-            op_ = ops.apply_spans_count_distinct_ordered_impl
-        else:
-            if isinstance(source, (FixedStringField, FixedStringMemField)):
-                op_ = ops.apply_spans_count_distinct_fixed_impl
-            else:
-                op_ = ops.apply_spans_count_distinct
+        # if ops.sorted_within_spans(spans, source.data[:]):
+        #     op_ = ops.apply_spans_count_distinct_ordered_impl
+        # else:
+        #     if isinstance(source, (FixedStringField, FixedStringMemField)):
+        #         op_ = ops.apply_spans_count_distinct_fixed_impl
+        #     else:
+        #         op_ = ops.apply_spans_count_distinct
 
-        return FieldDataOps._apply_spans_src(source, op_, spans_, np.int32, target, in_place)
+        if target is None:
+            target = NumericMemField(source._session, 'int32')
+
+        return FieldDataOps._apply_spans_src(source, ops.apply_spans_count_distinct,
+                                             spans_, np.int32, target, in_place)
 
     @staticmethod
     def apply_spans_count_distinct_fixed(source: Field,
@@ -2585,6 +2589,9 @@ class FieldDataOps:
 
         if not isinstance(source, (FixedStringField, FixedStringMemField)):
             raise ValueError("'source' must be a field containing fixed length string data")
+
+        if target is None:
+            target = NumericMemField(source._session, 'int32')
 
         return FieldDataOps._apply_spans_src(source, ops.apply_spans_count_distinct_fixed,
                                              spans_, np.int32, target, in_place)
