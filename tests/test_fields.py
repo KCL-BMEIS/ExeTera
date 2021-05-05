@@ -1007,6 +1007,15 @@ class TestFieldApplySpansCount(unittest.TestCase):
                                    lambda df: df.create_fixed_string('foo', 2),
                                    lambda f, p, d: f.apply_spans_max(p, d))
 
+        src_data = np.asarray([b'a', b'a', b'a', b'b', b'b', b'c', b'd', b'e', b'f', b'g', b'h',
+                               b'i', b'j', b'j', b'k', b'k', b'l', b'm', b'n', b'm', b'o',
+                               b'p', b'p', b'p', b'p'], dtype='S1')
+        spans = np.asarray([0, 3, 5, 6, 8, 11, 14, 17, 21, 23, 25])
+        expected = [1, 1, 1, 2, 3, 2, 2, 3, 1, 1]
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_fixed_string('foo', 1),
+                                   lambda f, p, d: f.apply_spans_count_distinct(p, d))
+
     def test_numeric_apply_spans(self):
         spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
         src_data = [1, 2, 11, 21, 22, 23, 31, 32]
@@ -1030,6 +1039,16 @@ class TestFieldApplySpansCount(unittest.TestCase):
         self._test_apply_spans_src(spans, src_data, expected,
                                    lambda df: df.create_numeric('foo', 'int32'),
                                    lambda f, p, d: f.apply_spans_max(p, d))
+
+        data = np.asarray([1, 1, 1, 2, 2, 3, 4, 5, 6, 7, 8,
+                           9, 10, 10, 11, 11, 12, 13, 14, 13, 15,
+                           16, 16, 16, 16])
+        spans = np.asarray([0, 3, 5, 6, 8, 11, 14, 17, 21, 23, 25])
+        expected = [1, 1, 1, 2, 3, 2, 2, 3, 1, 1]
+        self._test_apply_spans_src(spans, data, expected,
+                                   lambda df: df.create_numeric('foo', 'int32'),
+                                   lambda f, p, d: f.apply_spans_count_distinct(p, d))
+
 
     def test_categorical_apply_spans(self):
         spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
@@ -1055,6 +1074,15 @@ class TestFieldApplySpansCount(unittest.TestCase):
         self._test_apply_spans_src(spans, src_data, expected,
                                    lambda df: df.create_categorical('foo', 'int8', keys),
                                    lambda f, p, d: f.apply_spans_max(p, d))
+
+        data = np.asarray([0, 0, 0, 1, 1, 2, 0, 1, 0, 1, 2,
+                           0, 1, 1, 0, 0, 1, 0, 1, 0, 2,
+                           1, 1, 2, 2])
+        spans = np.asarray([0, 3, 5, 6, 8, 11, 14, 17, 21, 23, 25])
+        expected = [1, 1, 1, 2, 3, 2, 2, 3, 1, 1]
+        self._test_apply_spans_src(spans, data, expected,
+                                   lambda df: df.create_numeric('foo', 'int32'),
+                                   lambda f, p, d: f.apply_spans_count_distinct(p, d))
 
     def test_timestamp_apply_spans(self):
         spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
@@ -1083,6 +1111,15 @@ class TestFieldApplySpansCount(unittest.TestCase):
                                    lambda df: df.create_timestamp('foo'),
                                    lambda f, p, d: f.apply_spans_max(p, d))
 
+        data = np.asarray([0, 0, 0, 1, 1, 2, 0, 1, 0, 1, 2,
+                           0, 1, 1, 0, 0, 1, 0, 1, 0, 2,
+                           1, 1, 2, 2])
+        data = src_data[data]
+        spans = np.asarray([0, 3, 5, 6, 8, 11, 14, 17, 21, 23, 25])
+        expected = [1, 1, 1, 2, 3, 2, 2, 3, 1, 1]
+        self._test_apply_spans_src(spans, data, expected,
+                                   lambda df: df.create_numeric('foo', 'int32'),
+                                   lambda f, p, d: f.apply_spans_count_distinct(p, d))
 
 class TestFieldCreateLike(unittest.TestCase):
 

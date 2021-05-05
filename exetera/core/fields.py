@@ -549,6 +549,11 @@ class IndexedStringMemField(MemoryField):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+    def apply_spans_count_distinct(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_count_distinct_indexed(self, spans_to_apply,
+                                                               target, in_place)
+
+
 class FixedStringMemField(MemoryField):
     def __init__(self, session, length):
         super().__init__(session)
@@ -626,6 +631,10 @@ class FixedStringMemField(MemoryField):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+    def apply_spans_count_distinct(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_count_distinct_fixed(self, spans_to_apply,
+                                                             target, in_place)
+
 
 class NumericMemField(MemoryField):
     def __init__(self, session, nformat):
@@ -700,6 +709,9 @@ class NumericMemField(MemoryField):
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
+    def apply_spans_count_distinct(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_count_distinct(self, spans_to_apply, target, in_place)
 
     def __add__(self, second):
         return FieldDataOps.numeric_add(self._session, self, second)
@@ -871,6 +883,9 @@ class CategoricalMemField(MemoryField):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+    def apply_spans_count_distinct(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_count_distinct(self, spans_to_apply, target, in_place)
+
     def __lt__(self, value):
         return FieldDataOps.less_than(self._session, self, value)
 
@@ -961,6 +976,9 @@ class TimestampMemField(MemoryField):
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
+    def apply_spans_count_distinct(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_count_distinct(self, spans_to_apply, target, in_place)
 
     def __add__(self, second):
         return FieldDataOps.numeric_add(self._session, self, second)
@@ -1216,6 +1234,10 @@ class IndexedStringField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+    def apply_spans_count_distinct(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_count_distinct_indexed(self, spans_to_apply,
+                                                               target, in_place)
+
 
 class FixedStringField(HDF5Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
@@ -1310,6 +1332,10 @@ class FixedStringField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+    def apply_spans_count_distinct(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_count_distinct_fixed(self, spans_to_apply,
+                                                             target, in_place)
+
 
 class NumericField(HDF5Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
@@ -1398,6 +1424,9 @@ class NumericField(HDF5Field):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
+    def apply_spans_count_distinct(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_count_distinct(self, spans_to_apply, target, in_place)
 
     def __add__(self, second):
         self._ensure_valid()
@@ -1617,6 +1646,9 @@ class CategoricalField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+    def apply_spans_count_distinct(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_count_distinct(self, spans_to_apply, target, in_place)
+
     def __lt__(self, value):
         self._ensure_valid()
         return FieldDataOps.less_than(self._session, self, value)
@@ -1729,6 +1761,9 @@ class TimestampField(HDF5Field):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
+    def apply_spans_count_distinct(self, spans_to_apply, target=None, in_place=False):
+        return FieldDataOps.apply_spans_count_distinct(self, spans_to_apply, target, in_place)
 
     def __add__(self, second):
         self._ensure_valid()
@@ -2373,6 +2408,7 @@ class FieldDataOps:
     def _apply_spans_src(source: Field,
                          predicate: Callable[[np.ndarray, np.ndarray, np.ndarray], Field],
                          spans: Union[Field, np.ndarray],
+                         result_dtype: Union[None, np.dtype],
                          target: Optional[Field] = None,
                          in_place: bool = False) -> Field:
 
@@ -2381,7 +2417,8 @@ class FieldDataOps:
 
         spans_ = val.array_from_field_or_lower('spans', spans)
         result_inds = np.zeros(len(spans))
-        results = np.zeros(len(spans)-1, dtype=source.data.dtype)
+        rdtype = source.data.dtype if result_dtype is None else result_dtype
+        results = np.zeros(len(spans)-1, dtype=rdtype)
         predicate(spans_, source.data[:], results)
 
         if in_place is True:
@@ -2455,7 +2492,7 @@ class FieldDataOps:
                                                             ops.apply_spans_index_of_first,
                                                             spans_, target, in_place)
         else:
-            return FieldDataOps._apply_spans_src(source, ops.apply_spans_first, spans_,
+            return FieldDataOps._apply_spans_src(source, ops.apply_spans_first, spans_, None,
                                                  target, in_place)
 
     @staticmethod
@@ -2473,7 +2510,7 @@ class FieldDataOps:
                                                             ops.apply_spans_index_of_last,
                                                             spans_, target, in_place)
         else:
-            return FieldDataOps._apply_spans_src(source, ops.apply_spans_last, spans_,
+            return FieldDataOps._apply_spans_src(source, ops.apply_spans_last, spans_, None,
                                                  target, in_place)
 
     @staticmethod
@@ -2491,7 +2528,7 @@ class FieldDataOps:
                                                          ops.apply_spans_index_of_min_indexed,
                                                          spans_, target, in_place)
         else:
-            return FieldDataOps._apply_spans_src(source, ops.apply_spans_min, spans_,
+            return FieldDataOps._apply_spans_src(source, ops.apply_spans_min, spans_, None,
                                                  target, in_place)
 
 
@@ -2510,8 +2547,62 @@ class FieldDataOps:
                                                          ops.apply_spans_index_of_max_indexed,
                                                          spans_, target, in_place)
         else:
-            return FieldDataOps._apply_spans_src(source, ops.apply_spans_max, spans_,
+            return FieldDataOps._apply_spans_src(source, ops.apply_spans_max, spans_, None,
                                                  target, in_place)
+
+    @staticmethod
+    def apply_spans_count_distinct(source: Field,
+                                   spans: Union[Field, np.ndarray],
+                                   target: Optional[Field] = None,
+                                   in_place: bool = None) -> Field:
+
+        spans_ = val.array_from_field_or_lower('spans', spans)
+        if np.any(spans_[:-1] == spans_[1:]):
+            raise ValueError("cannot perform 'distinct' on spans with empty entries")
+
+        if source.indexed:
+            raise ValueError("'source' cannot be an indexed field")
+
+        if ops.sorted_within_spans(spans, source.data[:]):
+            op_ = ops.apply_spans_count_distinct_ordered_impl
+        else:
+            if isinstance(source, (FixedStringField, FixedStringMemField)):
+                op_ = ops.apply_spans_count_distinct_fixed_impl
+            else:
+                op_ = ops.apply_spans_count_distinct
+
+        return FieldDataOps._apply_spans_src(source, op_, spans_, np.int32, target, in_place)
+
+    @staticmethod
+    def apply_spans_count_distinct_fixed(source: Field,
+                                         spans: Union[Field, np.ndarray],
+                                         target: Optional[Field] = None,
+                                         in_place: bool = None) -> Field:
+
+        spans_ = val.array_from_field_or_lower('spans', spans)
+        if np.any(spans_[:-1] == spans_[1:]):
+            raise ValueError("cannot perform 'distinct' on spans with empty entries")
+
+        if not isinstance(source, (FixedStringField, FixedStringMemField)):
+            raise ValueError("'source' must be a field containing fixed length string data")
+
+        return FieldDataOps._apply_spans_src(source, ops.apply_spans_count_distinct_fixed,
+                                             spans_, np.int32, target, in_place)
+
+
+
+    @staticmethod
+    def apply_spans_count_distinct_indexed(source: Field,
+                                           spans: Union[Field, np.ndarray],
+                                           target: Optional[Field] = None,
+                                           in_place: bool = None) -> Field:
+
+        spans_ = val.array_from_field_or_lower('spans', spans)
+        if np.any(spans_[:-1] == spans_[1:]):
+            raise ValueError("cannot perform 'distinct' on spans with empty entries")
+
+        if not source.indexed:
+            raise ValueError("'target' must be an indexed field")
 
     @staticmethod
     def indexed_string_create_like(source, group, name, timestamp):

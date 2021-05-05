@@ -2,7 +2,8 @@ from datetime import datetime
 import numpy as np
 from numba import jit, njit
 import numba
-from numba.typed import List
+from numba.core import types as nbtypes
+from numba.typed import Dict, List
 
 from exetera.core import validation as val
 from exetera.core.abstract_types import Field
@@ -483,6 +484,140 @@ def apply_spans_min(spans, src_array, dest_array):
             dest_array[i] = src_array[cur]
         else:
             dest_array[i] = src_array[cur:next].min()
+
+
+def apply_spans_count_distinct(spans, src_array, dest_array):
+    if sorted_within_spans(spans, src_array):
+        return apply_spans_count_distinct_ordered_impl(spans, src_array, dest_array)
+    return apply_spans_count_distinct_impl(spans, src_array, dest_array)
+
+
+def apply_spans_count_distinct_fixed(spans, src_array, dest_array):
+    if sorted_within_spans(spans, src_array):
+        return apply_spans_count_distinct_ordered_impl(spans, src_array, dest_array)
+    return apply_spans_count_distinct_fixed_impl(spans, src_array, dest_array)
+
+
+def apply_spans_count_distinct_indexed(spans, src_indices, src_values, dest_array):
+    if sorted_within_spans_indexed(spans, src_indices, src_values):
+        return apply_spans_count_distinct_indexed_ordered_impl(spans, src_indices, src_values,
+                                                               dest_array)
+    return apply_spans_count_distinct_indexed_impl(spans, src_indices, src_values, dest_array)
+
+
+@njit
+def apply_spans_count_distinct_impl(spans, src_array, dest_array):
+    distinct = set()
+    for i in range(len(spans)-1):
+        cur_start, cur_end = spans[i], spans[i+1]
+        if cur_end - cur_start == 1:
+            dest_array[i] = 1
+        else:
+            distinct.clear()
+            last = src_array[cur_start]
+            distinct.add(last)
+            for j in range(cur_start+1, cur_end):
+                current = src_array[j]
+                if last != current:
+                    distinct.add(current)
+                    last = current
+            dest_array[i] = len(distinct)
+
+
+@njit
+def apply_spans_count_distinct_ordered_impl(spans, src_array, dest_array):
+    for i in range(len(spans)-1):
+        cur_start, cur_end = spans[i], spans[i+1]
+        if cur_end - cur_start == 1:
+            dest_array[i] = 1
+        else:
+            distinct = 1
+            last = src_array[cur_start]
+            for j in range(cur_start+1, cur_end):
+                current = src_array[j]
+                if last != current:
+                    distinct += 1
+                    last = current
+            dest_array[i] = distinct
+
+
+@njit
+def apply_spans_count_distinct_fixed_impl(spans, src_array, dest_array):
+    for i in range(len(spans)-1):
+        cur_start, cur_end = spans[i], spans[i+1]
+        if cur_end - cur_start == 1:
+            dest_array[i] = 1
+        else:
+            args = np.argsort(src_array[cur_start:cur_end])
+            distinct = 1
+            for j in range(1, cur_end - cur_start):
+                if src_array[cur_start + args[j-1]] != src_array[cur_start + args[j]]:
+                    distinct += 1
+            dest_array[i] = distinct
+
+
+def apply_spans_count_distinct_indexed_ordered_impl(spans, src_indices, src_values, dest_array):
+    raise NotImplementedError()
+
+
+#@njit
+def apply_spans_count_distinct_indexed_impl(spans, src_indices, src_values, dest_array):
+    distinct = Dict.empty(key_type=nbtypes.string, value_type=nbtypes.int32)
+    # distinct = Dict()
+    for i in range(len(spans)-1):
+        cur_start, cur_end = spans[i], spans[i+1]
+        if cur_end - cur_start == 1:
+            dest_array[i] = 1
+        else:
+            distinct.clear()
+            last_start = src_indices[cur_start]
+            last_end = src_indices[cur_start+1]
+            distinct[src_values[last_start:last_end].tobytes().decode()] = numba.int32(1)
+            for j in range(cur_start+1, cur_end):
+                next_start = src_indices[j]
+                next_end = src_indices[j+1]
+                if last_end - last_start != next_end - next_start:
+                    distinct[src_values[next_start:next_end].tobytes().decode()] = numba.int32(1)
+                    last_start = next_start
+                    last_end = next_end
+                else:
+                    for k in range(0, last_end-last_start):
+                        if src_values[last_start + k] != src_values[next_start + k]:
+                            distinct[src_values[next_start:next_end].tobytes().decode()] = numba.int32(1)
+                            last_start = next_start
+                            last_end = next_end
+                            break
+            dest_array[i] = len(distinct)
+
+# Utilities
+# =========
+
+@njit
+def sorted_within_spans(spans, source):
+    for s in range(len(spans)-1):
+        cur_start = spans[s]
+        cur_end = spans[s+1]
+        if cur_end - cur_start > 1:
+            for c in range(cur_start, cur_end-1):
+                if source[c+1] < source[c]:
+                    return False
+    return True
+
+
+@njit
+def sorted_within_spans_fixed(spans, source):
+    for s in range(len(spans)-1):
+        cur_start = spans[s]
+        cur_end = spans[s+1]
+        if cur_end - cur_start > 1:
+            for c in range(cur_start, cur_end-1):
+                if source[c+1] > source[c]:
+                    return False
+    return True
+
+
+def sorted_within_spans_indexed(spans, source_inds, source_vals):
+    raise NotImplementedError()
 
 
 # def _apply_spans_concat(spans, src_field):
