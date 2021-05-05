@@ -6,8 +6,7 @@ import numpy as np
 
 from exetera.core import persistence as pers
 from exetera.core.data_writer import DataWriter
-
-from numba import njit
+from exetera.core import operations as ops
 
 class Reader:
     def __init__(self, field):
@@ -360,7 +359,7 @@ class CategoricalImporter:
                                         categories, timestamp, write_mode)
         self.field_size = max([len(k) for k in categories.keys()])
 
-        self.byte_map = self._get_byte_map(categories)
+        self.byte_map = ops.get_byte_map(categories)
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype='int8')
@@ -383,67 +382,9 @@ class CategoricalImporter:
     def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
         chunk = np.zeros(written_row_count, dtype=np.uint8)
         cat_keys, _, cat_index, cat_values = self.byte_map
-
-        @njit           
-        def fast_categorical_transform(chunk, i_c, column_inds, column_vals, cat_keys, cat_index, cat_values):
                 
-            for row_idx in range(len(column_inds[i_c]) - 1):
-                if row_idx >= chunk.shape[0]:
-                    break
-
-                key_start = column_inds[i_c, row_idx]
-                key_end = column_inds[i_c, row_idx + 1]
-                key_len = key_end - key_start
-
-                for i in range(len(cat_index) - 1):
-                    sc_key_len = cat_index[i + 1] - cat_index[i]
-                    if key_len != sc_key_len:
-                        continue
-
-                    index = i
-                    for j in range(key_len):
-                        entry_start = cat_index[i]
-                        if column_vals[i_c, key_start + j] != cat_keys[entry_start + j]:
-                            index = -1
-                            break
-
-                    if index != -1:
-                        chunk[row_idx] = cat_values[index]
-
-                        
-        fast_categorical_transform(chunk, col_idx, column_inds, column_vals, cat_keys, cat_index, cat_values)
-        print('chunk', chunk)
+        ops.categorical_transform(chunk, col_idx, column_inds, column_vals, cat_keys, cat_index, cat_values)
         self.writer.write_part(chunk)
-
-
-    def _get_byte_map(self, string_map):
-        # sort by length of key first, and then sort alphabetically
-        sorted_string_map = {k: v for k, v in sorted(string_map.items(), key=lambda item: item[0])}
-        sorted_string_key = [(len(k), np.frombuffer(k.encode(), dtype=np.uint8), v) for k, v in sorted_string_map.items()]
-        sorted_string_values = list(sorted_string_map.values())
-        
-        # assign byte_map_key_lengths, byte_map_value
-        byte_map_key_lengths = np.zeros(len(sorted_string_map), dtype=np.uint8)
-        byte_map_value = np.zeros(len(sorted_string_map), dtype=np.uint8)
-
-        for i, (length, _, v)  in enumerate(sorted_string_key):
-            byte_map_key_lengths[i] = length
-            byte_map_value[i] = v
-
-        # assign byte_map_keys, byte_map_key_indices
-        byte_map_keys = np.zeros(sum(byte_map_key_lengths), dtype=np.uint8)
-        byte_map_key_indices = np.zeros(len(sorted_string_map)+1, dtype=np.uint8)
-        
-        idx_pointer = 0
-        for i, (_, b_key, _) in enumerate(sorted_string_key):   
-            for b in b_key:
-                byte_map_keys[idx_pointer] = b
-                idx_pointer += 1
-
-            byte_map_key_indices[i + 1] = idx_pointer  
-
-        byte_map = [byte_map_keys, byte_map_key_lengths, byte_map_key_indices, byte_map_value]
-        return byte_map
 
 
 class CategoricalWriter(Writer):
@@ -491,28 +432,6 @@ class CategoricalWriter(Writer):
         self.write_part(values)
         self.flush()
 
-# class CategoricalImporter:
-#     def __init__(self, datastore, group, name, categories,
-#                  timestamp=None, write_mode='write'):
-#         if timestamp is None:
-#             timestamp = datastore.timestamp
-
-#         self.timestamp = timestamp
-#         self.datastore = datastore
-
-
-#         self.field = group[name]
-        
-
-#         self.writer = CategoricalWriter(datastore, group, name,
-#                                         categories, timestamp, write_mode)
-        
-#         self.keys = categories  # {string: number}
-#         self.byte_map = self.get_byte_map(self.keys)
-
-
- 
-        
 
 class NumericImporter:
     def __init__(self, datastore, group, name, nformat, parser, invalid_value=0,
@@ -567,129 +486,15 @@ class NumericImporter:
         elements = np.zeros(written_row_count, dtype=self.data_writer.nformat)
         validity = np.zeros(written_row_count, dtype='bool')
 
-        @njit
-        def numeric_transform(elements, validity, column_inds, column_vals, col_idx, written_row_count,
-                                parser, invalid_value, validation_mode, field_name):
-                              
-            exception_message, exception_args = 0, [field_name]
-
-            for row_idx in range(written_row_count):
-                empty = False  
-                valid_input = True # Start by assuming number is valid
-  
-                row_start_idx = column_inds[col_idx, row_idx]
-                row_end_idx = column_inds[col_idx, row_idx + 1]
-
-                # number of bytes in this row (number) 
-                length = row_end_idx - row_start_idx
-
-                value = 0
-                bytes_start_index = 0 # Start by assuming no whitespace
-                negative_multiplier = 1 # Start by assuming not negative
-                decimal_index = length # Start by assuming no decimal
-
-                num_after_decimcal = 0 # Stores sum before decimal
-                num_before_decimal = 0 # Stores sum after decimal
-
-                num_of_nums_in_result = 0 # Counts nums for validation
-
-                
-                # For each byte, check the meaning and build real number
-                for byte_idx in range(length):
-                    val = column_vals[col_idx, row_start_idx + byte_idx]
-                    if val == 32: # empty space
-                        bytes_start_index = byte_idx + 1
-                        continue
-                    elif val == 45: # - (negative) symbol
-                        negative_multiplier = -1
-                        bytes_start_index = byte_idx + 1
-                        continue
-                    elif val == 46: # . (decimal) symbol
-                        decimal_index = byte_idx
-                        continue
-                    elif val < 48 or val > 57: # if not 0-9 (except those tested abow), invalidate
-                        valid_input = False
-                        #break
-
-                    num_of_nums_in_result += 1
-                    # Builds number based on value before or after decimal
-                    if byte_idx < decimal_index:
-                        window = decimal_index - bytes_start_index  # integral part
-                        pos = byte_idx - bytes_start_index
-                        num_before_decimal += (val - 48) * 10 ** (window - pos - 1)
-                    else:
-                        window = length - 1 - decimal_index # fraction part
-                        pos = byte_idx - decimal_index
-                        num_after_decimcal += (val - 48) * 10 ** (window - pos)
-
-                # If we could only find empty space
-                if length == bytes_start_index or num_of_nums_in_result == 0:
-                    empty = True
-                    valid_input = False
-
-                # Checking if all input valid to stop if already invalid
-                if not valid_input:
-                    elements[row_idx] = invalid_value
-                    validity[row_idx] = False
-
-                # Adjust for adding too many zeroes before we knew we had a decimal
-                divided = 10 ** (length - decimal_index)
-                num_before_decimal = num_before_decimal // divided  # actual integral part
-
-                # Adjust number after decimal based on length
-                if decimal_index != length:
-                    divided = 10 ** (length - decimal_index - 1)
-                    num_after_decimcal = num_after_decimcal / divided   # actual fractional part
-
-                # Calculate and set final number
-                val = negative_multiplier * (num_before_decimal + num_after_decimcal)
-
-                # TODO: This logic can be written cleaner
-                valid, value = parser(val, invalid_value)
-
-                if not valid or not valid_input:
-                    valid = False
-                    value = invalid_value
-
-                elements[row_idx] = value
-                validity[row_idx] = valid
-
-                # Optimized exception handling to avoid creating strings inside loop in Numba
-                if not valid:
-                    if validation_mode == 'strict':
-                        if empty:
-                            exception_message = 1
-                            exception_args = [field_name]
-                            break
-                        else:
-                            exception_message = 2
-                            non_parsable = column_vals[col_idx, row_start_idx : row_end_idx]
-                            exception_args = [field_name, non_parsable]
-                            break
-                    if validation_mode == 'allow_empty':
-                        if not empty:
-                            exception_message = 2
-                            non_parsable = column_vals[col_idx, row_start_idx : row_end_idx]
-                            exception_args = [field_name, non_parsable]
-                            break
-            return exception_message, exception_args
-
-
-        exception_message, exception_args = numeric_transform(
+        exception_message, exception_args = ops.numeric_transform(
             elements, validity, column_ids, column_vals, col_idx,
             written_row_count, self.parser, self.invalid_value,
             self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8)
         )
 
-        exceptions = {
-            1: "Numeric value in the field '{0}' can not be empty in strict mode",
-            2: "The following numeric value in the field '{0}' can not be parsed: {1}"
-        }
-
         if exception_message != 0:
-            raise Exception(exceptions[exception_message].format(
-                *[x.tobytes().decode('utf-8').strip() for x in exception_args]
-            ))
+            ops.raiseNumericException(exception_message, exception_args)
+
 
         self.data_writer.write_part(elements)
         if self.flag_writer is not None:
@@ -834,7 +639,7 @@ class DateTimeImporter:
         self.flush()
 
     def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
-        data = transform_to_values(column_inds, column_vals, col_idx, written_row_count)
+        data = ops.transform_to_values(column_inds, column_vals, col_idx, written_row_count)
         data = [x.tobytes().strip() for x in data]
         self.write_part(data)
 
@@ -1005,7 +810,7 @@ class OptionalDateImporter:
         return flags
 
     def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
-        data = transform_to_values(column_inds, column_vals, col_idx, written_row_count)
+        data = ops.transform_to_values(column_inds, column_vals, col_idx, written_row_count)
         data = [x.tobytes().strip() for x in data]
         self.write_part(data)
 
@@ -1021,14 +826,5 @@ class OptionalDateImporter:
         self.flush()
 
 
-@njit
-def transform_to_values(column_inds, column_vals, col_idx, written_row_count):
-    """
-    Method to transform column_vals to use old write_part()
-    """
-    data = []
-    for row_idx in range(written_row_count):
-        val = column_vals[col_idx, column_inds[col_idx, row_idx]: column_inds[col_idx, row_idx + 1]]
-        data.append(val)
-    return data
+
     
