@@ -10,6 +10,7 @@ from exetera.core import fields
 from exetera.core import persistence as per
 from exetera.core import operations as ops
 from exetera.core import utils
+from exetera.core.fields import IndexedStringMemField
 
 
 class TestSafeMap(unittest.TestCase):
@@ -58,6 +59,39 @@ class TestSafeMap(unittest.TestCase):
             np.asarray([3, 45, 6, 36, 0, 1, 55, 3, 45]), 0)
 
 
+class TestNumbaHelpers(unittest.TestCase):
+
+    def test_sorted_within_spans(self):
+        key = np.asarray([100, 100, 100, 101, 101, 102, 103, 103, 104, 104, 104,
+                          105, 105, 105, 106, 106, 106, 107, 107, 107, 107,
+                          108, 108, 109, 109], dtype=np.int32)
+        data = np.asarray([1, 1, 1, 2, 2, 3, 4, 5, 6, 7, 8,
+                           9, 10, 10, 11, 11, 12, 13, 14, 13, 15,
+                           16, 16, 16, 16])
+        spans = np.asarray([0, 3, 5, 6, 8, 11, 14, 17, 21, 23, 25])
+        self.assertFalse(ops.sorted_within_spans(spans, data))
+
+        data = np.asarray([1, 1, 1, 2, 2, 3, 4, 5, 6, 7, 8,
+                           9, 10, 10, 11, 11, 12, 13, 14, 14, 15,
+                           16, 16, 16, 16])
+        self.assertTrue(ops.sorted_within_spans(spans, data))
+
+    def test_sorted_within_spans_fixed_string(self):
+        key = np.asarray([100, 100, 100, 101, 101, 102, 103, 103, 104, 104, 104,
+                          105, 105, 105, 106, 106, 106, 107, 107, 107, 107,
+                          108, 108, 109, 109], dtype=np.int32)
+        data = np.asarray([b'a', b'a', b'a', b'b', b'b', b'c', b'd', b'e', b'f', b'g', b'h',
+                           b'i', b'j', b'j', b'k', b'k', b'l', b'm', b'n', b'm', b'o',
+                           b'p', b'p', b'p', b'p'], dtype='S1')
+        spans = np.asarray([0, 3, 5, 6, 8, 11, 14, 17, 21, 23, 25])
+        self.assertFalse(ops.sorted_within_spans(spans, data))
+
+        data = np.asarray([b'a', b'a', b'a', b'b', b'b', b'c', b'd', b'e', b'f', b'g', b'h',
+                           b'i', b'j', b'j', b'k', b'k', b'l', b'm', b'n', b'n', b'o',
+                           b'p', b'p', b'p', b'p'], dtype='S1')
+        self.assertTrue(ops.sorted_within_spans(spans, data))
+
+
 class TestAggregation(unittest.TestCase):
 
     def test_apply_spans_indexed_field(self):
@@ -84,7 +118,6 @@ class TestAggregation(unittest.TestCase):
         self.assertTrue(np.array_equal(dest, np.asarray([0, 3, 6, 8, 10], dtype=np.int32)))
         ops.apply_spans_index_of_last(spans, dest)
         self.assertTrue(np.array_equal(dest, np.asarray([2, 5, 7, 9, 10], dtype=np.int32)))
-
 
     def test_non_indexed_apply_spans_filter(self):
         values = np.asarray([1, 2, 3, 3, 2, 1, 1, 2, 2, 1, 1], dtype=np.int32)
@@ -120,6 +153,77 @@ class TestAggregation(unittest.TestCase):
         self.assertTrue(np.array_equal(dest, np.asarray([2, 0, 5, 7, 0, 9, 10], dtype=np.int32)))
         self.assertTrue(np.array_equal(flt, np.asarray([1, 0, 1, 1, 0, 1, 1], dtype=bool)))
 
+    def test_apply_spans_count_distinct_numeric(self):
+        key = np.asarray([100, 100, 100, 101, 101, 102, 103, 103, 104, 104, 104,
+                          105, 105, 105, 106, 106, 106, 107, 107, 107, 107,
+                          108, 108, 109, 109], dtype=np.int32)
+        data = np.asarray([1, 1, 1, 2, 2, 3, 4, 5, 6, 7, 8,
+                           9, 10, 10, 11, 11, 12, 13, 14, 13, 15,
+                           16, 16, 16, 16])
+        spans = np.asarray([0, 3, 5, 6, 8, 11, 14, 17, 21, 23, 25])
+        results = np.zeros(len(spans)-1, dtype=np.int32)
+
+        ops.apply_spans_count_distinct(spans, data, results)
+        self.assertListEqual([1, 1, 1, 2, 3, 2, 2, 3, 1, 1], results.tolist())
+
+    def test_apply_spans_count_distinct_numeric_ordered(self):
+        key = np.asarray([100, 100, 100, 101, 101, 102, 103, 103, 104, 104, 104,
+                          105, 105, 105, 106, 106, 106, 107, 107, 107, 107,
+                          108, 108, 109, 109], dtype=np.int32)
+        data = np.asarray([1, 1, 1, 2, 2, 3, 4, 5, 6, 7, 8,
+                           9, 10, 10, 11, 11, 12, 13, 14, 14, 15,
+                           16, 16, 16, 16])
+        spans = np.asarray([0, 3, 5, 6, 8, 11, 14, 17, 21, 23, 25])
+        results = np.zeros(len(spans)-1, dtype=np.int32)
+
+
+        ops.apply_spans_count_distinct_ordered_impl(spans, data, results)
+        self.assertListEqual([1, 1, 1, 2, 3, 2, 2, 3, 1, 1], results.tolist())
+
+    def test_apply_spans_count_distinct_fixed_str(self):
+        key = np.asarray([100, 100, 100, 101, 101, 102, 103, 103, 104, 104, 104,
+                          105, 105, 105, 106, 106, 106, 107, 107, 107, 107,
+                          108, 108, 109, 109], dtype=np.int32)
+        data = np.asarray([b'a', b'a', b'a', b'b', b'b', b'c', b'd', b'e', b'f', b'g', b'h',
+                           b'i', b'j', b'j', b'k', b'k', b'l', b'm', b'n', b'm', b'o',
+                           b'p', b'p', b'p', b'p'], dtype='S1')
+        spans = np.asarray([0, 3, 5, 6, 8, 11, 14, 17, 21, 23, 25])
+        results = np.zeros(len(spans)-1, dtype=np.int32)
+
+        ops.apply_spans_count_distinct_fixed_impl(spans, data, results)
+        self.assertListEqual([1, 1, 1, 2, 3, 2, 2, 3, 1, 1], results.tolist())
+
+    def test_apply_spans_count_distinct_fixed_str_ordered(self):
+        key = np.asarray([100, 100, 100, 101, 101, 102, 103, 103, 104, 104, 104,
+                          105, 105, 105, 106, 106, 106, 107, 107, 107, 107,
+                          108, 108, 109, 109], dtype=np.int32)
+        data = np.asarray([b'a', b'a', b'a', b'b', b'b', b'c', b'd', b'e', b'f', b'g', b'h',
+                           b'i', b'j', b'j', b'k', b'k', b'l', b'm', b'n', b'n', b'o',
+                           b'p', b'p', b'p', b'p'], dtype='S1')
+        spans = np.asarray([0, 3, 5, 6, 8, 11, 14, 17, 21, 23, 25])
+        results = np.zeros(len(spans) - 1, dtype=np.int32)
+
+        ops.apply_spans_count_distinct_ordered_impl(spans, data, results)
+        self.assertListEqual([1, 1, 1, 2, 3, 2, 2, 3, 1, 1], results.tolist())
+
+    def test_apply_spans_count_distinct_indexed_str(self):
+        key = np.asarray([100, 100, 100, 101, 101, 102, 103, 103, 104, 104, 104,
+                          105, 105, 105, 106, 106, 106, 107, 107, 107, 107,
+                          108, 108, 109, 109], dtype=np.int32)
+        data = ['a', 'a', 'a', 'bb', 'bb', 'ccc', 'dddd', 'eee', 'ff', 'g', 'hh',
+                'iii', 'jjjj', 'jjjj', 'kkk', 'kkk', 'll', 'm', 'nn', 'm', 'ooo',
+                'pppp', 'pppp', 'pppp', 'pppp']
+        field = IndexedStringMemField(session=None, chunksize=1024)
+        field.data.write(data)
+
+        spans = np.asarray([0, 3, 5, 6, 8, 11, 14, 17, 21, 23, 25])
+        results = np.zeros(len(spans)-1, dtype=np.int32)
+
+        ops.apply_spans_count_distinct_indexed_impl(spans, field.indices[:], field.values[:], results)
+        self.assertListEqual([1, 1, 1, 2, 3, 2, 2, 3, 1, 1], results.tolist())
+
+
+class TestOrderedMapLowLevel(unittest.TestCase):
 
     def test_ordered_map_valid_stream(self):
         bio = BytesIO()
