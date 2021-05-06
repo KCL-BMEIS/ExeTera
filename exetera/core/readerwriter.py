@@ -237,6 +237,7 @@ class IndexedStringWriter(Writer):
         self.accumulated = 0
         self.value_index = 0
         self.index_index = 0
+        self.chunk_accumulated = 0
 
     def chunk_factory(self, length):
         return [None] * length     
@@ -300,7 +301,10 @@ class IndexedStringWriter(Writer):
         self.flush()
 
     def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
-        index = column_inds[col_idx, :written_row_count] 
+        # broadcast accumulated size to current index array
+        index = column_inds[col_idx, :written_row_count] + self.chunk_accumulated
+        self.chunk_accumulated += column_inds[col_idx, written_row_count]
+
         values = column_vals[col_idx, :column_inds[col_idx, written_row_count]]
         self.write_part_raw(index, values)
 
@@ -365,10 +369,6 @@ class CategoricalImporter:
         return np.zeros(length, dtype='int8')
 
     def write_part(self, values):
-        # results = np.zeros(len(values), dtype='int8')
-        # keys = self.writer.keys
-        # for i in range(len(values)):
-        #     results[i] = keys[values[i]]
         self.writer.write_part(values)
 
     def flush(self):
@@ -378,13 +378,20 @@ class CategoricalImporter:
         self.write_part(values)
         self.flush()
 
+    def write_strings(self, values):
+        results = np.zeros(len(values), dtype='int8')
+        keys = self.writer.keys
+        for i in range(len(values)):
+            results[i] = keys[values[i]]
+        self.writer.write_part(results)
+        self.flush()
 
     def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
         chunk = np.zeros(written_row_count, dtype=np.uint8)
-        cat_keys, _, cat_index, cat_values = self.byte_map
+        cat_keys, cat_index, cat_values = self.byte_map
                 
         ops.categorical_transform(chunk, col_idx, column_inds, column_vals, cat_keys, cat_index, cat_values)
-        self.writer.write_part(chunk)
+        self.writer.write(chunk)
 
 
 class CategoricalWriter(Writer):

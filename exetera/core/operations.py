@@ -1214,6 +1214,8 @@ def is_ordered(field):
     return not np.any(fn(field[:-1], field[1:]))
 
 
+#======== method for transform functions that called in readerwriter.py ==========#
+
 def get_byte_map(string_map):
     """
     Getting byte indices and byte values from categorical key-value pair

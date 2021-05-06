@@ -24,9 +24,9 @@ from exetera.core import persistence as per
 from exetera.core import utils
 from exetera.core import operations as ops
 from exetera.core.load_schema import load_schema
-from exetera.core.csv_reader_speedup import fast_csv_reader, get_file_stat
+from exetera.core.csv_reader_speedup import read_file_using_fast_csv_reader
 
-def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite, include, exclude):
+def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite, include, exclude, chunk_size = 1 << 20):
 
     print(timestamp)
     print(schema_file)
@@ -104,7 +104,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
             DatasetImporter(datastore, files[sk], hf, sk, schema[sk], timestamp,
                             include=include, exclude=exclude,
                             stop_after=stop_after.get(sk, None),
-                            show_progress_every=show_every)
+                            show_progress_every=show_every, chunk_size=chunk_size)
 
             print(sk, hf.keys())
             table = hf[sk]
@@ -125,7 +125,7 @@ class DatasetImporter:
                  include=None, exclude=None,
                  keys=None,
                  stop_after=None, show_progress_every=None, filter_fn=None,
-                 early_filter=None):
+                 early_filter=None, chunk_size = 1 << 20):
 
         # self.names_ = list()
         self.index_ = None
@@ -149,7 +149,7 @@ class DatasetImporter:
             if space in exclude and len(exclude[space]) > 0:
                 available_keys = [k for k in available_keys if k not in exclude[space]]
 
-            # # available_keys = ['ruc11cd','ruc11']
+            # available_keys = ['ruc11cd','ruc11']
             # available_keys = ['lsoa11nm']
 
             if not keys:
@@ -170,7 +170,6 @@ class DatasetImporter:
                         f"'early_filter': tuple element zero must be a key that is in the dataset")
                 early_key_index = available_keys.index(early_filter[0])
 
-            chunk_size = 1 << 20
             new_fields = dict()
             field_importer_list = list()
             field_chunk_list = list()
@@ -186,78 +185,4 @@ class DatasetImporter:
         
         read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importer_list)
 
-
-def read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importer_list=None):
-
-    ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
-    SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
-    NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
-    WHITE_SPACE_VALUE = np.frombuffer(b' ', dtype='S1')[0][0]
-    #CARRIAGE_RETURN_VALUE = np.frombuffer(b'\r', dtype='S1')[0][0]
-
-    # TODO, add stop_after for row， show_progress_ever
-
-    time0 = time.time()
-
-    total_byte_size, count_columns, count_rows, val_row_count, val_threshold = get_file_stat(source, chunk_size)
-
-    with utils.Timer("read_file_using_fast_csv_reader"):
-        chunk_index = 0
-        hasHeader = True
-
-        rows = 0
-        # total_col = [[], []]
-        while chunk_index < total_byte_size:
-            # initialize column_inds, column_vals
-            column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
-            column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
-            # print('====== initialize =====')
-            # print(column_inds)
-            # print(column_vals)
-
-            # reads chunk size of file content
-            content = np.fromfile(source, count=chunk_size, offset=chunk_index, dtype=np.uint8)
-            length_content = content.shape[0]
-            if length_content == 0:
-                break
-
-            # check if there's newline at EOF in the last chunk. add one if it's missing
-            if chunk_index + length_content == total_byte_size and content[-1] != NEWLINE_VALUE:
-                content = np.append(content, NEWLINE_VALUE)
-
-            offset_pos, written_row_count = fast_csv_reader(content, column_inds, column_vals, hasHeader, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
-            # print('====== after csv reader =====')
-            # print('chunk_index', chunk_index)
-            # print('offset_pos', offset_pos)
-            # print('written_row_count', written_row_count)
-            # print('column_inds', column_inds)
-            # print('column_vals',column_vals)
-
-            chunk_index += offset_pos
-            hasHeader = False
-
-            # chunk = None
-            
-            for ith, i_c in enumerate(index_map):
-                
-                # if categorical_map_list and categorical_map_list[ith] is not None:
-                #     chunk = np.zeros(written_row_count, dtype=np.uint8)
-                #     cat_keys, _, cat_index, cat_values = categorical_map_list[ith]
-                #     my_fast_categorical_mapper(chunk, i_c, column_inds, column_vals, cat_keys, cat_index, cat_values)
-                #     total_col[ith].extend(chunk)
-                
-                if field_importer_list and field_importer_list[ith]: # and chunk is not None: 
-                    # print('i_c', i_c, 'writer', writer_list[ith])
-                    field_importer_list[ith].transform_and_write_part(column_inds, column_vals, i_c, written_row_count)
-                    # field_importer_list[ith].write_part(chunk)
-                    field_importer_list[ith].flush()
-
-            rows += written_row_count
-            print(f"{rows} rows parsed in {time.time() - time0}s")
-
-
-        # print("i_c", 0, Counter(total_col[0]))
-        # print("i_c", 1, Counter(total_col[1]))
-    
-    print(f"Total time {time.time() - time0}s")
 
