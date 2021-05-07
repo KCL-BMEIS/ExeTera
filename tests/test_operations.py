@@ -12,6 +12,44 @@ from exetera.core import operations as ops
 from exetera.core import utils
 
 
+class TestOpsUtils(unittest.TestCase):
+
+    def test_chunks(self):
+        lc_it = iter(ops.chunks(54321, 10000))
+        self.assertTupleEqual(next(lc_it), (0, 10000))
+        self.assertTupleEqual(next(lc_it), (10000, 20000))
+        self.assertTupleEqual(next(lc_it), (20000, 30000))
+        self.assertTupleEqual(next(lc_it), (30000, 40000))
+        self.assertTupleEqual(next(lc_it), (40000, 50000))
+        self.assertTupleEqual(next(lc_it), (50000, 54321))
+        with self.assertRaises(StopIteration):
+            next(lc_it)
+
+        actual = list(ops.chunks(54321, 10000))
+        self.assertListEqual(actual,
+                             [(0, 10000), (10000, 20000), (20000, 30000), (30000, 40000),
+                              (40000, 50000), (50000, 54321)])
+
+        foo = next(iter(ops.chunks(54321, 10000)))
+        print(foo, next(foo))
+
+    def test_count_back(self):
+        self.assertEqual(ops.count_back(np.asarray([1, 2, 3, 4, 5], dtype=np.int32)), 4)
+        self.assertEqual(ops.count_back(np.asarray([1, 2, 3, 4, 4], dtype=np.int32)), 3)
+        self.assertEqual(ops.count_back(np.asarray([1, 2, 3, 3, 3], dtype=np.int32)), 2)
+        self.assertEqual(ops.count_back(np.asarray([1, 2, 2, 2, 2], dtype=np.int32)), 1)
+        self.assertEqual(ops.count_back(np.asarray([1, 1, 1, 1, 1], dtype=np.int32)), 0)
+
+
+    def test_next_chunk(self):
+        self.assertTupleEqual(ops.next_chunk(0, 4, 3), (0, 3))
+        self.assertTupleEqual(ops.next_chunk(0, 4, 4), (0, 4))
+        self.assertTupleEqual(ops.next_chunk(0, 4, 5), (0, 4))
+        self.assertTupleEqual(ops.next_chunk(4, 8, 3), (4, 7))
+        self.assertTupleEqual(ops.next_chunk(4, 8, 4), (4, 8))
+        self.assertTupleEqual(ops.next_chunk(4, 8, 5), (4, 8))
+
+
 class TestSafeMap(unittest.TestCase):
 
     def _impl_safe_map_index_values(self, indices, values, map_indices,
@@ -142,6 +180,46 @@ class TestAggregation(unittest.TestCase):
             self.assertTrue(np.array_equal(result_field, expected))
 
 
+    def test_ordered_map_right_to_left_partial(self):
+        i_off, j_off, i, j, r, ii, jj, iimax, jjmax, inner = 0, 0, 0, 0, 0, 0, 0, -1, -1, False
+        left = np.asarray([10, 20, 30, 40, 40, 50, 50], dtype=np.int32)
+        right = np.asarray([20, 30, 40, 40, 40, 60, 70], dtype=np.int32)
+        results = np.zeros(8, dtype=np.int32)
+        res = ops.ordered_map_right_to_left_partial(
+            left, len(left), right, len(right), results,
+            -1, i_off, j_off, i, j, r, ii, jj, iimax, jjmax, inner)
+        self.assertTupleEqual(res, (3, 2, 8, 1, 2, 2, 3, True))
+        self.assertListEqual(results.tolist(), [-1, 0, 1, 2, 3, 4, 2, 3])
+        results = np.zeros(8, dtype=np.int32)
+        res = ops.ordered_map_right_to_left_partial(
+            left, len(left), right, len(right), results,
+            -1, 0, 0, 3, 2, 0, 1, 2, 2, 3, True)
+        print(res)
+        print(results)
+
+
+    def test_ordered_map_right_to_left_full_right_final(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 40, 40, 50, 50], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 40, 40, 60, 70], dtype=np.int32))
+        result = fields.NumericMemField(None, 'int32')
+        expected = [-1, 0, 1, 2, 3, 4, 2, 3, 4, -1, -1]
+        ops.ordered_map_right_to_left_streamed(left, right, result, -1, chunksize=4)
+        self.assertListEqual(result.data[:].tolist(), expected)
+
+
+    def test_ordered_map_right_to_left_full_left_final(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 40, 40, 50, 80], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 40, 40, 60, 70], dtype=np.int32))
+        result = fields.NumericMemField(None, 'int32')
+        expected = [-1, 0, 1, 2, 3, 4, 2, 3, 4, -1, -1]
+        ops.ordered_map_right_to_left_streamed(left, right, result, -1, chunksize=4)
+        self.assertListEqual(result.data[:].tolist(), expected)
+
+
     def test_ordered_map_to_right_both_unique(self):
         raw_ids = [0, 1, 2, 3, 5, 6, 7, 9]
         a_ids = np.asarray(raw_ids, dtype=np.int64)
@@ -159,9 +237,32 @@ class TestAggregation(unittest.TestCase):
         b_ids = np.asarray([1, 2, 3, 4, 5, 7, 8, 9], dtype=np.int64)
         results = np.zeros(len(b_ids), dtype=np.int64)
         ops.ordered_map_to_right_right_unique(b_ids, a_ids, results)
+
         expected = np.array([1, 2, 3, ops.INVALID_INDEX, 4, 6, ops.INVALID_INDEX, 7],
                             dtype=np.int64)
         self.assertTrue(np.array_equal(results, expected))
+
+
+    def test_ordered_map_to_right_right_unique_2(self):
+        a_ids = np.asarray([10, 20, 30, 40, 50], dtype=np.int64)
+        b_ids = np.asarray([20, 20, 30, 30, 60], dtype=np.int64)
+        results = np.zeros(len(b_ids), dtype=np.int64)
+        ops.ordered_map_to_right_right_unique(b_ids, a_ids, results)
+
+        expected = np.array([1, 1, 2, 2, ops.INVALID_INDEX],
+                            dtype=np.int64)
+        self.assertListEqual(results.tolist(), expected.tolist())
+
+
+    def test_ordered_map_to_right_right_unique_3(self):
+        a_ids = np.asarray([10, 20, 30, 40, 60], dtype=np.int64)
+        b_ids = np.asarray([20, 20, 30, 30, 50], dtype=np.int64)
+        results = np.zeros(len(b_ids), dtype=np.int64)
+        ops.ordered_map_to_right_right_unique(b_ids, a_ids, results)
+
+        expected = np.array([1, 1, 2, 2, ops.INVALID_INDEX],
+                            dtype=np.int64)
+        self.assertListEqual(results.tolist(), expected.tolist())
 
 
     def test_ordered_map_to_right_left_unique_streamed(self):

@@ -20,6 +20,30 @@ def chunks(length, chunksize=1 << 20):
         yield cur, next_
         cur = next_
 
+# @njit
+def count_back(array):
+    v = len(array)-1
+    while v > 0:
+        if array[v-1] != array[v]:
+            return v
+        v -= 1
+    return 0
+
+
+def next_chunk(current, length, desired):
+    if current + desired < length:
+        return current, current + desired
+    else:
+        return current, length
+
+
+def get_next_chunk(start, chunk_size, field):
+    next_range = next_chunk(start, len(field), chunk_size)
+    next_ = field.data[next_range[0]:next_range[1]]
+    if next_range[1] != len(field):
+        next_range = next_range[0], next_range[0] + count_back(next_)
+    return next_range, next_
+
 
 def safe_map(field, map_field, map_filter, empty_value=None):
     if isinstance(field, Field):
@@ -720,6 +744,91 @@ def ordered_map_to_right_right_unique_partial(d_j, left, right, left_to_right):
             # j += 1
     return i, j, unmapped
 
+def ordered_map_right_to_left_streamed(left, right, result,
+                                       invalid, chunksize = 1 << 20, rdtype=np.int32):
+    # the collection of variables that make up the finite state machine for the calls to
+    # partial
+    i_off, j_off, i, j, r, ii, jj, ii_max, jj_max, inner = 0, 0, 0, 0, 0, 0, 0, -1, -1, False
+
+    result_ = np.zeros(chunksize, dtype=rdtype)
+
+    left_chunk, left_ = get_next_chunk(0, chunksize, left)
+    i_max = left_chunk[1] - left_chunk[0]
+    right_chunk, right_ = get_next_chunk(0, chunksize, right)
+    j_max = right_chunk[1] - right_chunk[0]
+
+    while i + i_off < len(left) and j + j_off < len(right):
+        i, j, r, ii, jj, ii_max, jj_max, inner = \
+            ordered_map_right_to_left_partial(left_, i_max, right_, j_max, result_, invalid,
+                                              i_off, j_off, i, j, r,
+                                              ii, jj, ii_max, jj_max, inner)
+
+        # update the left chunk if necessary
+        if i_off + i < len(left) and i >= left_chunk[1] - left_chunk[0]:
+            left_chunk, left_ = get_next_chunk(left_chunk[1], chunksize, left)
+            i_max = left_chunk[1] - left_chunk[0]
+            i_off = left_chunk[0]
+            i = 0
+
+        # update the right chunk if necessary
+        if j_off + j < len(right) and j >= right_chunk[1] - right_chunk[0]:
+            right_chunk, right_ = get_next_chunk(right_chunk[1], chunksize, right)
+            j_max = right_chunk[1] - right_chunk[0]
+            j_off = right_chunk[0]
+            j = 0
+
+        # write the result buffer
+        if r > 0:
+            result.data.write_part(result_[:r])
+            r = 0
+
+
+def ordered_map_right_to_left_partial(left, i_max, right, j_max, result, invalid,
+                                      i_off, j_off, i, j, r,
+                                      ii, jj, ii_max, jj_max, inner):
+    while i < i_max and j < j_max and r < len(result):
+        if inner is False:
+            if left[i] < right[j]:
+                result[r] = invalid
+                i += 1
+                r += 1
+            elif left[i] > right[j]:
+                j += 1
+            else:
+                i_ = i
+                cur_i_count = 1
+                while i_ + 1 < i_max and left[i_+1] == left[i_]:
+                    cur_i_count += 1
+                    i_ += 1
+
+                j_ = j
+                cur_j_count = 1
+                while j_ + 1 < j_max and right[j_+1] == right[j_]:
+                    cur_j_count += 1
+                    j_ += 1
+
+                ii = 0
+                jj = 0
+                ii_max = cur_i_count
+                jj_max = cur_j_count
+                inner = True
+        else:
+            result[r] = j_off + j + jj
+            r += 1
+            jj += 1
+            if jj == jj_max:
+                jj = 0
+                ii += 1
+                if ii == ii_max:
+                    i += ii_max
+                    j += jj_max
+                    inner = False
+                    ii = 0
+                    jj = 0
+                    ii_max = -1
+                    jj_max = -1
+    return i, j, r, ii, jj, ii_max, jj_max, inner
+
 
 @njit
 def ordered_map_to_right_right_unique(first, second, result):
@@ -742,9 +851,9 @@ def ordered_map_to_right_right_unique(first, second, result):
                 j += 1
             i += 1
 
-    while j < len(second):
-        result[j] = INVALID_INDEX
-        j += 1
+    while i < len(first):
+        result[i] = INVALID_INDEX
+        i += 1
 
     return unmapped > 0
 
@@ -777,6 +886,35 @@ def ordered_map_to_right_both_unique(first, second, result):
     return unmapped > 0
 
 
+def ordered_left_map_result_size(left, right):
+    i = 0
+    j = 0
+    result_size = 0
+
+    while i < len(left) and j < len(right):
+        if left[i] < right[j]:
+            result_size += 1
+            i += 1
+        elif left[i] > right[j]:
+            j += 1
+        else:
+            cur_i_count = 1
+            while i + 1 < len(left) and left[i + 1] == left[i]:
+                cur_i_count += 1
+                i += 1
+            cur_j_count = 1
+            while j + 1 < len(right) and right[j + 1] == right[j]:
+                cur_j_count += 1
+                j += 1
+            result_size += cur_i_count * cur_j_count
+            i += 1
+            j += 1
+        return result_size
+
+    if i < len(left):
+        result_size += left - i
+
+
 @njit
 def ordered_inner_map_result_size(left, right):
     i = 0
@@ -790,11 +928,11 @@ def ordered_inner_map_result_size(left, right):
             j += 1
         else:
             cur_i_count = 1
-            while i+1 < len(left) and left[i + 1] == left[i]:
+            while i + 1 < len(left) and left[i + 1] == left[i]:
                 cur_i_count += 1
                 i += 1
             cur_j_count = 1
-            while j+1 < len(right) and right[j + 1] == right[j]:
+            while j + 1 < len(right) and right[j + 1] == right[j]:
                 cur_j_count += 1
                 j += 1
             result_size += cur_i_count * cur_j_count

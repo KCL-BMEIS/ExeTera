@@ -481,7 +481,11 @@ def merge(left: DataFrame,
           right_fields: Optional[Sequence[str]] = None,
           left_suffix: str = '_l',
           right_suffix: str = '_r',
-          how='left'):
+          how='left',
+          hint_left_keys_ordered: Optional[bool] = None,
+          hint_left_keys_unique: Optional[bool] = None,
+          hint_right_keys_ordered: Optional[bool] = None,
+          hint_right_keys_unique: Optional[bool] = None):
     """
     Merge 'left' and 'right' DataFrames into a destination dataset. The merge is a database-style
     join operation, in any of the following modes ("left", "right", "inner", "outer"). This
@@ -554,6 +558,66 @@ def merge(left: DataFrame,
     else:
         index_dtype = np.int64
 
+    left_fields_to_map = left.keys() if left_fields is None else left_fields
+    right_fields_to_map = right.keys() if right_fields is None else right_fields
+
+    if hint_left_keys_ordered is None:
+        left_keys_ordered = False
+    else:
+        left_keys_ordered = hint_left_keys_ordered
+
+    if hint_right_keys_ordered is None:
+        right_keys_ordered = False
+    else:
+        right_keys_ordered = hint_right_keys_ordered
+
+    if hint_left_keys_unique is None:
+        left_keys_unique = False
+    else:
+        left_keys_unique = hint_left_keys_unique
+
+    if hint_right_keys_unique is None:
+        right_keys_unique = hint_right_keys_unique
+
+    ordered = False
+    if left_keys_ordered and right_keys_ordered and \
+        len(left_on_fields) == 1 and len(right_on_fields) == 1 and \
+        how in ('left', 'right', 'inner'):
+        ordered = True
+
+
+    if ordered:
+        _ordered_merge(left, right, dest,
+                       left_on_fields, right_on_fields,
+                       left_len, right_len,
+                       index_dtype,
+                       left_suffix, right_suffix,
+                       how,
+                       left_keys_unique,
+                       right_keys_unique)
+    else:
+        _unordered_merge(left, right, dest,
+                         left_on_fields, right_on_fields,
+                         left_fields_to_map, right_fields_to_map,
+                         left_len, right_len,
+                         index_dtype,
+                         left_suffix, right_suffix,
+                         how)
+
+
+def _unordered_merge(left: DataFrame,
+                     right: DataFrame,
+                     dest: DataFrame,
+                     left_on_fields,
+                     right_on_fields,
+                     left_fields_to_map,
+                     right_fields_to_map,
+                     left_len,
+                     right_len,
+                     index_dtype,
+                     left_suffix,
+                     right_suffix,
+                     how):
     left_df_dict = {}
     right_df_dict = {}
     left_on_keys = []
@@ -589,12 +653,10 @@ def merge(left: DataFrame,
     r_to_d_filt = np.logical_not(df['r_i'].isnull()).to_numpy()
 
     # perform the mapping
-    left_fields_ = left.keys() if left_fields is None else left_fields
-    right_fields_ = right.keys() if right_fields is None else right_fields
 
-    for f in left_fields_:
+    for f in left_fields_to_map:
         dest_f = f
-        if f in right_fields_:
+        if f in right_fields_to_map:
             dest_f += left_suffix
         l = left[f]
         d = l.create_like(dest, dest_f)
@@ -609,9 +671,9 @@ def merge(left: DataFrame,
         d = dest.create_numeric('valid'+left_suffix, 'bool')
         d.data.write(l_to_d_filt)
 
-    for f in right_fields_:
+    for f in right_fields_to_map:
         dest_f = f
-        if f in left_fields_:
+        if f in left_fields_to_map:
             dest_f += right_suffix
         r = right[f]
         d = r.create_like(dest, dest_f)
@@ -625,3 +687,34 @@ def merge(left: DataFrame,
     if np.all(r_to_d_filt) == False:
         d = dest.create_numeric('valid'+right_suffix, 'bool')
         d.data.write(r_to_d_filt)
+
+
+def _ordered_merge(left: DataFrame,
+                   right: DataFrame,
+                   dest: DataFrame,
+                   left_on_fields,
+                   right_on_fields,
+                   left_fields_to_map,
+                   right_fields_to_map,
+                   left_len,
+                   right_len,
+                   index_dtype,
+                   left_suffix,
+                   right_suffix,
+                   how,
+                   left_keys_unique,
+                   right_keys_unique):
+    supported = ('left', 'right', 'inner')
+    if how not in supported:
+        raise ValueError("Unsupported mode for 'how'; must be one of "
+                         "{} but is {}".format(supported, how))
+
+    if how == 'left':
+        if left_keys_unique:
+            if right_keys_unique:
+                ops.ordered_map_to_right_right_unique()
+
+    elif how == 'right':
+        raise NotImplementedError()
+    else:
+        raise NotImplementedError()
