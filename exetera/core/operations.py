@@ -5,7 +5,7 @@ import numba
 from numba.typed import List
 
 from exetera.core import validation as val
-from exetera.core.abstract_types import Field
+from exetera.core.abstract_types import Field, DataFrame
 from exetera.core import fields, utils
 
 DEFAULT_CHUNKSIZE = 1 << 20
@@ -1294,3 +1294,30 @@ def is_ordered(field):
     else:
         fn = np.char.greater
     return not np.any(fn(field[:-1], field[1:]))
+
+
+def count(field: Field):
+    """
+    Count the number of appearances of each item in the field content.
+
+    :param field: The content field to count.
+
+    :return: a dictionary contains the index and count result.
+    """
+    if field.indexed:
+        sorted = np.sort(np.array(field.data[:]))
+        idx = np.unique(sorted)
+        span = get_spans_for_field(sorted)
+        result = np.zeros(len(span) - 1, dtype=np.uint32)
+        apply_spans_count(span, result)
+    else:
+        if not is_ordered(field.data[:]):
+            sorted = np.sort(field.data[:])
+        else:
+            sorted = field.data[:]
+        idx = np.unique(sorted)
+        span = get_spans_for_field(sorted)
+        result = np.zeros(len(span) - 1, dtype=np.uint32)
+        apply_spans_count(span, result)
+
+    return dict(zip(idx, result))

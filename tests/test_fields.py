@@ -256,6 +256,21 @@ class TestMemoryFieldCreateLike(unittest.TestCase):
             foo2.data.write(mfoo)
             self.assertListEqual([2, 3, 4, 5], foo2.data[:].tolist())
 
+    def test_numeric_as_type(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            foo = df.create_numeric('foo', 'int32')
+            foo.data.write(np.array([65, 66, 67, 68, 97, 98, 99, 100]))
+            newf = foo.astype('fixedstring', length=2)
+            self.assertListEqual(['AB', 'CD', 'ab', 'cd'], newf.data[:].tolist())
+
+            foo.data.clear()
+            foo.data.write([0, 0, 1, 1, 1, 2, 2, 2])
+            newf = foo.astype('categorical', key={'foo': 0, 'bar': 1, 'boo': 2})
+            self.assertListEqual([0, 0, 1, 1, 1, 2, 2, 2], newf.data[:].tolist())
+
 
 class TestMemoryFields(unittest.TestCase):
 
@@ -337,6 +352,35 @@ class TestMemoryFields(unittest.TestCase):
                     'f3', fields.dtype_to_str(r.data.dtype)).data.write(r)
                 test_simple(expected, df['f3'])
 
+    def _execute_uniary_field_test(self, a1, function):
+
+        def test_simple(expected, actual):
+            self.assertListEqual(expected.tolist(), actual.data[:].tolist())
+
+        def test_tuple(expected, actual):
+            self.assertListEqual(expected[0].tolist(), actual[0].data[:].tolist())
+            self.assertListEqual(expected[1].tolist(), actual[1].data[:].tolist())
+
+        expected = function(a1)
+
+        test_equal = test_tuple if isinstance(expected, tuple) else test_simple
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+
+            m1 = fields.NumericMemField(s, fields.dtype_to_str(a1.dtype))
+            m1.data.write(a1)
+
+            f1 = df.create_numeric('f1', fields.dtype_to_str(a1.dtype))
+            f1.data.write(a1)
+
+            # test memory field and field operations
+            test_equal(expected, function(f1))
+            test_equal(expected, function(f1))
+            test_equal(expected, function(m1))
+
     def test_mixed_field_add(self):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
@@ -406,6 +450,17 @@ class TestMemoryFields(unittest.TestCase):
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
         self._execute_memory_field_test(a1, a2, 1, lambda x, y: x | y)
         self._execute_field_test(a1, a2, 1, lambda x, y: x | y)
+
+    def test_mixed_field_invert(self):
+        # invert (~) symbol is used for logical not in field, hence different function called. Thus not using _execute_field_test
+        a1 = np.array([0, 0, 1, 1], dtype=np.int32)
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            f1 = df.create_numeric('f1','int32')
+            f1.data.write(a1)
+            self.assertListEqual(np.logical_not(a1).tolist(), (~f1).data[:].tolist())
 
     def test_less_than(self):
 

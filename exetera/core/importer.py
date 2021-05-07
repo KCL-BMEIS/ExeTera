@@ -25,11 +25,10 @@ from exetera.core.load_schema import load_schema
 
 
 def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite, include, exclude):
-
     print(timestamp)
     print(schema_file)
     print(files)
-    
+
     with open(schema_file) as sf:
         schema = load_schema(sf)
 
@@ -45,11 +44,13 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
     include_tables, exclude_tables = set(include.keys()), set(exclude.keys())
     if include_tables and not include_tables.issubset(input_file_tables):
         extra_tables = include_tables.difference(input_file_tables)
-        raise ValueError("-n/--include: the following include table(s) are not part of any input files: {}".format(extra_tables))
+        raise ValueError(
+            "-n/--include: the following include table(s) are not part of any input files: {}".format(extra_tables))
 
     if exclude_tables and not exclude_tables.issubset(input_file_tables):
         extra_tables = exclude_tables.difference(input_file_tables)
-        raise ValueError("-x/--exclude: the following exclude table(s) are not part of any input files: {}".format(extra_tables))
+        raise ValueError(
+            "-x/--exclude: the following exclude table(s) are not part of any input files: {}".format(extra_tables))
 
     stop_after = {}
     reserved_column_names = ('j_valid_from', 'j_valid_to')
@@ -82,7 +83,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
                 print("Warning:", msg.format(files[sk], missing_names))
                 # raise ValueError(msg.format(files[sk], missing_names))
 
-            # check if included/exclude fields are in the file  
+            # check if included/exclude fields are in the file
             include_missing_names = set(include.get(sk, [])).difference(names)
             if len(include_missing_names) > 0:
                 msg = "The following include fields are not part of the {}: {}"
@@ -92,7 +93,6 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
             if len(exclude_missing_names) > 0:
                 msg = "The following exclude fields are not part of the {}: {}"
                 raise ValueError(msg.format(files[sk], exclude_missing_names))
-
 
         for sk in schema.keys():
             if sk not in files:
@@ -121,7 +121,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
 
 
 class DatasetImporter:
-    def __init__(self, datastore, source, hf, space, schema, timestamp, 
+    def __init__(self, datastore, source, hf, space, schema, timestamp,
                  include=None, exclude=None,
                  keys=None,
                  stop_after=None, show_progress_every=None, filter_fn=None,
@@ -238,4 +238,3 @@ class DatasetImporter:
                 new_field_list[i_df].flush()
 
             print(f"{i_r} rows parsed in {time.time() - time0}s")
-

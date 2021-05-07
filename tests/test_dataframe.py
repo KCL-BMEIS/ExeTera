@@ -384,7 +384,6 @@ class TestDataFrameMerge(unittest.TestCase):
                              np.logical_not(ddf['valid_r'].data[:])
             self.assertTrue(np.all(valid_if_equal))
 
-
     def tests_merge_right(self):
 
         r_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
@@ -483,3 +482,4 @@ class TestDataFrameMerge(unittest.TestCase):
             self.assertEqual(expected, ddf['r_vals'].data[:])
             self.assertEqual(ddf['l_id_1'].data[:].tolist(), ddf['r_id_1'].data[:].tolist())
             self.assertEqual(ddf['r_id_2'].data[:].tolist(), ddf['r_id_2'].data[:].tolist())
+

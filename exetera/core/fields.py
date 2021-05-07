@@ -23,6 +23,15 @@ from exetera.core import validation as val
 
 class HDF5Field(Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
+        """
+        Construct a HDF5 file based Field. This construction is not used directly, rather, should be called from
+        specific field types, e.g. NumericField.
+
+        :param session: The session instance.
+        :param group: The HDF5 Group object.
+        :param dataframe: The dataframe this field belongs to.
+        :param write_enabled: A read-only/read-write switch.
+        """
         super().__init__()
 
         # if name is None:
@@ -116,6 +125,12 @@ class HDF5Field(Field):
 class MemoryField(Field):
 
     def __init__(self, session):
+        """
+        Construct a field stored in memory only, often used when perform arithmetic/comparison operations from storage
+        based fields, e.g. field3 = field1 + field2 will create a memory field during add operation and assign to field3.
+
+        :param session: The session instance.
+        """
         super().__init__()
         self._session = session
         self._write_enabled = True
@@ -162,8 +177,18 @@ class MemoryField(Field):
         raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
 
 
+# Field arrays
+# ============
+
+
 class ReadOnlyFieldArray:
     def __init__(self, field, dataset_name):
+        """
+        Construct a readonly FieldArray which used as the wrapper of data in Fields (apart from IndexedStringFields).
+
+        :param field: The HDF5 group object used as storage.
+        :param dataset_name: The name of the dataset object in HDF5, normally use 'values'
+        """
         self._field = field
         self._name = dataset_name
         self._dataset = field[dataset_name]
@@ -199,11 +224,14 @@ class ReadOnlyFieldArray:
                               "for a writeable copy of the field")
 
 
-# Field arrays
-# ============
-
 class WriteableFieldArray:
     def __init__(self, field, dataset_name):
+        """
+        Construct a read/write FieldArray which used as the wrapper of data in Field.
+
+        :param field: The HDF5 group object used as storage.
+        :param dataset_name: The name of the dataset object in HDF5, normally use 'values'
+        """
         self._field = field
         self._name = dataset_name
         self._dataset = field[dataset_name]
@@ -241,8 +269,12 @@ class WriteableFieldArray:
 
 
 class MemoryFieldArray:
-
     def __init__(self, dtype):
+        """
+        Construct a memory based FieldArray which used as the wrapper of data in Field. The data is stored in numpy array.
+
+        :param dtype: The data type for construct the numpy array.
+        """
         self._dtype = dtype
         self._dataset = None
 
@@ -288,6 +320,13 @@ class MemoryFieldArray:
 
 class ReadOnlyIndexedFieldArray:
     def __init__(self, field, indices, values):
+        """
+        Construct a IndexFieldArray which used as the wrapper of data in IndexedStringField.
+
+        :param field: The HDF5 group object for store the data.
+        :param indices: The indices of the IndexedStringField.
+        :param values: The values of the IndexedStringField.
+        """
         self._field = field
         self._indices = indices
         self._values = values
@@ -549,6 +588,7 @@ class IndexedStringMemField(MemoryField):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+
 class FixedStringMemField(MemoryField):
     def __init__(self, session, length):
         super().__init__(session)
@@ -631,7 +671,6 @@ class NumericMemField(MemoryField):
     def __init__(self, session, nformat):
         super().__init__(session)
         self._nformat = nformat
-
 
     def writeable(self):
         return self
@@ -1383,6 +1422,31 @@ class NumericField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
+    def astype(self, type, **kwargs):
+        if type == 'indexedstring':
+            raise NotImplementedError()
+        elif type == 'fixedstring':
+            if 'length' not in kwargs.keys():
+                raise ValueError("Please provide the length for fixed string field.")
+            else:
+                length = kwargs['length']
+            fld = FixedStringMemField(self._session, length)
+            result = np.zeros(int(len(self)/length), dtype = "U"+str(length))
+            for i in range(0, len(self), length):
+                result[int(i/length)] = ''.join([chr(i) for i in self.data[i:i+length]])
+            fld.data.write(result)
+            return fld
+        elif type == 'categorical':
+            if 'key' not in kwargs.keys():
+                raise ValueError("Please provide the key for categorical field.")
+            else:
+                key = kwargs['key']
+            fld = CategoricalMemField(self._session, 'uint8', key)
+            fld.data.write(self.data[:])
+            return fld
+        else:
+            raise NotImplementedError("The type {} is not convertible.".format(type))
+
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
         self._ensure_valid()
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
@@ -1478,6 +1542,9 @@ class NumericField(HDF5Field):
     def __ror__(self, first):
         self._ensure_valid()
         return FieldDataOps.numeric_or(self._session, first, self)
+
+    def __invert__(self):
+        return FieldDataOps.logical_not(self._session, self)
 
     def __lt__(self, value):
         self._ensure_valid()
@@ -2107,6 +2174,18 @@ class FieldDataOps:
         f.data.write(r)
         return f
 
+    @staticmethod
+    def _unary_op(session, first, function):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        r = function(first_data)
+        f = NumericMemField(session, dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
     @classmethod
     def numeric_add(cls, session, first, second):
         def function_add(first, second):
@@ -2188,6 +2267,13 @@ class FieldDataOps:
             return first | second
 
         return cls._binary_op(session, first, second, function_or)
+
+    @classmethod
+    def logical_not(cls, session, first):
+        def function_logical_not(first):
+            return np.logical_not(first)
+
+        return cls._unary_op(session, first, function_logical_not)
 
     @classmethod
     def less_than(cls, session, first, second):
