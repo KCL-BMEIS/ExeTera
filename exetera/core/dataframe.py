@@ -712,7 +712,7 @@ def _ordered_merge(left: DataFrame,
     if how == 'left':
         if left_keys_unique:
             if right_keys_unique:
-                ops.ordered_map_to_right_right_unique()
+                ops.generate_ordered_map_to_left_right_unique()
 
     elif how == 'right':
         raise NotImplementedError()

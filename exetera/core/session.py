@@ -1374,20 +1374,20 @@ class Session(AbstractSession):
 
         return left_results, right_results
 
-    def _map_fields(self, field_map, field_sources, field_sinks):
+    def _map_fields(self, field_map, field_sources, field_sinks, invalid):
         rtn_sinks = None
         if field_sinks is None:
             left_sinks = list()
             for src in field_sources:
                 src_ = val.array_from_parameter(self, 'left_field_sources', src)
-                snk_ = ops.map_valid(src_, field_map)
+                snk_ = ops.map_valid(src_, field_map, invalid=invalid)
                 left_sinks.append(snk_)
             rtn_sinks = left_sinks
         elif val.is_field_parameter(field_sinks[0]):
             # groups or fields
             for src, snk in zip(field_sources, field_sinks):
                 src_ = val.array_from_parameter(self, 'left_field_sources', src)
-                snk_ = ops.map_valid(src_, field_map)
+                snk_ = ops.map_valid(src_, field_map, invalid=invalid)
                 snk = val.field_from_parameter(self, 'left_field_sinks', snk)
                 snk.data.write(snk_)
         else:
@@ -1395,10 +1395,10 @@ class Session(AbstractSession):
             for src, snk in zip(field_sources, field_sinks):
                 src_ = val.array_from_parameter(self, 'left_field_sources', src)
                 snk_ = val.array_from_parameter(self, 'left_field_sinks', snk)
-                ops.map_valid(src_, field_map, snk_)
+                ops.map_valid(src_, field_map, snk_, invalid=invalid)
         return None if rtn_sinks is None else tuple(rtn_sinks)
 
-    def _streaming_map_fields(self, field_map, field_sources, field_sinks):
+    def _streaming_map_fields(self, field_map, field_sources, field_sinks, invalid=-1):
         # field map must be a field
         # field sources must be fields
         # field sinks must be fields
@@ -1407,7 +1407,7 @@ class Session(AbstractSession):
         for src, snk in zip(field_sources, field_sinks):
             src_ = val.field_from_parameter(self, 'field_sources', src)
             snk_ = val.field_from_parameter(self, 'field_sinks', snk)
-            ops.ordered_map_valid_stream(src_, map_, snk_)
+            ops.ordered_map_valid_stream(src_, map_, snk_, invalid=invalid)
 
     def ordered_merge_left(self, left_on, right_on, right_field_sources=tuple(), left_field_sinks=None,
                            left_to_right_map=None, left_unique=False, right_unique=False):
@@ -1457,16 +1457,17 @@ class Session(AbstractSession):
             else:
                 if streamable:
                     has_unmapped = \
-                        ops.ordered_map_to_right_right_unique_streamed(left_on, right_on,
-                                                                       left_to_right_map)
+                        ops.generate_ordered_map_to_left_right_unique_streamed_old(left_on, right_on,
+                                                                                   left_to_right_map,
+                                                                                   ops.INVALID_INDEX)
                     result = left_to_right_map
                 else:
                     result = np.zeros(len(left_on), dtype=np.int64)
                     left_data = val.array_from_parameter(self, "left_on", left_on)
                     right_data = val.array_from_parameter(self, "right_on", right_on)
                     has_unmapped = \
-                        ops.ordered_map_to_right_right_unique(
-                            left_data, right_data, result)
+                        ops.generate_ordered_map_to_left_right_unique(
+                            left_data, right_data, result, ops.INVALID_INDEX)
         else:
             if right_unique == False:
                 raise ValueError("Right key must not have duplicates")
@@ -1474,14 +1475,16 @@ class Session(AbstractSession):
                 result = np.zeros(len(left_on), dtype=np.int64)
                 left_data = val.array_from_parameter(self, "left_on", left_on)
                 right_data = val.array_from_parameter(self, "right_on", right_on)
-                has_unmapped = ops.ordered_map_to_right_both_unique(
-                    left_data, right_data, result)
+                has_unmapped = ops.generate_ordered_map_to_left_both_unique(
+                    left_data, right_data, result, ops.INVALID_INDEX)
 
         if streamable:
-            self._streaming_map_fields(result, right_field_sources, left_field_sinks)
+            self._streaming_map_fields(result, right_field_sources, left_field_sinks,
+                                       invalid=ops.INVALID_INDEX)
             return None
         else:
-            rtn_left_sinks = self._map_fields(result, right_field_sources, left_field_sinks)
+            rtn_left_sinks = self._map_fields(result, right_field_sources, left_field_sinks,
+                                              ops.INVALID_INDEX)
             return rtn_left_sinks
 
     def ordered_merge_right(self, left_on, right_on,
@@ -1575,8 +1578,10 @@ class Session(AbstractSession):
             else:
                 ops.ordered_inner_map_both_unique(left_data, right_data, left_to_inner, right_to_inner)
 
-        rtn_left_sinks = self._map_fields(left_to_inner, left_field_sources, left_field_sinks)
-        rtn_right_sinks = self._map_fields(right_to_inner, right_field_sources, right_field_sinks)
+        rtn_left_sinks = self._map_fields(left_to_inner, left_field_sources, left_field_sinks,
+                                          invalid=ops.INVALID_INDEX)
+        rtn_right_sinks = self._map_fields(right_to_inner, right_field_sources, right_field_sinks,
+                                           invalid=ops.INVALID_INDEX)
 
         if rtn_left_sinks:
             if rtn_right_sinks:
