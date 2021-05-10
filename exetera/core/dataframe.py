@@ -62,9 +62,6 @@ class HDF5DataFrame(DataFrame):
         for subg in h5group.keys():
             self._columns[subg] = dataset.session.get(h5group[subg])
 
-        self._index_filter = None
-        self._column_filter = None
-
     @property
     def columns(self):
         """
@@ -86,14 +83,6 @@ class HDF5DataFrame(DataFrame):
         The h5group property interface, used to handle underlying storage.
         """
         return self._h5group
-
-    @property
-    def column_filter(self):
-        return self._column_filter
-
-    @property
-    def index_filter(self):
-        return self._index_filter
 
     def add(self,
             field: fld.Field):
@@ -223,8 +212,7 @@ class HDF5DataFrame(DataFrame):
         if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
         else:
-            return name in self._columns if self._column_filter is None \
-                else (name in self._columns and name in self._column_filter)
+            return name in self._columns
 
     def contains_field(self, field):
         """
@@ -240,13 +228,6 @@ class HDF5DataFrame(DataFrame):
                     return True
             return False
 
-    def get_field(self, name):
-        """
-        Get a field stored by the field name.
-        :param name: The name of field to get.
-        """
-        return self.__getitem__(name)
-
     def __getitem__(self, name):
         """
         Get a field stored by the field name.
@@ -258,45 +239,28 @@ class HDF5DataFrame(DataFrame):
         elif not self.__contains__(name):
             raise ValueError("There is no field named '{}' in this dataframe".format(name))
         else:
-            if self._column_filter is None:
-                if self.index_filter is None:
-                    return self._columns[name]
-                else:
-                    return self._columns[name].data[:][self.index_filter]
-            elif name not in self.column_filter:
-                raise ValueError("The column to fetch is filtered.")
+            return self._columns[name]
 
-    def get_data(self, name=None):
+    def get_field(self, name):
         """
         Get a field stored by the field name.
 
         :param name: The name of field to get.
         """
-        if name is not None:
-            return self.__getitem__(name)
-
-        if self._column_filter is not None:
-            pass
-        else:
-            for column in self._column_filter:
-                return self.__getitem__(name)
-
+        return self.__getitem__(name)
 
     def __setitem__(self, name, field):
         if not isinstance(name, str):
             raise TypeError("The name must be of type str but is of type '{}'".format(str))
-        if isinstance(field, fld.Field):
-            nfield = field.create_like(self, name)
-            if field.indexed:
-                nfield.indices.write(field.indices[:])
-                nfield.values.write(field.values[:])
-            else:
-                nfield.data.write(field.data[:])
-            self._columns[name] = nfield
-        elif isinstance(field, list):  # TODO how to handle value assignment w/ filter?
-            pass
+        if not isinstance(field, fld.Field):
+            raise TypeError("The field must be a Field object.")
+        nfield = field.create_like(self, name)
+        if field.indexed:
+            nfield.indices.write(field.indices[:])
+            nfield.values.write(field.values[:])
         else:
-            raise TypeError("The field must be a Field or list.")
+            nfield.data.write(field.data[:])
+        self._columns[name] = nfield
 
     def __delitem__(self, name):
         if not self.__contains__(name=name):
@@ -429,42 +393,26 @@ class HDF5DataFrame(DataFrame):
 
         self._columns = final_columns
 
-    def apply_filter(self, filter_to_apply, ddf=None, hard=True, axis=0):
+
+    def apply_filter(self, filter_to_apply, ddf=None):
         """
         Apply the filter to all the fields in this dataframe, return a dataframe with filtered fields.
 
         :param filter_to_apply: the filter to be applied to the source field, an array of boolean
-        :param axis: {0 or ‘index’, 1 or ‘columns’, None}, default 0
-        :param hard: if perform the filtering when calling and write the result now
         :param ddf: optional- the destination data frame
         :returns: a dataframe contains all the fields filterd, self if ddf is not set
         """
-        if not isinstance(filter_to_apply, np.ndarray) and not isinstance(filter_to_apply, list):
-            raise TypeError("The filter must be a Numpy array or Python list.")
-
-        if hard is False:  # soft filter
-            if axis == 0 or axis == 'index':
-                self.index_filter = filter_to_apply
-            elif axis == 1 or axis == 'columns':
-                self.column_filter = filter_to_apply
-        else:  # hard filter
-            if ddf is not None and ddf is not self:  # filter to another df
-                if not isinstance(ddf, DataFrame):
-                    raise TypeError("The destination object must be an instance of DataFrame.")
-                for name, field in self._columns.items():
-                    newfld = field.create_like(ddf, name)
-                    field.apply_filter(filter_to_apply, target=newfld)
-                return ddf
-            elif ddf is not None and ddf is self:  # filter inline
-                for field in self._columns.values():
-                    field.apply_filter(filter_to_apply, in_place=True)
-                return self
-            elif ddf is None:  # return memory based df
-                pass
-
-    def clean_filters(self):
-        self._index_filter = None
-        self._column_filter = None
+        if ddf is not None:
+            if not isinstance(ddf, DataFrame):
+                raise TypeError("The destination object must be an instance of DataFrame.")
+            for name, field in self._columns.items():
+                newfld = field.create_like(ddf, name)
+                field.apply_filter(filter_to_apply, target=newfld)
+            return ddf
+        else:
+            for field in self._columns.values():
+                field.apply_filter(filter_to_apply, in_place=True)
+            return self
 
     def apply_index(self, index_to_apply, ddf=None):
         """
