@@ -226,7 +226,7 @@ class TestDataFrameCreateFields(unittest.TestCase):
 
             filter_to_apply = np.array([True, True, False, False, True])
             ddf = dst.create_dataframe('dst3')
-            df.apply_filter(filter_to_apply, ddf)
+            df.apply_filter(filter_to_apply, ddf=ddf)
             self.assertEqual([5, 4, 1], ddf['numf'].data[:].tolist())
             self.assertEqual([b'e', b'd', b'a'], ddf['fst'].data[:].tolist())
 
@@ -342,6 +342,7 @@ class TestDataFrameApplyFilter(unittest.TestCase):
 
         src = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
         filt = np.array([0, 1, 0, 1, 0, 1, 1, 0], dtype='bool')
+        cfilt = ['num2', 'fixed']
         expected = src[filt].tolist()
 
         bio = BytesIO()
@@ -350,14 +351,32 @@ class TestDataFrameApplyFilter(unittest.TestCase):
             df = dst.create_dataframe('df')
             numf = s.create_numeric(df, 'numf', 'int32')
             numf.data.write(src)
+            numf = s.create_numeric(df, 'num2', 'int32')
+            numf.data.write(src)
+            numf = s.create_numeric(df, 'num3', 'int32')
+            numf.data.write(src)
+            fixed = s.create_fixed_string(df, 'fixed', 1)
+            fixed.data.write([b'a', b'b', b'c', b'd', b'e', b'f', b'g', b'h'])
+
+            # soft filter
+            df.apply_filter(filt, hard=False)
+            df.apply_filter(cfilt, hard=False, axis=1)
+            self.assertTrue(df['numf'] is None)  # get item masked
+
+            # hard filter other df
             df2 = dst.create_dataframe('df2')
-            df2b = df.apply_filter(filt, df2)
+            df2b = df.apply_filter(filt, ddf=df2)
             self.assertListEqual(expected, df2['numf'].data[:].tolist())
             self.assertListEqual(expected, df2b['numf'].data[:].tolist())
             self.assertListEqual(src.tolist(), df['numf'].data[:].tolist())
-
-            df.apply_filter(filt)
+            # hard filter inline
+            df.apply_filter(filt, ddf=df)
             self.assertListEqual(expected, df['numf'].data[:].tolist())
+            # hard filter memory
+            memdf = df.apply_filter(filt, ddf=None)
+
+
+
 
 
 class TestDataFrameMerge(unittest.TestCase):

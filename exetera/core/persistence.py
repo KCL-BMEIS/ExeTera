@@ -680,6 +680,17 @@ def _aggregate_impl(predicate, fkey_indices=None, fkey_index_spans=None,
     return writer if writer is not None else results
 
 
+class StorageWrapper:
+    import io
+    TYPE = {h5py.Group: 0, io.TextIOWrapper: 1}
+
+    def __init__(self, file):
+        self.file = file
+        self.type = self.TYPE(type(file))
+
+
+
+
 class DataStore:
 
     def __init__(self, chunksize=DEFAULT_CHUNKSIZE,

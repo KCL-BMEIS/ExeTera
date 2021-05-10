@@ -26,6 +26,21 @@ class TestFieldExistence(unittest.TestCase):
             f = s.create_categorical(src, "d", "int8", {"no": 0, "yes": 1})
             self.assertTrue(bool(f))
 
+    def test_numeric_field_astype(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('df')
+            num = df.create_numeric('num', 'float32')
+            num.data.write([1.1, 2.1, 3.1, 4.1, 5.1, 6.1])
+            self.assertTrue(type(num.data[0]) == np.float32)
+            num.astype('int8')
+            self.assertTrue(type(num.data[0]) == np.int8)
+            num.astype('uint16')
+            self.assertTrue(type(num.data[0]) == np.uint16)
+            num.astype(np.float32)
+            self.assertTrue(type(num.data[0]) == np.float32)
+
 
 class TestFieldGetSpans(unittest.TestCase):
 
@@ -352,7 +367,7 @@ class TestMemoryFields(unittest.TestCase):
                     'f3', fields.dtype_to_str(r.data.dtype)).data.write(r)
                 test_simple(expected, df['f3'])
 
-    def _execute_uniary_field_test(self, a1, function):
+    def _execute_unary_field_test(self, a1, function):
 
         def test_simple(expected, actual):
             self.assertListEqual(expected.tolist(), actual.data[:].tolist())
@@ -452,15 +467,18 @@ class TestMemoryFields(unittest.TestCase):
         self._execute_field_test(a1, a2, 1, lambda x, y: x | y)
 
     def test_mixed_field_invert(self):
-        # invert (~) symbol is used for logical not in field, hence different function called. Thus not using _execute_field_test
+        a1 = np.array([0, 0, 1, 1], dtype=np.int32)
+        self._execute_unary_field_test(a1, lambda x: ~x)
+
+    def test_logical_not(self):
         a1 = np.array([0, 0, 1, 1], dtype=np.int32)
         bio = BytesIO()
         with session.Session() as s:
             ds = s.open_dataset(bio, 'w', 'ds')
             df = ds.create_dataframe('df')
-            f1 = df.create_numeric('f1','int32')
-            f1.data.write(a1)
-            self.assertListEqual(np.logical_not(a1).tolist(), (~f1).data[:].tolist())
+            num = df.create_numeric('num', 'uint32')
+            num.data.write(a1)
+            self.assertListEqual(np.logical_not(a1).tolist(), num.logical_not().data[:].tolist())
 
     def test_less_than(self):
 
