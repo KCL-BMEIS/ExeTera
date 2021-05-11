@@ -345,7 +345,8 @@ class Session(AbstractSession):
         return results
 
     def get_spans(self, field: Union[Field, np.array] = None,
-                  dest: Field = None, **kwargs):
+                  fields: (Union[Field, np.array], Union[Field, np.array]) = None,
+                  dest: Field = None):
         """
         Calculate a set of spans that indicate contiguous equal values.
         The entries in the result array correspond to the inclusive start and
@@ -362,26 +363,12 @@ class Session(AbstractSession):
             result: [0, 1, 3, 6, 7, 10, 15]
 
         :param field: A Field or numpy array to be evaluated for spans
-        :param dest: A destination Field to store the result
-        :param **kwargs: See below. For parameters set in both argument and kwargs, use kwargs
-
-        :Keyword Arguments:
-            * field -- Similar to field parameter, in case user specify field as keyword
-            * fields -- A tuple of Fields or tuple of numpy arrays to be evaluated for spans
-            * dest -- Similar to dest parameter, in case user specify as keyword
+        :param fields: A tuple of Fields or tuple of numpy arrays to be evaluated for spans
+        :param dest: Similar to dest parameter, in case user specify as keyword
 
         :return: The resulting set of spans as a numpy array
         """
-        fields = []
         result = None
-        if len(kwargs) > 0:
-            for k in kwargs.keys():
-                if k == 'field':
-                    field = kwargs[k]
-                elif k == 'fields':
-                    fields = kwargs[k]
-                elif k == 'dest':
-                    dest = kwargs[k]
         if dest is not None and not isinstance(dest, Field):
             raise TypeError(f"'dest' must be one of 'Field' but is {type(dest)}")
 

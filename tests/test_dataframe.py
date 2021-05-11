@@ -359,8 +359,8 @@ class TestDataFrameApplyFilter(unittest.TestCase):
             fixed.data.write([b'a', b'b', b'c', b'd', b'e', b'f', b'g', b'h'])
 
             # soft filter
-            df.apply_filter(filt, hard=False)
-            df.apply_filter(cfilt, hard=False, axis=1)
+            df.apply_filter(filt)
+            df.apply_filter(cfilt)
             self.assertTrue(df['numf'] is None)  # get item masked
 
             # hard filter other df
