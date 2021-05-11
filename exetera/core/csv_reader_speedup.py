@@ -5,24 +5,43 @@ import numpy as np
 from exetera.core import utils
 import time
 from collections import Counter
+from io import StringIO
 
 
 def get_file_stat(source, chunk_size):
-    with open(source, 'rb') as f:
-        f.seek(0,2)
-        total_byte_size = f.tell()
-        # print('total_byte_size', total_byte_size)
+    total_byte_size, count_columns, first_line = 0, 0, ''
 
-    with open(source) as f:
-        header = csv.DictReader(f)
-        count_columns = len(header.fieldnames)
-        avg_line_length = len(f.readline()) * 10    # TODO: this can be improved
-    
-    count_rows = max(chunk_size // count_columns * avg_line_length, 5)
-    print('count_columns', count_columns, 'count_rows', count_rows)
+    if isinstance(source,str):
+        with open(source) as f:
+            f.seek(0,2)
+            total_byte_size = f.tell()
 
-    val_row_count = count_rows * avg_line_length
-    val_threshold = int(count_rows * avg_line_length * 0.8)
+            f.seek(0)
+            header = csv.DictReader(f)  
+            count_columns = len(header.fieldnames)              
+            first_line = f.readline()
+
+    elif isinstance(source, StringIO):
+        source.seek(0,2)
+        total_byte_size = source.tell()
+
+        source.seek(0)
+        header = csv.DictReader(source)
+        count_columns = len(header.fieldnames) 
+        first_line = source.readline()
+        
+
+    length_factor = 10
+    assume_line_length = len(first_line) * length_factor    
+    assume_cell_length = max([len(x) for x in first_line.split(',')])* length_factor
+    # print('assume_line_length', assume_line_length, 'assume_cell_length', assume_cell_length)
+
+    count_rows = max(chunk_size // assume_line_length, 5)
+    # print('count_columns', count_columns, 'count_rows', count_rows)
+
+    val_row_count = count_rows * assume_cell_length
+    val_threshold = int(val_row_count * 0.8)
+    # print('val_row_count', val_row_count, 'val_threshold', val_threshold)
     
     return total_byte_size, count_columns, count_rows, val_row_count, val_threshold
 
@@ -57,6 +76,8 @@ def read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importe
 
             # reads chunk size of file content
             content = np.fromfile(source, count=chunk_size, offset=chunk_index, dtype=np.uint8)
+            # print('content', content, 'len_content', content.shape[0])
+
             length_content = content.shape[0]
             if length_content == 0:
                 break
@@ -65,13 +86,19 @@ def read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importe
             if chunk_index + length_content == total_byte_size and content[-1] != NEWLINE_VALUE:
                 content = np.append(content, NEWLINE_VALUE)
 
-            offset_pos, written_row_count = fast_csv_reader(content, column_inds, column_vals, hasHeader, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+            column_inds, column_vals, offset_pos, written_row_count = fast_csv_reader(content, column_inds, column_vals, hasHeader, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+            if written_row_count in (-1, 0):
+                raise Exception('The length of one line is too large, please modify the chunksize and make it larger')
             # print('====== after csv reader =====')
             # print('chunk_index', chunk_index)
             # print('offset_pos', offset_pos)
             # print('written_row_count', written_row_count)
             # print('column_inds', column_inds)
             # print('column_vals',column_vals)
+
+
+            count_columns, count_rows = column_inds.shape[0], column_inds.shape[1] - 1
+            val_row_count, val_threshold = column_vals.shape[1], int(column_vals.shape[1] * 0.8)
 
             chunk_index += offset_pos
             hasHeader = False
@@ -173,15 +200,12 @@ def fast_csv_reader(source, column_inds, column_vals, hasHeader, val_threshold, 
                 # print(column_inds)
                 # print(column_vals)
                 # print("========")
-                if cur_cell_char_count + cur_cell_char_count > val_threshold:
+                if cur_cell_start + cur_cell_char_count > val_threshold:
                     is_column_vals_full = True
 
             if end_line:
                 row_index += 1
                 col_index = 0
-                # print('~~~~~~~~~~~')
-                # print(col_index, row_index)
-                # print('~~~~~~~~~~~')
                 if row_index == maxrowcount:
                     is_column_inds_full = True
 
@@ -196,7 +220,32 @@ def fast_csv_reader(source, column_inds, column_vals, hasHeader, val_threshold, 
 
         index += 1
 
-        if index == len(source) or is_column_inds_full or is_column_vals_full:
+        if is_column_inds_full:
+            column_inds = resize_ndarray(column_inds)
+            maxrowcount = column_inds.shape[1] - 1
+            is_column_inds_full = False
+
+        if is_column_vals_full:
+            column_vals = resize_ndarray(column_vals)
+            is_column_vals_full = False
+            val_threshold = int(column_vals.shape[1] * 0.8)
+
+        if index == len(source): 
             next_pos = index_for_end_line + 1
             written_row_count = row_index
-            return next_pos, written_row_count 
+            return column_inds, column_vals, next_pos, written_row_count
+
+
+@njit
+def resize_ndarray(arr):
+    """
+    Make column_inds or column_vals larger when they are full before we reach the end of source
+    """
+    resize_factor = 2
+    cols, rows = arr.shape[0], arr.shape[1]  
+
+    new_arr = np.zeros((np.uint32(cols), np.uint32(rows * resize_factor)), dtype = arr.dtype)
+    for i_c in range(cols):       
+        new_arr[i_c][:rows] = arr[i_c][:]
+    return new_arr
+    

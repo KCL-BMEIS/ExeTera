@@ -31,8 +31,6 @@ class IndexedStringReader(Reader):
         try:
             if isinstance(item, slice):
 
-                print('helloooooooooooooooooooooooooooo')
-
                 start = item.start if item.start is not None else 0
                 stop = item.stop if item.stop is not None else len(self.field['index']) - 1
                 step = item.step

@@ -1278,103 +1278,141 @@ def categorical_transform(chunk, i_c, column_inds, column_vals, cat_keys, cat_in
                 chunk[row_idx] = cat_values[index]
 
 
-@njit
+# @njit
+# def numeric_transform(elements, validity, column_inds, column_vals, col_idx, written_row_count,
+#                         parser, invalid_value, validation_mode, field_name):
+#     """
+#     Transform method for numeric importer in readerwriter.py
+#     """
+                        
+#     exception_message, exception_args = 0, [field_name]
+
+#     for row_idx in range(written_row_count):
+#         empty = False  
+#         valid_input = True # Start by assuming number is valid
+
+#         row_start_idx = column_inds[col_idx, row_idx]
+#         row_end_idx = column_inds[col_idx, row_idx + 1]
+
+#         # number of bytes in this row (number) 
+#         length = row_end_idx - row_start_idx
+
+#         value = 0
+#         bytes_start_index = 0 # Start by assuming no whitespace
+#         negative_multiplier = 1 # Start by assuming not negative
+#         hasDecimal = False  # Start by assuming no decimal
+#         decimal_index = length
+
+#         num_after_decimcal = 0 # Stores sum before decimal
+#         num_before_decimal = 0 # Stores sum after decimal
+
+#         num_of_nums_in_result = 0 # Counts nums for validation
+
+        
+#         # For each byte, check the meaning and build real number
+#         for byte_idx in range(length):
+#             val = column_vals[col_idx, row_start_idx + byte_idx]
+#             if val == 32: # empty space
+#                 bytes_start_index = byte_idx + 1
+#                 continue
+#             elif val == 45: # - (negative) symbol
+#                 negative_multiplier = -1
+#                 bytes_start_index = byte_idx + 1
+#                 continue
+#             elif val == 46: # . (decimal) symbol
+#                 if hasDecimal:
+#                     valid_input = False    
+#                 else:
+#                     hasDecimal = True
+#                     decimal_index = byte_idx
+#                 continue
+#             elif val < 48 or val > 57: # if not 0-9 (except those tested abow), invalidate
+#                 valid_input = False
+#                 #break
+
+#             num_of_nums_in_result += 1
+#             # Builds number based on value before or after decimal
+#             if byte_idx < decimal_index:
+#                 window = decimal_index - bytes_start_index  # integral part
+#                 pos = byte_idx - bytes_start_index
+#                 num_before_decimal += (val - 48) * 10 ** (window - pos - 1)
+#             else:
+#                 window = length - 1 - decimal_index # fraction part
+#                 pos = byte_idx - decimal_index
+#                 num_after_decimcal += (val - 48) * 10 ** (window - pos)
+
+#         # If we could only find empty space
+#         if length == bytes_start_index or num_of_nums_in_result == 0:
+#             empty = True
+#             valid_input = False
+
+#         # Checking if all input valid to stop if already invalid
+#         if not valid_input:
+#             elements[row_idx] = invalid_value
+#             validity[row_idx] = False
+
+#         # Adjust for adding too many zeroes before we knew we had a decimal
+#         divided = 10 ** (length - decimal_index)
+#         num_before_decimal = num_before_decimal // divided  # actual integral part
+
+#         # Adjust number after decimal based on length
+#         if decimal_index != length:
+#             divided = 10 ** (length - decimal_index - 1)
+#             num_after_decimcal = num_after_decimcal / divided   # actual fractional part
+
+#         # Calculate and set final number
+#         val = negative_multiplier * (num_before_decimal + num_after_decimcal)
+
+#         # TODO: This logic can be written cleaner
+#         valid, value = parser(val, invalid_value)
+
+#         if not valid or not valid_input:
+#             valid = False
+#             value = invalid_value
+        
+
+#         elements[row_idx] = value
+#         validity[row_idx] = valid
+
+#         # Optimized exception handling to avoid creating strings inside loop in Numba
+#         if not valid:
+#             if validation_mode == 'strict':
+#                 if empty:
+#                     exception_message = 1
+#                     exception_args = [field_name]
+#                     break
+#                 else:
+#                     exception_message = 2
+#                     non_parsable = column_vals[col_idx, row_start_idx : row_end_idx]
+#                     exception_args = [field_name, non_parsable]
+#                     break
+#             if validation_mode == 'allow_empty':
+#                 if not empty:
+#                     exception_message = 2
+#                     non_parsable = column_vals[col_idx, row_start_idx : row_end_idx]
+#                     exception_args = [field_name, non_parsable]
+#                     break
+#     return exception_message, exception_args
+
+
 def numeric_transform(elements, validity, column_inds, column_vals, col_idx, written_row_count,
                         parser, invalid_value, validation_mode, field_name):
-    """
-    Transform method for numeric importer in readerwriter.py
-    """
-                        
+
     exception_message, exception_args = 0, [field_name]
+                        
+    data = transform_to_values(column_inds, column_vals, col_idx, written_row_count)
 
-    for row_idx in range(written_row_count):
-        empty = False  
-        valid_input = True # Start by assuming number is valid
+    for row_idx, val in enumerate(data):
+        print('val', val)
+        val = val.tobytes().strip()
+        print('val', val)
+        empty = True if val == b'' else False
 
-        row_start_idx = column_inds[col_idx, row_idx]
-        row_end_idx = column_inds[col_idx, row_idx + 1]
-
-        # number of bytes in this row (number) 
-        length = row_end_idx - row_start_idx
-
-        value = 0
-        bytes_start_index = 0 # Start by assuming no whitespace
-        negative_multiplier = 1 # Start by assuming not negative
-        hasDecimal = False  # Start by assuming no decimal
-        decimal_index = length
-
-        num_after_decimcal = 0 # Stores sum before decimal
-        num_before_decimal = 0 # Stores sum after decimal
-
-        num_of_nums_in_result = 0 # Counts nums for validation
-
-        
-        # For each byte, check the meaning and build real number
-        for byte_idx in range(length):
-            val = column_vals[col_idx, row_start_idx + byte_idx]
-            if val == 32: # empty space
-                bytes_start_index = byte_idx + 1
-                continue
-            elif val == 45: # - (negative) symbol
-                negative_multiplier = -1
-                bytes_start_index = byte_idx + 1
-                continue
-            elif val == 46: # . (decimal) symbol
-                if hasDecimal:
-                    valid_input = False    
-                else:
-                    hasDecimal = True
-                    decimal_index = byte_idx
-                continue
-            elif val < 48 or val > 57: # if not 0-9 (except those tested abow), invalidate
-                valid_input = False
-                #break
-
-            num_of_nums_in_result += 1
-            # Builds number based on value before or after decimal
-            if byte_idx < decimal_index:
-                window = decimal_index - bytes_start_index  # integral part
-                pos = byte_idx - bytes_start_index
-                num_before_decimal += (val - 48) * 10 ** (window - pos - 1)
-            else:
-                window = length - 1 - decimal_index # fraction part
-                pos = byte_idx - decimal_index
-                num_after_decimcal += (val - 48) * 10 ** (window - pos)
-
-        # If we could only find empty space
-        if length == bytes_start_index or num_of_nums_in_result == 0:
-            empty = True
-            valid_input = False
-
-        # Checking if all input valid to stop if already invalid
-        if not valid_input:
-            elements[row_idx] = invalid_value
-            validity[row_idx] = False
-
-        # Adjust for adding too many zeroes before we knew we had a decimal
-        divided = 10 ** (length - decimal_index)
-        num_before_decimal = num_before_decimal // divided  # actual integral part
-
-        # Adjust number after decimal based on length
-        if decimal_index != length:
-            divided = 10 ** (length - decimal_index - 1)
-            num_after_decimcal = num_after_decimcal / divided   # actual fractional part
-
-        # Calculate and set final number
-        val = negative_multiplier * (num_before_decimal + num_after_decimcal)
-
-        # TODO: This logic can be written cleaner
         valid, value = parser(val, invalid_value)
-
-        if not valid or not valid_input:
-            valid = False
-            value = invalid_value
-        
 
         elements[row_idx] = value
         validity[row_idx] = valid
 
-        # Optimized exception handling to avoid creating strings inside loop in Numba
         if not valid:
             if validation_mode == 'strict':
                 if empty:
@@ -1383,15 +1421,16 @@ def numeric_transform(elements, validity, column_inds, column_vals, col_idx, wri
                     break
                 else:
                     exception_message = 2
-                    non_parsable = column_vals[col_idx, row_start_idx : row_end_idx]
+                    non_parsable = column_vals[col_idx, column_inds[col_idx, row_idx] : column_inds[col_idx, row_idx + 1]]
                     exception_args = [field_name, non_parsable]
                     break
             if validation_mode == 'allow_empty':
                 if not empty:
                     exception_message = 2
-                    non_parsable = column_vals[col_idx, row_start_idx : row_end_idx]
+                    non_parsable = column_vals[col_idx, column_inds[col_idx, row_idx] : column_inds[col_idx, row_idx + 1]]
                     exception_args = [field_name, non_parsable]
                     break
+
     return exception_message, exception_args
 
 

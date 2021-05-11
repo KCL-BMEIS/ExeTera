@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from exetera.core import importer
 from exetera.core.load_schema import NewDataSchema
 import numpy as np
+from io import BytesIO
 
 TEST_SCHEMA = json.dumps({
     "exetera": {
@@ -101,78 +102,62 @@ class TestImporter(unittest.TestCase):
 
 
     def test_importer_with_arg_include(self):
-        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
         include, exclude = {'schema_key': ['id', 'name']}, {}
 
-        importer.import_with_schema(self.ts, dest_file_name, self.schema_file_name, self.files, False, include, exclude)
-        f = h5py.File(dest_file_name, 'r')
-        self.assertListEqual(list(f.keys()), ['schema_key'])
-        self.assertTrue(set(f['schema_key'].keys()) >= set(['id', 'name']))
-        self.assertEqual(f['schema_key']['id']['values'].shape[0], 5)
-
-        os.close(fd_dest)
+        bio = BytesIO()
+        importer.import_with_schema(self.ts, bio, self.schema_file_name, self.files, False, include, exclude)
+        with h5py.File(bio, 'r') as hf:
+            self.assertListEqual(list(hf.keys()), ['schema_key'])
+            self.assertTrue(set(hf['schema_key'].keys()) >= set(['id', 'name']))
+            self.assertEqual(hf['schema_key']['id']['values'].shape[0], 5)
 
 
     def test_importer_with_wrong_arg_include(self):
-        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+        bio = BytesIO()
         include, exclude = {'schema_wrong_key': ['id', 'name']}, {}
 
         with self.assertRaises(Exception) as context:
-            importer.import_with_schema(self.ts, dest_file_name, self.schema_file_name, self.files, False, include, exclude)
+            importer.import_with_schema(self.ts, bio, self.schema_file_name, self.files, False, include, exclude)
             self.assertEqual(str(context.exception), "-n/--include: the following include table(s) are not part of any input files: {'schema_wrong_key'}")
-        
-        os.close(fd_dest)
-            
+                    
 
     def test_importer_with_arg_exclude(self):
-        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+        bio = BytesIO()
         include, exclude = {}, {'schema_key':['updated_at']}
 
-        importer.import_with_schema(self.ts, dest_file_name, self.schema_file_name, self.files, False, include, exclude)
-        f = h5py.File(dest_file_name, 'r')
-        self.assertListEqual(list(f.keys()), ['schema_key'])
-        self.assertTrue('updated_at' not in set(f['schema_key'].keys()))
-        self.assertEqual(f['schema_key']['id']['values'].shape[0], 5)
-
-        os.close(fd_dest)       
+        importer.import_with_schema(self.ts, bio, self.schema_file_name, self.files, False, include, exclude)
+        with h5py.File(bio, 'r') as hf:
+            self.assertListEqual(list(hf.keys()), ['schema_key'])
+            self.assertTrue('updated_at' not in set(hf['schema_key'].keys()))
+            self.assertEqual(hf['schema_key']['id']['values'].shape[0], 5)
 
 
-    def test_date_importer_without_create_day_field(self):
-        
-        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
-
-        importer.import_with_schema(self.ts, dest_file_name, self.schema_file_name, self.files, False, {}, {})
-        f = h5py.File(dest_file_name, 'r')
-
-        self.assertTrue('birthday' in set(f['schema_key'].keys()))  
-        self.assertEqual(datetime.fromtimestamp(f['schema_key']['birthday']['values'][1]).strftime("%Y-%m-%d"), '1980-03-04')
-
-        self.assertTrue('birthday_day' not in set(f['schema_key'].keys()))       
-
-        os.close(fd_dest)  
+    def test_date_importer_without_create_day_field(self):     
+        bio = BytesIO()
+        importer.import_with_schema(self.ts, bio, self.schema_file_name, self.files, False, {}, {})
+        with h5py.File(bio, 'r') as hf:
+            self.assertTrue('birthday' in set(hf['schema_key'].keys()))  
+            self.assertEqual(datetime.fromtimestamp(hf['schema_key']['birthday']['values'][1]).strftime("%Y-%m-%d"), '1980-03-04')
+            
+            self.assertTrue('birthday_day' not in set(hf['schema_key'].keys()))       
 
 
     def test_datetime_importer_with_create_day_field_True(self):
-        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+        bio = BytesIO()
+        importer.import_with_schema(self.ts, bio, self.schema_file_name, self.files, False, {}, {})
+        with h5py.File(bio, 'r') as hf:
+            self.assertTrue('updated_at' in set(hf['schema_key'].keys()))                
+            self.assertEqual(datetime.fromtimestamp(hf['schema_key']['updated_at']['values'][1]).strftime("%Y-%m-%d %H:%M:%S"), '2020-05-13 01:00:00')  
 
-        importer.import_with_schema(self.ts, dest_file_name, self.schema_file_name, self.files, False, {}, {})
-        f = h5py.File(dest_file_name, 'r')
-
-        self.assertTrue('updated_at' in set(f['schema_key'].keys()))                
-        self.assertEqual(datetime.fromtimestamp(f['schema_key']['updated_at']['values'][1]).strftime("%Y-%m-%d %H:%M:%S"), '2020-05-13 01:00:00')  
-
-        self.assertTrue('updated_at_day' in set(f['schema_key'].keys()))         
-        self.assertEqual(f['schema_key']['updated_at_day']['values'][1], b'2020-05-13')
-
-        os.close(fd_dest)  
+            self.assertTrue('updated_at_day' in set(hf['schema_key'].keys()))         
+            self.assertEqual(hf['schema_key']['updated_at_day']['values'][1], b'2020-05-13')
 
 
     def test_numeric_field_importer_with_small_chunk_size(self):
-        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+        chunk_size = 1000
 
-        chunk_size = 100
-        importer.import_with_schema(self.ts, dest_file_name, self.schema_file_name, self.files, False, {}, {})
-        f = h5py.File(dest_file_name, 'r')
+        bio = BytesIO()
+        importer.import_with_schema(self.ts, bio, self.schema_file_name, self.files, False, {}, {})
 
         # numeric int field
         expected_age_list = list(np.array([30,40,50,60,70], dtype = np.int32 ))
@@ -181,9 +166,10 @@ class TestImporter(unittest.TestCase):
         # numeric float field with min_default_value
         expected_weight_change_list = list(np.array([21.2, NewDataSchema._get_min_max('float32')[0], -17.5, -17.5, 2.5], dtype = np.float32))
 
-        self.assertListEqual(list(f['schema_key']['age']['values'][:]), expected_age_list)
-        self.assertListEqual(list(f['schema_key']['height']['values'][:]), expected_height_list)
-        self.assertListEqual(list(f['schema_key']['weight_change']['values'][:]), expected_weight_change_list)
+        with h5py.File(bio, 'r') as hf:
+            self.assertListEqual(list(hf['schema_key']['age']['values'][:]), expected_age_list)
+            self.assertListEqual(list(hf['schema_key']['height']['values'][:]), expected_height_list)
+            self.assertListEqual(list(hf['schema_key']['weight_change']['values'][:]), expected_weight_change_list)
 
 
     def test_numeric_importer_with_empty_value_in_strict_mode(self):
@@ -198,13 +184,11 @@ class TestImporter(unittest.TestCase):
             fcsv.write(TEST_CSV_CONTENTS_EMPTY_VALUE)
 
         files = {'schema_key': csv_file_name}
-        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
         
+        bio = BytesIO()
         with self.assertRaises(Exception) as context:
-            importer.import_with_schema(self.ts, dest_file_name, self.schema_file_name, files, False, {}, {})
+            importer.import_with_schema(self.ts, bio, self.schema_file_name, files, False, {}, {})
             self.assertEqual(str(context.exception), "Numeric value in the field 'id' can not be empty in strict mode")
-
-        os.close(fd_dest)
 
         
     def test_numeric_importer_with_non_numeric_value_in_strict_mode(self):
@@ -219,79 +203,64 @@ class TestImporter(unittest.TestCase):
             fcsv.write(TEST_CSV_CONTENTS_EMPTY_VALUE)
 
         files = {'schema_key': csv_file_name}
-        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
-
+        
+        bio = BytesIO()
         with self.assertRaises(Exception) as context:
-            importer.import_with_schema(self.ts, dest_file_name, self.schema_file_name, files, False, {}, {})
+            importer.import_with_schema(self.ts, bio, self.schema_file_name, files, False, {}, {})
             self.assertEqual(str(context.exception), "The following numeric value in the field 'id' can not be parsed: 5@")
         
-        os.close(fd_dest)
 
 
     def test_numeric_importer_with_non_empty_valid_value_in_strict_mode(self):
-        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+        bio = BytesIO()
+        importer.import_with_schema(self.ts, bio, self.schema_file_name, self.files, False, {}, {})
+        with h5py.File(bio, 'r') as hf:
+            self.assertTrue('id' in set(hf['schema_key'].keys()))
+            self.assertTrue('id_valid' not in set(hf['schema_key'].keys()))
 
-        importer.import_with_schema(self.ts, dest_file_name, self.schema_file_name, self.files, False, {}, {})
-        f = h5py.File(dest_file_name, 'r')
-        self.assertTrue('id' in set(f['schema_key'].keys()))
-        self.assertTrue('id_valid' not in set(f['schema_key'].keys()))
-
-        os.close(fd_dest)
 
     def test_numeric_importer_in_allow_empty_mode(self):
-        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
-
-        importer.import_with_schema(self.ts, dest_file_name, self.schema_file_name, self.files, False, {}, {})
-        f = h5py.File(dest_file_name, 'r')
-        self.assertTrue('age' in set(f['schema_key'].keys()))
-        self.assertTrue('age_valid' in set(f['schema_key'].keys()))
-        self.assertTrue('weight_change' in set(f['schema_key'].keys()))
-        self.assertTrue('weight_change_valid' not in set(f['schema_key'].keys()))            
-
-        os.close(fd_dest)
+        bio = BytesIO()
+        importer.import_with_schema(self.ts, bio, self.schema_file_name, self.files, False, {}, {})
+        with h5py.File(bio, 'r') as hf:
+            self.assertTrue('age' in set(hf['schema_key'].keys()))
+            self.assertTrue('age_valid' in set(hf['schema_key'].keys()))
+            self.assertTrue('weight_change' in set(hf['schema_key'].keys()))
+            self.assertTrue('weight_change_valid' not in set(hf['schema_key'].keys()))            
 
 
     def test_numeric_importer_in_relaxed_mode(self):
-        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
-
-        importer.import_with_schema(self.ts, dest_file_name, self.schema_file_name, self.files, False, {}, {})
-        f = h5py.File(dest_file_name, 'r')
-        self.assertTrue('height' in set(f['schema_key'].keys()))
-        self.assertTrue('height_valid' not in set(f['schema_key'].keys()))
-        self.assertTrue('height_valid_test' in set(f['schema_key'].keys()))
-        self.assertTrue('BMI' in set(f['schema_key'].keys()))
-        self.assertTrue('BMI_valid' in set(f['schema_key'].keys()))
-
-        os.close(fd_dest)
+        bio = BytesIO()
+        importer.import_with_schema(self.ts, bio, self.schema_file_name, self.files, False, {}, {})
+        with h5py.File(bio, 'r') as hf:
+            self.assertTrue('height' in set(hf['schema_key'].keys()))
+            self.assertTrue('height_valid' not in set(hf['schema_key'].keys()))
+            self.assertTrue('height_valid_test' in set(hf['schema_key'].keys()))
+            self.assertTrue('BMI' in set(hf['schema_key'].keys()))
+            self.assertTrue('BMI_valid' in set(hf['schema_key'].keys()))
 
 
     def test_indexed_string_importer_with_small_chunk_size(self):
-        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
+        chunk_size = 400 # < total_bytes
 
-        # total bytes in csv file > chunk size // count_col
-        chunk_size = 100
-        importer.import_with_schema(self.ts, dest_file_name, self.schema_file_name, self.files, False, {}, {}, chunk_size = chunk_size)
-        f = h5py.File(dest_file_name, 'r')
-        indices = f['schema_key']['name']['index'][:]
-        values = f['schema_key']['name']['values'][:]
+        bio = BytesIO()
+        importer.import_with_schema(self.ts, bio, self.schema_file_name, self.files, False, {}, {}, chunk_size = chunk_size)
+        with h5py.File(bio, 'r') as hf:
+            indices = hf['schema_key']['name']['index'][:]
+            values = hf['schema_key']['name']['values'][:]
 
         self.assertListEqual(list(indices), [0,1,2,3,4])
         self.assertEqual(values[indices[0]:indices[1]].tobytes(), b'a')
 
-        os.close(fd_dest)
-
 
     def test_categorical_field_importer_with_small_chunk_size(self):
-        fd_dest, dest_file_name = tempfile.mkstemp(suffix='.hdf5')
-
-        chunk_size = 100
-        importer.import_with_schema(self.ts, dest_file_name, self.schema_file_name, self.files, False, {}, {}, chunk_size = chunk_size)
-        f = h5py.File(dest_file_name, 'r')
-
-        expected_postcode_value_list = [1, 3, 2, 0, 4]
-        self.assertEqual(list(f['schema_key']['postcode']['values'][:]), expected_postcode_value_list)
-
-        os.close(fd_dest)
+        chunk_size = 400 # < total_bytes
+        
+        bio = BytesIO()
+        importer.import_with_schema(self.ts, bio, self.schema_file_name, self.files, False, {}, {}, chunk_size = chunk_size)
+        with h5py.File(bio, 'r') as hf:
+            expected_postcode_value_list = [1, 3, 2, 0, 4]
+            self.assertEqual(list(hf['schema_key']['postcode']['values'][:]), expected_postcode_value_list)
 
 
     def tearDown(self):

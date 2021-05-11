@@ -5,10 +5,10 @@ import numpy as np
 import os
 import pandas as pd
 import exetera.core.operations as ops
+from io import StringIO
 
 
-TEST_SCHEMA = [
-                {'name': 'a', 'type': 'cat', 'vals': ('','a', 'bb', 'ccc', 'dddd', 'eeeee'), 
+TEST_SCHEMA = [{'name': 'a', 'type': 'cat', 'vals': ('','a', 'bb', 'ccc', 'dddd', 'eeeee'), 
                     'strings_to_values': {'':0,'a':1, 'bb':2, 'ccc':3, 'dddd':4, 'eeeee':5}},
                 {'name': 'b', 'type': 'int'},
                 {'name': 'c', 'type': 'cat', 'vals': ('', '', '', '', '', 'True', 'False'),  
@@ -50,14 +50,12 @@ class DummyWriter:
  
 class TestFastCSVReader(TestCase):
     
-    def _make_test_data(self, count, schema, csv_file_name, fields_to_use=None):
+    def _make_test_data(self, count, schema, fields_to_use=None, csv_file_name=None):
         """
         [ {'name':name, 'type':'cat'|'float'|'fixed', 'values':(vals)} ]
         """
-        import pandas as pd
         rng = np.random.RandomState(12345678)
         columns = {}
-        cat_columns_v = {}
         cat_map_dict = {}
         for s in schema: 
             if s['type'] == 'cat':
@@ -70,7 +68,6 @@ class TestFastCSVReader(TestCase):
                     arr_str_to_val[i] = s['strings_to_values'][vals[arr[i]]]
 
                 columns[s['name']] = larr
-                cat_columns_v[s['name']] = arr_str_to_val
                 cat_map_dict[s['name']] = s['strings_to_values']
             elif s['type'] == 'float':
                 arr = rng.uniform(size=count)
@@ -88,7 +85,12 @@ class TestFastCSVReader(TestCase):
 
         # create csv file 
         df = pd.DataFrame(columns)
-        df.to_csv(csv_file_name, index = False)
+
+        csv_buffer = StringIO()
+        if csv_file_name:
+            df.to_csv(csv_file_name, index=False)
+        else:
+            df.to_csv(csv_buffer, index = False)
 
         # create byte map for each categorical field 
         fieldnames = list(df)
@@ -107,92 +109,75 @@ class TestFastCSVReader(TestCase):
         # index map for field_to_use
         index_map = [fieldnames.index(k) for k in fields_to_use]
 
-        return df, cat_columns_v, writer_list, index_map
+        return csv_buffer, df, writer_list, index_map
 
 
     def test_escape_well_formed_csv(self):
-        TEST_CSV_CONTENTS = '\n'.join((
-            'id, f1, f2, f3',
-            '1, "abc", "a""b""c", """ab"""'
-        ))
-        
-        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
-        with open(csv_file_name, 'w') as fcsv:
-            fcsv.write(TEST_CSV_CONTENTS)
-            fcsv.write('\n')
+        open_csv = StringIO('id,f1,f2,f3\n1,"abc","a""b""c","""ab"""\n')
+        content = np.frombuffer(open_csv.getvalue().encode(), dtype=np.uint8)
 
-        total_byte_size, count_columns, count_rows, val_row_count, val_threshold = get_file_stat(csv_file_name, chunk_size=10)
+        total_byte_size, count_columns, count_rows, val_row_count, val_threshold = get_file_stat(open_csv, chunk_size=10)
 
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
         column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
-        
-        content = np.fromfile(csv_file_name, dtype=np.uint8)    
 
-        _, written_row_count = fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        column_inds, _, _, written_row_count = fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
         self.assertEqual(written_row_count, 1)
         self.assertEqual(column_inds[1, 1], 3)  # abc
         self.assertEqual(column_inds[2, 1], 5)  # a"b"c
         self.assertEqual(column_inds[3, 1], 4)  # "ab"
 
-        os.close(fd_csv)
-
 
     def test_escape_bad_formed_csv_1(self):
-        TEST_CSV_CONTENTS = '\n'.join((
-            'id, f1 ',
-            '1, abc"',
-        ))
-        
-        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
-        with open(csv_file_name, 'w') as fcsv:
-            fcsv.write(TEST_CSV_CONTENTS)
+        open_csv = StringIO('id,f1\n1,abc"\n')
+        content = np.frombuffer(open_csv.getvalue().encode(), dtype=np.uint8)
 
-        total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(csv_file_name, chunk_size=10)
+        total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(open_csv, chunk_size=10)
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
         column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
-        content = np.fromfile(csv_file_name, dtype=np.uint8)
 
         with self.assertRaises(Exception) as context:
             fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)    
             self.assertEqual(str(context.exception), 'double quote should start at the beginning of the cell') 
 
-        os.close(fd_csv)
-
 
     def test_escape_bad_formed_csv_2(self):
-        TEST_CSV_CONTENTS = '\n'.join((
-            'id, f1 ',
-            '1, "abc"de',
-        ))
-        
-        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
-        with open(csv_file_name, 'w') as fcsv:
-            fcsv.write(TEST_CSV_CONTENTS)
+        open_csv = StringIO('id,f1\n1,"abc"de\n')
+        content = np.frombuffer(open_csv.getvalue().encode(), dtype=np.uint8)
 
-        total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(csv_file_name, chunk_size=10)
+        total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(open_csv, chunk_size=10)
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
-        column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)   
-        content = np.fromfile(csv_file_name, dtype=np.uint8)
+        column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
 
         with self.assertRaises(Exception) as context:
             fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)    
-            self.assertEqual(str(context.exception), 'invalid double quote') 
+            self.assertEqual(str(context.exception), 'invalid double quote')   
 
-        os.close(fd_csv)      
+    
+    def test_escape_bad_formed_csv_3(self):
+        open_csv = StringIO('id,f1\n1, "abc\n')
+        content = np.frombuffer(open_csv.getvalue().encode(), dtype=np.uint8)
+
+        total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(open_csv, chunk_size=10)
+        column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
+        column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
+
+        with self.assertRaises(Exception) as context:
+            fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)    
+            self.assertEqual(str(context.exception), 'invalid double quote')   
                                 
 
     def test_csv_fast_correctness(self):
         file_lines, chunk_size = 3, 100
 
-        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
-        df, _, _, _ = self._make_test_data(file_lines, TEST_SCHEMA, csv_file_name)
-
-        total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(csv_file_name, chunk_size=chunk_size)
+        csv_buffer, df, _, _ = self._make_test_data(file_lines, TEST_SCHEMA)
+        content = np.frombuffer(csv_buffer.getvalue().encode(), dtype=np.uint8)
+        
+        total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(csv_buffer, chunk_size=chunk_size)
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
         column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
         
-        content = np.fromfile(csv_file_name, dtype=np.uint8)
-        offset, written_row_count = fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        column_inds, column_vals, offset, written_row_count = fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
 
         self.assertEqual(written_row_count, 3)
         self.assertListEqual(list(column_inds[0][:written_row_count + 1]), [0, 3, 5, 9])
@@ -200,17 +185,14 @@ class TestFastCSVReader(TestCase):
         self.assertListEqual(list(column_vals[0][:9]), [99, 99, 99, 98, 98, 100, 100, 100, 100])
         self.assertListEqual(list(column_vals[1][:3]), [49, 48, 49])
 
-        os.close(fd_csv)
-
 
     def test_fast_csv_reader_on_only_categorical_field(self):
         file_lines, chunk_size = 1003, 100
         fields_to_use = [s['name'] for s in TEST_SCHEMA if s['type'] == 'cat']
 
         fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
-        df, cat_columns_v, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, csv_file_name, fields_to_use)
-
-        csv_fieldnames = list(df)
+        _, df, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, fields_to_use, csv_file_name)
+        
         read_file_using_fast_csv_reader(source=csv_file_name, chunk_size=chunk_size, index_map=index_map, field_importer_list=writer_list)
 
         for ith, field in enumerate(fields_to_use):
@@ -226,26 +208,25 @@ class TestFastCSVReader(TestCase):
         fields_to_use = [s['name'] for s in TEST_SCHEMA if s['type'] == 'str']
 
         fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
-        df, _, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, csv_file_name, fields_to_use)
+        _, df, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, fields_to_use, csv_file_name)
 
         read_file_using_fast_csv_reader(source = csv_file_name, chunk_size=chunk_size, index_map=index_map, field_importer_list = writer_list)
         
-        csv_fieldnames = list(df)
         for ith, field in enumerate(fields_to_use):
             result = writer_list[ith].result
             self.assertEqual(len(result), len(df[field]))
             self.assertListEqual(result, list(df[field]))
 
         os.close(fd_csv) 
+
     
     def test_fast_csv_reader_on_only_numeric_field(self):
         file_lines, chunk_size = 998, 100
         fields_to_use = [s['name'] for s in TEST_SCHEMA if s['type'] in ('int', 'float')]
 
         fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
-        df, cat_columns_v, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, csv_file_name, fields_to_use)
+        _, df, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, fields_to_use, csv_file_name)
 
-        csv_fieldnames = list(df)
         read_file_using_fast_csv_reader(source=csv_file_name, chunk_size=chunk_size, index_map=index_map, field_importer_list=writer_list)
 
         for ith, field in enumerate(fields_to_use):
@@ -254,3 +235,83 @@ class TestFastCSVReader(TestCase):
             self.assertListEqual(result, list(df[field]))
 
         os.close(fd_csv)
+
+
+    def test_fast_csv_reader_chunksize_too_small(self):
+        file_lines, chunk_size = 10, 10
+
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+        _, df, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, fields_to_use=None, csv_file_name=csv_file_name)
+
+        with self.assertRaises(Exception) as context:
+            read_file_using_fast_csv_reader(source=csv_file_name, chunk_size=chunk_size, index_map=index_map, field_importer_list=writer_list)
+            self.assertEqual(context.exception, 'The length of one line is too large, please modify the chunksize and make it larger')
+
+        os.close(fd_csv)
+
+
+    def _make_empty_test_data(self):
+        columns = {}
+        count_row = 10
+        count_col = 3
+
+        for i in range(count_col):
+            fieldname = 'f' + str(i)
+            columns[fieldname] = ['']*count_row
+
+        df = pd.DataFrame(columns)
+        
+        csv_buffer = StringIO()
+        df.to_csv(csv_buffer, index = False)
+
+        index_map = [i for i in range(count_row)]
+        return csv_buffer, df, index_map
+
+
+    def test_fast_csv_reader_column_inds_full(self):
+        chunk_size = 50
+
+        csv_buffer, df, index_map  = self._make_empty_test_data()
+        content = np.frombuffer(csv_buffer.getvalue().encode(), dtype=np.uint8)
+        
+        total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(csv_buffer, chunk_size=chunk_size)
+        column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
+        column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
+
+        indices, values, offset_pos, _ = fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+
+        self.assertGreater(indices.shape[1], column_inds.shape[1])  # resized column_inds
+        self.assertEqual(values.shape[1], column_vals.shape[1])     # column_val didn't resizes
+        self.assertEqual(offset_pos, len(content))                  # whole chunk of content got read
+
+
+    def _make_column_val_full_data(self):
+        columns = {}
+        count_row = 100
+        columns['f1'] = [str(i) for i in range(2)] + [str(i*10000000) for i in range(2, count_row)]
+
+        df = pd.DataFrame(columns)
+
+        csv_buffer = StringIO()
+        df.to_csv(csv_buffer, index = False)
+
+        index_map = [i for i in range(count_row)]
+        return csv_buffer, df, index_map
+
+
+    def test_fast_csv_reader_column_vals_full(self):
+        chunk_size = 1000
+
+        csv_buffer, df, index_map = self._make_column_val_full_data()        
+        content = np.frombuffer(csv_buffer.getvalue().encode(), dtype=np.uint8)
+        
+        total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(csv_buffer, chunk_size=chunk_size)
+        column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
+        column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
+
+        indices, values, offset_pos, _ = fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+
+        self.assertGreater(indices.shape[1], column_inds.shape[1])  # resized column_inds
+        self.assertGreater(values.shape[1], column_vals.shape[1])   # resized column_vals
+        self.assertEqual(offset_pos, len(content))                  # whole chunk of content got read
+
