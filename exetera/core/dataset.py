@@ -9,6 +9,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional
+
 import h5py
 
 from exetera.core.abstract_types import DataFrame, Dataset
@@ -30,7 +32,7 @@ class HDF5Dataset(Dataset):
 
     def __init__(self, session, dataset_path, mode, name):
         """
-        Create a HDF5Dataset instance that contains dataframes. The dataframes are represented in a dict() with the
+        Create a Dataset instance that contains dataframes. The dataframes are represented in a dict() with the
         name(str) as a key. The construction should always be called by Session.open_dataset() otherwise the instance
         is not included in Session.datasets. If the HDF5 datafile contains group, the content in loaded into dataframes.
 
@@ -61,12 +63,23 @@ class HDF5Dataset(Dataset):
         """
         return self._session
 
-    def create_dataframe(self, name, dataframe: DataFrame = None):
+    def create_group(self,
+                     name: str):
         """
-        Create a group object in HDF5 file and a Exetera dataframe in memory.
+        This method is a wrapper around :py:meth:`~dataset.DataSet.create_dataframe`for
+        backwards compatibility with older versions of ExeTera. Please use
+        :py:meth:`~dataset.DataSet.create_dataframe` instead.
+        """
+        return self.create_dataframe(name)
 
-        :param name: name of the dataframe, or the group name in HDF5
-        :param dataframe: optional - copy an existing dataframe
+    def create_dataframe(self,
+                         name: str,
+                         dataframe: Optional[DataFrame] = None):
+        """
+        Create a new DataFrame object as a part of this Dataset.
+
+        :param name: name of the dataframe
+        :param dataframe: if set, this is a dataframe object whose contents are duplicated
         :return: a dataframe object
         """
         if dataframe is not None:
@@ -130,7 +143,7 @@ class HDF5Dataset(Dataset):
         Check if a dataframe is contained in this dataset by the dataframe object itself.
 
         :param dataframe: the dataframe object to check
-        :return: Ture or False if the dataframe is contained
+        :return: True or False if the dataframe is contained
         """
         if not isinstance(dataframe, DataFrame):
             raise TypeError("The field must be a DataFrame object")
