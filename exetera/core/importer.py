@@ -25,6 +25,7 @@ from exetera.core import utils
 from exetera.core import operations as ops
 from exetera.core.load_schema import load_schema
 from exetera.core.csv_reader_speedup import read_file_using_fast_csv_reader
+from io import StringIO
 
 def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite, include, exclude, chunk_size = 1 << 20):
 
@@ -32,8 +33,12 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
     print(schema_file)
     print(files)
 
-    with open(schema_file) as sf:
-        schema = load_schema(sf)
+    schema = None
+    if isinstance(schema_file, str):
+        with open(schema_file) as sf:
+            schema = load_schema(sf)
+    elif isinstance(schema_file, StringIO):
+        schema = load_schema(schema_file)
 
     any_parts_present = False
     for sk in schema.keys():
@@ -72,7 +77,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
                 continue
 
             fields = schema[sk].fields
-
+    
             with open(files[sk]) as f:
                 ds = dataset.Dataset(f, stop_after=1)
             names = set([n.strip() for n in ds.names_])

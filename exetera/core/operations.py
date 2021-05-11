@@ -1403,9 +1403,7 @@ def numeric_transform(elements, validity, column_inds, column_vals, col_idx, wri
     data = transform_to_values(column_inds, column_vals, col_idx, written_row_count)
 
     for row_idx, val in enumerate(data):
-        print('val', val)
         val = val.tobytes().strip()
-        print('val', val)
         empty = True if val == b'' else False
 
         valid, value = parser(val, invalid_value)

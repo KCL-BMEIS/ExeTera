@@ -221,14 +221,14 @@ def fast_csv_reader(source, column_inds, column_vals, hasHeader, val_threshold, 
         index += 1
 
         if is_column_inds_full:
-            column_inds = resize_ndarray(column_inds)
+            column_inds = make_ndarray_larger(column_inds)
             maxrowcount = column_inds.shape[1] - 1
             is_column_inds_full = False
 
         if is_column_vals_full:
-            column_vals = resize_ndarray(column_vals)
-            is_column_vals_full = False
+            column_vals = make_ndarray_larger(column_vals)
             val_threshold = int(column_vals.shape[1] * 0.8)
+            is_column_vals_full = False
 
         if index == len(source): 
             next_pos = index_for_end_line + 1
@@ -237,7 +237,7 @@ def fast_csv_reader(source, column_inds, column_vals, hasHeader, val_threshold, 
 
 
 @njit
-def resize_ndarray(arr):
+def make_ndarray_larger(arr):
     """
     Make column_inds or column_vals larger when they are full before we reach the end of source
     """

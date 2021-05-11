@@ -6,7 +6,7 @@ import os
 import pandas as pd
 import exetera.core.operations as ops
 from io import StringIO
-
+import mock
 
 TEST_SCHEMA = [{'name': 'a', 'type': 'cat', 'vals': ('','a', 'bb', 'ccc', 'dddd', 'eeeee'), 
                     'strings_to_values': {'':0,'a':1, 'bb':2, 'ccc':3, 'dddd':4, 'eeeee':5}},
@@ -50,7 +50,7 @@ class DummyWriter:
  
 class TestFastCSVReader(TestCase):
     
-    def _make_test_data(self, count, schema, fields_to_use=None, csv_file_name=None):
+    def _make_test_data(self, count, schema, fields_to_use=None):
         """
         [ {'name':name, 'type':'cat'|'float'|'fixed', 'values':(vals)} ]
         """
@@ -87,10 +87,7 @@ class TestFastCSVReader(TestCase):
         df = pd.DataFrame(columns)
 
         csv_buffer = StringIO()
-        if csv_file_name:
-            df.to_csv(csv_file_name, index=False)
-        else:
-            df.to_csv(csv_buffer, index = False)
+        df.to_csv(csv_buffer, index = False)
 
         # create byte map for each categorical field 
         fieldnames = list(df)
@@ -98,7 +95,6 @@ class TestFastCSVReader(TestCase):
         fields_to_use = fieldnames if fields_to_use is None else fields_to_use
         writer_list = [None] * len(fields_to_use)
 
-        print('initial', fields_to_use)
 
         for i, fn in enumerate(fields_to_use):
             for s in schema:
@@ -186,68 +182,63 @@ class TestFastCSVReader(TestCase):
         self.assertListEqual(list(column_vals[1][:3]), [49, 48, 49])
 
 
-    def test_fast_csv_reader_on_only_categorical_field(self):
+    @mock.patch("numpy.fromfile")
+    def test_fast_csv_reader_on_only_categorical_field(self, mock_fromfile):
         file_lines, chunk_size = 1003, 100
         fields_to_use = [s['name'] for s in TEST_SCHEMA if s['type'] == 'cat']
 
-        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
-        _, df, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, fields_to_use, csv_file_name)
+        csv_buffer, df, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, fields_to_use)
+        mock_fromfile.return_value = np.frombuffer(csv_buffer.getvalue().encode(), dtype=np.uint8)
         
-        read_file_using_fast_csv_reader(source=csv_file_name, chunk_size=chunk_size, index_map=index_map, field_importer_list=writer_list)
+        read_file_using_fast_csv_reader(source=csv_buffer, chunk_size=chunk_size, index_map=index_map, field_importer_list=writer_list)
 
         for ith, field in enumerate(fields_to_use):
             result = writer_list[ith].result
             self.assertEqual(len(result), len(df[field]))
             self.assertListEqual(result, list(df[field]))
 
-        os.close(fd_csv)
-
-
-    def test_fast_csv_reader_on_only_indexed_string_field(self):
+    @mock.patch("numpy.fromfile")
+    def test_fast_csv_reader_on_only_indexed_string_field(self, mock_fromfile):
         file_lines, chunk_size = 53, 100
         fields_to_use = [s['name'] for s in TEST_SCHEMA if s['type'] == 'str']
 
-        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
-        _, df, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, fields_to_use, csv_file_name)
+        csv_buffer, df, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, fields_to_use)
+        mock_fromfile.return_value = np.frombuffer(csv_buffer.getvalue().encode(), dtype=np.uint8)
 
-        read_file_using_fast_csv_reader(source = csv_file_name, chunk_size=chunk_size, index_map=index_map, field_importer_list = writer_list)
+        read_file_using_fast_csv_reader(source = csv_buffer, chunk_size=chunk_size, index_map=index_map, field_importer_list = writer_list)
         
         for ith, field in enumerate(fields_to_use):
             result = writer_list[ith].result
             self.assertEqual(len(result), len(df[field]))
             self.assertListEqual(result, list(df[field]))
 
-        os.close(fd_csv) 
-
     
-    def test_fast_csv_reader_on_only_numeric_field(self):
+    @mock.patch("numpy.fromfile")
+    def test_fast_csv_reader_on_only_numeric_field(self, mock_fromfile):
         file_lines, chunk_size = 998, 100
         fields_to_use = [s['name'] for s in TEST_SCHEMA if s['type'] in ('int', 'float')]
 
-        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
-        _, df, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, fields_to_use, csv_file_name)
+        csv_buffer, df, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, fields_to_use)
+        mock_fromfile.return_value = np.frombuffer(csv_buffer.getvalue().encode(), dtype=np.uint8)
 
-        read_file_using_fast_csv_reader(source=csv_file_name, chunk_size=chunk_size, index_map=index_map, field_importer_list=writer_list)
+        read_file_using_fast_csv_reader(source=csv_buffer, chunk_size=chunk_size, index_map=index_map, field_importer_list=writer_list)
 
         for ith, field in enumerate(fields_to_use):
             result = writer_list[ith].result
             self.assertEqual(len(result), len(df[field]))
             self.assertListEqual(result, list(df[field]))
 
-        os.close(fd_csv)
 
-
-    def test_fast_csv_reader_chunksize_too_small(self):
+    @mock.patch("numpy.fromfile")
+    def test_fast_csv_reader_chunksize_too_small(self, mock_fromfile):
         file_lines, chunk_size = 10, 10
 
-        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
-        _, df, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA, fields_to_use=None, csv_file_name=csv_file_name)
-
+        csv_buffer, df, writer_list, index_map = self._make_test_data(file_lines, TEST_SCHEMA)
+        mock_fromfile.return_value = np.frombuffer(csv_buffer.getvalue().encode(), dtype=np.uint8)
+        
         with self.assertRaises(Exception) as context:
-            read_file_using_fast_csv_reader(source=csv_file_name, chunk_size=chunk_size, index_map=index_map, field_importer_list=writer_list)
+            read_file_using_fast_csv_reader(source=csv_buffer, chunk_size=chunk_size, index_map=index_map, field_importer_list=writer_list)
             self.assertEqual(context.exception, 'The length of one line is too large, please modify the chunksize and make it larger')
-
-        os.close(fd_csv)
 
 
     def _make_empty_test_data(self):
