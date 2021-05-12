@@ -271,8 +271,30 @@ def ordered_map_valid_partial_old(d, data_field, map_field, result, invalid):
             return i, val
 
 
+@njit
+def next_map_subchunk(map_, sm, invalid, chunksize):
+
+    start = -1
+    while sm < len(map_) and map_[sm] == invalid:
+        sm += 1
+
+    if sm < len(map_):
+        start = map_[sm]
+
+    while sm < len(map_) and map_[sm] - start < chunksize:
+        sm += 1
+
+    return sm
+
+
 def ordered_map_valid_stream(data_field, map_field, result_field,
                              invalid=-1, chunksize=DEFAULT_CHUNKSIZE):
+    """
+    . for each map chunk
+      . calculate sub chunks based on indices
+        . for each sub chunk
+          . map indices for sub chunk
+    """
     result_data = np.zeros(chunksize, dtype=result_field.data.dtype)
 
     m_chunk, map_, m_max, m_off, m = first_untrimmed_chunk(map_field, chunksize)
@@ -283,13 +305,10 @@ def ordered_map_valid_stream(data_field, map_field, result_field,
         if d_limits[0] == -1:
             # no unfiltered values in this chunk so just assign empty entries to the result field
             result_data.fill(0)
-            result_field.data.write(result_data)
-            m += chunksize
-            continue
-
-        values = data_field.data[d_limits[0]:d_limits[1]+1]
-
-        m = ordered_map_valid_partial(values, map_, d_limits[0], result_data, invalid, 0, m)
+            m += m_max
+        else:
+            values = data_field.data[d_limits[0]:d_limits[1]+1]
+            m = ordered_map_valid_partial(values, map_, d_limits[0], result_data, invalid, 0, m)
 
 
 
@@ -349,45 +368,48 @@ def ordered_map_valid_indexed_stream(data_field, map_field, result_field,
         if i_limits[0] == -1:
             # no unfiltered values in this chunk so just assign empty entries to the result field
             result_indices.fill(ri_accum)
-            result_field.indices.write(result_indices)
+            result_field.indices.write(result_indices[:m_max])
             m += chunksize
-            continue
+        else:
 
-        # TODO: can potentially optimise here by checking if upper limit has increased
-        indices_ = data_field.indices[i_limits[0]:i_limits[1]+2]
-        sub_chunks = list()
-        calculate_chunk_decomposition(0, i_limits[1] - i_limits[0]+1, indices_,
-                                      chunksize * value_factor, sub_chunks)
+            # TODO: can potentially optimise here by checking if upper limit has increased
+            indices_ = data_field.indices[i_limits[0]:i_limits[1]+2]
+            sub_chunks = list()
+            calculate_chunk_decomposition(0, i_limits[1] - i_limits[0]+1, indices_,
+                                          chunksize * value_factor, sub_chunks)
 
-        s = 0
-        sc = sub_chunks[s]
-        values_ = data_field.values[indices_[sc[0]]:indices_[sc[1]]]
+            s = 0
+            sc = sub_chunks[s]
+            values_ = data_field.values[indices_[sc[0]]:indices_[sc[1]]]
 
-        while m < len(map_):
+            # iterate over the subchunks (there may only be one) until this map chunk
+            # iterate over the subchunks (there may only be one) until this map chunk
+            # has been fully consumed
+            while m < len(map_):
 
-            m, ri, rv, ri_accum, need_subchunk = \
-                ordered_map_valid_indexed_partial(indices_, sc[0], sc[1], values_,
-                                                  map_, i_limits[0],
-                                                  result_indices, result_values,
-                                                  invalid, m, ri, rv, ri_accum)
+                m, ri, rv, ri_accum, need_subchunk = \
+                    ordered_map_valid_indexed_partial(indices_, sc[0], sc[1], values_,
+                                                      map_, i_limits[0],
+                                                      result_indices, result_values,
+                                                      invalid, m, ri, rv, ri_accum)
 
-            # update the subchunk if necessary
-            if need_subchunk:
-                s += 1
-                sc = sub_chunks[s]
-                values_ = data_field.values[indices_[sc[0]]:indices_[sc[1]]]
+                # update the subchunk if necessary
+                if need_subchunk:
+                    s += 1
+                    sc = sub_chunks[s]
+                    values_ = data_field.values[indices_[sc[0]]:indices_[sc[1]]]
 
-            # TODO: extra validation to ensure subchunks have been iterated over and we exit this
-            # while loop on the last chunk
+                # TODO: extra validation to ensure subchunks have been iterated over and we exit
+                # this while loop on the last chunk
 
-            # write the result buffers
-            if ri > 0:
-                result_field.indices.write_part(result_indices[:ri])
-                ri = 0
+                # write the result buffers
+                if ri > 0:
+                    result_field.indices.write_part(result_indices[:ri])
+                    ri = 0
 
-            if rv > 0:
-                result_field.values.write_part(result_values[:rv])
-                rv = 0
+                if rv > 0:
+                    result_field.values.write_part(result_values[:rv])
+                    rv = 0
 
         if m_off + m < len(map_field):
             m_chunk, map_, m_max, m_off, m = next_untrimmed_chunk(map_field, m_chunk, chunksize)

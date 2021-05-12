@@ -119,6 +119,37 @@ class TestOpsUtils(unittest.TestCase):
         self.assertListEqual([first, last], [2, 5])
 
 
+    def test_next_map_subchunk(self):
+
+        map_values = np.asarray([-1, 1, 10, 10, 11])
+        result = ops.next_map_subchunk(map_values, 0, -1, 4)
+        self.assertEqual(result, 2)
+        result = ops.next_map_subchunk(map_values, result, -1, 4)
+        self.assertEqual(result, 5)
+
+        map_values = np.asarray([0, 10, 10])
+        result = ops.next_map_subchunk(map_values, 0, -1, 4)
+        self.assertEqual(result, 1)
+        result = ops.next_map_subchunk(map_values, result, -1, 4)
+        self.assertEqual(result, 3)
+
+        map_values = np.asarray([0, 0, 10])
+        result = ops.next_map_subchunk(map_values, 0, -1, 4)
+        self.assertEqual(result, 2)
+        result = ops.next_map_subchunk(map_values, result, -1, 4)
+        self.assertEqual(result, 3)
+
+        map_values = np.asarray([0, 0, 0])
+        result = ops.next_map_subchunk(map_values, 0, -1, 4)
+        self.assertEqual(result, 3)
+        result = ops.next_map_subchunk(map_values, result, -1, 4)
+        self.assertEqual(result, 3)
+
+        map_values = np.asarray([1, 2, 3, 4])
+        result = ops.next_map_subchunk(map_values, 0, -1, 4)
+        self.assertEqual(result, 4)
+
+
 class TestSafeMap(unittest.TestCase):
 
     def _impl_safe_map_index_values(self, indices, values, map_indices,
@@ -266,9 +297,9 @@ class TestOrderedMap(unittest.TestCase):
         print(src_indices_)
         print(src_values_)
         i_off, m_off, i, m, ri, rv, r_accum = 0, 0, 0, 0, 0, 0, 0
-        ops.ordered_map_valid_indexed_partial(src_indices_, 4, src_values_, map_, len(map_),
+        ops.ordered_map_valid_indexed_partial(src_indices_, 0, 4, src_values_, map_, 0,
                                               result_i, result_v, -1,
-                                              i_off, m_off, i, m, ri, rv, r_accum)
+                                              m, ri, rv, r_accum)
 
 
 
@@ -679,6 +710,19 @@ class TestOrderedMap(unittest.TestCase):
         # print(dest_data.data[:])
 
 
+    def test_ordered_map_valid_stream_start_end_chunks_invalid(self):
+        s = session.Session()
+        map_data = fields.NumericMemField(s, 'int32')
+        map_data.data.write(np.asarray([-1, -1, -1, -1, 0, 2, 2, -1, 4, 4, 4, 5, 5, -1, -1, -1, -1], dtype=np.int32))
+        src_data = fields.NumericMemField(s, 'int32')
+        src_data.data.write(np.asarray([10, 20, 30, 40, 50, 60], dtype=np.int32))
+        dest_data = fields.NumericMemField(s, 'int32')
+        ops.ordered_map_valid_stream(src_data, map_data, dest_data, -1, 4)
+        expected = [0, 0, 0, 0, 10, 30, 30, 0, 50, 50, 50, 60, 60, 0, 0, 0, 0]
+        self.assertListEqual(dest_data.data[:].tolist(), expected)
+        # print(dest_data.data[:])
+
+
     def test_ordered_map_valid_indexed_stream_no_valid(self):
         s = session.Session()
         map_data = fields.NumericMemField(s, 'int32')
@@ -705,6 +749,19 @@ class TestOrderedMap(unittest.TestCase):
         # print(dest_data.data[:])
 
 
+    def test_ordered_map_valid_indexed_stream(self):
+        s = session.Session()
+        map_data = fields.NumericMemField(s, 'int32')
+        map_data.data.write(np.asarray([0, 2, 2, -1, 4, 4, 4, 5, 5]))
+        src_data = fields.IndexedStringMemField(s)
+        src_data.data.write(['a', 'bb', 'ccc', 'dddd', 'eeeee', 'ffffff'])
+        dest_data = fields.IndexedStringMemField(s)
+        ops.ordered_map_valid_indexed_stream(src_data, map_data, dest_data, -1, 4, 4)
+        expected = ['a', 'ccc', 'ccc', '', 'eeeee', 'eeeee', 'eeeee', 'ffffff', 'ffffff']
+        self.assertListEqual(dest_data.data[:], expected)
+        # print(dest_data.data[:])
+
+
     def test_ordered_map_valid_indexed_stream_max_source_entry_size_for_chunksize(self):
         s = session.Session()
         map_data = fields.NumericMemField(s, 'int32')
@@ -713,10 +770,25 @@ class TestOrderedMap(unittest.TestCase):
         src_data.data.write(['a', 'bb', 'ccc', 'dddd', 'eeeeeeeeeeeeeeee', 'ffffff', 'ggggggg'])
         dest_data = fields.IndexedStringMemField(s)
         ops.ordered_map_valid_indexed_stream(src_data, map_data, dest_data, -1, 4, 4)
-        expected = ['a', 'ccc', 'ccc', '', 'eeeeeeeeeeeeeeee', 'ffffff', 'ffffff', '', 'ggggggg', 'ggggggg']
+        expected = ['a', 'ccc', 'ccc', '', 'eeeeeeeeeeeeeeee', 'ffffff', 'ffffff',
+                    '', 'ggggggg', 'ggggggg']
         self.assertListEqual(dest_data.data[:], expected)
         # print(dest_data.data[:])
 
+
+    def test_ordered_map_valid_indexed_stream_start_and_end_chunks_invalid(self):
+        s = session.Session()
+        map_data = fields.NumericMemField(s, 'int32')
+        map_data.data.write(np.asarray([-1, -1, -1, -1, 0, 2, 2, -1, 4, 4, 4, 5, 5,
+                                        -1, -1, -1, -1]))
+        src_data = fields.IndexedStringMemField(s)
+        src_data.data.write(['a', 'bb', 'ccc', 'dddd', 'eeeee', 'ffffff'])
+        dest_data = fields.IndexedStringMemField(s)
+        ops.ordered_map_valid_indexed_stream(src_data, map_data, dest_data, -1, 4, 4)
+        expected = ['', '', '', '', 'a', 'ccc', 'ccc', '', 'eeeee', 'eeeee', 'eeeee',
+                    'ffffff', 'ffffff', '', '', '', '']
+        self.assertListEqual(dest_data.data[:], expected)
+        # print(dest_data.data[:])
 
 
 
