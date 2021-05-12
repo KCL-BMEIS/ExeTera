@@ -1407,7 +1407,7 @@ class Session(AbstractSession):
         for src, snk in zip(field_sources, field_sinks):
             src_ = val.field_from_parameter(self, 'field_sources', src)
             snk_ = val.field_from_parameter(self, 'field_sinks', snk)
-            ops.ordered_map_valid_stream(src_, map_, snk_, invalid=invalid)
+            ops.ordered_map_valid_stream_old(src_, map_, snk_, invalid=invalid)
 
     def ordered_merge_left(self, left_on, right_on, right_field_sources=tuple(), left_field_sinks=None,
                            left_to_right_map=None, left_unique=False, right_unique=False):

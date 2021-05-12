@@ -553,6 +553,7 @@ def merge(left: DataFrame,
     left_len = list(left_lens)[0]
     right_len = list(right_lens)[0]
 
+    # TODO: tweak this to be consistent with the streaming code
     if left_len < (2 << 30) and right_len < (2 << 30):
         index_dtype = np.int32
     else:
@@ -561,6 +562,7 @@ def merge(left: DataFrame,
     left_fields_to_map = left.keys() if left_fields is None else left_fields
     right_fields_to_map = right.keys() if right_fields is None else right_fields
 
+    # TODO: check for ordering for multi-key-fields (is_ordered doesn't support it yet)
     if hint_left_keys_ordered is None:
         left_keys_ordered = False
     else:
@@ -645,6 +647,7 @@ def _unordered_merge(left: DataFrame,
     l_df = pd.DataFrame(left_df_dict)
     r_df = pd.DataFrame(right_df_dict)
 
+    # TODO: more efficient unordered merges using dict and numba
     df = pd.merge(left=l_df, right=r_df, left_on=l_key, right_on=r_key, how=how)
 
     l_to_d_map = df['l_i'].to_numpy(dtype=np.int32)
@@ -666,8 +669,9 @@ def _unordered_merge(left: DataFrame,
             d.values.write(v)
         else:
             v = ops.safe_map_values(l.data[:], l_to_d_map, l_to_d_filt)
-            d.data.write(v)
-    if np.all(l_to_d_filt) == False:
+        d.data.write(v)
+
+    if not np.all(l_to_d_filt):
         d = dest.create_numeric('valid'+left_suffix, 'bool')
         d.data.write(l_to_d_filt)
 
@@ -684,7 +688,8 @@ def _unordered_merge(left: DataFrame,
         else:
             v = ops.safe_map_values(r.data[:], r_to_d_map, r_to_d_filt)
             d.data.write(v)
-    if np.all(r_to_d_filt) == False:
+
+    if not np.all(r_to_d_filt):
         d = dest.create_numeric('valid'+right_suffix, 'bool')
         d.data.write(r_to_d_filt)
 
@@ -709,12 +714,78 @@ def _ordered_merge(left: DataFrame,
         raise ValueError("Unsupported mode for 'how'; must be one of "
                          "{} but is {}".format(supported, how))
 
-    if how == 'left':
-        if left_keys_unique:
-            if right_keys_unique:
-                ops.generate_ordered_map_to_left_right_unique()
+    chunksize = 1 << 25
+    if how in ('left', 'right'):
+        if how == 'left':
+            # adf, bdf, ddf = left, right, dest
+            a_on, b_on = left_on_fields, right_on_fields
+            a_fields, b_fields = left_on_fields, right_on_fields
+            a_to_map, b_to_map = left_fields_to_map, right_fields_to_map
+            a_suf, b_suf = left_suffix, right_suffix
+            a_unique, b_unique = left_keys_unique, right_keys_unique
+        else:
+            # adf, bdf, ddf = right, left, dest
+            a_on, b_on = right_on_fields, left_on_fields
+            a_fields, b_fields = right_on_fields, left_on_fields
+            a_to_map, b_to_map = right_fields_to_map, left_fields_to_map
+            a_suf, b_suf = right_suffix, left_suffix
+            a_unique, b_unique = right_keys_unique, left_keys_unique
 
-    elif how == 'right':
-        raise NotImplementedError()
+        if a_unique or b_unique:
+            npdtype = ops.get_map_datatype_based_on_lengths(left_len, right_len)
+            strdtype = 'int32' if npdtype == np.int32 else np.int64
+            invalid = ops.INVALID_INDEX_32 if npdtype == np.int32 else ops.INVALID_INDEX_64
+        else:
+            npdtype = np.int64
+            strdtype = 'int64'
+            invalid = ops.INVALID_INDEX_64
+
+        if a_unique:
+            if b_unique:
+                b_result = dest.create_numeric('_b_map', strdtype)
+                ops.generate_ordered_map_to_left_right_both_unique_streamed(
+                    a_on[0], b_on[0], b_result, invalid, rdtype=npdtype)
+            else:
+                a_result = dest.create_numeric('_a_map', strdtype)
+                b_result = dest.create_numeric('_b_map', strdtype)
+                ops.generate_ordered_map_to_left_left_unique_streamed(
+                    a_on[0], b_on[0], a_result, b_result, invalid, rdtype=npdtype)
+        else:
+            if right_keys_unique:
+                b_result = dest.create_numeric('_b_map', strdtype)
+                ops.generate_ordered_map_to_left_right_unique_streamed(
+                    a_on[0], b_on[0], b_result, invalid, rdtype=npdtype)
+            else:
+                a_result = dest.create_numeric('_a_map', strdtype)
+                b_result = dest.create_numeric('_b_map', strdtype)
+                ops.generate_ordered_map_to_left_streamed(
+                    a_on[0], b_on[0], a_result, b_result, invalid, rdtype=npdtype)
     else:
         raise NotImplementedError()
+
+    # perform the mappings
+    # ====================
+
+    if how == 'right':
+        dest.rename('_a_map', '_right_map')
+        dest.rename('_b_map', '_left_map')
+    else:
+        dest.rename('_a_map', '_left_map')
+        dest.rename('_b_map', '_right_map')
+
+    left_map = dest['_left_map'] if '_left_map' in dest else None
+    right_map = dest['_right_map']
+
+    for k in left_fields_to_map:
+        dest_k = k
+        if k in dest:
+            dest_k += left_suffix
+        dest_f = left[k].create_like(dest, dest_k)
+        ops.ordered_map_valid_stream(left[k], left_map, dest_f)
+
+    for k in right_fields_to_map:
+        dest_k = k
+        if k in dest:
+            dest_k += right_suffix
+        dest_f = right[k].create_like(dest, dest_k)
+        ops.ordered_map_valid_stream(right[k], right_map, dest_f)

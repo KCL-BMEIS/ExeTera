@@ -46,6 +46,79 @@ class TestOpsUtils(unittest.TestCase):
         self.assertTupleEqual(ops.next_chunk(4, 8, 5), (4, 8))
 
 
+    def test_calculate_chunk_decomposition(self):
+
+        def _impl(indices, chunk_size, expected):
+            actual = list()
+            ops.calculate_chunk_decomposition(0, len(indices)-1, indices, chunk_size, actual)
+            self.assertListEqual(actual, expected)
+
+        indices = [0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+        _impl(indices, 5000, [(0, 8)])
+        _impl(indices, 4000, [(0, 8)])
+        _impl(indices, 3999, [(0, 4), (4, 8)])
+        _impl(indices, 2000, [(0, 4), (4, 8)])
+        _impl(indices, 1999, [(0, 2), (2, 4), (4, 6), (6, 8)])
+        _impl(indices, 1000, [(0, 2), (2, 4), (4, 6), (6, 8)])
+        _impl(indices, 999, [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8)])
+        _impl(indices, 500, [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8)])
+        _impl(indices, 499, [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8)])
+
+        indices = [0, 1000, 2000, 2500, 3000, 3500, 4000]
+        _impl(indices, 5000, [(0, 6)])
+        _impl(indices, 4000, [(0, 6)])
+        _impl(indices, 3999, [(0, 3), (3, 6)])
+        _impl(indices, 2000, [(0, 1), (1, 3), (3, 6)])
+        _impl(indices, 1999, [(0, 1), (1, 3), (3, 6)])
+        _impl(indices, 1000, [(0, 1), (1, 2), (2, 3), (3, 4), (4, 6)])
+        _impl(indices, 999, [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6)])
+        _impl(indices, 500, [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6)])
+        _impl(indices, 499, [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6)])
+
+        indices = [0, 0, 0, 0, 1000, 1000, 1000]
+        _impl(indices, 1000, [(0, 6)])
+        _impl(indices, 999, [(0, 3), (3, 4), (4, 6)])
+
+
+    def test_get_valid_value_extents(self):
+
+        chunk = np.asarray([-1, -1, -1, -1, -1], dtype=np.int32)
+        first, last = ops.get_valid_value_extents(chunk, -1)
+        self.assertListEqual([first, last], [-1, -1])
+
+        chunk = np.asarray([-1], dtype=np.int32)
+        first, last = ops.get_valid_value_extents(chunk, -1)
+        self.assertListEqual([first, last], [-1, -1])
+
+        chunk = np.asarray([3], dtype=np.int32)
+        first, last = ops.get_valid_value_extents(chunk, -1)
+        self.assertListEqual([first, last], [3, 3])
+
+        chunk = np.asarray([-1, -1, 3], dtype=np.int32)
+        first, last = ops.get_valid_value_extents(chunk, -1)
+        self.assertListEqual([first, last], [3, 3])
+
+        chunk = np.asarray([3, -1, -1], dtype=np.int32)
+        first, last = ops.get_valid_value_extents(chunk, -1)
+        self.assertListEqual([first, last], [3, 3])
+
+        chunk = np.asarray([3, -1, -1, 3], dtype=np.int32)
+        first, last = ops.get_valid_value_extents(chunk, -1)
+        self.assertListEqual([first, last], [3, 3])
+
+        chunk = np.asarray([-1, 2, 3, -1, 4, 5, -1], dtype=np.int32)
+        first, last = ops.get_valid_value_extents(chunk, -1)
+        self.assertListEqual([first, last], [2, 5])
+
+        chunk = np.asarray([2, 3, -1, 4, 5], dtype=np.int32)
+        first, last = ops.get_valid_value_extents(chunk, -1)
+        self.assertListEqual([first, last], [2, 5])
+
+        chunk = np.asarray([2, 3, 4, 5], dtype=np.int32)
+        first, last = ops.get_valid_value_extents(chunk, -1)
+        self.assertListEqual([first, last], [2, 5])
+
+
 class TestSafeMap(unittest.TestCase):
 
     def _impl_safe_map_index_values(self, indices, values, map_indices,
@@ -155,6 +228,8 @@ class TestAggregation(unittest.TestCase):
         self.assertTrue(np.array_equal(flt, np.asarray([1, 0, 1, 1, 0, 1, 1], dtype=bool)))
 
 
+class TestOrderedMap(unittest.TestCase):
+
     def test_ordered_map_valid_stream(self):
         bio = BytesIO()
         with session.Session() as s:
@@ -174,6 +249,27 @@ class TestAggregation(unittest.TestCase):
             expected = np.asarray([-1, -1, -1, -2, -2, -4, -4, -4, -4, -6, -6, -6, -6, 0, 0, -9, -9, -9],
                                   dtype=np.int32)
             self.assertTrue(np.array_equal(result_field, expected))
+
+
+    def test_ordered_map_valid_indexed(self):
+
+        s = session.Session()
+        src = fields.IndexedStringMemField(s)
+        src.data.write(['a', 'bb', 'ccc', 'dddd', 'eeeee'])
+        map = fields.NumericMemField(s, 'int32')
+        map.data.write(np.asarray([0, 2, 2, -1, 4, 4]))
+        map_ = map.data[0:4]
+        src_indices_ = src.indices[0:5]
+        src_values_ = src.values[src_indices_[0]:src_indices_[-1]]
+        result_i = np.zeros(4, dtype=np.int32)
+        result_v = np.zeros(32, dtype=np.uint8)
+        print(src_indices_)
+        print(src_values_)
+        i_off, m_off, i, m, ri, rv, r_accum = 0, 0, 0, 0, 0, 0, 0
+        ops.ordered_map_valid_indexed_partial(src_indices_, 4, src_values_, map_, len(map_),
+                                              result_i, result_v, -1,
+                                              i_off, m_off, i, m, ri, rv, r_accum)
+
 
 
     # streaming - left to right - neither unique
@@ -554,6 +650,34 @@ class TestAggregation(unittest.TestCase):
             self.assertTrue(np.array_equal(right_result.data[:], right_expected))
 
 
+    def test_ordered_map_valid_indexed_stream(self):
+        s = session.Session()
+        map_data = fields.NumericMemField(s, 'int32')
+        map_data.data.write(np.asarray([0, 2, 2, -1, 4, 4, 4, 5, 5]))
+        src_data = fields.IndexedStringMemField(s)
+        src_data.data.write(['a', 'bb', 'ccc', 'dddd', 'eeeee', 'ffffff'])
+        dest_data = fields.IndexedStringMemField(s)
+        ops.ordered_map_valid_indexed_stream(src_data, map_data, dest_data, -1, 4, 4)
+        expected = ['a', 'ccc', 'ccc', '', 'eeeee', 'eeeee', 'eeeee', 'ffffff', 'ffffff']
+        self.assertListEqual(dest_data.data[:], expected)
+        # print(dest_data.data[:])
+
+
+    def test_ordered_map_valid_indexed_stream_max_source_entry_size_for_chunksize(self):
+        s = session.Session()
+        map_data = fields.NumericMemField(s, 'int32')
+        map_data.data.write(np.asarray([0, 2, 2, -1, 4, 5, 5, -1, 6, 6]))
+        src_data = fields.IndexedStringMemField(s)
+        src_data.data.write(['a', 'bb', 'ccc', 'dddd', 'eeeeeeeeeeeeeeee', 'ffffff', 'ggggggg'])
+        dest_data = fields.IndexedStringMemField(s)
+        ops.ordered_map_valid_indexed_stream(src_data, map_data, dest_data, -1, 4, 4)
+        expected = ['a', 'ccc', 'ccc', '', 'eeeeeeeeeeeeeeee', 'ffffff', 'ffffff', '', 'ggggggg', 'ggggggg']
+        self.assertListEqual(dest_data.data[:], expected)
+        # print(dest_data.data[:])
+
+
+class TestOrderedGetLast(unittest.TestCase):
+
     def test_ordered_get_last_as_filter_all_unique(self):
         field = np.asarray([b'ab', b'af', b'be', b'ez'])
         result = ops.ordered_get_last_as_filter(field)
@@ -567,6 +691,8 @@ class TestAggregation(unittest.TestCase):
         expected = np.asarray([False, True, True, False, True, False, True])
         self.assertTrue(np.array_equal(result, expected))
 
+
+class TestJournalling(unittest.TestCase):
 
     def test_ordered_generate_journalling_indices(self):
         old = np.asarray([0, 0, 0, 1, 1, 2, 3, 3, 5, 5, 5], dtype=np.int32)
