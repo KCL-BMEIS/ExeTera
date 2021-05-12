@@ -549,6 +549,7 @@ class IndexedStringMemField(MemoryField):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+
 class FixedStringMemField(MemoryField):
     def __init__(self, session, length):
         super().__init__(session)

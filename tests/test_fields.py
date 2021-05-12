@@ -144,6 +144,16 @@ class TestIsSorted(unittest.TestCase):
 
 class TestIndexedStringFields(unittest.TestCase):
 
+    def test_create_indexed_string(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'src')
+            df = ds.create_dataframe('src')
+            f = df.create_indexed_string('f')
+            d = f.data[:]
+            print(d)
+
+
     def test_filter_indexed_string(self):
         bio = BytesIO()
         with session.Session() as s:

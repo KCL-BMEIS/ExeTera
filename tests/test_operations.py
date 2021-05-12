@@ -594,6 +594,7 @@ class TestOrderedMap(unittest.TestCase):
         self.assertTrue(np.array_equal(a_map, expected_a))
         self.assertTrue(np.array_equal(b_map, expected_b))
 
+
     def test_ordered_inner_map_left_unique(self):
         a_ids = np.asarray([0, 1, 2, 3, 5, 6, 8], dtype=np.int64)
         b_ids = np.asarray([1, 1, 2, 3, 5, 5, 6, 7, 8, 8, 8], dtype=np.int64)
@@ -615,6 +616,7 @@ class TestOrderedMap(unittest.TestCase):
         self.assertTrue(np.array_equal(a_map, expected_a))
         self.assertTrue(np.array_equal(b_map, expected_b))
 
+
     def test_ordered_inner_map(self):
         a_ids = np.asarray([0, 1, 2, 2, 3, 5, 5, 5, 6, 8], dtype=np.int64)
         b_ids = np.asarray([1, 1, 2, 3, 5, 5, 6, 7, 8, 8, 8], dtype=np.int64)
@@ -626,6 +628,7 @@ class TestOrderedMap(unittest.TestCase):
         expected_b = np.array([0, 1, 2, 2, 3, 4, 5, 4, 5, 4, 5, 6, 8, 9, 10], dtype=np.int64)
         self.assertTrue(np.array_equal(a_map, expected_a))
         self.assertTrue(np.array_equal(b_map, expected_b))
+
 
     def test_ordered_inner_map_left_unique_streamed(self):
         bio = BytesIO()
@@ -648,6 +651,45 @@ class TestOrderedMap(unittest.TestCase):
             self.assertTrue(np.array_equal(left_result.data[:], left_expected))
             right_expected = np.asarray([0, 1, 2, 3, 5, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18, 19], dtype=np.int32)
             self.assertTrue(np.array_equal(right_result.data[:], right_expected))
+
+
+    def test_ordered_map_valid_stream_no_valid(self):
+        s = session.Session()
+        map_data = fields.NumericMemField(s, 'int32')
+        map_data.data.write(np.asarray([-1, -1, -1, -1, -1], dtype=np.int32))
+        src_data = fields.NumericMemField(s, 'int32')
+        src_data.data.write(np.asarray([10, 20, 30, 40, 50, 60], dtype=np.int32))
+        dest_data = fields.NumericMemField(s, 'int32')
+        ops.ordered_map_valid_stream(src_data, map_data, dest_data, -1, 4)
+        expected = [0, 0, 0, 0, 0]
+        self.assertListEqual(dest_data.data[:].tolist(), expected)
+        # print(dest_data.data[:])
+
+
+    def test_ordered_map_valid_stream(self):
+        s = session.Session()
+        map_data = fields.NumericMemField(s, 'int32')
+        map_data.data.write(np.asarray([0, 2, 2, -1, 4, 4, 4, 5, 5], dtype=np.int32))
+        src_data = fields.NumericMemField(s, 'int32')
+        src_data.data.write(np.asarray([10, 20, 30, 40, 50, 60], dtype=np.int32))
+        dest_data = fields.NumericMemField(s, 'int32')
+        ops.ordered_map_valid_stream(src_data, map_data, dest_data, -1, 4)
+        expected = [10, 30, 30, 0, 50, 50, 50, 60, 60]
+        self.assertListEqual(dest_data.data[:].tolist(), expected)
+        # print(dest_data.data[:])
+
+
+    def test_ordered_map_valid_indexed_stream_no_valid(self):
+        s = session.Session()
+        map_data = fields.NumericMemField(s, 'int32')
+        map_data.data.write(np.asarray([-1, -1, -1, -1, -1]))
+        src_data = fields.IndexedStringMemField(s)
+        src_data.data.write(['a', 'bb', 'ccc', 'dddd', 'eeeee', 'ffffff'])
+        dest_data = fields.IndexedStringMemField(s)
+        ops.ordered_map_valid_indexed_stream(src_data, map_data, dest_data, -1, 4, 4)
+        expected = ['', '', '', '', '']
+        self.assertListEqual(dest_data.data[:], expected)
+        # print(dest_data.data[:])
 
 
     def test_ordered_map_valid_indexed_stream(self):
@@ -674,6 +716,8 @@ class TestOrderedMap(unittest.TestCase):
         expected = ['a', 'ccc', 'ccc', '', 'eeeeeeeeeeeeeeee', 'ffffff', 'ffffff', '', 'ggggggg', 'ggggggg']
         self.assertListEqual(dest_data.data[:], expected)
         # print(dest_data.data[:])
+
+
 
 
 class TestOrderedGetLast(unittest.TestCase):

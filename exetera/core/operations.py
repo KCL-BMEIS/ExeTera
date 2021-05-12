@@ -284,13 +284,19 @@ def ordered_map_valid_stream(data_field, map_field, result_field,
             # no unfiltered values in this chunk so just assign empty entries to the result field
             result_data.fill(0)
             result_field.data.write(result_data)
+            m += chunksize
             continue
 
-        values_ = data_field.values[d_limits[0]:d_limits[1]+1]
+        values = data_field.data[d_limits[0]:d_limits[1]+1]
 
-        m = ordered_map_valid_partial(values_, map_, d_limits[0], result_data, invalid, m)
+        m = ordered_map_valid_partial(values, map_, d_limits[0], result_data, invalid, 0, m)
 
-        
+
+
+        if m > 0:
+            result_field.data.write(result_data[:m])
+            m_chunk, map_, m_max, m_off, m = next_untrimmed_chunk(map_field, m_chunk, chunksize)
+
 
 
 def ordered_map_valid_partial(values,
@@ -344,6 +350,7 @@ def ordered_map_valid_indexed_stream(data_field, map_field, result_field,
             # no unfiltered values in this chunk so just assign empty entries to the result field
             result_indices.fill(ri_accum)
             result_field.indices.write(result_indices)
+            m += chunksize
             continue
 
         # TODO: can potentially optimise here by checking if upper limit has increased
