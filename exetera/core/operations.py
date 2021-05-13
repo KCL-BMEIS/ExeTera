@@ -1495,3 +1495,14 @@ def transform_to_values(column_inds, column_vals, col_idx, written_row_count):
         val = column_vals[col_idx, column_inds[col_idx, row_idx]: column_inds[col_idx, row_idx + 1]]
         data.append(val)
     return data
+
+
+@njit
+def fix_string_transform(column_inds, column_vals, col_idx, written_row_count, strlen):
+    data = []
+    for row_idx in range(written_row_count):
+        start_row_idx = column_inds[col_idx, row_idx]
+        end_row_idx = min(column_inds[col_idx, row_idx + 1], start_row_idx + strlen)
+        val = column_vals[col_idx, start_row_idx: end_row_idx]
+        data.append(val)
+    return data

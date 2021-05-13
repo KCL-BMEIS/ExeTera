@@ -69,6 +69,10 @@ TEST_SCHEMA = json.dumps({
                         }
                     }
                 },
+                "patient_id": {
+                    "field_type": "fixed_string",
+                    "length": 4
+                }
             }
         }
     }
@@ -77,13 +81,12 @@ TEST_SCHEMA = json.dumps({
 
 
 TEST_CSV_CONTENTS = '\n'.join((
-    'name, id, age, birthday,  height, weight_change, BMI,  postcode, updated_at',
-    'a,     1, 30, 1990-01-01, 170.9,    21.2,        20.5,      NW1, 2020-05-12 07:00:00',
-    'b,     2, 40, 1980-03-04, 180.2,        ,        25.4,     SW1P, 2020-05-13 01:00:00',
-    'c,     3, 50, 1970-04-05,      ,   -17.5,        27.2,       E1, 2020-05-14 03:00:00',
-    'd,     4, 60, 1960-04-05,      ,   -17.5,        27.2,         , 2020-05-15 03:00:00',
-    'e,     5, 70, 1950-04-05, 161.0,     2.5,        20.2,      NW3, 2020-05-16 03:00:00',
-
+    'name, id, age, birthday,  height, weight_change, BMI,  postcode, patient_id, updated_at',
+    'a,     1, 30, 1990-01-01, 170.9,    21.2,        20.5,      NW1,         E1, 2020-05-12 07:00:00',
+    'bb,    2, 40, 1980-03-04, 180.2,        ,        25.4,     SW1P,       E123, 2020-05-13 01:00:00',
+    'ccc,   3, 50, 1970-04-05,      ,   -17.5,        27.2,       E1,       E234, 2020-05-14 03:00:00',
+    'dddd,  4, 60, 1960-04-05,      ,   -17.5,        27.2,         ,           , 2020-05-15 03:00:00',
+    'eeeee, 5, 70, 1950-04-05, 161.0,     2.5,        20.2,      NW3,    E456789, 2020-05-16 03:00:00',
 ))
 
 class TestImporter(unittest.TestCase):
@@ -229,8 +232,9 @@ class TestImporter(unittest.TestCase):
             indices = hf['schema_key']['name']['index'][:]
             values = hf['schema_key']['name']['values'][:]
 
-        self.assertListEqual(list(indices), [0,1,2,3,4])
+        self.assertListEqual(list(indices), [0,1,3,6,10])
         self.assertEqual(values[indices[0]:indices[1]].tobytes(), b'a')
+        self.assertEqual(values[indices[3]:indices[4]].tobytes(), b'dddd')
 
 
     def test_categorical_field_importer_with_small_chunk_size(self):
@@ -241,6 +245,17 @@ class TestImporter(unittest.TestCase):
         with h5py.File(bio, 'r') as hf:
             expected_postcode_value_list = [1, 3, 2, 0, 4]
             self.assertEqual(list(hf['schema_key']['postcode']['values'][:]), expected_postcode_value_list)
+
+
+    def test_fixed_string_field_importer(self):
+        chunk_size = 1000
+
+        bio = BytesIO()
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {})
+
+        expected_patient_id_value_list = [b'E1', b'E123', b'E234', b'', b'E456']
+        with h5py.File(bio, 'r') as hf:
+            self.assertEqual(list(hf['schema_key']['patient_id']['values'][:]), expected_patient_id_value_list)
 
 
     def tearDown(self):

@@ -575,6 +575,11 @@ class FixedStringWriter(Writer):
     def write_part(self, values):
         DataWriter.write(self.field, 'values', values, len(values))
 
+    def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
+        data = ops.fix_string_transform(column_inds, column_vals, col_idx, written_row_count, self.strlen)
+        values = [x.tobytes().strip() for x in data]
+        self.write_part(values)
+
     def flush(self):
         # self.field.attrs['fieldtype'] = self.fieldtype
         # self.field.attrs['timestamp'] = self.timestamp

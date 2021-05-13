@@ -545,7 +545,7 @@ class TestFieldImporter(unittest.TestCase):
 
 
     def test_numeric_transform_int(self):
-        column_inds, column_vals, written_row_count = self._one_dim_data_to_indexed(['1', '001', '+1', '100', '10.23', '10.89'])
+        column_inds, column_vals, written_row_count = self._one_dim_data_to_indexed(['1', '001', '+1', '-1', '100', '10.23', '10.89', '1e1'])
 
         elements = np.zeros(written_row_count, dtype=np.uint8)
         validity = np.zeros(written_row_count, dtype='bool')
@@ -557,7 +557,7 @@ class TestFieldImporter(unittest.TestCase):
         
         ops.numeric_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)          
 
-        expected_elements = np.array([1, 1, 1, 100, 10, 10], dtype = np.uint8)
+        expected_elements = np.array([1, 1, 1, -1, 100, 10, 10, 10], dtype = np.uint8)
         
         self.assertListEqual(list(elements), list(expected_elements))    
         self.assertTrue(np.all(validity))
