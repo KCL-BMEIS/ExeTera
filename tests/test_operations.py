@@ -491,6 +491,23 @@ class TestGetSpans(unittest.TestCase):
 
 class TestFieldImporter(unittest.TestCase):
 
+    def _one_dim_data_to_indexed(self, data):
+        total_data_bytes = sum([len(s) for s in data])
+        count_row = len(data)
+
+        indices = np.zeros((1, count_row + 1), dtype = np.int64)
+        values = np.zeros((1, total_data_bytes), dtype = np.uint8)
+
+        accumulated = 0
+        for i, s in enumerate(data):
+            indices[0, i + 1] = indices[0, i] + len(s)
+            for j, c in enumerate(s):
+                values[0, accumulated] = np.frombuffer(c.encode(), dtype =np.uint8)[0]
+                accumulated += 1
+
+        return indices, values, count_row
+
+
     def test_get_byte_map(self):
         byte_map_keys, byte_map_key_indices, byte_map_value = ops.get_byte_map({'a':1, 'bb':2, 'ccc':3, 'dddd':4})
 
@@ -528,14 +545,10 @@ class TestFieldImporter(unittest.TestCase):
 
 
     def test_numeric_transform_int(self):
-        written_row_count = 4
+        column_inds, column_vals, written_row_count = self._one_dim_data_to_indexed(['1', '001', '+1', '100', '10.23', '10.89'])
+
         elements = np.zeros(written_row_count, dtype=np.uint8)
         validity = np.zeros(written_row_count, dtype='bool')
-
-        column_inds = np.array([[0, 1, 4, 9, 14],
-                                [0, 1, 6, 9, 12]], dtype = np.uint64)
-        column_vals = np.array([[49, 49, 48, 48, 49, 48, 46, 50, 51, 49, 48, 46, 56, 57],
-                                [51, 49, 48, 46, 50, 51, 51, 46, 53, 53, 46, 48, 0, 0]], dtype = np.uint8)
 
         parser = per.try_str_to_int
         invalid_value = 0
@@ -544,44 +557,56 @@ class TestFieldImporter(unittest.TestCase):
         
         ops.numeric_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)          
 
-        expected_elements = np.array([1, 100, 10, 10], dtype = np.uint8)
+        expected_elements = np.array([1, 1, 1, 100, 10, 10], dtype = np.uint8)
         
         self.assertListEqual(list(elements), list(expected_elements))    
         self.assertTrue(np.all(validity))
 
 
     def test_numeric_transform_float(self):
-        written_row_count = 4
+        column_inds, column_vals, written_row_count = self._one_dim_data_to_indexed(['1.', '.1', '001.0000', '10.23', '3.5'])
+
         elements = np.zeros(written_row_count, dtype=np.float32)
         validity = np.zeros(written_row_count, dtype='bool')
-
-        column_inds = np.array([[0, 1, 4, 9, 14],
-                                [0, 1, 6, 9, 12]], dtype = np.uint64)
-        column_vals = np.array([[49, 49, 48, 48, 49, 48, 46, 50, 51, 49, 48, 46, 56, 57],
-                                [51, 49, 48, 46, 50, 51, 51, 46, 53, 53, 46, 48, 0, 0]], dtype = np.uint8)
 
         parser = per.try_str_to_float
         invalid_value = 0
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('float_field', "utf-8"), dtype=np.uint8)
 
-        ops.numeric_transform(elements, validity, column_inds, column_vals, 1, written_row_count, parser, invalid_value, validation_mode, field_name)              
+        ops.numeric_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)              
 
-        expected_elements = np.array([3, 10.23, 3.5, 5.0], dtype = np.float32)  
+        expected_elements = np.array([1, 0.1, 1, 10.23, 3.5], dtype = np.float32)  
 
         self.assertListEqual(list(elements), list(expected_elements))    
         self.assertTrue(np.all(validity))
 
 
-    def test_numeric_transform_exception(self):
-        written_row_count = 4
+    def test_numeric_transform_pow(self):
+        column_inds, column_vals, written_row_count = self._one_dim_data_to_indexed(['1e1', '1e+1', '+1e001', '1e-1','1.5e2'])
+
         elements = np.zeros(written_row_count, dtype=np.float32)
         validity = np.zeros(written_row_count, dtype='bool')
 
-        column_inds = np.array([[0, 1, 4, 9, 14],
-                                [0, 1, 6, 9, 12]], dtype = np.uint64)
-        column_vals = np.array([[49, 49, 48, 48, 49, 48, 46, 50, 51, 49, 48, 46, 56, 46],
-                                [51, 49, 48, 46, 50, 51, 51, 46, 53, 53, 46, 48, 0, 0]], dtype = np.uint8)
+        parser = per.try_str_to_float
+        invalid_value = 0
+        validation_mode = 'strict'
+        field_name = np.frombuffer(bytes('float_field', "utf-8"), dtype=np.uint8)
+
+        ops.numeric_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)              
+
+        expected_elements = np.array([10, 10, 10, 0.1, 150], dtype = np.float32)  
+
+        self.assertListEqual(list(elements), list(expected_elements))    
+        self.assertTrue(np.all(validity))
+
+
+
+    def test_numeric_transform_exception_too_many_decimal(self):
+        column_inds, column_vals, written_row_count = self._one_dim_data_to_indexed(['1', '100', '10.23', '10..8'])
+
+        elements = np.zeros(written_row_count, dtype=np.float32)
+        validity = np.zeros(written_row_count, dtype='bool')
 
         parser = per.try_str_to_float
         invalid_value = 0
@@ -598,7 +623,7 @@ class TestFieldImporter(unittest.TestCase):
 
         self.assertEqual(
             str(context.exception),
-            "The following numeric value in the field 'int_field' can not be parsed: 10.8."
+            "The following numeric value in the field 'int_field' can not be parsed: 10..8"
         ) 
 
 
