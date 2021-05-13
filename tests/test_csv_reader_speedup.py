@@ -117,7 +117,7 @@ class TestFastCSVReader(TestCase):
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
         column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
 
-        column_inds, _, _, written_row_count = fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        _, written_row_count, is_indices_full, is_values_full= fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
         self.assertEqual(written_row_count, 1)
         self.assertEqual(column_inds[1, 1], 3)  # abc
         self.assertEqual(column_inds[2, 1], 5)  # a"b"c
@@ -173,7 +173,7 @@ class TestFastCSVReader(TestCase):
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
         column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
         
-        column_inds, column_vals, offset, written_row_count = fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        offset, written_row_count, is_indices_full, is_values_full = fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
 
         self.assertEqual(written_row_count, 3)
         self.assertListEqual(list(column_inds[0][:written_row_count + 1]), [0, 3, 5, 9])
@@ -196,6 +196,7 @@ class TestFastCSVReader(TestCase):
             result = writer_list[ith].result
             self.assertEqual(len(result), len(df[field]))
             self.assertListEqual(result, list(df[field]))
+
 
     @mock.patch("numpy.fromfile")
     def test_fast_csv_reader_on_only_indexed_string_field(self, mock_fromfile):
@@ -241,68 +242,66 @@ class TestFastCSVReader(TestCase):
             self.assertEqual(context.exception, 'The length of one line is too large, please modify the chunksize and make it larger')
 
 
-    def _make_empty_test_data(self):
-        columns = {}
-        count_row = 10
-        count_col = 3
-
-        for i in range(count_col):
-            fieldname = 'f' + str(i)
-            columns[fieldname] = ['']*count_row
-
-        df = pd.DataFrame(columns)
-        
-        csv_buffer = StringIO()
-        df.to_csv(csv_buffer, index = False)
-
-        index_map = [i for i in range(count_row)]
-        return csv_buffer, df, index_map
-
-
     def test_fast_csv_reader_column_inds_full(self):
+        
+        def _make_column_inds_full_data():
+            columns = {}
+            count_row = 10
+            count_col = 3
+
+            for i in range(count_col):
+                fieldname = 'f' + str(i)
+                columns[fieldname] = ['abcd'] + ['']*(count_row - 1)
+
+            df = pd.DataFrame(columns)
+            
+            csv_buffer = StringIO()
+            df.to_csv(csv_buffer, index = False)
+
+            index_map = [i for i in range(count_row)]
+            return csv_buffer, df, index_map
+
+
         chunk_size = 50
 
-        csv_buffer, df, index_map  = self._make_empty_test_data()
+        csv_buffer, df, index_map = _make_column_inds_full_data()
         content = np.frombuffer(csv_buffer.getvalue().encode(), dtype=np.uint8)
         
         total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(csv_buffer, chunk_size=chunk_size)
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
         column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
 
-        indices, values, offset_pos, _ = fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        offset_pos, _, is_indices_full, is_values_full = fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
 
-        self.assertGreater(indices.shape[1], column_inds.shape[1])  # resized column_inds
-        self.assertEqual(values.shape[1], column_vals.shape[1])     # column_val didn't resizes
-        self.assertEqual(offset_pos, len(content))                  # whole chunk of content got read
-
-
-    def _make_column_val_full_data(self):
-        columns = {}
-        count_row = 100
-        columns['f1'] = [str(i) for i in range(2)] + [str(i*10000000) for i in range(2, count_row)]
-
-        df = pd.DataFrame(columns)
-
-        csv_buffer = StringIO()
-        df.to_csv(csv_buffer, index = False)
-
-        index_map = [i for i in range(count_row)]
-        return csv_buffer, df, index_map
+        self.assertTrue(is_indices_full)
+        self.assertFalse(is_values_full)
 
 
     def test_fast_csv_reader_column_vals_full(self):
+        def _make_column_val_full_data():
+            columns = {}
+            count_row = 100
+            columns['f1'] = ['a' for _ in range(count_row // 2)] + ['b'*1000 for _ in range(count_row // 2, count_row)]
+            #print(columns['f1'])
+            df = pd.DataFrame(columns)
+            print(df)
+
+            csv_buffer = StringIO()
+            df.to_csv(csv_buffer, index = False)
+
+            index_map = [i for i in range(count_row)]
+            return csv_buffer, df, index_map
+
         chunk_size = 1000
 
-        csv_buffer, df, index_map = self._make_column_val_full_data()        
+        csv_buffer, df, index_map = _make_column_val_full_data()        
         content = np.frombuffer(csv_buffer.getvalue().encode(), dtype=np.uint8)
         
         total_byte_size, count_columns, count_rows,  val_row_count, val_threshold = get_file_stat(csv_buffer, chunk_size=chunk_size)
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
         column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
 
-        indices, values, offset_pos, _ = fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
-
-        self.assertGreater(indices.shape[1], column_inds.shape[1])  # resized column_inds
-        self.assertGreater(values.shape[1], column_vals.shape[1])   # resized column_vals
-        self.assertEqual(offset_pos, len(content))                  # whole chunk of content got read
+        offset_pos, written_row_count, is_indices_full, is_values_full = fast_csv_reader(content, column_inds, column_vals, True, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        self.assertFalse(is_indices_full)
+        self.assertTrue(is_values_full)
 

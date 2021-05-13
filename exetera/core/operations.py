@@ -1283,11 +1283,12 @@ def categorical_transform(chunk, i_c, column_inds, column_vals, cat_keys, cat_in
 #                         parser, invalid_value, validation_mode, field_name):
 #     """
 #     Transform method for numeric importer in readerwriter.py
-#     """
-                        
+#     """          
+
 #     exception_message, exception_args = 0, [field_name]
 
 #     for row_idx in range(written_row_count):
+        
 #         empty = False  
 #         valid_input = True # Start by assuming number is valid
 
@@ -1311,6 +1312,7 @@ def categorical_transform(chunk, i_c, column_inds, column_vals, cat_keys, cat_in
         
 #         # For each byte, check the meaning and build real number
 #         for byte_idx in range(length):
+            
 #             val = column_vals[col_idx, row_start_idx + byte_idx]
 #             if val == 32: # empty space
 #                 bytes_start_index = byte_idx + 1
@@ -1325,6 +1327,9 @@ def categorical_transform(chunk, i_c, column_inds, column_vals, cat_keys, cat_in
 #                 else:
 #                     hasDecimal = True
 #                     decimal_index = byte_idx
+#                 continue
+
+#             elif val == 101: # e (power) symbol
 #                 continue
 #             elif val < 48 or val > 57: # if not 0-9 (except those tested abow), invalidate
 #                 valid_input = False
@@ -1404,7 +1409,7 @@ def numeric_transform(elements, validity, column_inds, column_vals, col_idx, wri
 
     for row_idx, val in enumerate(data):
         val = val.tobytes().strip()
-        empty = True if val == b'' else False
+        empty = len(val) == 0
 
         valid, value = parser(val, invalid_value)
 
