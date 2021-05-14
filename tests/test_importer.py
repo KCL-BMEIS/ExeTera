@@ -59,19 +59,32 @@ TEST_SCHEMA = json.dumps({
                 "postcode": {
                     "field_type": "categorical",
                     "categorical": {
-                    "value_type": "int8",
-                    "strings_to_values": {
-                        ""    : 0,
-                        "NW1" : 1,
-                        "E1"  : 2,
-                        "SW1P": 3,
-                        "NW3" : 4,
+                        "value_type": "int8",
+                        "strings_to_values": {
+                            ""    : 0,
+                            "NW1" : 1,
+                            "E1"  : 2,
+                            "SW1P": 3,
+                            "NW3" : 4,
                         }
                     }
                 },
                 "patient_id": {
                     "field_type": "fixed_string",
                     "length": 4
+                },
+                "degree": {
+                    "field_type": "categorical",
+                    "categorical": {
+                        "value_type": "int8",
+                        "strings_to_values": {
+                            ""         : 0,
+                            "bachelor" : 1,
+                            "master"   : 2,
+                            "doctor"   : 3,
+                            },
+                        "out_of_range": "freetext"    
+                    }                
                 }
             }
         }
@@ -81,12 +94,12 @@ TEST_SCHEMA = json.dumps({
 
 
 TEST_CSV_CONTENTS = '\n'.join((
-    'name, id, age, birthday,  height, weight_change, BMI,  postcode, patient_id, updated_at',
-    'a,     1, 30, 1990-01-01, 170.9,    21.2,        20.5,      NW1,         E1, 2020-05-12 07:00:00',
-    'bb,    2, 40, 1980-03-04, 180.2,        ,        25.4,     SW1P,       E123, 2020-05-13 01:00:00',
-    'ccc,   3, 50, 1970-04-05,      ,   -17.5,        27.2,       E1,       E234, 2020-05-14 03:00:00',
-    'dddd,  4, 60, 1960-04-05,      ,   -17.5,        27.2,         ,           , 2020-05-15 03:00:00',
-    'eeeee, 5, 70, 1950-04-05, 161.0,     2.5,        20.2,      NW3,    E456789, 2020-05-16 03:00:00',
+    'name, id, age, birthday,  height, weight_change, BMI,  postcode, patient_id,   degree, updated_at',
+    'a,     1, 30, 1990-01-01, 170.9,    21.2,        20.5,      NW1,         E1, bachelor, 2020-05-12 07:00:00',
+    'bb,    2, 40, 1980-03-04, 180.2,        ,        25.4,     SW1P,       E123,   master, 2020-05-13 01:00:00',
+    'ccc,   3, 50, 1970-04-05,      ,   -17.5,        27.2,       E1,       E234,         , 2020-05-14 03:00:00',
+    'dddd,  4, 60, 1960-04-05,      ,   -17.5,        27.2,         ,           ,     prof, 2020-05-15 03:00:00',
+    'eeeee, 5, 70, 1950-04-05, 161.0,     2.5,        20.2,      NW3,    E456789,   doctor, 2020-05-16 03:00:00',
 ))
 
 class TestImporter(unittest.TestCase):
@@ -257,6 +270,21 @@ class TestImporter(unittest.TestCase):
         with h5py.File(bio, 'r') as hf:
             self.assertEqual(list(hf['schema_key']['patient_id']['values'][:]), expected_patient_id_value_list)
 
+
+    def test_leaky_categorical_field_importer(self):
+        chunk_size = 1000
+
+        bio = BytesIO()
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {})
+
+        expected_degree_value_list = [1, 2, 0, -1, 3]
+        expected_degree_freetext_index_list = [0, 0, 0, 0, 4, 4]
+        expected_degree_freetext_value_list = list(np.frombuffer(b'prof', dtype = np.uint8))
+        with h5py.File(bio, 'r') as hf:
+            self.assertEqual(list(hf['schema_key']['degree']['values'][:]), expected_degree_value_list)
+            self.assertEqual(list(hf['schema_key']['degree_freetext']['index'][:]), expected_degree_freetext_index_list)
+            self.assertEqual(list(hf['schema_key']['degree_freetext']['values'][:]), expected_degree_freetext_value_list)
+        
 
     def tearDown(self):
         os.close(self.fd_csv)

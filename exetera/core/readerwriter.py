@@ -319,6 +319,8 @@ class LeakyCategoricalImporter:
         self.other_values = IndexedStringWriter(datastore, group, f"{name}_{out_of_range}",
                                                 timestamp, write_mode)
         self.field_size = max([len(k) for k in categories.keys()])
+        self.byte_map = ops.get_byte_map(categories)
+        self.freetext_index_accumulated = 0
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype=f'U{self.field_size}')
@@ -348,6 +350,20 @@ class LeakyCategoricalImporter:
     def write(self, values):
         self.write_part(values)
         self.flush()
+
+    def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
+        cat_keys, cat_index, cat_values = self.byte_map
+        chunk = np.zeros(written_row_count, dtype=np.int8) # use np.int8 instead of np.uint8, as we set -1 for leaky key
+        freetext_indices_chunk = np.zeros(written_row_count + 1, dtype = np.int64)
+        freetext_values_chunk = np.zeros(np.int32(column_vals.shape[1]), dtype = np.uint8)
+
+        ops.leaky_categorical_transform(chunk, freetext_indices_chunk, freetext_values_chunk, col_idx, column_inds, column_vals, cat_keys, cat_index, cat_values)
+
+        freetext_indices = freetext_indices_chunk + self.freetext_index_accumulated # broadcast
+        self.freetext_index_accumulated += freetext_indices_chunk[written_row_count]
+        freetext_values = freetext_values_chunk[:freetext_indices_chunk[written_row_count]]
+        self.writer.write(chunk)
+        self.other_values.write_part_raw(freetext_indices, freetext_values)
 
 
 # TODO: should produce a warning for unmappable strings and a corresponding filter, rather

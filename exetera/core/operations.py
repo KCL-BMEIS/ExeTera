@@ -1276,6 +1276,43 @@ def categorical_transform(chunk, i_c, column_inds, column_vals, cat_keys, cat_in
 
             if index != -1:
                 chunk[row_idx] = cat_values[index]
+                
+
+@njit           
+def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, column_inds, column_vals, cat_keys, cat_index, cat_values):
+    """
+    Tranform method for categorical importer in readerwriter.py
+    """   
+    for row_idx in range(len(column_inds[i_c]) - 1):
+        if row_idx >= chunk.shape[0]:   # reach the end of chunk
+            break
+
+        key_start = column_inds[i_c, row_idx]
+        key_end = column_inds[i_c, row_idx + 1]
+        key_len = key_end - key_start
+
+        is_found = False
+        for i in range(len(cat_index) - 1):
+            sc_key_len = cat_index[i + 1] - cat_index[i]
+            if key_len != sc_key_len:
+                continue
+
+            index = i
+            for j in range(key_len):
+                entry_start = cat_index[i]
+                if column_vals[i_c, key_start + j] != cat_keys[entry_start + j]:
+                    index = -1
+                    break
+
+            if index != -1:
+                is_found = True
+                chunk[row_idx] = cat_values[index]
+                freetext_indices[row_idx + 1] = freetext_indices[row_idx]
+
+        if not is_found:
+            chunk[row_idx] = -1 
+            freetext_indices[row_idx + 1] = freetext_indices[row_idx] + key_len
+            freetext_values[freetext_indices[row_idx]: freetext_indices[row_idx + 1]] = column_vals[i_c, key_start: key_end]
 
 
 @njit
