@@ -46,16 +46,14 @@ def get_file_stat(source, chunk_size):
     return total_byte_size, count_columns, count_rows, val_row_count, val_threshold
 
 
-def read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importer_list=None):
-    
-
+def read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importer_list=None, stop_after_rows=None):
     ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
     SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
     NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
     WHITE_SPACE_VALUE = np.frombuffer(b' ', dtype='S1')[0][0]
     #CARRIAGE_RETURN_VALUE = np.frombuffer(b'\r', dtype='S1')[0][0]
 
-    # TODO, add stop_after for row， show_progress_ever
+    # TODO, add show_progress_ever
 
     time0 = time.time()
 
@@ -65,7 +63,7 @@ def read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importe
         chunk_index = 0
         hasHeader = True
 
-        rows = 0
+        accumulated_written_rows = 0
         # total_col = [[], []]
 
         # initialize column_inds, column_vals ouside of while-loop
@@ -78,7 +76,12 @@ def read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importe
 
         content = None
         start_index = 0
+
+        ch = 0
         while chunk_index < total_byte_size:
+            if stop_after_rows and accumulated_written_rows >= stop_after_rows:
+                break
+
             # reads chunk size of file content 
             # when indices or values is full, we need to call fast_csv_reader again, but we don't want to read same content again
             if not is_indices_full and not is_values_full:
@@ -100,34 +103,36 @@ def read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importe
             # print('column_inds', column_inds)
             # print('column_vals', column_vals)
 
+            # make column_inds larger if it gets full before reach the end of chunk
             if is_indices_full:
                 indices_row_count = column_inds.shape[1] - 1
                 column_inds = np.zeros((count_columns, np.uint32(indices_row_count * larger_factor + 1)), dtype=np.int64)  
-                
+
+            # make column_values larger if it gets full before reach the end of chunk 
             if is_values_full:
                 values_row_count = column_vals.shape[1]
-                print('values_row_count', values_row_count)
                 val_threshold = int(values_row_count * 0.8)
                 column_vals = np.zeros((count_columns, np.uint32(values_row_count * larger_factor)), dtype=np.uint8)
                 
             # reassign
             if is_indices_full or is_values_full:
-                # start_index += offset_pos
                 continue
                 
-            if written_row_count in (-1, 0):
+            if written_row_count == -1 or written_row_count == 0:
                 raise Exception('The length of one line is too large, please modify the chunksize and make it larger')
 
-            chunk_index += offset_pos
             hasHeader = False
+            chunk_index += offset_pos
+            accumulated_written_rows += written_row_count
+            ch += 1
 
+            # convert and write
             for ith, i_c in enumerate(index_map):                
                 if field_importer_list and field_importer_list[ith]: # and chunk is not None: 
                     field_importer_list[ith].transform_and_write_part(column_inds, column_vals, i_c, written_row_count)
                     field_importer_list[ith].flush()
-
-            rows += written_row_count
-            # print(f"{rows} rows parsed in {time.time() - time0}s")
+           
+            print(f"{ch} chunks, {accumulated_written_rows} accumulated_written_rows parsed in {time.time() - time0}s")
 
         # print("i_c", 0, Counter(total_col[0]))
         # print("i_c", 1, Counter(total_col[1]))
@@ -202,6 +207,9 @@ def fast_csv_reader(source, column_inds, column_vals, hasHeader, val_threshold, 
                     escaped_literal_candidate = True
                 elif index + 1 < len(source) and (source[index + 1] == separator_value or source[index + 1] == newline_value):
                     escaped = False
+                elif index + 1 == len(source):
+                    # reach the end of source, retry in next chunk
+                    pass
                 else:
                     raise Exception('invalid double quote')
         else:

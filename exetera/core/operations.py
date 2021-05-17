@@ -1459,6 +1459,7 @@ def numeric_transform(elements, validity, column_inds, column_vals, col_idx, wri
                     break
     return exception_message, exception_args
 
+
 @njit
 def calculate_value(length, decimal_index, num_before_decimal, num_after_decimcal, sign):
     # Adjust for adding too many zeroes before we knew we had a decimal
@@ -1535,7 +1536,7 @@ def transform_to_values(column_inds, column_vals, col_idx, written_row_count):
 
 
 @njit
-def fix_string_transform(column_inds, column_vals, col_idx, written_row_count, strlen):
+def fixed_string_transform(column_inds, column_vals, col_idx, written_row_count, strlen):
     data = []
     for row_idx in range(written_row_count):
         start_row_idx = column_inds[col_idx, row_idx]

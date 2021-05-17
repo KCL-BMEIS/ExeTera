@@ -154,9 +154,6 @@ class DatasetImporter:
             if space in exclude and len(exclude[space]) > 0:
                 available_keys = [k for k in available_keys if k not in exclude[space]]
 
-            # available_keys = ['ruc11cd','ruc11']
-            # available_keys = ['lsoa11nm']
-
             if not keys:
                 fields_to_use = available_keys
             else:
@@ -188,6 +185,6 @@ class DatasetImporter:
                 field_importer = sch.importer(datastore, group, field_name, timestamp)
                 field_importer_list.append(field_importer)
         
-        read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importer_list)
+        read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importer_list, stop_after_rows=stop_after)
 
 
