@@ -27,7 +27,7 @@ from exetera.core.load_schema import load_schema
 from exetera.core.csv_reader_speedup import read_file_using_fast_csv_reader
 from io import StringIO
 
-def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite, include, exclude, chunk_size = 1 << 20):
+def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite, include, exclude, chunk_row_size = 1 << 20):
 
     print(timestamp)
     print(schema_file)
@@ -109,7 +109,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
             DatasetImporter(datastore, files[sk], hf, sk, schema[sk], timestamp,
                             include=include, exclude=exclude,
                             stop_after=stop_after.get(sk, None),
-                            show_progress_every=show_every, chunk_size=chunk_size)
+                            show_progress_every=show_every, chunk_row_size=chunk_row_size)
 
             print(sk, hf.keys())
             table = hf[sk]
@@ -130,13 +130,13 @@ class DatasetImporter:
                  include=None, exclude=None,
                  keys=None,
                  stop_after=None, show_progress_every=None, filter_fn=None,
-                 early_filter=None, chunk_size = 1 << 20):
+                 early_filter=None, chunk_row_size = (1 << 20)) :
 
         # self.names_ = list()
         self.index_ = None
 
         # stop_after = 2000000
-
+        
         time0 = time.time()
 
         seen_ids = set()
@@ -185,6 +185,6 @@ class DatasetImporter:
                 field_importer = sch.importer(datastore, group, field_name, timestamp)
                 field_importer_list.append(field_importer)
         
-        read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importer_list, stop_after_rows=stop_after)
+        read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_importer_list, stop_after_rows=stop_after)
 
 

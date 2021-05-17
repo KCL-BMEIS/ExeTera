@@ -8,7 +8,7 @@ from collections import Counter
 from io import StringIO
 
 
-def get_file_stat(source, chunk_size):
+def get_file_stat(source, chunk_row_size):
     total_byte_size, count_columns, first_line = 0, 0, ''
 
     if isinstance(source,str):
@@ -37,16 +37,16 @@ def get_file_stat(source, chunk_size):
     # print('assume_line_length', assume_line_length, 'assume_cell_length', assume_cell_length)
 
     # margin = 10
-    count_rows = max(chunk_size // assume_line_length, 5)
-    print('count_columns', count_columns, 'count_rows', count_rows)
-    val_row_count = count_rows * assume_cell_length
+    count_rows = chunk_row_size
+    # print('count_columns', count_columns, 'count_rows', count_rows)
+    val_row_count = count_rows * assume_cell_length #* margin
     val_threshold = int(val_row_count * 0.8)
-    print('val_row_count', val_row_count, 'val_threshold', val_threshold)
-    
-    return total_byte_size, count_columns, count_rows, val_row_count, val_threshold
+    # print('', val_row_count, 'val_threshold', val_threshold)
+    chunk_byte_size = count_rows * count_columns
+    return total_byte_size, count_columns, count_rows, val_row_count, val_threshold, chunk_byte_size
 
 
-def read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importer_list=None, stop_after_rows=None):
+def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_importer_list=None, stop_after_rows=None, show_progress_every = 1):
     ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
     SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
     NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
@@ -57,7 +57,7 @@ def read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importe
 
     time0 = time.time()
 
-    total_byte_size, count_columns, count_rows, val_row_count, val_threshold = get_file_stat(source, chunk_size)
+    total_byte_size, count_columns, count_rows, val_row_count, val_threshold, chunk_byte_size = get_file_stat(source, chunk_row_size)
 
     with utils.Timer("read_file_using_fast_csv_reader"):
         chunk_index = 0
@@ -79,13 +79,14 @@ def read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importe
 
         ch = 0
         while chunk_index < total_byte_size:
+            # print("cols", count_columns, "rows", count_rows)
             if stop_after_rows and accumulated_written_rows >= stop_after_rows:
                 break
 
             # reads chunk size of file content 
             # when indices or values is full, we need to call fast_csv_reader again, but we don't want to read same content again
             if not is_indices_full and not is_values_full:
-                content = np.fromfile(source, count=chunk_size, offset=chunk_index, dtype=np.uint8)
+                content = np.fromfile(source, count=chunk_byte_size, offset=chunk_index, dtype=np.uint8)
 
             length_content = content.shape[0]
             if length_content == 0:
@@ -132,7 +133,8 @@ def read_file_using_fast_csv_reader(source, chunk_size, index_map, field_importe
                     field_importer_list[ith].transform_and_write_part(column_inds, column_vals, i_c, written_row_count)
                     field_importer_list[ith].flush()
            
-            print(f"{ch} chunks, {accumulated_written_rows} accumulated_written_rows parsed in {time.time() - time0}s")
+            if show_progress_every and ch % show_progress_every == 0:
+                print(f"{ch} chunks, {accumulated_written_rows} accumulated_written_rows parsed in {time.time() - time0}s")
 
         # print("i_c", 0, Counter(total_col[0]))
         # print("i_c", 1, Counter(total_col[1]))
@@ -208,7 +210,7 @@ def fast_csv_reader(source, column_inds, column_vals, hasHeader, val_threshold, 
                 elif index + 1 < len(source) and (source[index + 1] == separator_value or source[index + 1] == newline_value):
                     escaped = False
                 elif index + 1 == len(source):
-                    # reach the end of source, retry in next chunk
+                    # reach the end of source, will retry in next chunk
                     pass
                 else:
                     raise Exception('invalid double quote')

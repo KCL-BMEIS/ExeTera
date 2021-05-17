@@ -79,7 +79,6 @@ class DataWriter:
     def _write_additional(group, name, field, count):
         if count == 0:
             return 
-            
         gv = group[name]
         gv.resize((gv.size + count,))
         if count == len(field):
