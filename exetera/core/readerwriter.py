@@ -592,7 +592,7 @@ class FixedStringWriter(Writer):
         DataWriter.write(self.field, 'values', values, len(values))
 
     def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
-        data = ops.fix_string_transform(column_inds, column_vals, col_idx, written_row_count, self.strlen)
+        data = ops.fixed_string_transform(column_inds, column_vals, col_idx, written_row_count, self.strlen)
         values = [x.tobytes().strip() for x in data]
         self.write_part(values)
 
