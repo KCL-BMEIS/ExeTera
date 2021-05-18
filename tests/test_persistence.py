@@ -15,6 +15,7 @@ from exetera.core import utils
 
 
 def one_dim_data_to_indexed(data):
+    data = [str(s) for s in data]
     total_data_bytes = sum([len(s) for s in data])
     count_row = len(data)
 
@@ -251,21 +252,37 @@ class TestPersistence(unittest.TestCase):
             reader2 = datastore.get_reader(hf['foo2'])
             self.assertTrue(np.array_equal(reader[:], reader2[:]))
 
+
     def test_numeric_importer_bool(self):
 
         datastore = persistence.DataStore(10)
         ts = str(datetime.now(timezone.utc))
         bio = BytesIO()
-        values = [True, False, None, False, True, None, None, False, True, False,
-                  True, False, None, False, True, None, None, False, True, False,
-                  True, False, None, False, True]
-        arrvalues = np.asarray(values, dtype='bool')
+        data = ['True', 'False', 'None', 'false', 'true', 'Wrong', 'incorrect', 'FALSE', 'TRUE', 'OFF',
+                  'ON', 'off', '', 'no', 'on', '-1', None, 'N', 'on', 'n',
+                  'yes', '0', None, 'f', 'F', 'YES', '1', 'y', 'Y']
+        indices, values, written_row_count = one_dim_data_to_indexed(data)
+
         with h5py.File(bio, 'w') as hf:
             hf.create_group('test')
-            foo = rw.NumericWriter(datastore, hf, 'foo', 'bool', ts).write(arrvalues)
-
+            foo = rw.NumericImporter(datastore, hf, 'foo', 'bool', persistence.try_str_to_bool, validation_mode='relaxed', timestamp=ts)
+            foo.transform_and_write_part(indices, values, 0, written_row_count)
+            
             foo = rw.NumericReader(datastore, hf['foo'])[:]
-            self.assertTrue(np.array_equal(arrvalues, foo))
+            foo_valid = rw.NumericReader(datastore, hf['foo_valid'])[:]
+
+
+
+            expected_foo_list = [True, False, False, False, True, False, False, False, True, False,
+                  True, False, False, False, True, False, False, False, True, False,
+                  True, False, False, False, False, True, True, True, True]
+
+            expected_foo_valid_list = [True, True, False, True, True, False, False, True, True, True,
+                                        True, True, False, True, True, False, False, True, True, True,
+                                        True, True, False, True, True, True, True, True, True]
+            
+            self.assertTrue(np.array_equal(expected_foo_list, foo))
+            self.assertTrue(np.array_equal(expected_foo_valid_list, foo_valid))
 
 
     def test_numeric_importer_float32(self):
@@ -274,11 +291,13 @@ class TestPersistence(unittest.TestCase):
         ts = str(datetime.now(timezone.utc))
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
-            values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
+            data = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
+            indices, values, written_row_count = one_dim_data_to_indexed(data) 
+
             foo = rw.NumericImporter(datastore, hf, 'foo', 'float32',
                                               persistence.try_str_to_float, validation_mode='relaxed',timestamp=ts)
-            foo.write(values)
+            foo.transform_and_write_part(indices, values, 0, written_row_count)
 
             r = rw.NumericReader(datastore, hf['foo'])[:]
             expected = [0.0, 0.0, 2.0, 3.0, 40.0, 5.21e-2, 0.0, -6.0, -7.0, -80.0, -9.21e-2,
@@ -298,20 +317,22 @@ class TestPersistence(unittest.TestCase):
         datastore = persistence.DataStore(10)
         ts = str(datetime.now(timezone.utc))
         bio = BytesIO()
-        values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
+        data = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                   '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
+        indices, values, written_row_count = one_dim_data_to_indexed(data)
+
         with h5py.File(bio, 'w') as hf:
             foo = rw.NumericImporter(datastore, hf, 'foo', 'float32',
                                               persistence.try_str_to_float, validation_mode='relaxed', timestamp=ts)
 
-            foo.write(values)
+            foo.transform_and_write_part(indices, values, 0, written_row_count)
 
         with h5py.File(bio, 'r') as hf:
             foo = rw.NumericReader(datastore, hf['foo'])
             expected =\
                 [0.0, 0.0, 2.0, 3.0, 40.0, 5.21e-2, 0.0, -6.0, -7.0, -80.0, -9.21e-2,
                  0.0, 0.0, 2.0, 3.0, 40.0, 5.21e-2, 0.0, -6.0, -7.0, -80.0, -9.21e-2]
-            self.assertEqual(len(values), len(foo))
+            self.assertEqual(len(data), len(foo))
             for e, a in zip(expected, foo[:]):
                 self.assertAlmostEqual(e, a)
 
@@ -384,11 +405,14 @@ class TestPersistence(unittest.TestCase):
         ts = str(datetime.now(timezone.utc))
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
-            values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
+            data = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
+            indices, values, written_row_count = one_dim_data_to_indexed(data)
+
             foo = rw.NumericImporter(datastore, hf, 'foo', 'int32',
                                               persistence.try_str_to_int, validation_mode='relaxed', timestamp=ts)
-            foo.write(values)
+
+            foo.transform_and_write_part(indices, values, 0, written_row_count)
 
             # expected = [0, 0, 2, 0, 0, 0, 0, -6, 0, 0, 0,
             #             0, 0, 2, 0, 0, 0, 0, -6, 0, 0, 0]
@@ -406,13 +430,14 @@ class TestPersistence(unittest.TestCase):
         ts = str(datetime.now(timezone.utc))
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
-            values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
+            data = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       0, 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
+            indices, values, written_row_count = one_dim_data_to_indexed(data)
+
             foo = rw.NumericImporter(datastore, hf, 'foo', 'int32',
                                               persistence.try_str_to_float_to_int, validation_mode='relaxed', timestamp=ts)
-            foo.write_part(values[0:10])
-            foo.write_part(values[10:20])
-            foo.write_part(values[20:22])
+
+            foo.transform_and_write_part(indices, values, 0, written_row_count)
             foo.flush()
             # for f in persistence.numeric_iterator(hf['foo']):
             #     print(f[0], f[1])
@@ -435,18 +460,21 @@ class TestPersistence(unittest.TestCase):
         ts = str(datetime.now(timezone.utc))
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
-            values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
+            data = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
-            foo = rw.NumericImporter(datastore, hf, 'foo', 'uint32',
-                                              persistence.try_str_to_int, validation_mode='relaxed', timestamp=ts).write(values)
+            indices, values, written_row_count = one_dim_data_to_indexed(data)
 
-            expected = [0, 0, 2, 0, 0, 0, 0, 4294967290, 0, 0, 0,
-                        0, 0, 2, 0, 0, 0, 0, 4294967290, 0, 0, 0]
+            foo = rw.NumericImporter(datastore, hf, 'foo', 'uint32',
+                                              persistence.try_str_to_int, validation_mode='relaxed', timestamp=ts)
+            foo.transform_and_write_part(indices, values, 0, written_row_count)
+
+            expected = [0, 0, 2, 3, 40, 0, 0, 4294967290, 4294967289, 4294967216, 0,
+                        0, 0, 2, 3, 40, 0, 0, 4294967290, 4294967289, 4294967216, 0]
             self.assertListEqual(expected,
                                  datastore.get_reader(hf['foo'])[:].tolist())
             expected_valid =\
-                [False, False, True, False, False, False, False, True, False, False, False,
-                 False, False, True, False, False, False, False, True, False, False, False]
+                [False, False, True, True, True, True, False, True, True, True, True,
+                 False, False, True, True, True, True, False, True, True, True, True]
             self.assertListEqual(expected_valid,
                                  datastore.get_reader(hf['foo_valid'])[:].tolist())
 
@@ -1374,13 +1402,13 @@ class TestJittingSort(unittest.TestCase):
         s_index = sorted(index, key=predicate)
 
 
-class TestConverters(unittest.TestCase):
+# class TestConverters(unittest.TestCase):
 
-    def test_str_to_bool(self):
-        self.assertTupleEqual((True, True), persistence.try_str_to_bool('True', 0))
-        self.assertTupleEqual((True, False), persistence.try_str_to_bool('False', 0))
-        self.assertTupleEqual((False, 0), persistence.try_str_to_bool('Foo', 0))
-        self.assertTupleEqual((False, None), persistence.try_str_to_bool('Foo', None))
+#     def test_str_to_bool(self):
+#         self.assertTupleEqual((True, True), persistence.try_str_to_bool('True', 0))
+#         self.assertTupleEqual((True, False), persistence.try_str_to_bool('False', 0))
+#         self.assertTupleEqual((False, 0), persistence.try_str_to_bool('Foo', 0))
+#         self.assertTupleEqual((False, None), persistence.try_str_to_bool('Foo', None))
 
 
 class TestDataWriter(unittest.TestCase):

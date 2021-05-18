@@ -506,16 +506,23 @@ class NumericImporter:
     def transform_and_write_part(self, column_ids, column_vals, col_idx, written_row_count):
         elements = np.zeros(written_row_count, dtype=self.data_writer.nformat)
         validity = np.zeros(written_row_count, dtype='bool')
+        
+        if self.data_writer.nformat == 'bool':
+            exception_message, exception_args = ops.numeric_bool_transform(
+                elements, validity, column_ids, column_vals, col_idx,
+                written_row_count, self.parser, self.invalid_value,
+                self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8)
+            )
 
-        exception_message, exception_args = ops.numeric_transform(
-            elements, validity, column_ids, column_vals, col_idx,
-            written_row_count, self.parser, self.invalid_value,
-            self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8)
-        )
+        else:
+            exception_message, exception_args = ops.numeric_int_float_transform(
+                elements, validity, column_ids, column_vals, col_idx,
+                written_row_count, self.parser, self.invalid_value,
+                self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8)
+            )
 
         if exception_message != 0:
             ops.raiseNumericException(exception_message, exception_args)
-
 
         self.data_writer.write_part(elements)
         if self.flag_writer is not None:

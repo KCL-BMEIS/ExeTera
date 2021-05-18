@@ -237,10 +237,10 @@ class TestImporter(unittest.TestCase):
 
 
     def test_indexed_string_importer_with_small_chunk_size(self):
-        chunk_size = 400 # < total_bytes
+        chunk_row_size = 20 # chunk_row_size * column_count < total_bytes
 
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_size = chunk_size)
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size = chunk_row_size)
         with h5py.File(bio, 'r') as hf:
             indices = hf['schema_key']['name']['index'][:]
             values = hf['schema_key']['name']['values'][:]
@@ -251,10 +251,10 @@ class TestImporter(unittest.TestCase):
 
 
     def test_categorical_field_importer_with_small_chunk_size(self):
-        chunk_size = 400 # < total_bytes
+        chunk_row_size = 20 # chunk_row_size * column_count < total_bytes
         
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_size = chunk_size)
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size = chunk_row_size)
         with h5py.File(bio, 'r') as hf:
             expected_postcode_value_list = [1, 3, 2, 0, 4]
             self.assertEqual(list(hf['schema_key']['postcode']['values'][:]), expected_postcode_value_list)

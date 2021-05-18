@@ -555,7 +555,7 @@ class TestFieldImporter(unittest.TestCase):
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('int_field', "utf-8"), dtype=np.uint8)
         
-        ops.numeric_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)          
+        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)          
 
         expected_elements = np.array([1, 1, 1, -1, 100, 10, 10, 10], dtype = np.uint8)
         
@@ -574,7 +574,7 @@ class TestFieldImporter(unittest.TestCase):
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('float_field', "utf-8"), dtype=np.uint8)
 
-        ops.numeric_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)              
+        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)              
 
         expected_elements = np.array([1, 0.1, 1, 10.23, 3.5], dtype = np.float32)  
 
@@ -593,7 +593,7 @@ class TestFieldImporter(unittest.TestCase):
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('float_field', "utf-8"), dtype=np.uint8)
 
-        ops.numeric_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)              
+        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)              
 
         expected_elements = np.array([10, 10, 10, 0.1, 150], dtype = np.float32)  
 

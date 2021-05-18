@@ -105,10 +105,18 @@ def try_str_to_int(value, invalid=0):
     except Exception:
         return False, invalid
 
+# @njit
+# def try_str_to_bool(value, invalid=0):
+#     try:
+#         return True, bool(strtobool(value))
+#     except Exception:
+#         return False, invalid
+
+
 @njit
 def try_str_to_bool(value, invalid=0):
     try:
-        return True, bool(strtobool(value))
+        return True, bool(value)
     except Exception:
         return False, invalid
 

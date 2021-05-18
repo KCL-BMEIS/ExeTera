@@ -1316,10 +1316,10 @@ def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, c
 
 
 @njit
-def numeric_transform(elements, validity, column_inds, column_vals, col_idx, written_row_count,
-                        parser, invalid_value, validation_mode, field_name):
+def numeric_int_float_transform(elements, validity, column_inds, column_vals, col_idx, written_row_count,
+                                parser, invalid_value, validation_mode, field_name):
     """
-    Transform method for numeric importer in readerwriter.py
+    Transform method for numeric importer (int, float) in readerwriter.py
     """          
 
     exception_message, exception_args = 0, [field_name]
@@ -1460,6 +1460,117 @@ def numeric_transform(elements, validity, column_inds, column_vals, col_idx, wri
     return exception_message, exception_args
 
 
+@njit
+def numeric_bool_transform(elements, validity, column_inds, column_vals, col_idx, written_row_count,
+                            parser, invalid_value, validation_mode, field_name):
+    """
+    Transform method for numeric importer (bool) in readerwriter.py
+    """         
+    exception_message, exception_args = 0, [field_name]
+
+    for row_idx in range(written_row_count):
+        
+        empty = False  
+        valid_input = True # Start by assuming number is valid
+        value = -1 # start by assuming value is -1, the valid result will be 1 or 0 for bool
+
+        row_start_idx = column_inds[col_idx, row_idx]
+        row_end_idx = column_inds[col_idx, row_idx + 1]
+
+        length = row_end_idx - row_start_idx
+
+        byte_start_idx, byte_end_idx = 0, length - 1
+        # ignore heading whitespace
+        while byte_start_idx < length and column_vals[col_idx, row_start_idx + byte_start_idx] == 32:
+            byte_start_idx += 1
+        # ignore tailing whitespace 
+        while byte_end_idx >= 0 and column_vals[col_idx, row_start_idx + byte_end_idx] == 32:
+            byte_end_idx -= 1
+        
+        # actual length after removing heading and trailing whitespace
+        actual_length = byte_end_idx - byte_start_idx + 1
+
+        if actual_length <= 0:
+            empty = True
+            valid_input = False
+        else:
+        
+            val = column_vals[col_idx, row_start_idx + byte_start_idx: row_start_idx + byte_start_idx + actual_length]
+            if actual_length == 1:
+                if val in (49, 89, 121, 84, 116): # '1', 'Y', 'y', 'T', 't'
+                    value = 1
+                elif val in (48, 78, 110, 70, 102):   # '0', 'N', 'n', 'F', 'f'
+                    value = 0
+                else:
+                    valid_input = False
+
+            elif actual_length == 2:
+                if val[0] in (79, 111) and val[1] in (78, 110): # val.lower() == 'on': val[0] in ('O', 'o'), val[1] in ('N', 'n')
+                    value = 1
+                elif val[0] in (78, 110) and val[1] in (79, 111): # val.lower() == 'no'
+                    value = 0
+                else:
+                    valid_input = False
+
+            elif actual_length == 3:
+                if val[0] in (89, 121) and val[1] in (69, 101) and val[2] in (83, 115): # 'yes'
+                    value = 1
+                elif val[0] in (79, 111) and val[1] in (70, 102) and val[2] in (70, 102): # 'off'
+                    value = 0
+                else:
+                    valid_input = False
+
+            elif actual_length == 4: 
+                if val[0] in (84, 116) and val[1] in (82, 114) and val[2] in (85, 117) and val[3] in (69, 101): # 'true'
+                    value = 1
+                else:
+                    valid_input = False
+
+            elif actual_length == 5:
+                if val[0] in (70, 102) and val[1] in (65, 97) and val[2] in (76, 108) and val[3] in (83, 115) and val[4] in (69, 101): # 'false'
+                    value = 0
+                else:
+                    valid_input = False
+            else:
+                valid_input = False
+
+        # Checking if all input valid to stop if already invalid
+        if not valid_input:
+            elements[row_idx] = invalid_value
+            validity[row_idx] = False
+
+        # TODO: This logic can be written cleaner
+        valid, val = parser(value, invalid_value)
+
+        if not valid or not valid_input:
+            valid = False
+            val = invalid_value
+
+        elements[row_idx] = val
+        validity[row_idx] = valid
+
+        # Optimized exception handling to avoid creating strings inside loop in Numba
+        if not valid:
+            if validation_mode == 'strict':
+                if empty:
+                    exception_message = 1
+                    exception_args = [field_name]
+                    break
+                else:
+                    exception_message = 2
+                    non_parsable = column_vals[col_idx, row_start_idx : row_end_idx]
+                    exception_args = [field_name, non_parsable]
+                    break
+            if validation_mode == 'allow_empty':
+                if not empty:
+                    exception_message = 2
+                    non_parsable = column_vals[col_idx, row_start_idx : row_end_idx]
+                    exception_args = [field_name, non_parsable]
+                    break
+    return exception_message, exception_args      
+
+        
+            
 @njit
 def calculate_value(length, decimal_index, num_before_decimal, num_after_decimcal, sign):
     # Adjust for adding too many zeroes before we knew we had a decimal
