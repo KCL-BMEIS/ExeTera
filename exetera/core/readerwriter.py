@@ -238,9 +238,10 @@ class IndexedStringWriter(Writer):
         return [None] * length
 
     def write_part(self, values):
-        """Writes a list of strings in indexed string form to a field
-        Args:
-            values: a list of utf8 strings
+        """
+        Writes a list of strings in indexed string form to a field.
+        
+        :param values: a list of utf8 strings
         """
         if not self.ever_written:
             self.indices[0] = self.accumulated
@@ -432,8 +433,8 @@ class NumericImporter:
         Given a list of strings, parse the strings and write the parsed values. Values that
         cannot be parsed are written out as zero for the values, and zero for the flags to
         indicate that that entry is not valid.
-        Args:
-            values: a list of strings to be parsed
+        
+        :param values: a list of strings to be parsed
         """
         elements = np.zeros(len(values), dtype=self.data_writer.nformat)
         validity = np.zeros(len(values), dtype='bool')

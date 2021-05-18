@@ -28,6 +28,13 @@ class HDF5Dataset(Dataset):
     For a detailed explanation of Dataset along with examples of its use, please refer to the
     wiki documentation at
     https://github.com/KCL-BMEIS/ExeTera/wiki/Dataset-API
+
+    :param session: The session instance to include this dataset to.
+    :param dataset_path: The path of HDF5 file.
+    :param mode: the mode in which the dataset should be opened. This is one of "r", "r+" or "w".
+    :param name: the name that is associated with this dataset. This can be used to retrieve the dataset when
+        calling :py:meth:`~session.Session.get_dataset`.
+    :return: A HDF5Dataset instance.
     """
 
     def __init__(self, session, dataset_path, mode, name):
@@ -35,13 +42,6 @@ class HDF5Dataset(Dataset):
         Create a Dataset instance that contains dataframes. The dataframes are represented in a dict() with the
         name(str) as a key. The construction should always be called by Session.open_dataset() otherwise the instance
         is not included in Session.datasets. If the HDF5 datafile contains group, the content in loaded into dataframes.
-
-        :param session: The session instance to include this dataset to.
-        :param dataset_path: The path of HDF5 file.
-        :param mode: the mode in which the dataset should be opened. This is one of "r", "r+" or "w".
-        :param name: the name that is associated with this dataset. This can be used to retrieve the dataset when
-        calling :py:meth:`~session.Session.get_dataset`.
-        :return: A HDF5Dataset instance.
         """
         self.name = name
         self._session = session
@@ -202,6 +202,7 @@ class HDF5Dataset(Dataset):
     def __delitem__(self, name: str):
         """
         Delete a dataframe by del dataset[name].
+        
         :param name: The name of dataframe to delete.
         :return: Boolean if the dataframe is deleted.
         """
@@ -215,6 +216,7 @@ class HDF5Dataset(Dataset):
     def delete_dataframe(self, dataframe: DataFrame):
         """
         Remove dataframe from this dataset by the dataframe object.
+        
         :param dataframe: The dataframe instance to delete.
         :return: Boolean if the dataframe is deleted.
         """

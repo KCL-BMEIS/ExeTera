@@ -36,6 +36,14 @@ class HDF5DataFrame(DataFrame):
     For a detailed explanation of DataFrame along with examples of its use, please refer to the
     wiki documentation at
     https://github.com/KCL-BMEIS/ExeTera/wiki/DataFrame-API
+    
+    :param name: name of the dataframe.
+    :param dataset: a dataset object, where this dataframe belongs to.
+    :param h5group: the h5group object to store the fields. If the h5group is not empty, acquire data from h5group
+        object directly. The h5group structure is h5group<-h5group-dataset structure, the later group has a
+        'fieldtype' attribute and only one dataset named 'values'. So that the structure is mapped to
+        Dataframe<-Field-Field.data automatically.
+    :param dataframe: optional - replicate data from another dictionary of (name:str, field: Field).
     """
     def __init__(self,
                  dataset: Dataset,
@@ -44,14 +52,6 @@ class HDF5DataFrame(DataFrame):
         """
         Create a Dataframe object, that contains a dictionary of fields. User should always create dataframe by
         dataset.create_dataframe, otherwise the dataframe is not stored in the dataset.
-
-        :param name: name of the dataframe.
-        :param dataset: a dataset object, where this dataframe belongs to.
-        :param h5group: the h5group object to store the fields. If the h5group is not empty, acquire data from h5group
-        object directly. The h5group structure is h5group<-h5group-dataset structure, the later group has a
-        'fieldtype' attribute and only one dataset named 'values'. So that the structure is mapped to
-        Dataframe<-Field-Field.data automatically.
-        :param dataframe: optional - replicate data from another dictionary of (name:str, field: Field).
         """
 
         self.name = name
@@ -207,7 +207,7 @@ class HDF5DataFrame(DataFrame):
 
         :param name: the name of the field to check
         :return: A boolean value indicating whether this DataFrame contains a Field with the
-        name in question
+            name in question
         """
         if not isinstance(name, str):
             raise TypeError("The name must be a str object.")
@@ -309,21 +309,22 @@ class HDF5DataFrame(DataFrame):
         a single field to be renamed or you can provide a dictionary with a set of fields to be
         renamed.
 
-        ```
-        # rename a single field
-        df.rename('a', 'b')
-
-        # rename multiple fields
-        df.rename({'a': 'b', 'b': 'c', 'c': 'a'})
-        ```
+        Example::
+        
+            # rename a single field
+            df.rename('a', 'b')
+    
+            # rename multiple fields
+            df.rename({'a': 'b', 'b': 'c', 'c': 'a'})
 
         Field renaming can fail if the resulting set of renamed fields would have name clashes. If
         this is the case, none of the rename operations go ahead and the dataframe remains unmodified.
+        
         :param field: Either a string or a dictionary of name pairs, each of which is the existing
-        field name and the destination field name
+            field name and the destination field name
         :param field_to: Optional parameter containing a string, if `field` is a string. If 'field'
-        is a dictionary, parameter should not be set.
-        Field references remain valid after this operation and reflect their renaming.
+            is a dictionary, parameter should not be set.
+            Field references remain valid after this operation and reflect their renaming.
         :return: None
         """
 
@@ -498,26 +499,26 @@ def merge(left: DataFrame,
     Fields are written to the destination dataframe. If the field names clash, they will get
     appended with the strings specified in 'left_suffix' and 'right_suffix' respectively.
 
-    :params left: The left dataframe
-    :params right: The right dataframe
-    :left_on: The field corresponding to the left key used to perform the join. This is either the
-    the name of the field, or a field object. If it is a field object, it can be from another
-    dataframe but it must be the same length as the fields being joined. This can also be a tuple
-    of such values when performing joins on compound keys
-    :right_on: The field corresponding to the right key used to perform the join. This is either
-    the name of the field, or a field object. If it is a field object, it can be from another
-    dataframe but it must be the same length as the fields being joined. This can also be a tuple
-    of such values when performing joins on compound keys
-    :left_fields: Optional parameter listing which fields are to be joined from the left table. If
-    this is not set, all fields from the left table are joined
-    :right_fields: Optional parameter listing which fields are to be joined from the right table.
-    If this is not set, all fields from the right table are joined
-    :left_suffix: A string to be appended to fields from the left table if they clash with fields
-    from the right table.
-    :right_suffix: A string to be appended to fields from the right table if they clash with fields
-    from the left table.
-    :how: Optional parameter specifying the merge mode. It must be one of ('left', 'right',
-    'inner', 'outer' or 'cross). If not set, the 'left' join is performed.
+    :param left: The left dataframe
+    :param right: The right dataframe
+    :param left_on: The field corresponding to the left key used to perform the join. This is either the
+        the name of the field, or a field object. If it is a field object, it can be from another
+        dataframe but it must be the same length as the fields being joined. This can also be a tuple
+        of such values when performing joins on compound keys
+    :param right_on: The field corresponding to the right key used to perform the join. This is either
+        the name of the field, or a field object. If it is a field object, it can be from another
+        dataframe but it must be the same length as the fields being joined. This can also be a tuple
+        of such values when performing joins on compound keys
+    :param left_fields: Optional parameter listing which fields are to be joined from the left table. If
+        this is not set, all fields from the left table are joined
+    :param right_fields: Optional parameter listing which fields are to be joined from the right table.
+        If this is not set, all fields from the right table are joined
+    :param left_suffix: A string to be appended to fields from the left table if they clash with fields from the 
+        right table.
+    :param right_suffix: A string to be appended to fields from the right table if they clash with fields from the 
+        left table.
+    :param how: Optional parameter specifying the merge mode. It must be one of ('left', 'right',
+        'inner', 'outer' or 'cross). If not set, the 'left' join is performed.
 
     """
 
