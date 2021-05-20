@@ -26,6 +26,10 @@ def chunks(length, chunksize=1 << 20):
         cur = next_
 
 
+# mapping functionality
+# =====================
+
+
 def count_back(array):
     """
     This is a helper function that provides functionality specific to streaming ordered
@@ -220,7 +224,6 @@ def map_valid(data_field, map_field, result=None, invalid=-1):
     return result
 
 
-@njit
 def ordered_map_valid_stream_old(data_field, map_field, result_field,
                              invalid=-1, chunksize=DEFAULT_CHUNKSIZE):
     df_it = iter(chunks(len(data_field.data), chunksize=chunksize))
@@ -317,7 +320,7 @@ def ordered_map_valid_stream(data_field, map_field, result_field,
         sub_map_chunks = get_map_subchunks_based_on_index_lengths(map_, invalid, chunksize)
         for sm_start, sm_end in sub_map_chunks:
             d_limits = get_valid_value_extents(map_, sm_start, sm_end, invalid)
-            if d_limits[0] == -1:
+            if d_limits[0] == invalid:
                 # no unfiltered values in this chunk so just assign empty entries to the result field
                 result_data.fill(0)
             else:
@@ -334,7 +337,7 @@ def ordered_map_valid_stream(data_field, map_field, result_field,
         #     m_chunk, map_, m_max, m_off, m = next_untrimmed_chunk(map_field, m_chunk, chunksize)
 
 
-
+@njit
 def ordered_map_valid_partial(values,
                               map_values,
                               sm_start,
@@ -490,6 +493,25 @@ def ordered_map_valid_indexed_partial(sm_values,
         ri += 1
 
     return sm, ri, rv, ri_accum, need_values
+
+
+# chunked copying functionality
+
+def element_chunked_copy(src_elem, dest_elem, chunksize):
+    i = 0
+    chunk = next_chunk(i, len(src_elem), chunksize)
+    while i < len(src_elem):
+        dest_elem.write(src_elem[chunk[0]:chunk[1]])
+        i += chunk[1] - chunk[0]
+        chunk = next_chunk(i, len(src_elem), chunksize)
+
+
+def chunked_copy(src_field, dest_field, chunksize=1 << 20):
+    if src_field.indexed:
+        element_chunked_copy(src_field.indices, dest_field.indices, chunksize)
+        element_chunked_copy(src_field.values, dest_field.values, chunksize)
+    else:
+        element_chunked_copy(src_field.data, dest_field.data, chunksize)
 
 
 @njit
@@ -1020,9 +1042,186 @@ def generate_ordered_map_to_left_streamed(left: Field,
 
 
 @njit
-def generate_ordered_map_to_left_partial(left, i_max, right, j_max, l_result, r_result, invalid,
-                                         i_off, j_off, i, j, r,
-                                         ii, jj, ii_max, jj_max, inner):
+def generate_ordered_map_to_left_remaining(i_max, l_result, r_result, i_off, i, r, invalid):
+    while i < i_max and r < len(l_result):
+        l_result[r] = i_off + i
+        r_result[r] = invalid
+        i += 1
+        r += 1
+    return i, r
+
+
+def generate_ordered_map_to_left_left_unique_streamed(left: Field,
+                                                      right: Field,
+                                                      l_result: Field,
+                                                      r_result: Field,
+                                                      invalid: Union[np.int32, np.int64],
+                                                      chunksize: Optional[int] = 1 << 20,
+                                                      rdtype=np.int32):
+    # the collection of variables that make up the finite state machine for the calls to
+    # partial
+    i_off, j_off, i, j, r = 0, 0, 0, 0, 0
+
+    l_result_ = np.zeros(chunksize, dtype=rdtype)
+    r_result_ = np.zeros(chunksize, dtype=rdtype)
+
+    l_chunk, left_, i_max, i_off, i = first_untrimmed_chunk(left, chunksize)
+    r_chunk, right_, j_max, j_off, j = first_trimmed_chunk(right, chunksize)
+
+    while i + i_off < len(left) and j + j_off < len(right):
+        i, j, r = \
+            generate_ordered_map_to_left_left_unique_partial(left_, right_, j_max,
+                                                             l_result_, r_result_,
+                                                             invalid, i_off, j_off, i, j, r)
+
+        # update the left chunk if necessary
+        if i_off + i < len(left) and i >= l_chunk[1] - l_chunk[0]:
+            l_chunk, left_, i_max, i_off, i = next_untrimmed_chunk(left, l_chunk, chunksize)
+
+        # update the right chunk if necessary
+        if j_off + j < len(right) and j >= r_chunk[1] - r_chunk[0]:
+            r_chunk, right_, j_max, j_off, j = next_trimmed_chunk(right, r_chunk, chunksize)
+
+        # write the result buffer
+        if r > 0:
+            l_result.data.write_part(l_result_[:r])
+            r_result.data.write_part(r_result_[:r])
+            r = 0
+
+    while i + i_off < len(left):
+        i, r = generate_ordered_map_to_left_remaining(i_max, l_result_, r_result_, i_off, i, r,
+                                                      invalid)
+
+        # update which part of left we are writing for; note we don't need to fetch the data
+        # itself as we are mapping left on a 1:1 basis for the rest of its length
+        l_chunk = next_chunk(l_chunk[1], len(left), chunksize)
+        i_max = l_chunk[1] - l_chunk[0]
+        i_off = l_chunk[0]
+        i = 0
+
+        # write the result buffer
+        if r > 0:
+            l_result.data.write_part(l_result_[:r])
+            r_result.data.write_part(r_result_[:r])
+            r = 0
+
+    l_result.data.complete()
+    r_result.data.complete()
+
+
+def generate_ordered_map_to_left_right_unique_streamed(left: Field,
+                                                       right: Field,
+                                                       r_result: Field,
+                                                       invalid: Union[np.int32, np.int64],
+                                                       chunksize: Optional[int] = 1 << 20,
+                                                       rdtype=np.int32):
+    i_off, j_off, i, j, r = 0, 0, 0, 0, 0
+
+    r_result_ = np.zeros(chunksize, dtype=rdtype)
+
+    l_chunk, left_, i_max, i_off, i = first_trimmed_chunk(left, chunksize)
+    r_chunk, right_, j_max, j_off, j = first_untrimmed_chunk(right, chunksize)
+
+    while i + i_off < len(left) and j + j_off < len(right):
+        i, j, r = \
+            generate_ordered_map_to_left_right_unique_partial(left_, i_max, right_, r_result_,
+                                                              invalid, j_off, i, j, r)
+
+        # update the left chunk if necessary
+        if i_off + i < len(left) and i >= l_chunk[1] - l_chunk[0]:
+            l_chunk, left_, i_max, i_off, i = next_trimmed_chunk(left, l_chunk, chunksize)
+
+        # update the right chunk if necessary
+        if j_off + j < len(right) and j >= r_chunk[1] - r_chunk[0]:
+            r_chunk, right_, j_max, j_off, j = next_untrimmed_chunk(right, r_chunk, chunksize)
+
+        # write the result buffer
+        if r > 0:
+            r_result.data.write_part(r_result_[:r])
+            r = 0
+
+    while i + i_off < len(left):
+        i, r = generate_ordered_map_to_left_right_unique_remaining(i_max, r_result_, i, r, invalid)
+
+        # update the left chunk if necessary
+        l_chunk = next_chunk(l_chunk[1], len(left), chunksize)
+        i_max = l_chunk[1] - l_chunk[0]
+        i_off = l_chunk[0]
+        i = 0
+
+        # write the result buffer
+        if r > 0:
+            r_result.data.write_part(r_result_[:r])
+            r = 0
+
+    r_result.data.complete()
+
+
+def generate_ordered_map_to_left_both_unique_streamed(left: Field,
+                                                      right: Field,
+                                                      r_result: Field,
+                                                      invalid: Union[np.int32, np.int64],
+                                                      chunksize: Optional[int] = 1 << 20,
+                                                      rdtype=np.int32):
+    i_off, j_off, i, j, r = 0, 0, 0, 0, 0
+
+    r_result_ = np.zeros(chunksize, dtype=rdtype)
+
+    l_chunk, left_, i_max, i_off, i = first_untrimmed_chunk(left, chunksize)
+    r_chunk, right_, j_max, j_off, j = first_untrimmed_chunk(right, chunksize)
+
+    while i + i_off < len(left) and j + j_off < len(right):
+        i, j, r = \
+            generate_ordered_map_to_left_both_unique_partial(left_, right_, r_result_,
+                                                             invalid, j_off, i, j, r)
+
+        # update the left chunk if necessary
+        if i_off + i < len(left) and i >= l_chunk[1] - l_chunk[0]:
+            l_chunk, left_, i_max, i_off, i = next_untrimmed_chunk(left, l_chunk, chunksize)
+
+        if j_off + j < len(right) and j >= r_chunk[1] - r_chunk[0]:
+            r_chunk, right_, j_max, j_off, j = next_untrimmed_chunk(right, r_chunk, chunksize)
+
+        # write the result buffer
+        if r > 0:
+            r_result.data.write_part(r_result_[:r])
+            r = 0
+
+    while i + i_off < len(left):
+        i, r = generate_ordered_map_to_left_right_unique_remaining(i_max, r_result_, i, r, invalid)
+
+        # update the left chunk if necessary
+        l_chunk = next_chunk(l_chunk[1], len(left), chunksize)
+        i_max = l_chunk[1] - l_chunk[0]
+        i_off = l_chunk[0]
+        i = 0
+
+        # write the result buffer
+        if r > 0:
+            r_result.data.write_part(r_result_[:r])
+            r = 0
+
+    r_result.data.complete()
+
+
+@njit
+def generate_ordered_map_to_left_partial(left,
+                                         i_max,
+                                         right,
+                                         j_max,
+                                         l_result,
+                                         r_result,
+                                         invalid,
+                                         i_off,
+                                         j_off,
+                                         i,
+                                         j,
+                                         r,
+                                         ii,
+                                         jj,
+                                         ii_max,
+                                         jj_max,
+                                         inner):
     """
     This function performs generates a mapping from a subset of a left key to a subset of a
     a right key, writing the resulting mapping to a buffer, where both keys can contain repeated
@@ -1108,74 +1307,6 @@ def generate_ordered_map_to_left_partial(left, i_max, right, j_max, l_result, r_
 
 
 @njit
-def generate_ordered_map_to_left_remaining(i_max, l_result, r_result, i_off, i, r, invalid):
-    while i < i_max and r < len(l_result):
-        l_result[r] = i_off + i
-        r_result[r] = invalid
-        i += 1
-        r += 1
-    return i, r
-
-
-def generate_ordered_map_to_left_left_unique_streamed(left: Field,
-                                                      right: Field,
-                                                      l_result: Field,
-                                                      r_result: Field,
-                                                      invalid: Union[np.int32, np.int64],
-                                                      chunksize: Optional[int] = 1 << 20,
-                                                      rdtype=np.int32):
-    # the collection of variables that make up the finite state machine for the calls to
-    # partial
-    i_off, j_off, i, j, r = 0, 0, 0, 0, 0
-
-    l_result_ = np.zeros(chunksize, dtype=rdtype)
-    r_result_ = np.zeros(chunksize, dtype=rdtype)
-
-    l_chunk, left_, i_max, i_off, i = first_untrimmed_chunk(left, chunksize)
-    r_chunk, right_, j_max, j_off, j = first_trimmed_chunk(right, chunksize)
-
-    while i + i_off < len(left) and j + j_off < len(right):
-        i, j, r = \
-            generate_ordered_map_to_left_left_unique_partial(left_, right_, j_max,
-                                                             l_result_, r_result_,
-                                                             invalid, i_off, j_off, i, j, r)
-
-        # update the left chunk if necessary
-        if i_off + i < len(left) and i >= l_chunk[1] - l_chunk[0]:
-            l_chunk, left_, i_max, i_off, i = next_untrimmed_chunk(left, l_chunk, chunksize)
-
-        # update the right chunk if necessary
-        if j_off + j < len(right) and j >= r_chunk[1] - r_chunk[0]:
-            r_chunk, right_, j_max, j_off, j = next_trimmed_chunk(right, r_chunk, chunksize)
-
-        # write the result buffer
-        if r > 0:
-            l_result.data.write_part(l_result_[:r])
-            r_result.data.write_part(r_result_[:r])
-            r = 0
-
-    while i + i_off < len(left):
-        i, r = generate_ordered_map_to_left_remaining(i_max, l_result_, r_result_, i_off, i, r,
-                                                      invalid)
-
-        # update which part of left we are writing for; note we don't need to fetch the data
-        # itself as we are mapping left on a 1:1 basis for the rest of its length
-        l_chunk = next_chunk(l_chunk[1], len(left), chunksize)
-        i_max = l_chunk[1] - l_chunk[0]
-        i_off = l_chunk[0]
-        i = 0
-
-        # write the result buffer
-        if r > 0:
-            l_result.data.write_part(l_result_[:r])
-            r_result.data.write_part(r_result_[:r])
-            r = 0
-
-    l_result.data.complete()
-    r_result.data.complete()
-
-
-@njit
 def generate_ordered_map_to_left_left_unique_partial(left,
                                                      right,
                                                      j_max,
@@ -1205,53 +1336,6 @@ def generate_ordered_map_to_left_left_unique_partial(left,
     return i, j, r
 
 
-def generate_ordered_map_to_left_right_unique_streamed(left: Field,
-                                                       right: Field,
-                                                       r_result: Field,
-                                                       invalid: Union[np.int32, np.int64],
-                                                       chunksize: Optional[int] = 1 << 20,
-                                                       rdtype=np.int32):
-    i_off, j_off, i, j, r = 0, 0, 0, 0, 0
-
-    r_result_ = np.zeros(chunksize, dtype=rdtype)
-
-    l_chunk, left_, i_max, i_off, i = first_trimmed_chunk(left, chunksize)
-    r_chunk, right_, j_max, j_off, j = first_untrimmed_chunk(right, chunksize)
-
-    while i + i_off < len(left) and j + j_off < len(right):
-        i, j, r = \
-            generate_ordered_map_to_left_right_unique_partial(left_, i_max, right_, r_result_,
-                                                              invalid, j_off, i, j, r)
-
-        # update the left chunk if necessary
-        if i_off + i < len(left) and i >= l_chunk[1] - l_chunk[0]:
-            l_chunk, left_, i_max, i_off, i = next_trimmed_chunk(left, l_chunk, chunksize)
-
-        # update the right chunk if necessary
-        if j_off + j < len(right) and j >= r_chunk[1] - r_chunk[0]:
-            r_chunk, right_, j_max, j_off, j = next_untrimmed_chunk(right, r_chunk, chunksize)
-
-        # write the result buffer
-        if r > 0:
-            r_result.data.write_part(r_result_[:r])
-            r = 0
-
-    while i + i_off < len(left):
-        i, r = generate_ordered_map_to_left_right_unique_remaining(i_max, r_result_, i, r, invalid)
-
-        # update the left chunk if necessary
-        l_chunk = next_chunk(l_chunk[1], len(left), chunksize)
-        i_max = l_chunk[1] - l_chunk[0]
-        i_off = l_chunk[0]
-        i = 0
-
-        # write the result buffer
-        if r > 0:
-            r_result.data.write_part(r_result_[:r])
-            r = 0
-
-    r_result.data.complete()
-
 @njit
 def generate_ordered_map_to_left_right_unique_partial(left,
                                                       i_max,
@@ -1276,6 +1360,42 @@ def generate_ordered_map_to_left_right_unique_partial(left,
                 j += 1
             i += 1
     return i, j, r
+
+
+@njit
+def generate_ordered_map_to_left_both_unique_partial(left,
+                                                     right,
+                                                     r_result,
+                                                     invalid,
+                                                     j_off,
+                                                     i,
+                                                     j,
+                                                     r):
+    i_max = len(left)
+    j_max = len(right)
+    r_max = len(r_result)
+    while i < i_max and j < j_max and r < r_max:
+        if left[i] < right[j]:
+            r_result[r] = invalid
+            i += 1
+            r += 1
+        elif left[i] > right[j]:
+            j += 1
+        else:
+            r_result[r] = j + j_off
+            i += 1
+            j += 1
+            r += 1
+    return i, j, r
+
+
+@njit
+def generate_ordered_map_to_left_right_unique_remaining(i_max, r_result, i, r, invalid):
+    while i < i_max and r < len(r_result):
+        r_result[r] = invalid
+        i += 1
+        r += 1
+    return i, r
 
 
 def generate_ordered_map_to_left_right_unique_streamed_old(left,
@@ -1358,14 +1478,167 @@ def generate_ordered_map_to_left_right_unique_partial_old(d_j, left, right, left
     return i, j, unmapped
 
 
-def generate_ordered_map_to_left_both_unique_streamed(left: Field,
-                                                      right: Field,
-                                                      r_result: Field,
-                                                      invalid: Union[np.int32, np.int64],
-                                                      chunksize: Optional[int] = 1 << 20,
-                                                      rdtype=np.int32):
+# ordered map to inner functionality: streaming
+# =============================================
+
+def generate_ordered_map_to_inner_streamed(left: Field,
+                                           right: Field,
+                                           l_result: Field,
+                                           r_result: Field,
+                                           chunksize: Optional[int] = 1 << 20,
+                                           rdtype=np.int32):
+    """
+    This function performs the most generic type of left to right mapping calculation in
+    which both key fields can have repeated key values.
+    At its heart, the function generates a mapping from left to right that can then be
+    used to map data in the right space to data in the left space. Note that this can also
+    be used to generate the inverse mapping my simply flipping left and right collections.
+
+    As the Fields ``left`` and ``right`` can contain arbitrarily long sequences of data,
+    the data is streamed through the algorithm in a series of chunks. Similarly, the resulting
+    map is written to a buffer that is written to the ``result`` field in chunks.
+
+    This streamed function makes a sequence of calls to a corresponding _partial function that
+    does the heavy lifting. Inside the _partial function, a finite state machine (FSM) iterates
+    over the data, performing the mapping. The _partial function call exits whenever any of the
+    chunks (``left_``, ``right_`` or ``result_`` that it is passed become exhausted.
+
+    Please take a look at the documentation for the partial function to understand the finite
+    state machine parameters to understand that role that the various parameters play.
+
+    We have to make some adjustments to the finite state machine between calls to _partial:
+     * if the call used all the ``left_`` data, add the size of that data chunk to ``i_off``
+     * if the call used all of the ``right_`` data, add the size of that data chunk to ``j_off``
+     * write the accumulated ``result_`` data to the `result`` field, and reset ``r`` to 0
+    """
+    # the collection of variables that make up the finite state machine for the calls to
+    # partial
+    i_off, j_off, i, j, r, ii, jj, ii_max, jj_max, inner = 0, 0, 0, 0, 0, 0, 0, -1, -1, False
+
+    l_result_ = np.zeros(chunksize, dtype=rdtype)
+    r_result_ = np.zeros(chunksize, dtype=rdtype)
+
+    l_chunk, left_, i_max, i_off, i = first_trimmed_chunk(left, chunksize)
+    r_chunk, right_, j_max, j_off, j = first_trimmed_chunk(right, chunksize)
+
+    while i + i_off < len(left) and j + j_off < len(right):
+        i, j, r, ii, jj, ii_max, jj_max, inner = \
+            generate_ordered_map_to_inner_partial(left_, i_max, right_, j_max, l_result_, r_result_,
+                                                  i_off, j_off, i, j, r,
+                                                  ii, jj, ii_max, jj_max, inner)
+
+        # update the left chunk if necessary
+        if i_off + i < len(left) and i >= l_chunk[1] - l_chunk[0]:
+            l_chunk, left_, i_max, i_off, i = next_trimmed_chunk(left, l_chunk, chunksize)
+
+        # update the right chunk if necessary
+        if j_off + j < len(right) and j >= r_chunk[1] - r_chunk[0]:
+            r_chunk, right_, j_max, j_off, j = next_trimmed_chunk(right, r_chunk, chunksize)
+
+        # write the result buffer
+        if r > 0:
+            l_result.data.write_part(l_result_[:r])
+            r_result.data.write_part(r_result_[:r])
+            r = 0
+
+    l_result.data.complete()
+    r_result.data.complete()
+
+
+def generate_ordered_map_to_inner_left_unique_streamed(left: Field,
+                                                       right: Field,
+                                                       l_result: Field,
+                                                       r_result: Field,
+                                                       invalid: Union[np.int32, np.int64],
+                                                       chunksize: Optional[int] = 1 << 20,
+                                                       rdtype=np.int32):
+    # the collection of variables that make up the finite state machine for the calls to
+    # partial
     i_off, j_off, i, j, r = 0, 0, 0, 0, 0
 
+    l_result_ = np.zeros(chunksize, dtype=rdtype)
+    r_result_ = np.zeros(chunksize, dtype=rdtype)
+
+    l_chunk, left_, i_max, i_off, i = first_untrimmed_chunk(left, chunksize)
+    r_chunk, right_, j_max, j_off, j = first_trimmed_chunk(right, chunksize)
+
+    while i + i_off < len(left) and j + j_off < len(right):
+        i, j, r = \
+            generate_ordered_map_to_inner_left_unique_partial(left_, i_max, right_, j_max,
+                                                              l_result_, r_result_,
+                                                              i_off, j_off, i, j, r)
+
+        # update the left chunk if necessary
+        if i_off + i < len(left) and i >= l_chunk[1] - l_chunk[0]:
+            l_chunk, left_, i_max, i_off, i = next_untrimmed_chunk(left, l_chunk, chunksize)
+
+        # update the right chunk if necessary
+        if j_off + j < len(right) and j >= r_chunk[1] - r_chunk[0]:
+            r_chunk, right_, j_max, j_off, j = next_trimmed_chunk(right, r_chunk, chunksize)
+
+        # write the result buffer
+        if r > 0:
+            l_result.data.write_part(l_result_[:r])
+            r_result.data.write_part(r_result_[:r])
+            r = 0
+
+    l_result.data.complete()
+    r_result.data.complete()
+
+
+def generate_ordered_map_to_inner_right_unique_streamed(left: Field,
+                                                        right: Field,
+                                                        l_result: Field,
+                                                        r_result: Field,
+                                                        invalid: Union[np.int32, np.int64],
+                                                        chunksize: Optional[int] = 1 << 20,
+                                                        rdtype=np.int32):
+    # the collection of variables that make up the finite state machine for the calls to
+    # partial
+    i_off, j_off, i, j, r = 0, 0, 0, 0, 0
+
+    l_result_ = np.zeros(chunksize, dtype=rdtype)
+    r_result_ = np.zeros(chunksize, dtype=rdtype)
+
+    l_chunk, left_, i_max, i_off, i = first_trimmed_chunk(left, chunksize)
+    r_chunk, right_, j_max, j_off, j = first_untrimmed_chunk(right, chunksize)
+
+    while i + i_off < len(left) and j + j_off < len(right):
+        i, j, r = \
+            generate_ordered_map_to_inner_right_unique_partial(left_, i_max, right_, j_max,
+                                                               l_result_, r_result_,
+                                                               i_off, j_off, i, j, r)
+
+        # update the left chunk if necessary
+        if i_off + i < len(left) and i >= l_chunk[1] - l_chunk[0]:
+            l_chunk, left_, i_max, i_off, i = next_trimmed_chunk(left, l_chunk, chunksize)
+
+        # update the right chunk if necessary
+        if j_off + j < len(right) and j >= r_chunk[1] - r_chunk[0]:
+            r_chunk, right_, j_max, j_off, j = next_untrimmed_chunk(right, r_chunk, chunksize)
+
+        # write the result buffer
+        if r > 0:
+            l_result.data.write_part(l_result_[:r])
+            r_result.data.write_part(r_result_[:r])
+            r = 0
+
+    l_result.data.complete()
+    r_result.data.complete()
+
+
+def generate_ordered_map_to_inner_both_unique_streamed(left: Field,
+                                                       right: Field,
+                                                       l_result: Field,
+                                                       r_result: Field,
+                                                       invalid: Union[np.int32, np.int64],
+                                                       chunksize: Optional[int] = 1 << 20,
+                                                       rdtype=np.int32):
+    # the collection of variables that make up the finite state machine for the calls to
+    # partial
+    i_off, j_off, i, j, r = 0, 0, 0, 0, 0
+
+    l_result_ = np.zeros(chunksize, dtype=rdtype)
     r_result_ = np.zeros(chunksize, dtype=rdtype)
 
     l_chunk, left_, i_max, i_off, i = first_untrimmed_chunk(left, chunksize)
@@ -1373,65 +1646,204 @@ def generate_ordered_map_to_left_both_unique_streamed(left: Field,
 
     while i + i_off < len(left) and j + j_off < len(right):
         i, j, r = \
-            generate_ordered_map_to_left_both_unique_partial(left_, right_, r_result_,
-                                                             invalid, j_off, i, j, r)
+            generate_ordered_map_to_inner_both_unique_partial(left_, i_max, right_, j_max,
+                                                              l_result_, r_result_,
+                                                              i_off, j_off, i, j, r)
 
         # update the left chunk if necessary
         if i_off + i < len(left) and i >= l_chunk[1] - l_chunk[0]:
             l_chunk, left_, i_max, i_off, i = next_untrimmed_chunk(left, l_chunk, chunksize)
 
+        # update the right chunk if necessary
         if j_off + j < len(right) and j >= r_chunk[1] - r_chunk[0]:
             r_chunk, right_, j_max, j_off, j = next_untrimmed_chunk(right, r_chunk, chunksize)
 
         # write the result buffer
         if r > 0:
+            l_result.data.write_part(l_result_[:r])
             r_result.data.write_part(r_result_[:r])
             r = 0
 
-    while i + i_off < len(left):
-        i, r = generate_ordered_map_to_left_right_unique_remaining(i_max, r_result_, i, r, invalid)
-
-        # update the left chunk if necessary
-        l_chunk = next_chunk(l_chunk[1], len(left), chunksize)
-        i_max = l_chunk[1] - l_chunk[0]
-        i_off = l_chunk[0]
-        i = 0
-
-        # write the result buffer
-        if r > 0:
-            r_result.data.write_part(r_result_[:r])
-            r = 0
-
+    l_result.data.complete()
     r_result.data.complete()
 
+
 @njit
-def generate_ordered_map_to_left_both_unique_partial(left, right, r_result, invalid,
-                                                     j_off, i, j, r):
-    i_max = len(left)
-    j_max = len(right)
-    r_max = len(r_result)
-    while i < i_max and j < j_max and r < r_max:
-        if left[i] < right[j]:
-            r_result[r] = invalid
-            i += 1
+def generate_ordered_map_to_inner_partial(left,
+                                          i_max,
+                                          right,
+                                          j_max,
+                                          l_result,
+                                          r_result,
+                                          i_off,
+                                          j_off,
+                                          i,
+                                          j,
+                                          r,
+                                          ii,
+                                          jj,
+                                          ii_max,
+                                          jj_max,
+                                          inner):
+    """
+    This function performs generates a mapping from a subset of a left key to a subset of a
+    a right key, writing the resulting mapping to a buffer, where both keys can contain repeated
+    entries.
+
+    Example::
+
+      left = [10, 20, 30, 40, 40, 50, 50]
+      right = [20, 30, 30, 40, 40, 40, 60, 70]
+
+      i  j op r lres rres
+      0  0 <  0  0   INV
+      1  0 =  1  1   0
+      2  1 =  2  2   1
+      2  2    3  2   2
+      3  3    4  3   3
+      3  4    5  3   4
+      3  5    6  3   5
+      4  3    7  4   3
+      4  4    8  4   4
+      4  5    9  4   5
+      5  6   10  5   INV
+      6  6   11  6   INV
+
+
+      left_map = [0, 1, 2, 2, 3, 3, 3, 4, 4, 4, 5, 6]
+      right_map = [INV, 1, 2, 2, 3, 3, 3, 4, 4, 4, INV, INV]
+
+    Everything about this function is optimised for performance under njit. It is effectively
+    a finite state machine that iterates through left, right, and result arrays. The various...
+
+    i and i_max are used to track the index of the left source
+    j and j_max are used to track the index of the right source
+    """
+
+    while i < i_max and j < j_max and r < len(l_result):
+        if inner is False:
+            if left[i] < right[j]:
+                i += 1
+            elif left[i] > right[j]:
+                j += 1
+            else:
+                # freeze i for the duration of the loop; i_ tracks
+                i_ = i
+                cur_i_count = 1
+                while i_ + 1 < i_max and left[i_+1] == left[i_]:
+                    cur_i_count += 1
+                    i_ += 1
+
+                j_ = j
+                cur_j_count = 1
+                while j_ + 1 < j_max and right[j_+1] == right[j_]:
+                    cur_j_count += 1
+                    j_ += 1
+
+                ii = 0
+                jj = 0
+                ii_max = cur_i_count
+                jj_max = cur_j_count
+                inner = True
+        else:
+            # TODO: if ii_max * jj_max is > a passed in threshold, raise
+            # and error saying the merge is unperformable (say 10,000,000,000)
+            l_result[r] = i_off + i + ii
+            r_result[r] = j_off + j + jj
             r += 1
+            jj += 1
+            if jj == jj_max:
+                jj = 0
+                ii += 1
+                if ii == ii_max:
+                    i += ii_max
+                    j += jj_max
+                    inner = False
+                    ii = 0
+                    jj = 0
+                    ii_max = -1
+                    jj_max = -1
+    return i, j, r, ii, jj, ii_max, jj_max, inner
+
+
+@njit
+def generate_ordered_map_to_inner_left_unique_partial(left,
+                                                      i_max,
+                                                      right,
+                                                      j_max,
+                                                      l_result,
+                                                      r_result,
+                                                      i_off,
+                                                      j_off,
+                                                      i,
+                                                      j,
+                                                      r):
+    while i < i_max and j < j_max:
+        if left[i] < right[j]:
+            i += 1
         elif left[i] > right[j]:
             j += 1
         else:
+            l_result[r] = i + i_off
             r_result[r] = j + j_off
-            i += 1
-            j += 1
             r += 1
+            if j+1 >= j_max or right[j+1] != right[j]:
+                i += 1
+            j += 1
     return i, j, r
 
 
 @njit
-def generate_ordered_map_to_left_right_unique_remaining(i_max, r_result, i, r, invalid):
-    while i < i_max and r < len(r_result):
-        r_result[r] = invalid
-        i += 1
-        r += 1
-    return i, r
+def generate_ordered_map_to_inner_right_unique_partial(left,
+                                                       i_max,
+                                                       right,
+                                                       j_max,
+                                                       l_result,
+                                                       r_result,
+                                                       i_off,
+                                                       j_off,
+                                                       i,
+                                                       j,
+                                                       r):
+    while i < i_max and j < j_max:
+        if left[i] < right[j]:
+            i += 1
+        elif left[i] > right[j]:
+            j += 1
+        else:
+            l_result[r] = i + i_off
+            r_result[r] = j + j_off
+            r += 1
+            if i+1 >= i_max or left[i+1] != left[i]:
+                j += 1
+            i += 1
+    return i, j, r
+
+
+@njit
+def generate_ordered_map_to_inner_both_unique_partial(left,
+                                                      i_max,
+                                                      right,
+                                                      j_max,
+                                                      l_result,
+                                                      r_result,
+                                                      i_off,
+                                                      j_off,
+                                                      i,
+                                                      j,
+                                                      r):
+    while i < i_max and j < j_max:
+        if left[i] < right[j]:
+            i += 1
+        elif left[i] > right[j]:
+            j += 1
+        else:
+            l_result[r] = i + i_off
+            r_result[r] = j + j_off
+            r += 1
+            i += 1
+            j += 1
+    return i, j, r
 
 
 # ordered map to left functionality: non-streaming
@@ -1494,6 +1906,7 @@ def generate_ordered_map_to_left_both_unique(first, second, result, invalid):
     return unmapped > 0
 
 
+@njit
 def ordered_left_map_result_size(left, right):
     i = 0
     j = 0
@@ -1627,6 +2040,7 @@ def ordered_inner_map_left_unique_streamed(left, right, left_to_inner, right_to_
             rc = right.data[rc_range[0]:rc_range[1]]
         else:
             rc = rc[jj:]
+
 
 @njit
 def ordered_inner_map_left_unique_partial(d_i, d_j, left, right,

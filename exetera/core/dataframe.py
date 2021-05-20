@@ -485,7 +485,8 @@ def merge(left: DataFrame,
           hint_left_keys_ordered: Optional[bool] = None,
           hint_left_keys_unique: Optional[bool] = None,
           hint_right_keys_ordered: Optional[bool] = None,
-          hint_right_keys_unique: Optional[bool] = None):
+          hint_right_keys_unique: Optional[bool] = None,
+          chunk_size=1 << 20):
     """
     Merge 'left' and 'right' DataFrames into a destination dataset. The merge is a database-style
     join operation, in any of the following modes ("left", "right", "inner", "outer"). This
@@ -579,6 +580,8 @@ def merge(left: DataFrame,
         left_keys_unique = hint_left_keys_unique
 
     if hint_right_keys_unique is None:
+        right_keys_unique = False
+    else:
         right_keys_unique = hint_right_keys_unique
 
     ordered = False
@@ -587,16 +590,17 @@ def merge(left: DataFrame,
         how in ('left', 'right', 'inner'):
         ordered = True
 
-
     if ordered:
         _ordered_merge(left, right, dest,
                        left_on_fields, right_on_fields,
+                       left_fields_to_map, right_fields_to_map,
                        left_len, right_len,
                        index_dtype,
                        left_suffix, right_suffix,
                        how,
                        left_keys_unique,
-                       right_keys_unique)
+                       right_keys_unique,
+                       chunk_size)
     else:
         _unordered_merge(left, right, dest,
                          left_on_fields, right_on_fields,
@@ -708,42 +712,35 @@ def _ordered_merge(left: DataFrame,
                    right_suffix,
                    how,
                    left_keys_unique,
-                   right_keys_unique):
+                   right_keys_unique,
+                   chunk_size=1 << 20):
     supported = ('left', 'right', 'inner')
     if how not in supported:
         raise ValueError("Unsupported mode for 'how'; must be one of "
                          "{} but is {}".format(supported, how))
 
-    chunksize = 1 << 25
+    if left_keys_unique or right_keys_unique:
+        npdtype = ops.get_map_datatype_based_on_lengths(left_len, right_len)
+        strdtype = 'int32' if npdtype == np.int32 else np.int64
+        invalid = ops.INVALID_INDEX_32 if npdtype == np.int32 else ops.INVALID_INDEX_64
+    else:
+        npdtype = np.int64
+        strdtype = 'int64'
+        invalid = ops.INVALID_INDEX_64
+
+    # chunksize = 1 << 25
     if how in ('left', 'right'):
         if how == 'left':
-            # adf, bdf, ddf = left, right, dest
             a_on, b_on = left_on_fields, right_on_fields
-            a_fields, b_fields = left_on_fields, right_on_fields
-            a_to_map, b_to_map = left_fields_to_map, right_fields_to_map
-            a_suf, b_suf = left_suffix, right_suffix
             a_unique, b_unique = left_keys_unique, right_keys_unique
         else:
-            # adf, bdf, ddf = right, left, dest
             a_on, b_on = right_on_fields, left_on_fields
-            a_fields, b_fields = right_on_fields, left_on_fields
-            a_to_map, b_to_map = right_fields_to_map, left_fields_to_map
-            a_suf, b_suf = right_suffix, left_suffix
             a_unique, b_unique = right_keys_unique, left_keys_unique
-
-        if a_unique or b_unique:
-            npdtype = ops.get_map_datatype_based_on_lengths(left_len, right_len)
-            strdtype = 'int32' if npdtype == np.int32 else np.int64
-            invalid = ops.INVALID_INDEX_32 if npdtype == np.int32 else ops.INVALID_INDEX_64
-        else:
-            npdtype = np.int64
-            strdtype = 'int64'
-            invalid = ops.INVALID_INDEX_64
 
         if a_unique:
             if b_unique:
                 b_result = dest.create_numeric('_b_map', strdtype)
-                ops.generate_ordered_map_to_left_right_both_unique_streamed(
+                ops.generate_ordered_map_to_left_both_unique_streamed(
                     a_on[0], b_on[0], b_result, invalid, rdtype=npdtype)
             else:
                 a_result = dest.create_numeric('_a_map', strdtype)
@@ -760,32 +757,65 @@ def _ordered_merge(left: DataFrame,
                 b_result = dest.create_numeric('_b_map', strdtype)
                 ops.generate_ordered_map_to_left_streamed(
                     a_on[0], b_on[0], a_result, b_result, invalid, rdtype=npdtype)
+
+        if how == 'right':
+            dest.rename('_a_map', '_right_map')
+            dest.rename('_b_map', '_left_map')
+        else:
+            dest.rename('_a_map', '_left_map')
+            dest.rename('_b_map', '_right_map')
     else:
-        raise NotImplementedError()
+        left_result = dest.create_numeric('_left_map', strdtype)
+        right_result = dest.create_numeric('_right_map', strdtype)
+        if left_keys_unique:
+            if right_keys_unique:
+                ops.generate_ordered_map_to_inner_both_unique_streamed(
+                    left_on_fields[0], right_on_fields[0], left_result, right_result,
+                    rdtype=npdtype)
+            else:
+                ops.generate_ordered_map_to_inner_right_unique_streamed(
+                    left_on_fields[0], right_on_fields[0], left_result, right_result,
+                    rdtype=npdtype)
+        else:
+            if right_keys_unique:
+                ops.generate_ordered_map_to_inner_left_unique_streamed(
+                    left_on_fields[0], right_on_fields[0], left_result, right_result,
+                    rdtype=npdtype)
+            else:
+                ops.generate_ordered_map_to_inner_streamed(
+                    left_on_fields[0], right_on_fields[0], left_result, right_result,
+                    rdtype=npdtype)
 
     # perform the mappings
     # ====================
 
-    if how == 'right':
-        dest.rename('_a_map', '_right_map')
-        dest.rename('_b_map', '_left_map')
-    else:
-        dest.rename('_a_map', '_left_map')
-        dest.rename('_b_map', '_right_map')
-
     left_map = dest['_left_map'] if '_left_map' in dest else None
     right_map = dest['_right_map']
 
-    for k in left_fields_to_map:
-        dest_k = k
-        if k in dest:
-            dest_k += left_suffix
-        dest_f = left[k].create_like(dest, dest_k)
-        ops.ordered_map_valid_stream(left[k], left_map, dest_f)
+    if left_map is None:
+        for k in left_fields_to_map:
+            dest_k = k
+            if k in dest:
+                dest_k += left_suffix
+            dest_f = left[k].create_like(dest, dest_k)
+            ops.chunked_copy(left[k], dest_f, chunk_size)
+    else:
+        for k in left_fields_to_map:
+            dest_k = k
+            if k in dest:
+                dest_k += left_suffix
+            dest_f = left[k].create_like(dest, dest_k)
+            if left[k].indexed:
+                ops.ordered_map_valid_indexed_stream(left[k], left_map, dest_f)
+            else:
+                ops.ordered_map_valid_stream(left[k], left_map, dest_f)
 
     for k in right_fields_to_map:
         dest_k = k
         if k in dest:
             dest_k += right_suffix
         dest_f = right[k].create_like(dest, dest_k)
-        ops.ordered_map_valid_stream(right[k], right_map, dest_f)
+        if right[k].indexed:
+            ops.ordered_map_valid_indexed_stream(right[k], right_map, dest_f, invalid)
+        else:
+            ops.ordered_map_valid_stream(right[k], right_map, dest_f, invalid)

@@ -217,7 +217,7 @@ def validate_and_get_key_fields(side, df, key):
         if field.indexed:
             raise ValueError("'{}': field is indexed; indexed fields cannot be "
                              "used as keys".format(side))
-        return field
+        return (field,)
 
 
 def validate_key_lengths(side, df, key):

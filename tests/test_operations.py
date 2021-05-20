@@ -261,7 +261,7 @@ class TestAggregation(unittest.TestCase):
 
 class TestOrderedMap(unittest.TestCase):
 
-    def test_ordered_map_valid_stream(self):
+    def test_ordered_map_valid_stream_old(self):
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio, 'r+', 'dst')
@@ -276,7 +276,7 @@ class TestOrderedMap(unittest.TestCase):
             f_data_field.data.write(data_field)
 
             result_field = np.zeros(len(map_field), dtype=np.int32)
-            ops.ordered_map_valid_stream(f_data_field, f_map_field, result_field, -1, chunksize=4)
+            ops.ordered_map_valid_stream_old(f_data_field, f_map_field, result_field, -1, chunksize=4)
             expected = np.asarray([-1, -1, -1, -2, -2, -4, -4, -4, -4, -6, -6, -6, -6, 0, 0, -9, -9, -9],
                                   dtype=np.int32)
             self.assertTrue(np.array_equal(result_field, expected))
@@ -298,8 +298,6 @@ class TestOrderedMap(unittest.TestCase):
         ops.ordered_map_valid_indexed_partial(map_, 0, 4, src_indices_, 0, 4, src_values_, 0,
                                               result_i, result_v, -1,
                                               m, ri, rv, r_accum)
-        print(result_i)
-        print(result_v)
 
 
     # streaming - left to right - neither unique
@@ -368,7 +366,6 @@ class TestOrderedMap(unittest.TestCase):
     # streaming - map right to left - left unique
     # -------------------------------------------
 
-
     def test_generate_ordered_map_right_to_left_left_unique_streaming_right_final(self):
         left = fields.NumericMemField(None, 'int32')
         left.data.write(np.asarray([10, 20, 30, 40, 50], dtype=np.int32))
@@ -418,7 +415,6 @@ class TestOrderedMap(unittest.TestCase):
     # streaming - map right to left - right unique
     # --------------------------------------------
 
-
     def test_generate_ordered_map_right_to_left_right_unique_streaming_right_final(self):
         left = fields.NumericMemField(None, 'int32')
         left.data.write(np.asarray([10, 20, 30, 40, 40, 50, 50], dtype=np.int32))
@@ -458,7 +454,6 @@ class TestOrderedMap(unittest.TestCase):
 
     # streaming - map right to left - both unique
     # -------------------------------------------
-
 
     def test_generate_ordered_map_right_to_left_both_unique_streaming_right_final(self):
         left = fields.NumericMemField(None, 'int32')
@@ -508,7 +503,6 @@ class TestOrderedMap(unittest.TestCase):
 
     # non-streaming - map right to left - both unique
     # -----------------------------------------------
-
 
     def test_ordered_map_to_right_both_unique(self):
         raw_ids = [0, 1, 2, 3, 5, 6, 7, 9]
@@ -574,6 +568,214 @@ class TestOrderedMap(unittest.TestCase):
             expected = np.asarray([0, 1, 3, -1, 5, 7, -1, 8, 11, -1, 12, 13, -1, 16, 17, 19])
             self.assertTrue(np.array_equal(left_to_right_result.data[:], expected))
 
+
+    # streaming - inner - neither unique
+
+    def test_ordered_inner_map_streamed_right_final(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 30, 40, 40, 50, 50], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 40, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 3, 4, 4, 4, 5, 5, 5]
+        r_expected = [0, 1, 1, 2, 3, 4, 2, 3, 4]
+        ops.generate_ordered_map_to_inner_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+
+    def test_ordered_inner_map_streaming_left_final(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 30, 40, 40, 50, 80], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 40, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 3, 4, 4, 4, 5, 5, 5]
+        r_expected = [0, 1, 1, 2, 3, 4, 2, 3, 4]
+        ops.generate_ordered_map_to_inner_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+
+    # streaming - inner - left unique
+
+    def test_ordered_inner_map_left_unique_streamed_left_final(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 40, 50], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 40, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 3, 3, 3]
+        r_expected = [0, 1, 2, 3, 4]
+        ops.generate_ordered_map_to_inner_left_unique_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+
+    def test_ordered_inner_map_left_unique_streaming_right_final(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 40, 50, 80], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 40, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 3, 3, 3]
+        r_expected = [0, 1, 2, 3, 4]
+        ops.generate_ordered_map_to_inner_left_unique_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+
+    # streaming - inner - left unique
+
+    def test_ordered_inner_map_right_unique_streamed_left_final(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 30, 30, 40, 40, 50, 50], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 3, 4, 5, 6]
+        r_expected = [0, 1, 1, 1, 2, 2]
+        ops.generate_ordered_map_to_inner_right_unique_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+
+    def test_ordered_inner_map_right_unique_streaming_right_final(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 30, 30, 40, 40, 50, 80], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 3, 4, 5, 6]
+        r_expected = [0, 1, 1, 1, 2, 2]
+        ops.generate_ordered_map_to_inner_right_unique_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+
+    # streaming - inner - right unique
+
+    def test_ordered_inner_map_right_unique_streamed_left_final(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 40, 50, 50], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 3]
+        r_expected = [0, 1, 2]
+        ops.generate_ordered_map_to_inner_right_unique_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+
+    def test_ordered_inner_map_right_unique_streamed_left_final_2(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 50, 50, 60], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 5]
+        r_expected = [0, 1, 3]
+        ops.generate_ordered_map_to_inner_right_unique_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+
+    def test_ordered_inner_map_right_unique_streaming_right_final(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 40, 50, 80], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 3]
+        r_expected = [0, 1, 2]
+        ops.generate_ordered_map_to_inner_right_unique_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+
+    def test_ordered_inner_map_right_unique_streaming_right_final_2(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 50, 50, 60, 80], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 5]
+        r_expected = [0, 1, 3]
+        ops.generate_ordered_map_to_inner_right_unique_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+    # streaming - inner - right unique
+
+    def test_ordered_inner_map_both_unique_streamed_left_final(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 40, 50, 50], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 3]
+        r_expected = [0, 1, 2]
+        ops.generate_ordered_map_to_inner_both_unique_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+
+    def test_ordered_inner_map_both_unique_streamed_left_final_2(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 50, 50, 60], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 5]
+        r_expected = [0, 1, 3]
+        ops.generate_ordered_map_to_inner_both_unique_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+
+    def test_ordered_inner_map_both_unique_streaming_right_final(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 40, 50, 80], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 3]
+        r_expected = [0, 1, 2]
+        ops.generate_ordered_map_to_inner_both_unique_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+
+    def test_ordered_inner_map_both_unique_streaming_right_final_2(self):
+        left = fields.NumericMemField(None, 'int32')
+        left.data.write(np.asarray([10, 20, 30, 50, 50, 60, 80], dtype=np.int32))
+        right = fields.NumericMemField(None, 'int32')
+        right.data.write(np.asarray([20, 30, 40, 60, 70], dtype=np.int32))
+        l_result = fields.NumericMemField(None, 'int32')
+        r_result = fields.NumericMemField(None, 'int32')
+        l_expected = [1, 2, 5]
+        r_expected = [0, 1, 3]
+        ops.generate_ordered_map_to_inner_right_unique_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        self.assertListEqual(l_result.data[:].tolist(), l_expected)
+        self.assertListEqual(r_result.data[:].tolist(), r_expected)
+
+
+    # old inner / outer map functionality
+    # ===========================
 
     def test_ordered_inner_map_result_size(self):
         a_ids = np.asarray([0, 1, 2, 2, 3, 5, 5, 5, 6, 8], dtype=np.int64)
@@ -682,6 +884,9 @@ class TestOrderedMap(unittest.TestCase):
             right_expected = np.asarray([0, 1, 2, 3, 5, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18, 19], dtype=np.int32)
             self.assertTrue(np.array_equal(right_result.data[:], right_expected))
 
+
+    # streamed field mapping
+    # ======================
 
     def test_ordered_map_valid_stream_no_valid(self):
         s = session.Session()
@@ -805,6 +1010,26 @@ class TestOrderedMap(unittest.TestCase):
         self.assertListEqual(dest_data.data[:], expected)
         # print(dest_data.data[:])
 
+
+class TestChunkedCopy(unittest.TestCase):
+
+    def test_chunked_copy_numeric(self):
+        s = session.Session()
+        src = fields.NumericMemField(s, 'int32')
+        src.data.write(np.asarray([1, 20, 2, 19, 3, 18, 4, 17, 5, 16, 6, 15, 7, 14, 8, 13, 9, 12, 10, 11],
+                                  dtype=np.int32))
+        dest = fields.NumericMemField(s, 'int32')
+        ops.chunked_copy(src, dest, 8)
+        self.assertListEqual(src.data[:].tolist(), dest.data[:].tolist())
+
+
+    def test_chunked_copy_indexed(self):
+        s = session.Session()
+        src = fields.IndexedStringMemField(s)
+        src.data.write(['a', 'bb', 'ccc', 'dddd', 'eeeee', 'ffffff', 'gggggg', '', 'hhhhhhh', 'iiiiiiii'])
+        dest = fields.IndexedStringMemField(s)
+        ops.chunked_copy(src, dest, 8)
+        self.assertListEqual(src.data[:], dest.data[:])
 
 
 class TestOrderedGetLast(unittest.TestCase):
