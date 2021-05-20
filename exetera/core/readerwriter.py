@@ -837,7 +837,7 @@ class OptionalDateImporter:
         return days
 
     def _get_flags(self, values):
-        flags = self.datetimeset.chunk_factory(len(values))
+        flags = self.dateset.chunk_factory(len(values))
         for i in range(len(values)):
             flags[i] = values[i] != b''
         return flags
