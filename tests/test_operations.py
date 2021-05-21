@@ -580,7 +580,7 @@ class TestOrderedMap(unittest.TestCase):
         r_result = fields.NumericMemField(None, 'int32')
         l_expected = [1, 2, 3, 4, 4, 4, 5, 5, 5]
         r_expected = [0, 1, 1, 2, 3, 4, 2, 3, 4]
-        ops.generate_ordered_map_to_inner_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        ops.generate_ordered_map_to_inner_streamed(left, right, l_result, r_result, chunksize=4)
         self.assertListEqual(l_result.data[:].tolist(), l_expected)
         self.assertListEqual(r_result.data[:].tolist(), r_expected)
 
@@ -594,7 +594,7 @@ class TestOrderedMap(unittest.TestCase):
         r_result = fields.NumericMemField(None, 'int32')
         l_expected = [1, 2, 3, 4, 4, 4, 5, 5, 5]
         r_expected = [0, 1, 1, 2, 3, 4, 2, 3, 4]
-        ops.generate_ordered_map_to_inner_streamed(left, right, l_result, r_result, -1, chunksize=4)
+        ops.generate_ordered_map_to_inner_streamed(left, right, l_result, r_result, chunksize=4)
         self.assertListEqual(l_result.data[:].tolist(), l_expected)
         self.assertListEqual(r_result.data[:].tolist(), r_expected)
 
