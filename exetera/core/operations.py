@@ -10,7 +10,7 @@ from exetera.core import fields, utils
 
 DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62
-MAX_DATETIME = datetime(year=9999, month=1, day=1) #.timestamp()
+MAX_DATETIME = datetime(year=3000, month=1, day=1) #.timestamp()
 
 
 def chunks(length, chunksize=1 << 20):

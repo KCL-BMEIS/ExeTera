@@ -30,7 +30,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
     print(schema_file)
     print(files)
     
-    with open(schema_file) as sf:
+    with open(schema_file, encoding='utf-8') as sf:
         schema = load_schema(sf)
 
     any_parts_present = False
@@ -73,7 +73,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
 
             fields = schema[sk].fields
 
-            with open(files[sk]) as f:
+            with open(files[sk], encoding='utf-8') as f:
                 ds = dataset.Dataset(f, stop_after=1)
             names = set([n.strip() for n in ds.names_])
             missing_names = names.difference(fields.keys())
@@ -137,7 +137,7 @@ class DatasetImporter:
             hf.create_group(space)
         group = hf[space]
 
-        with open(source) as sf:
+        with open(source, encoding='utf-8') as sf:
             csvf = csv.DictReader(sf, delimiter=',', quotechar='"')
             # self.names_ = csvf.fieldnames
 
