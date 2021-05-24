@@ -63,7 +63,7 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_imp
     chunk_scale_factor = 4
     count_rows = 1000000 * row_scale_factor
     val_row_count = count_rows * 32
-    val_threshold = val_row_count // 8 * 6
+    val_threshold = val_row_count // 100 * 99
     chunk_byte_size = 250000000 * chunk_scale_factor
     print(count_rows, val_row_count, val_threshold, chunk_byte_size)
 
@@ -75,8 +75,9 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_imp
         # total_col = [[], []]
 
         # initialize column_inds, column_vals ouside of while-loop
-        column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
-        column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
+        with utils.Timer("allocating buffers"):
+            column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
+            column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
 
         # make ndarray larger factor
         larger_factor = 1.5
@@ -94,7 +95,9 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_imp
             # reads chunk size of file content 
             # when indices or values is full, we need to call fast_csv_reader again, but we don't want to read same content again
             if not is_indices_full and not is_values_full:
-                content = np.fromfile(source, count=chunk_byte_size, offset=chunk_index, dtype=np.uint8)
+                with utils.Timer("read chunk {}".format(ch)):
+                    content = np.fromfile(source, count=chunk_byte_size,
+                                          offset=chunk_index, dtype=np.uint8)
 
             length_content = content.shape[0]
             if length_content == 0:
@@ -103,8 +106,12 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_imp
             # check if there's newline at EOF in the last chunk. add one if it's missing
             if chunk_index + length_content == total_byte_size and content[-1] != NEWLINE_VALUE:
                 content = np.append(content, NEWLINE_VALUE)
-            
-            offset_pos, written_row_count, is_indices_full, is_values_full = fast_csv_reader(content, column_inds, column_vals, hasHeader, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+
+            with utils.Timer("parse chunk {}".format(ch)):
+                offset_pos, written_row_count, is_indices_full, is_values_full =\
+                    fast_csv_reader(content, column_inds, column_vals, hasHeader,
+                                    val_threshold,
+                                    ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
             # print('====== after csv reader =====')
             # print('chunk_index', chunk_index)
             # print('offset_pos', offset_pos)
