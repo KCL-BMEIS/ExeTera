@@ -58,6 +58,14 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_imp
     time0 = time.time()
 
     total_byte_size, count_columns, count_rows, val_row_count, val_threshold, chunk_byte_size = get_file_stat(source, chunk_row_size)
+    print(total_byte_size, count_columns, count_rows, val_row_count, val_threshold, chunk_byte_size)
+    row_scale_factor = 4
+    chunk_scale_factor = 4
+    count_rows = 1000000 * row_scale_factor
+    val_row_count = count_rows * 32
+    val_threshold = val_row_count // 8 * 6
+    chunk_byte_size = 250000000 * chunk_scale_factor
+    print(count_rows, val_row_count, val_threshold, chunk_byte_size)
 
     with utils.Timer("read_file_using_fast_csv_reader"):
         chunk_index = 0
@@ -71,7 +79,7 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_imp
         column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
 
         # make ndarray larger factor
-        larger_factor = 2
+        larger_factor = 1.5
         is_indices_full, is_values_full = False, False
 
         content = None
@@ -108,13 +116,15 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_imp
             if is_indices_full:
                 indices_row_count = column_inds.shape[1] - 1
                 column_inds = np.zeros((count_columns, np.uint32(indices_row_count * larger_factor + 1)), dtype=np.int64)  
+                print("indices resize to", column_inds.shape[1])
 
             # make column_values larger if it gets full before reach the end of chunk 
             if is_values_full:
                 values_row_count = column_vals.shape[1]
                 val_threshold = int(values_row_count * 0.8)
                 column_vals = np.zeros((count_columns, np.uint32(values_row_count * larger_factor)), dtype=np.uint8)
-                
+                print("values resize to", column_vals.shape[1])
+
             # reassign
             if is_indices_full or is_values_full:
                 continue
