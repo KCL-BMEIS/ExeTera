@@ -36,7 +36,7 @@ def export_to_csv(destination, datastore, fields):
     readers = [datastore.get_reader(f[1]) for f in fields]
     transforms = [transform_from_reader_type(r) for r in readers]
 
-    with open(destination, 'w') as d:
+    with open(destination, 'w', encoding='utf-8') as d:
         csvw = csv.writer(d)
         #header
         header = [None] * len(fields)
