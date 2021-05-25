@@ -350,17 +350,18 @@ def read_fields_from_hdf5(file_name, field_count):
                     data = field.data[:]
 
 
-# generate_dataset(1 << 25, 16)
-
-new_prep(1<<28, 4)
-# new_to_hdf5(16)
-# new_hs_test(4)
-new_pd_test(1)
-# pd_test_1(1 << 24, 64)
-#hs_test_1(1 << 21, 16)
-# raw_np_test_1(1 << 29, 4)
-# minimal_test_1(1 << 29, 16)
-# iterator_test_1(1 << 24)
-
-# read_id_from_csv('/home/ben/covid/patients_export_geocodes_20200830040058.csv', 1)
-# read_fields_from_hdf5('/home/ben/covid/ds_20200830_full.hdf5', 16)
+if __name__ == "__main__":
+    # generate_dataset(1 << 25, 16)
+    
+    new_prep(1<<28, 4)
+    # new_to_hdf5(16)
+    # new_hs_test(4)
+    new_pd_test(1)
+    # pd_test_1(1 << 24, 64)
+    #hs_test_1(1 << 21, 16)
+    # raw_np_test_1(1 << 29, 4)
+    # minimal_test_1(1 << 29, 16)
+    # iterator_test_1(1 << 24)
+    
+    # read_id_from_csv('/home/ben/covid/patients_export_geocodes_20200830040058.csv', 1)
+    # read_fields_from_hdf5('/home/ben/covid/ds_20200830_full.hdf5', 16)
