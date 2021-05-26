@@ -18,8 +18,11 @@ from io import StringIO
 import numpy as np
 from numba import njit
 
+import pytz
+
 
 SECONDS_PER_DAY = 86400
+LOCAL_TIMEZONE = datetime.now(timezone.utc).astimezone().tzinfo
 
 
 def validate_file_exists(file_name):
@@ -93,13 +96,20 @@ def to_timestamp(dt):
     UTC will be used to determine the timestamp.
     """
     # convert to UTC if needed
-    # dt = dt if dt.tzinfo is not None else dt.astimezone(timezone.utc)
-    if dt.tzinfo is None:
-        # because datetime.astimezone is also bugged
-        dt=dt.replace(tzinfo=timezone.utc)
+#     if dt.tzinfo is None:
+# #         dt = dt.astimezone(timezone.utc)
+#         # because datetime.astimezone is also bugged
+# #         dt=dt.replace(tzinfo=timezone.utc)
+#         dt=pytz.utc.localize(dt)
+
+    ts = (dt - datetime(1970, 1, 1, tzinfo=dt.tzinfo)).total_seconds()
+
+    ltime=time.localtime(ts)
+    if ltime.tm_isdst:
+        return ts-3600
+    else:
+        return ts
         
-    return (dt - datetime(1970, 1, 1, tzinfo=dt.tzinfo)).total_seconds()
-    
     
 def from_timestamp(ts,tzinfo=None):
     """
