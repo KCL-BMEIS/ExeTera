@@ -2,7 +2,6 @@ from typing import Optional, Sequence, Tuple, Union
 from datetime import datetime, timedelta
 
 import numpy as np
-from numpy.typing import ArrayLike
 
 from exetera.core.utils import SECONDS_PER_DAY
 
@@ -63,11 +62,11 @@ def get_periods(start_date: datetime,
     return dates
 
 
-def get_days(date_field: ArrayLike,
-             date_filter: ArrayLike = None,
+def get_days(date_field: np.ndarray,
+             date_filter: Optional[np.ndarray] = None,
              start_date: Optional[np.float64] = None,
              end_date: Optional[np.float64] = None
-             ) -> Tuple[ArrayLike, Optional[ArrayLike]]:
+             ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
     """
     This converts a field of timestamps into a field of relative elapsed days.
     The precise behaviour depends on the optional parameters but essentially, the lowest
@@ -117,7 +116,7 @@ def get_days(date_field: ArrayLike,
 
 
 def generate_period_offset_map(periods: Sequence[datetime]
-                               ) -> ArrayLike:
+                               ) -> np.ndarray:
     """
     Given a list of ordered datetimes relating to period boundaries, generate a numpy
     array of days that map each day to a period.
@@ -142,10 +141,10 @@ def generate_period_offset_map(periods: Sequence[datetime]
     return period_per_day
 
 
-def get_period_offsets(periods_by_day: ArrayLike,
-                       days: ArrayLike,
-                       in_range: Optional[ArrayLike] = None
-                       ) -> ArrayLike:
+def get_period_offsets(periods_by_day: np.ndarray,
+                       days: np.ndarray,
+                       in_range: Optional[np.ndarray] = None
+                       ) -> np.ndarray:
     """
     Given a ``periods_by_day``, a numpy array of days mapping to periods and ``days``, a numpy array of days to be mapped to
     periods, perform the mapping to generate a numpy array indicating which period a day is
