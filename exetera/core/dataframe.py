@@ -674,7 +674,7 @@ def _unordered_merge(left: DataFrame,
             d.values.write(v)
         else:
             v = ops.safe_map_values(l.data[:], l_to_d_map, l_to_d_filt)
-        d.data.write(v)
+            d.data.write(v)
 
     if not np.all(l_to_d_filt):
         d = dest.create_numeric('valid'+left_suffix, 'bool')
