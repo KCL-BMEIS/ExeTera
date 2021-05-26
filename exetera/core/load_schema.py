@@ -92,21 +92,21 @@ class NewDataSchema:
                                " to int32 but is {} and {}, respectively")
                         raise ValueError(msg.format(fk, raw_type, value_type))
                     converter = per.try_str_to_float_to_int
-                    field_size = 350
+                    field_size = 30
                 else:
                     if value_type not in permitted_numeric_types:
                         msg = "Field {} has an invalid value_type '{}'. Permitted types are {}"
                         raise ValueError(msg.format(fk, value_type, permitted_numeric_types))
                     if value_type in ('float', 'float32', 'float64'):
                         converter = per.try_str_to_float
-                        field_size = 350
+                        field_size = 30
                     elif value_type == 'bool':
                         converter = per.try_str_to_bool
                         field_size = 5
                     elif value_type in ('int', 'int8', 'int16', 'int32', 'int64',
                                         'uint8', 'uint16', 'uint32', 'uint64'):
                         converter = per.try_str_to_int
-                        field_size = 30
+                        field_size = 20
                     else:
                         msg = "Unrecognised value_type '{}' in field '{}'"
                         raise ValueError(msg.format(value_type, fk))

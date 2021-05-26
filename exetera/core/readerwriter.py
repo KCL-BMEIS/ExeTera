@@ -357,7 +357,7 @@ class LeakyCategoricalImporter:
         chunk = np.zeros(written_row_count, dtype=np.int8) # use np.int8 instead of np.uint8, as we set -1 for leaky key
         freetext_indices_chunk = np.zeros(written_row_count + 1, dtype = np.int64)
 
-        col_count = column_offsets[col_idx + 1]
+        col_count = column_offsets[col_idx + 1] - column_offsets[col_idx]
         freetext_values_chunk = np.zeros(np.int64(col_count), dtype = np.uint8)
 
         ops.leaky_categorical_transform(chunk, freetext_indices_chunk, freetext_values_chunk, col_idx, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values)
