@@ -613,7 +613,7 @@ class TestFieldImporter(unittest.TestCase):
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('int_field', "utf-8"), dtype=np.uint8)
         
-        exception_message, exception_args = ops.numeric_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)    
+        exception_message, exception_args = ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)    
 
         self.assertEqual(exception_message, 2)
         self.assertEqual(len(exception_args), 2)
