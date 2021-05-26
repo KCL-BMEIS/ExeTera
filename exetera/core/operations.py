@@ -1250,10 +1250,12 @@ def get_byte_map(string_map):
 
 
 @njit           
-def categorical_transform(chunk, i_c, column_inds, column_vals, cat_keys, cat_index, cat_values):
+def categorical_transform(chunk, i_c, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values):
     """
     Tranform method for categorical importer in readerwriter.py
     """   
+    col_offset = column_offsets[i_c]
+
     for row_idx in range(len(column_inds[i_c]) - 1):
         if row_idx >= chunk.shape[0]:
             break
@@ -1270,7 +1272,7 @@ def categorical_transform(chunk, i_c, column_inds, column_vals, cat_keys, cat_in
             index = i
             for j in range(key_len):
                 entry_start = cat_index[i]
-                if column_vals[i_c, key_start + j] != cat_keys[entry_start + j]:
+                if column_vals[col_offset + key_start + j] != cat_keys[entry_start + j]:
                     index = -1
                     break
 
@@ -1279,10 +1281,12 @@ def categorical_transform(chunk, i_c, column_inds, column_vals, cat_keys, cat_in
                 
 
 @njit           
-def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, column_inds, column_vals, cat_keys, cat_index, cat_values):
+def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values):
     """
     Tranform method for categorical importer in readerwriter.py
     """   
+    col_offset = column_offsets[i_c] 
+
     for row_idx in range(len(column_inds[i_c]) - 1):
         if row_idx >= chunk.shape[0]:   # reach the end of chunk
             break
@@ -1300,7 +1304,7 @@ def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, c
             index = i
             for j in range(key_len):
                 entry_start = cat_index[i]
-                if column_vals[i_c, key_start + j] != cat_keys[entry_start + j]:
+                if column_vals[col_offset + key_start + j] != cat_keys[entry_start + j]:
                     index = -1
                     break
 
@@ -1312,16 +1316,16 @@ def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, c
         if not is_found:
             chunk[row_idx] = -1 
             freetext_indices[row_idx + 1] = freetext_indices[row_idx] + key_len
-            freetext_values[freetext_indices[row_idx]: freetext_indices[row_idx + 1]] = column_vals[i_c, key_start: key_end]
+            freetext_values[freetext_indices[row_idx]: freetext_indices[row_idx + 1]] = column_vals[col_offset + key_start: col_offset + key_end]
 
 
 @njit
-def numeric_int_float_transform(elements, validity, column_inds, column_vals, col_idx, written_row_count,
+def numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, col_idx, written_row_count,
                                 parser, invalid_value, validation_mode, field_name):
     """
     Transform method for numeric importer (int, float) in readerwriter.py
     """          
-
+    col_offset = column_offsets[col_idx] 
     exception_message, exception_args = 0, [field_name]
 
     for row_idx in range(written_row_count):
@@ -1353,7 +1357,7 @@ def numeric_int_float_transform(elements, validity, column_inds, column_vals, co
 
         # For each byte, check the meaning and build real number
         for byte_idx in range(length):
-            val = column_vals[col_idx, row_start_idx + byte_idx]
+            val = column_vals[col_offset + row_start_idx + byte_idx]
             if val == 32: # empty space
                 if not has_power:
                     bytes_start_index = byte_idx + 1
@@ -1448,24 +1452,25 @@ def numeric_int_float_transform(elements, validity, column_inds, column_vals, co
                     break
                 else:
                     exception_message = 2
-                    non_parsable = column_vals[col_idx, row_start_idx : row_end_idx]
+                    non_parsable = column_vals[col_offset + row_start_idx : col_offset + row_end_idx]
                     exception_args = [field_name, non_parsable]
                     break
             if validation_mode == 'allow_empty':
                 if not empty:
                     exception_message = 2
-                    non_parsable = column_vals[col_idx, row_start_idx : row_end_idx]
+                    non_parsable = column_vals[col_offset + row_start_idx : col_offset + row_end_idx]
                     exception_args = [field_name, non_parsable]
                     break
     return exception_message, exception_args
 
 
 @njit
-def numeric_bool_transform(elements, validity, column_inds, column_vals, col_idx, written_row_count,
+def numeric_bool_transform(elements, validity, column_inds, column_vals, column_offsets, col_idx, written_row_count,
                             parser, invalid_value, validation_mode, field_name):
     """
     Transform method for numeric importer (bool) in readerwriter.py
-    """         
+    """  
+    col_offset = column_offsets[col_idx]       
     exception_message, exception_args = 0, [field_name]
 
     for row_idx in range(written_row_count):
@@ -1481,10 +1486,10 @@ def numeric_bool_transform(elements, validity, column_inds, column_vals, col_idx
 
         byte_start_idx, byte_end_idx = 0, length - 1
         # ignore heading whitespace
-        while byte_start_idx < length and column_vals[col_idx, row_start_idx + byte_start_idx] == 32:
+        while byte_start_idx < length and column_vals[col_offset + row_start_idx + byte_start_idx] == 32:
             byte_start_idx += 1
         # ignore tailing whitespace 
-        while byte_end_idx >= 0 and column_vals[col_idx, row_start_idx + byte_end_idx] == 32:
+        while byte_end_idx >= 0 and column_vals[col_offset + row_start_idx + byte_end_idx] == 32:
             byte_end_idx -= 1
         
         # actual length after removing heading and trailing whitespace
@@ -1495,7 +1500,7 @@ def numeric_bool_transform(elements, validity, column_inds, column_vals, col_idx
             valid_input = False
         else:
         
-            val = column_vals[col_idx, row_start_idx + byte_start_idx: row_start_idx + byte_start_idx + actual_length]
+            val = column_vals[col_offset + row_start_idx + byte_start_idx: col_offset + row_start_idx + byte_start_idx + actual_length]
             if actual_length == 1:
                 if val in (49, 89, 121, 84, 116): # '1', 'Y', 'y', 'T', 't'
                     value = 1
@@ -1558,13 +1563,13 @@ def numeric_bool_transform(elements, validity, column_inds, column_vals, col_idx
                     break
                 else:
                     exception_message = 2
-                    non_parsable = column_vals[col_idx, row_start_idx : row_end_idx]
+                    non_parsable = column_vals[col_offset + row_start_idx : col_offset + row_end_idx]
                     exception_args = [field_name, non_parsable]
                     break
             if validation_mode == 'allow_empty':
                 if not empty:
                     exception_message = 2
-                    non_parsable = column_vals[col_idx, row_start_idx : row_end_idx]
+                    non_parsable = column_vals[col_offset + row_start_idx : col_offset + row_end_idx]
                     exception_args = [field_name, non_parsable]
                     break
     return exception_message, exception_args      
@@ -1635,23 +1640,25 @@ def raiseNumericException(exception_message, exception_args):
 
 
 @njit
-def transform_to_values(column_inds, column_vals, col_idx, written_row_count):
+def transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count):
     """
     Trasnform method for byte data from np.int to np.bytes_
     """
     data = []
+    col_offset = column_offsets[col_idx]
     for row_idx in range(written_row_count):
-        val = column_vals[col_idx, column_inds[col_idx, row_idx]: column_inds[col_idx, row_idx + 1]]
+        val = column_vals[col_offset + column_inds[col_idx, row_idx]: col_offset + column_inds[col_idx, row_idx + 1]]
         data.append(val)
     return data
 
 
 @njit
-def fixed_string_transform(column_inds, column_vals, col_idx, written_row_count, strlen):
+def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, written_row_count, strlen):
     data = []
+    col_offset = column_offsets[col_idx]
     for row_idx in range(written_row_count):
         start_row_idx = column_inds[col_idx, row_idx]
         end_row_idx = min(column_inds[col_idx, row_idx + 1], start_row_idx + strlen)
-        val = column_vals[col_idx, start_row_idx: end_row_idx]
+        val = column_vals[col_offset + start_row_idx: col_offset + end_row_idx]
         data.append(val)
     return data

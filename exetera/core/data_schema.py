@@ -93,13 +93,14 @@ new_field_importers = {
 
 class FieldDesc:
     def __init__(self, field, importer, strings_to_values, values_to_strings, to_datatype,
-                 out_of_range_label):
+                 out_of_range_label, field_size):
         self.field = field
         self.importer = importer
         self.to_datatype = to_datatype
         self.strings_to_values = strings_to_values
         self.values_to_strings = values_to_strings
         self.out_of_range_label = out_of_range_label
+        self.field_size = field_size
 
     def __str__(self):
         output = 'FieldDesc(field={}, strings_to_values={}, values_to_strings={})'

@@ -11,6 +11,7 @@
 
 import csv
 from datetime import datetime, MAXYEAR
+from itertools import accumulate
 import time
 
 import numpy as np
@@ -165,6 +166,7 @@ class DatasetImporter:
             csvf_fieldnames = [k.strip() for k in csvf.fieldnames]
             index_map = [csvf_fieldnames.index(k) for k in fields_to_use]
 
+            #TODO: check
             early_key_index = None
             if early_filter is not None:
                 if early_filter[0] not in available_keys:
@@ -172,19 +174,25 @@ class DatasetImporter:
                         f"'early_filter': tuple element zero must be a key that is in the dataset")
                 early_key_index = available_keys.index(early_filter[0])
 
-            new_fields = dict()
-            field_importer_list = list()
-            field_chunk_list = list()
-            categorical_map_list = list()
-            longest_keys = list()
-
-            # TODO: categorical writers should use the datatype specified in the schema
+            field_importer_list = list() # only for field_to_use
+            
             for i_n in range(len(fields_to_use)):
                 field_name = fields_to_use[i_n]
                 sch = schema.fields[field_name]
                 field_importer = sch.importer(datastore, group, field_name, timestamp)
                 field_importer_list.append(field_importer)
+
+
+            column_offsets = np.zeros(len(csvf_fieldnames) + 1, dtype=np.int64)
+            column_val_counts = np.zeros(len(csvf_fieldnames), dtype=np.int64)
+            for i, field_name in enumerate(csvf_fieldnames):
+                sch = schema.fields[field_name]
+                column_val_counts[i] = sch.field_size * chunk_row_size
+                column_offsets[i + 1] = column_offsets[i] + sch.field_size * chunk_row_size
+
+            # print(column_offset)
+            # exit()
         
-        read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_importer_list, stop_after_rows=stop_after)
+        read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, column_val_counts, index_map, field_importer_list, stop_after_rows=stop_after)
 
 

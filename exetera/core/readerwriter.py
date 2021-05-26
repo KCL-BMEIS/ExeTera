@@ -298,12 +298,13 @@ class IndexedStringWriter(Writer):
         self.write_part_raw(index, values)
         self.flush()
 
-    def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
+    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         # broadcast accumulated size to current index array
         index = column_inds[col_idx, :written_row_count] + self.chunk_accumulated
         self.chunk_accumulated += column_inds[col_idx, written_row_count]
 
-        values = column_vals[col_idx, :column_inds[col_idx, written_row_count]]
+        col_offset = column_offsets[col_idx]
+        values = column_vals[col_offset : col_offset + column_inds[col_idx, written_row_count]]
         self.write_part_raw(index, values)
 
 
@@ -351,13 +352,15 @@ class LeakyCategoricalImporter:
         self.write_part(values)
         self.flush()
 
-    def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
+    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         cat_keys, cat_index, cat_values = self.byte_map
         chunk = np.zeros(written_row_count, dtype=np.int8) # use np.int8 instead of np.uint8, as we set -1 for leaky key
         freetext_indices_chunk = np.zeros(written_row_count + 1, dtype = np.int64)
-        freetext_values_chunk = np.zeros(np.int32(column_vals.shape[1]), dtype = np.uint8)
 
-        ops.leaky_categorical_transform(chunk, freetext_indices_chunk, freetext_values_chunk, col_idx, column_inds, column_vals, cat_keys, cat_index, cat_values)
+        col_count = column_offsets[col_idx + 1]
+        freetext_values_chunk = np.zeros(np.int64(col_count), dtype = np.uint8)
+
+        ops.leaky_categorical_transform(chunk, freetext_indices_chunk, freetext_values_chunk, col_idx, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values)
 
         freetext_indices = freetext_indices_chunk + self.freetext_index_accumulated # broadcast
         self.freetext_index_accumulated += freetext_indices_chunk[written_row_count]
@@ -400,11 +403,11 @@ class CategoricalImporter:
         self.writer.write_part(results)
         self.flush()
 
-    def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
+    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         chunk = np.zeros(written_row_count, dtype=np.uint8)
         cat_keys, cat_index, cat_values = self.byte_map
                 
-        ops.categorical_transform(chunk, col_idx, column_inds, column_vals, cat_keys, cat_index, cat_values)
+        ops.categorical_transform(chunk, col_idx, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values)
         self.writer.write(chunk)
 
 
@@ -503,20 +506,20 @@ class NumericImporter:
             self.flag_writer.write_part(validity)
 
 
-    def transform_and_write_part(self, column_ids, column_vals, col_idx, written_row_count):
+    def transform_and_write_part(self, column_ids, column_vals, column_offsets, col_idx, written_row_count):
         elements = np.zeros(written_row_count, dtype=self.data_writer.nformat)
         validity = np.zeros(written_row_count, dtype='bool')
         
         if self.data_writer.nformat == 'bool':
             exception_message, exception_args = ops.numeric_bool_transform(
-                elements, validity, column_ids, column_vals, col_idx,
+                elements, validity, column_ids, column_vals, column_offsets, col_idx,
                 written_row_count, self.parser, self.invalid_value,
                 self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8)
             )
 
         else:
             exception_message, exception_args = ops.numeric_int_float_transform(
-                elements, validity, column_ids, column_vals, col_idx,
+                elements, validity, column_ids, column_vals, column_offsets, col_idx,
                 written_row_count, self.parser, self.invalid_value,
                 self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8)
             )
@@ -598,8 +601,8 @@ class FixedStringWriter(Writer):
     def write_part(self, values):
         DataWriter.write(self.field, 'values', values, len(values))
 
-    def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
-        data = ops.fixed_string_transform(column_inds, column_vals, col_idx, written_row_count, self.strlen)
+    def transform_and_write_part(self, column_inds, column_vals, column_offsets,  col_idx, written_row_count):
+        data = ops.fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, written_row_count, self.strlen)
         values = [x.tobytes().strip() for x in data]
         self.write_part(values)
 
@@ -671,8 +674,8 @@ class DateTimeImporter:
         self.write_part(values)
         self.flush()
 
-    def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
-        data = ops.transform_to_values(column_inds, column_vals, col_idx, written_row_count)
+    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+        data = ops.transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count)
         data = [x.tobytes().strip() for x in data]
         self.write_part(data)
 
@@ -842,8 +845,8 @@ class OptionalDateImporter:
             flags[i] = values[i] != b''
         return flags
 
-    def transform_and_write_part(self, column_inds, column_vals, col_idx, written_row_count):
-        data = ops.transform_to_values(column_inds, column_vals, col_idx, written_row_count)
+    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+        data = ops.transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count)
         data = [x.tobytes().strip() for x in data]
         self.write_part(data)
 

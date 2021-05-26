@@ -46,7 +46,7 @@ def get_file_stat(source, chunk_row_size):
     return total_byte_size, count_columns, count_rows, val_row_count, val_threshold, chunk_byte_size
 
 
-def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_importer_list=None, stop_after_rows=None, show_progress_every = 1):
+def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, column_val_counts, index_map, field_importer_list=None, stop_after_rows=None, show_progress_every = 1):
     ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
     SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
     NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
@@ -59,6 +59,8 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_imp
 
     total_byte_size, count_columns, count_rows, val_row_count, val_threshold, chunk_byte_size = get_file_stat(source, chunk_row_size)
 
+    val_row_count = sum(column_val_counts)
+
     with utils.Timer("read_file_using_fast_csv_reader"):
         chunk_index = 0
         hasHeader = True
@@ -68,7 +70,9 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_imp
 
         # initialize column_inds, column_vals ouside of while-loop
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
-        column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
+        
+        # column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
+        column_vals = np.zeros(np.int64(val_row_count), dtype=np.uint8)
 
         # make ndarray larger factor
         larger_factor = 2
@@ -96,7 +100,7 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_imp
             if chunk_index + length_content == total_byte_size and content[-1] != NEWLINE_VALUE:
                 content = np.append(content, NEWLINE_VALUE)
             
-            offset_pos, written_row_count, is_indices_full, is_values_full = fast_csv_reader(content, column_inds, column_vals, hasHeader, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+            offset_pos, written_row_count, is_indices_full, is_values_full, val_full_col_idx = fast_csv_reader(content, column_inds, column_vals, column_offsets, column_val_counts, hasHeader, val_threshold, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
             # print('====== after csv reader =====')
             # print('chunk_index', chunk_index)
             # print('offset_pos', offset_pos)
@@ -109,11 +113,20 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_imp
                 indices_row_count = column_inds.shape[1] - 1
                 column_inds = np.zeros((count_columns, np.uint32(indices_row_count * larger_factor + 1)), dtype=np.int64)  
 
-            # make column_values larger if it gets full before reach the end of chunk 
-            if is_values_full:
-                values_row_count = column_vals.shape[1]
-                val_threshold = int(values_row_count * 0.8)
-                column_vals = np.zeros((count_columns, np.uint32(values_row_count * larger_factor)), dtype=np.uint8)
+            # # make column_values larger if it gets full before reach the end of chunk 
+            # if is_values_full:
+            #     values_row_count = column_vals.shape[1]
+            #     val_threshold = int(values_row_count * 0.8)
+            #     column_vals = np.zeros((count_columns, np.uint32(values_row_count * larger_factor)), dtype=np.uint8)
+            
+            if is_values_full and val_full_col_idx != -1:
+                print('hello', val_full_col_idx)
+                delta = column_val_counts[val_full_col_idx] * (larger_factor - 1)
+                column_val_counts[val_full_col_idx] += np.int64(delta)
+                column_offsets = np.concatenate((column_offsets[:val_full_col_idx + 1], column_offsets[val_full_col_idx + 1:] + np.int64(delta)))
+                val_row_count = sum(column_val_counts)
+                column_vals = np.zeros(np.int64(val_row_count), dtype=np.uint8)
+
                 
             # reassign
             if is_indices_full or is_values_full:
@@ -130,7 +143,7 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_imp
             # convert and write
             for ith, i_c in enumerate(index_map):                
                 if field_importer_list and field_importer_list[ith]: # and chunk is not None: 
-                    field_importer_list[ith].transform_and_write_part(column_inds, column_vals, i_c, written_row_count)
+                    field_importer_list[ith].transform_and_write_part(column_inds, column_vals, column_offsets, i_c, written_row_count)
                     field_importer_list[ith].flush()
            
             if show_progress_every and ch % show_progress_every == 0:
@@ -143,7 +156,7 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, index_map, field_imp
 
 
 @njit
-def fast_csv_reader(source, column_inds, column_vals, hasHeader, val_threshold, escape_value, separator_value, newline_value, whitespace_value ):
+def fast_csv_reader(source, column_inds, column_vals, column_offsets, column_val_counts, hasHeader, val_threshold, escape_value, separator_value, newline_value, whitespace_value ):
     colcount = column_inds.shape[0]
     maxrowcount = np.int64(column_inds.shape[1] - 1)  # -1: minus the first element (0) in the row that created for prefix
     
@@ -152,6 +165,7 @@ def fast_csv_reader(source, column_inds, column_vals, hasHeader, val_threshold, 
     
     col_index = np.int64(0)
     row_index = np.int64(-1) if hasHeader else np.int64(0)
+    val_full_col_idx = np.int64(-1)
 
     escaped = False
     end_cell = False
@@ -165,6 +179,9 @@ def fast_csv_reader(source, column_inds, column_vals, hasHeader, val_threshold, 
 
     is_column_inds_full = False
     is_column_vals_full = False
+
+    col_offset = column_offsets[0]
+    col_val_count = column_offsets[1]
 
     while True:
         write_char = False
@@ -218,11 +235,12 @@ def fast_csv_reader(source, column_inds, column_vals, hasHeader, val_threshold, 
             write_char = True
 
         if write_char and row_index >= 0:
-            column_vals[col_index, cur_cell_start + cur_cell_char_count] = c
+            column_vals[col_offset + cur_cell_start + cur_cell_char_count] = c
             cur_cell_char_count += 1
 
-            if cur_cell_start + cur_cell_char_count > val_threshold:
+            if col_offset + cur_cell_start + cur_cell_char_count > col_val_count:
                 is_column_vals_full = True
+                val_full_col_idx = col_index
                                 
         if end_cell:
             if row_index >= 0:
@@ -230,10 +248,15 @@ def fast_csv_reader(source, column_inds, column_vals, hasHeader, val_threshold, 
             if end_line:
                 row_index += 1
                 col_index = 0
+                col_offset = column_offsets[col_index]
+                col_val_count = column_offsets[col_index + 1]
+
                 if row_index == maxrowcount:
                     is_column_inds_full = True
             else:
                 col_index += 1
+                col_offset = column_offsets[col_index]
+                col_val_count = column_offsets[col_index + 1]
 
             cur_cell_start = column_inds[col_index, row_index]
             cur_cell_char_count = 0
@@ -246,7 +269,7 @@ def fast_csv_reader(source, column_inds, column_vals, hasHeader, val_threshold, 
         if index == len(source) or is_column_inds_full or is_column_vals_full: 
             next_pos = index_for_end_line + 1
             written_row_count = row_index
-            return next_pos, written_row_count, is_column_inds_full, is_column_vals_full
+            return next_pos, written_row_count, is_column_inds_full, is_column_vals_full, val_full_col_idx
      
 # @njit    
 # def make_ndarray_larger(arr):
