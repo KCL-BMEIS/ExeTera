@@ -9,6 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import platform
 import time
 from collections import defaultdict
 import csv
@@ -95,26 +96,27 @@ def to_timestamp(dt):
     Convert the date time object `dt` to a timestamp value in a portable way. If `dt` has no timezone information
     UTC will be used to determine the timestamp.
     """
+    if platform.system().lower() != "windows":
+        return dt.timestamp()
+    
     # convert to UTC if needed
-#     if dt.tzinfo is None:
+    if dt.tzinfo is None:
 # #         dt = dt.astimezone(timezone.utc)
 #         # because datetime.astimezone is also bugged
 # #         dt=dt.replace(tzinfo=timezone.utc)
-#         dt=pytz.utc.localize(dt)
 
-    ts = (dt - datetime(1970, 1, 1, tzinfo=dt.tzinfo)).total_seconds()
-
-    ltime=time.localtime(ts)
-    if ltime.tm_isdst:
-        return ts-3600
-    else:
-        return ts
         
-    
+
+    return (dt - datetime(1970, 1, 1, tzinfo=dt.tzinfo)).total_seconds()
+
+
 def from_timestamp(ts,tzinfo=None):
     """
     Convert the UTC timestamp float value `ts` to a datetime object in a portable way.  
     """
+    if platform.system().lower() != "windows":
+        return datetime.fromtimestamp(ts, tzinfo)
+        
     # select UTC if no timezone specified
     tzinfo=tzinfo if tzinfo is not None else timezone.utc
         
