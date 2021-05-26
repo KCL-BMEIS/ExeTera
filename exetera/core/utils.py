@@ -23,7 +23,7 @@ import pytz
 
 
 SECONDS_PER_DAY = 86400
-LOCAL_TIMEZONE = datetime.now(timezone.utc).astimezone().tzinfo
+DATE_TIME_EPOCH = datetime(1970,1,1,tzinfo=timezone.utc)
 
 
 def validate_file_exists(file_name):
@@ -96,31 +96,24 @@ def to_timestamp(dt):
     Convert the date time object `dt` to a timestamp value in a portable way. If `dt` has no timezone information
     UTC will be used to determine the timestamp.
     """
-    if platform.system().lower() != "windows":
+    if "windows" not in platform.system().lower():
         return dt.timestamp()
     
-    # convert to UTC if needed
-    if dt.tzinfo is None:
-# #         dt = dt.astimezone(timezone.utc)
-#         # because datetime.astimezone is also bugged
-# #         dt=dt.replace(tzinfo=timezone.utc)
-
-        
-
-    return (dt - datetime(1970, 1, 1, tzinfo=dt.tzinfo)).total_seconds()
+    return (dt - DATE_TIME_EPOCH.replace(tzinfo=dt.tzinfo)).total_seconds()
 
 
 def from_timestamp(ts,tzinfo=None):
     """
     Convert the UTC timestamp float value `ts` to a datetime object in a portable way.  
     """
-    if platform.system().lower() != "windows":
-        return datetime.fromtimestamp(ts, tzinfo)
-        
+    
     # select UTC if no timezone specified
     tzinfo=tzinfo if tzinfo is not None else timezone.utc
+    
+    if "windows" not in platform.system().lower():
+        return datetime.fromtimestamp(ts, tzinfo)
         
-    return datetime(1970, 1, 1, tzinfo=tzinfo) + timedelta(seconds=ts)
+    return DATE_TIME_EPOCH.replace(tzinfo=tzinfo) + timedelta(seconds=ts)
 
 
 def build_histogram(dataset, filtered_records=None, tx=None):
