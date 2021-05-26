@@ -6,6 +6,7 @@ import numpy as np
 
 from exetera.core import persistence as pers
 from exetera.core.data_writer import DataWriter
+from exetera.core import utils
 
 
 class Reader:
@@ -633,7 +634,7 @@ class DateTimeWriter(Writer):
                                   int(value[11:13]), int(value[14:16]), int(value[17:19]))
                 else:
                     raise ValueError(f"Date field '{self.field}' has unexpected format '{value}'")
-                timestamps[i] = ts.timestamp()
+                timestamps[i] = utils.to_timestamp(ts)
         DataWriter.write(self.field, 'values', timestamps, len(timestamps))
 
     def flush(self):
@@ -673,7 +674,7 @@ class DateWriter(Writer):
                 timestamps[i] = 0
             else:
                 ts = datetime.strptime(value.decode(), '%Y-%m-%d')
-                timestamps[i] = ts.timestamp()
+                timestamps[i] = utils.to_timestamp(ts)
         DataWriter.write(self.field, 'values', timestamps, len(timestamps))
 
     def flush(self):

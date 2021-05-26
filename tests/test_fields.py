@@ -8,7 +8,7 @@ import h5py
 from exetera.core import session
 from exetera.core import fields
 from exetera.core import persistence as per
-
+from exetera.core import utils
 
 class TestFieldExistence(unittest.TestCase):
 
@@ -132,7 +132,7 @@ class TestIsSorted(unittest.TestCase):
             d = D(2020, 5, 10)
             vals = [d + T(seconds=50000), d - T(days=280), d + T(weeks=2), d + T(weeks=250),
                     d - T(weeks=378), d + T(hours=2897), d - T(days=23), d + T(minutes=39873)]
-            vals = [v.timestamp() for v in vals]
+            vals = [utils.to_timestamp(v) for v in vals]
             f.data.write(vals)
             self.assertFalse(f.is_sorted())
 
@@ -666,7 +666,7 @@ class TestFieldApplyFilter(unittest.TestCase):
         from datetime import datetime as D
         data = [D(2020, 1, 1), D(2021, 5, 18), D(2950, 8, 17), D(1840, 10, 11),
                 D(2110, 11, 1), D(2002, 3, 3), D(2018, 2, 28), D(2400, 9, 1)]
-        data = np.asarray([d.timestamp() for d in data], dtype=np.float64)
+        data = np.asarray([utils.to_timestamp(d) for d in data], dtype=np.float64)
         filt = np.array([0, 1, 0, 1, 0, 1, 0, 1], dtype=bool)
         expected = data[filt].tolist()
 
@@ -903,7 +903,7 @@ class TestFieldApplyIndex(unittest.TestCase):
         from datetime import datetime as D
         data = [D(2020, 1, 1), D(2021, 5, 18), D(2950, 8, 17), D(1840, 10, 11),
                 D(2110, 11, 1), D(2002, 3, 3), D(2018, 2, 28), D(2400, 9, 1)]
-        data = np.asarray([d.timestamp() for d in data], dtype=np.float64)
+        data = np.asarray([utils.to_timestamp(d) for d in data], dtype=np.float64)
         indices = np.array([7, 0, 6, 1, 5, 2, 4, 3], dtype=np.int32)
         expected = data[indices].tolist()
         bio = BytesIO()
@@ -1061,7 +1061,7 @@ class TestFieldApplySpansCount(unittest.TestCase):
         from datetime import datetime as D
         src_data = [D(2020, 1, 1), D(2021, 5, 18), D(2950, 8, 17), D(1840, 10, 11),
                     D(2021, 1, 1), D(2022, 5, 18), D(2951, 8, 17), D(1841, 10, 11)]
-        src_data = np.asarray([d.timestamp() for d in src_data], dtype=np.float64)
+        src_data = np.asarray([utils.to_timestamp(d) for d in src_data], dtype=np.float64)
 
         expected = src_data[[0, 2, 3, 6]].tolist()
         self._test_apply_spans_src(spans, src_data, expected,
@@ -1166,7 +1166,7 @@ class TestFieldCreateLike(unittest.TestCase):
     def test_timestamp_field_create_like(self):
         from datetime import datetime as D
         data = [D(2020, 1, 1), D(2021, 5, 18), D(2950, 8, 17), D(1840, 10, 11)]
-        data = np.asarray([d.timestamp() for d in data], dtype=np.float64)
+        data = np.asarray([utils.to_timestamp(d) for d in data], dtype=np.float64)
 
         bio = BytesIO()
         with session.Session() as s:
@@ -1253,7 +1253,7 @@ class TestFieldCreateLikeWithGroups(unittest.TestCase):
     def test_timestamp_field_create_like(self):
         from datetime import datetime as D
         data = [D(2020, 1, 1), D(2021, 5, 18), D(2950, 8, 17), D(1840, 10, 11)]
-        data = np.asarray([d.timestamp() for d in data], dtype=np.float64)
+        data = np.asarray([utils.to_timestamp(d) for d in data], dtype=np.float64)
 
         bio = BytesIO()
         with h5py.File(bio, 'w') as ds:

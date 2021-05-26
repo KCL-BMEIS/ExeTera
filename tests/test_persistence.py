@@ -528,7 +528,7 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'r') as hf:
             foo = rw.TimestampReader(datastore, hf['foo'])
             actual = [f for f in foo[:]]
-            self.assertEqual([v.timestamp() for v in values], actual)
+            self.assertEqual([utils.to_timestamp(v) for v in values], actual)
 
 
     def test_new_timestamp_reader(self):
@@ -541,7 +541,7 @@ class TestPersistence(unittest.TestCase):
         deltas = [random.randint(10, 1000) for _ in range(95)]
         values = [dt + timedelta(seconds=d) for d in deltas]
         svalues = [str(v).encode() for v in values]
-        tsvalues = np.asarray([v.timestamp() for v in values], dtype=np.float64)
+        tsvalues = np.asarray([utils.to_timestamp(v) for v in values], dtype=np.float64)
 
         with h5py.File(bio, 'w') as hf:
             foo = rw.DateTimeWriter(datastore, hf, 'foo', ts)
@@ -568,7 +568,7 @@ class TestPersistence(unittest.TestCase):
         deltas = [random.randint(10, 1000) for _ in range(95)]
         values = [dt + timedelta(seconds=d) for d in deltas]
         svalues = [str(v).encode() for v in values]
-        tsvalues = np.asarray([v.timestamp() for v in values], dtype=np.float64)
+        tsvalues = np.asarray([utils.to_timestamp(v) for v in values], dtype=np.float64)
 
         with h5py.File(bio, 'w') as hf:
             rw.DateTimeWriter(datastore, hf, 'foo', ts).write(svalues)

@@ -9,6 +9,7 @@ from exetera.core import session
 from exetera.core import fields
 from exetera.core import dataframe
 from exetera.core import persistence as per
+from exetera.core import utils
 
 
 class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
@@ -74,7 +75,7 @@ class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
         from datetime import datetime as D
         bio = BytesIO()
         contents = [D(2021, 2, 6), D(2020, 11, 5), D(2974, 8, 1), D(1873, 12, 28)]
-        contents = [c.timestamp() for c in contents]
+        contents = [utils.to_timestamp(c) for c in contents]
 
         with session.Session() as s:
             with h5py.File(bio, 'w') as src:
@@ -1166,7 +1167,9 @@ class TestSessionImporters(unittest.TestCase):
             im = fields.DateImporter(s, hf, 'x')
             im.write(values)
             f = s.get(hf['x'])
-            self.assertListEqual(
-                [datetime(year=int(v[0:4]), month=int(v[5:7]), day=int(v[8:10])
-                          ).timestamp() for v in values],
-                f.data[:].tolist())
+            
+            ts_list = [
+                utils.to_timestamp(datetime(year=int(v[0:4]), month=int(v[5:7]), day=int(v[8:10]))) for v in values
+            ] 
+            
+            self.assertListEqual(ts_list, f.data[:].tolist())

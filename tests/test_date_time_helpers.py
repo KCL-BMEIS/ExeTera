@@ -6,7 +6,7 @@ from datetime import timedelta as T
 import numpy as np
 
 from exetera.processing import date_time_helpers as dth
-
+from exetera.core import utils
 
 class S:
     def __init__(self, start, end, expected=None, message=None):
@@ -139,13 +139,13 @@ class TestDateTimeHelpers(unittest.TestCase):
         self._do_scenario_test(scenarios, 'days', -28)
         self._do_scenario_test(scenarios, 'week', -4)
         self._do_scenario_test(scenarios, 'weeks', -4)
-
+        
 
 class TestGetDays(unittest.TestCase):
 
     def _setup_timestamps(self, start, delta, count):
 
-        return np.asarray([(start + T(seconds=delta * i)).timestamp()
+        return np.asarray([utils.to_timestamp(start + T(seconds=delta * i))
                          for i in range(count)], dtype=np.float64)
 
     def _get_expected(self, timestamps, filter_field=None, start_date=None, end_date=None):
@@ -176,7 +176,7 @@ class TestGetDays(unittest.TestCase):
 
     def test_get_days_delimiting_dates(self):
         tss = self._setup_timestamps(D(2020, 5, 10, 23, 55, 0, 123500), 30000, 11)
-        start_date = D(2020, 5, 11).timestamp()
+        start_date = utils.to_timestamp(D(2020, 5, 11))
         actual = dth.get_days(tss, start_date=start_date)
         expected = self._get_expected(tss, start_date=start_date)
         self.assertListEqual(expected.tolist(), actual[0].tolist())

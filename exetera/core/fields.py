@@ -20,6 +20,7 @@ from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
 from exetera.core import validation as val
+from exetera.core import utils
 
 class HDF5Field(Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
@@ -1974,10 +1975,10 @@ class DateTimeImporter:
         for i, v in enumerate(values):
             if len(v) == 32:
                 ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S.%f%z')
-                results[i] = ts.timestamp()
+                results[i] = utils.to_timestamp(ts)
             elif len(v) == 25:
                 ts = datetime.strptime(v, '%Y-%m-%d %H:%M:%S%z')
-                results[i] = ts.timestamp()
+                results[i] = utils.to_timestamp(ts)
             else:
                 if self._optional is True and len(v) == 0:
                     results[i] = np.nan
@@ -2019,7 +2020,7 @@ class DateImporter:
                 timestamps[i] = np.nan
             else:
                 ts = datetime.strptime(value, '%Y-%m-%d')
-                timestamps[i] = ts.timestamp()
+                timestamps[i] = utils.to_timestamp(ts)
         self._field.data.write_part(timestamps)
 
     def complete(self):

@@ -7,6 +7,7 @@ from exetera.core import session, fields
 from exetera.core.abstract_types import DataFrame
 from io import BytesIO
 from exetera.core.dataset import HDF5Dataset, copy, move
+from exetera.core import utils
 
 
 class TestDataSet(unittest.TestCase):
@@ -102,9 +103,9 @@ class TestDataSet(unittest.TestCase):
         ncontents2 = np.array([5, 6, 7, 8], dtype=np.int32)
         from datetime import datetime as D
         tcontents1 = [D(2020, 1, 1), D(2020, 1, 2), D(2020, 1, 3), D(2020, 1, 4)]
-        tcontents1 = np.array([d.timestamp() for d in tcontents1])
+        tcontents1 = np.array([utils.to_timestamp(d) for d in tcontents1])
         tcontents2 = [D(2021, 1, 1), D(2021, 1, 2), D(2021, 1, 3), D(2021, 1, 4)]
-        tcontents2 = np.array([d.timestamp() for d in tcontents2])
+        tcontents2 = np.array([utils.to_timestamp(d) for d in tcontents2])
 
         bio = BytesIO()
         with session.Session() as s:

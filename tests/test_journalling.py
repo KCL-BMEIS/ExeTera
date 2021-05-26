@@ -12,6 +12,7 @@ from exetera.core import session
 from exetera.core import fields
 from exetera.core import persistence as per
 from exetera.core import journal
+from exetera.core import utils
 
 
 class Schema:
@@ -23,9 +24,9 @@ class TestSessionMerge(unittest.TestCase):
 
     def test_journal_full(self):
 
-        ts1 = datetime(2020, 8, 1).timestamp()
-        ts2 = datetime(2020, 9, 1).timestamp()
-        tsf = ops.MAX_DATETIME.timestamp()
+        ts1 = utils.to_timestamp(datetime(2020, 8, 1))
+        ts2 = utils.to_timestamp(datetime(2020, 9, 1))
+        tsf = utils.to_timestamp(ops.MAX_DATETIME)
 
         d1_id = np.chararray(9)
         d1_id[:] = np.asarray(['a', 'a', 'b', 'b', 'c', 'e', 'e', 'e', 'g'])

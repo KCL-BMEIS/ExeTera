@@ -12,7 +12,7 @@
 import time
 from collections import defaultdict
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 
 import numpy as np
@@ -85,6 +85,30 @@ def string_to_datetime(field):
             ts = datetime.strptime(field, '%Y-%m-%d')
 
     return ts
+
+
+def to_timestamp(dt):
+    """
+    Convert the date time object `dt` to a timestamp value in a portable way. If `dt` has no timezone information
+    UTC will be used to determine the timestamp.
+    """
+    # convert to UTC if needed
+    # dt = dt if dt.tzinfo is not None else dt.astimezone(timezone.utc)
+    if dt.tzinfo is None:
+        # because datetime.astimezone is also bugged
+        dt=dt.replace(tzinfo=timezone.utc)
+        
+    return (dt - datetime(1970, 1, 1, tzinfo=dt.tzinfo)).total_seconds()
+    
+    
+def from_timestamp(ts,tzinfo=None):
+    """
+    Convert the UTC timestamp float value `ts` to a datetime object in a portable way.  
+    """
+    # select UTC if no timezone specified
+    tzinfo=tzinfo if tzinfo is not None else timezone.utc
+        
+    return datetime(1970, 1, 1, tzinfo=tzinfo) + timedelta(seconds=ts)
 
 
 def build_histogram(dataset, filtered_records=None, tx=None):

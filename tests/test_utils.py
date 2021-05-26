@@ -10,10 +10,13 @@
 # limitations under the License.
 
 import unittest
+from datetime import datetime, timezone, timedelta
 
 import numpy as np
 
-from exetera.core.utils import find_longest_sequence_of, to_escaped, bytearray_to_escaped
+from exetera.core.utils import (
+    find_longest_sequence_of, to_escaped, bytearray_to_escaped, to_timestamp, from_timestamp
+)
 
 
 class TestUtils(unittest.TestCase):
@@ -81,3 +84,59 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(
             np.array_equal(dest[:len1 + len2],
                            np.frombuffer(b'"ab""cd""""ab"",""cd"""', dtype='S1')))
+
+    def test_to_timestamp_past(self):
+        n=datetime(2020,1,4,1,2,3)  # winter time
+        ts=n.timestamp()
+        
+        self.assertAlmostEqual(ts, to_timestamp(n),5)
+
+    def test_to_timestamp_past_dst(self):
+        n=datetime(2020,6,4,1,2,3)  # daylight savings time
+        ts=n.timestamp()
+        
+        self.assertAlmostEqual(ts, to_timestamp(n),5)
+
+    def test_to_timestamp_future(self):
+        n=datetime(2050,1,4,1,2,3)  # winter time
+        ts=n.timestamp()
+        
+        self.assertAlmostEqual(ts, to_timestamp(n),5)
+
+    def test_to_timestamp_future_dst(self):
+        n=datetime(2050,6,4,1,2,3)  # daylight savings time
+        ts=n.timestamp()
+        
+        self.assertAlmostEqual(ts, to_timestamp(n),5)
+        
+    def test_to_timestamp_pre_epoch(self):
+        n=datetime(1970,1,1) - timedelta(days=365)
+        ts=-60*60*24*365
+        
+        self.assertAlmostEqual(ts, to_timestamp(n),5)
+        
+    def test_to_timestamp_pre_epoch_dst(self):
+        n=datetime(1970,1,1) - timedelta(days=180)
+        ts=-60*60*24*180
+        
+        self.assertAlmostEqual(ts, to_timestamp(n),5)
+        
+    def test_from_timestamp(self):
+        self.assertEqual(from_timestamp(0),datetime(1970,1,1,tzinfo=timezone.utc))
+        
+    def test_from_timestamp_past(self):
+        day=60*60*24
+        self.assertEqual(from_timestamp(day*3),datetime(1970,1,4,tzinfo=timezone.utc))
+        
+    def test_from_timestamp_past_dst(self):
+        day=60*60*24
+        self.assertEqual(from_timestamp(day*100),datetime(1970,4,11,tzinfo=timezone.utc))
+                
+    def test_from_timestamp_future(self):
+        day=60*60*24
+        self.assertEqual(from_timestamp(day*29220),datetime(2050,1,1,tzinfo=timezone.utc))
+                
+    def test_from_timestamp_future_dst(self):
+        day=60*60*24
+        self.assertEqual(from_timestamp(day*29320),datetime(2050,4,11,tzinfo=timezone.utc))
+        
