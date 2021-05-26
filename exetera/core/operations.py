@@ -14,7 +14,7 @@ DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62
 INVALID_INDEX_64 = INVALID_INDEX
 INVALID_INDEX_32 = (1 << 31) - 1
-MAX_DATETIME = datetime(year=9999, month=1, day=1) #.timestamp()
+MAX_DATETIME = datetime(year=3000, month=1, day=1)
 
 
 @njit
