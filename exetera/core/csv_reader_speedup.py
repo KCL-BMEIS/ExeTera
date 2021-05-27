@@ -9,7 +9,7 @@ from io import StringIO
 
 
 def get_file_stat(source, chunk_row_size):
-    total_byte_size, count_columns, first_line = 0, 0, ''
+    total_byte_size, count_columns = 0, 0
 
     if isinstance(source,str):
         with open(source) as f:
@@ -19,7 +19,6 @@ def get_file_stat(source, chunk_row_size):
             f.seek(0)
             header = csv.DictReader(f)  
             count_columns = len(header.fieldnames)              
-            first_line = f.readline()
 
     elif isinstance(source, StringIO):
         source.seek(0,2)
@@ -27,19 +26,13 @@ def get_file_stat(source, chunk_row_size):
 
         source.seek(0)
         header = csv.DictReader(source)
-        count_columns = len(header.fieldnames) 
-        first_line = source.readline()
-        
-
-    # length_factor = 10
-    assume_line_length = len(first_line) #* length_factor    
-    assume_cell_length = max([len(x) for x in first_line.split(',')]) #* length_factor
-    # print('assume_line_length', assume_line_length, 'assume_cell_length', assume_cell_length)
+        count_columns = len(header.fieldnames)     
 
     # margin = 10
     count_rows = chunk_row_size
-    # print('count_columns', count_columns, 'count_rows', count_rows)
     chunk_byte_size = count_rows * count_columns
+    # print('count_columns', count_columns, 'count_rows', count_rows, 'chunk_byte_size', chunk_byte_size)
+
     return total_byte_size, count_columns, count_rows, chunk_byte_size
 
 
@@ -121,9 +114,6 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
             # reassign
             if is_indices_full or is_values_full:
                 continue
-                
-            if written_row_count == -1 or written_row_count == 0:
-                raise Exception('The length of one line is too large, please modify the chunksize and make it larger')
 
             hasHeader = False
             chunk_index += offset_pos
@@ -131,7 +121,7 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
             ch += 1
 
             # convert and write
-            for ith, i_c in enumerate(index_map):                
+            for ith, i_c in enumerate(index_map):     
                 if field_importer_list and field_importer_list[ith]: 
                     field_importer_list[ith].transform_and_write_part(column_inds, column_vals, column_offsets, i_c, written_row_count)
                     field_importer_list[ith].flush()

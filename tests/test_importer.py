@@ -133,7 +133,8 @@ class TestImporter(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             importer.import_with_schema(self.ts, bio, self.schema, self.files, False, include, exclude)
-            self.assertEqual(str(context.exception), "-n/--include: the following include table(s) are not part of any input files: {'schema_wrong_key'}")
+        
+        self.assertEqual(str(context.exception), "-n/--include: the following include table(s) are not part of any input files: {'schema_wrong_key'}")
                     
 
     def test_importer_with_arg_exclude(self):
@@ -188,30 +189,54 @@ class TestImporter(unittest.TestCase):
 
 
     def test_numeric_importer_with_empty_value_in_strict_mode(self):
-        open_csv = StringIO('name,id\na,1\nc,')
-        files = {'schema_key': open_csv}
+        TEST_CSV_CONTENTS_EMPTY_VALUE = '\n'.join((
+            'name, id',
+            'a,     1',
+            'c,     '
+        ))
 
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+        with open(csv_file_name, 'w') as fcsv:
+            fcsv.write(TEST_CSV_CONTENTS_EMPTY_VALUE)
+
+        files = {'schema_key': csv_file_name}
+        
         bio = BytesIO()
         with self.assertRaises(Exception) as context:
             importer.import_with_schema(self.ts, bio, self.schema, files, False, {}, {})
-            self.assertEqual(str(context.exception), "Numeric value in the field 'id' can not be empty in strict mode")
+        
+        self.assertEqual(str(context.exception), "Numeric value in the field 'id' can not be empty in strict mode")
+        
+        os.close(fd_csv)
 
         
-    def test_numeric_importer_with_non_numeric_value_in_strict_mode(self):        
-        open_csv = StringIO('name,id\na,1\nc,5@')
-        files = {'schema_key': open_csv}
+    def test_numeric_importer_with_non_numeric_value_in_strict_mode(self):
+        TEST_CSV_CONTENTS_EMPTY_VALUE = '\n'.join((
+            'name, id',
+            'a,     1',
+            'c,     5@'
+        ))
+
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+        with open(csv_file_name, 'w') as fcsv:
+            fcsv.write(TEST_CSV_CONTENTS_EMPTY_VALUE)
+
+        files = {'schema_key': csv_file_name}
         
         bio = BytesIO()
         with self.assertRaises(Exception) as context:
             importer.import_with_schema(self.ts, bio, self.schema, files, False, {}, {})
-            self.assertEqual(str(context.exception), "The following numeric value in the field 'id' can not be parsed: 5@")
+        
+        self.assertEqual(str(context.exception), "The following numeric value in the field 'id' can not be parsed: 5@")
+
+        os.close(fd_csv)
 
 
     def test_numeric_importer_with_non_empty_valid_value_in_strict_mode(self):
         bio = BytesIO()
         importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {})
         with h5py.File(bio, 'r') as hf:
-            self.assertTrue('id' in set(hf['schema_key'].keys()))
+            self.assertTrue('id' in set(hf['schema_key'].keys()))  
             self.assertTrue('id_valid' not in set(hf['schema_key'].keys()))
 
 

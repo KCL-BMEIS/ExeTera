@@ -491,21 +491,23 @@ class TestGetSpans(unittest.TestCase):
 
 class TestFieldImporter(unittest.TestCase):
 
-    def _one_dim_data_to_indexed(self, data):
-        total_data_bytes = sum([len(s) for s in data])
+    def _one_dim_data_to_indexed(self, data, field_size):
+        data = [str(s) for s in data]
         count_row = len(data)
+        chunk_row_size = count_row
 
         indices = np.zeros((1, count_row + 1), dtype = np.int64)
-        values = np.zeros((1, total_data_bytes), dtype = np.uint8)
+        offsets = np.array([0, field_size], dtype=np.int64) * chunk_row_size
+        values = np.zeros(offsets[-1], dtype = np.uint8)
 
         accumulated = 0
         for i, s in enumerate(data):
             indices[0, i + 1] = indices[0, i] + len(s)
             for j, c in enumerate(s):
-                values[0, accumulated] = np.frombuffer(c.encode(), dtype =np.uint8)[0]
+                values[accumulated] = np.frombuffer(c.encode(), dtype =np.uint8)[0]
                 accumulated += 1
 
-        return indices, values, count_row
+        return indices, values, offsets, count_row
 
 
     def test_get_byte_map(self):
@@ -528,24 +530,25 @@ class TestFieldImporter(unittest.TestCase):
 
         column_inds = np.array([[0, 4, 5, 8, 10],
                                 [0, 3, 5, 7, 10]], dtype = np.uint64)
-        column_vals = np.array([[100, 100, 100, 100, 97, 99, 99, 99, 98, 98],
-                                [89, 101, 115, 78, 111, 78, 111, 89, 101, 115]], dtype = np.uint8)
+        column_vals = np.array([100, 100, 100, 100, 97, 99, 99, 99, 98, 98,
+                                89, 101, 115, 78, 111, 78, 111, 89, 101, 115], dtype = np.uint8)
+        column_offsets = np.array([0,10,20], dtype = np.int64)
 
         expected_chunk_1 = np.array([4,1,3,2,0,0], dtype = np.uint8)
         expected_chunk_2 = np.array([1,0,0,1,0,0], dtype = np.uint8)
 
         cat_keys, cat_indices, cat_value = ops.get_byte_map({'a':1, 'bb':2, 'ccc':3, 'dddd':4})
-        ops.categorical_transform(chunk_1, 0, column_inds, column_vals, cat_keys, cat_indices, cat_value)
+        ops.categorical_transform(chunk_1, 0, column_inds, column_vals, column_offsets, cat_keys, cat_indices, cat_value)
         
         cat_keys, cat_indices, cat_value = ops.get_byte_map({'Yes':1, 'No':0})
-        ops.categorical_transform(chunk_2, 1, column_inds, column_vals, cat_keys, cat_indices, cat_value)
+        ops.categorical_transform(chunk_2, 1, column_inds, column_vals, column_offsets, cat_keys, cat_indices, cat_value)
 
         self.assertListEqual(list(chunk_1), list(expected_chunk_1))
         self.assertListEqual(list(chunk_2), list(expected_chunk_2))
 
 
     def test_numeric_transform_int(self):
-        column_inds, column_vals, written_row_count = self._one_dim_data_to_indexed(['1', '001', '+1', '-1', '100', '10.23', '10.89', '1e1'])
+        column_inds, column_vals, column_offsets, written_row_count = self._one_dim_data_to_indexed(['1', '001', '+1', '-1', '100', '10.23', '10.89', '1e1'], 30)
 
         elements = np.zeros(written_row_count, dtype=np.uint8)
         validity = np.zeros(written_row_count, dtype='bool')
@@ -555,7 +558,7 @@ class TestFieldImporter(unittest.TestCase):
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('int_field', "utf-8"), dtype=np.uint8)
         
-        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)          
+        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, parser, invalid_value, validation_mode, field_name)          
 
         expected_elements = np.array([1, 1, 1, -1, 100, 10, 10, 10], dtype = np.uint8)
         
@@ -564,7 +567,7 @@ class TestFieldImporter(unittest.TestCase):
 
 
     def test_numeric_transform_float(self):
-        column_inds, column_vals, written_row_count = self._one_dim_data_to_indexed(['1.', '.1', '001.0000', '10.23', '3.5'])
+        column_inds, column_vals, column_offsets, written_row_count = self._one_dim_data_to_indexed(['1.', '.1', '001.0000', '10.23', '3.5'], 30)
 
         elements = np.zeros(written_row_count, dtype=np.float32)
         validity = np.zeros(written_row_count, dtype='bool')
@@ -574,7 +577,7 @@ class TestFieldImporter(unittest.TestCase):
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('float_field', "utf-8"), dtype=np.uint8)
 
-        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)              
+        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, parser, invalid_value, validation_mode, field_name)              
 
         expected_elements = np.array([1, 0.1, 1, 10.23, 3.5], dtype = np.float32)  
 
@@ -583,7 +586,7 @@ class TestFieldImporter(unittest.TestCase):
 
 
     def test_numeric_transform_pow(self):
-        column_inds, column_vals, written_row_count = self._one_dim_data_to_indexed(['1e1', '1e+1', '+1e001', '1e-1','1.5e2'])
+        column_inds, column_vals, column_offsets, written_row_count = self._one_dim_data_to_indexed(['1e1', '1e+1', '+1e001', '1e-1','1.5e2'], 30)
 
         elements = np.zeros(written_row_count, dtype=np.float32)
         validity = np.zeros(written_row_count, dtype='bool')
@@ -593,7 +596,7 @@ class TestFieldImporter(unittest.TestCase):
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('float_field', "utf-8"), dtype=np.uint8)
 
-        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)              
+        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, parser, invalid_value, validation_mode, field_name)              
 
         expected_elements = np.array([10, 10, 10, 0.1, 150], dtype = np.float32)  
 
@@ -603,7 +606,7 @@ class TestFieldImporter(unittest.TestCase):
 
 
     def test_numeric_transform_exception_too_many_decimal(self):
-        column_inds, column_vals, written_row_count = self._one_dim_data_to_indexed(['1', '100', '10.23', '10..8'])
+        column_inds, column_vals, column_offsets, written_row_count = self._one_dim_data_to_indexed(['1', '100', '10.23', '10..8'],30)
 
         elements = np.zeros(written_row_count, dtype=np.float32)
         validity = np.zeros(written_row_count, dtype='bool')
@@ -613,7 +616,7 @@ class TestFieldImporter(unittest.TestCase):
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('int_field', "utf-8"), dtype=np.uint8)
         
-        exception_message, exception_args = ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, 0, written_row_count, parser, invalid_value, validation_mode, field_name)    
+        exception_message, exception_args = ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, parser, invalid_value, validation_mode, field_name)    
 
         self.assertEqual(exception_message, 2)
         self.assertEqual(len(exception_args), 2)
@@ -631,14 +634,18 @@ class TestFieldImporter(unittest.TestCase):
         written_row_count = 4
         column_inds = np.array([[0, 4, 5, 8, 10],
                                 [0, 3, 5, 7, 10]], dtype = np.uint64)
-        column_vals = np.array([[100, 100, 100, 100, 97, 99, 99, 99, 98, 98],
-                                [89, 101, 115, 78, 111, 78, 111, 89, 101, 115]], dtype = np.uint8)
+        column_vals = np.array([100, 100, 100, 100, 97, 99, 99, 99, 98, 98, 
+                                89, 101, 115, 78, 111, 78, 111, 89, 101, 115], dtype = np.uint8)
+        column_offsets = np.array([0, 10, 20], dtype = np.int64)
 
-        data = ops.transform_to_values(column_inds, column_vals, 0, written_row_count)
+        data_0 = ops.transform_to_values(column_inds, column_vals, column_offsets, 0, written_row_count)
+        byte_data_0 = [x.tobytes() for x in data_0]
+        expected_byte_data_0 = [b'dddd', b'a', b'ccc', b'bb']
+        self.assertEqual(byte_data_0, expected_byte_data_0)
 
-        byte_data = [x.tobytes() for x in data]
-        expected_byte_data = [b'dddd', b'a', b'ccc', b'bb']
+        data_1 = ops.transform_to_values(column_inds, column_vals, column_offsets, 1, written_row_count)
+        byte_data_1 = [x.tobytes() for x in data_1]
+        expected_byte_data_1 = [b'Yes', b'No', b'No', b'Yes']
+        self.assertEqual(byte_data_1, expected_byte_data_1)
 
-        self.assertEqual(byte_data, expected_byte_data)
-        
         

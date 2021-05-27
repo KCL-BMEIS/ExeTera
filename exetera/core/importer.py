@@ -110,7 +110,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
             DatasetImporter(datastore, files[sk], hf, sk, schema[sk], timestamp,
                             include=include, exclude=exclude,
                             stop_after=stop_after.get(sk, None),
-                            show_progress_every=show_every, chunk_row_size=chunk_row_size)
+                            chunk_row_size=chunk_row_size)
 
             print(sk, hf.keys())
             table = hf[sk]
@@ -128,19 +128,9 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
 
 class DatasetImporter:
     def __init__(self, datastore, source, hf, space, schema, timestamp,
-                 include=None, exclude=None,
-                 keys=None,
-                 stop_after=None, show_progress_every=None, filter_fn=None,
-                 early_filter=None, chunk_row_size = (1 << 20)) :
-
-        # self.names_ = list()
-        self.index_ = None
-
-        # stop_after = 2000000
-        
-        time0 = time.time()
-
-        seen_ids = set()
+                 include=None, exclude=None, keys=None,
+                 stop_after=None, chunk_row_size = (1 << 20)) :
+                 
 
         if space not in hf.keys():
             hf.create_group(space)
@@ -166,13 +156,6 @@ class DatasetImporter:
             csvf_fieldnames = [k.strip() for k in csvf.fieldnames]
             index_map = [csvf_fieldnames.index(k) for k in fields_to_use]
 
-            #TODO: check
-            early_key_index = None
-            if early_filter is not None:
-                if early_filter[0] not in available_keys:
-                    raise ValueError(
-                        f"'early_filter': tuple element zero must be a key that is in the dataset")
-                early_key_index = available_keys.index(early_filter[0])
 
             field_importer_list = list() # only for field_to_use          
             for i_n in range(len(fields_to_use)):

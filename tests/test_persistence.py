@@ -14,22 +14,23 @@ from exetera.core import validation as val
 from exetera.core import utils
 
 
-def one_dim_data_to_indexed(data):
+def one_dim_data_to_indexed(data, field_size):
     data = [str(s) for s in data]
-    total_data_bytes = sum([len(s) for s in data])
     count_row = len(data)
+    chunk_row_size = count_row
 
     indices = np.zeros((1, count_row + 1), dtype = np.int64)
-    values = np.zeros((1, total_data_bytes), dtype = np.uint8)
+    offsets = np.array([0, field_size], dtype=np.int64) * chunk_row_size
+    values = np.zeros(offsets[-1], dtype = np.uint8)
 
     accumulated = 0
     for i, s in enumerate(data):
         indices[0, i + 1] = indices[0, i] + len(s)
         for j, c in enumerate(s):
-            values[0, accumulated] = np.frombuffer(c.encode(), dtype =np.uint8)[0]
+            values[accumulated] = np.frombuffer(c.encode(), dtype =np.uint8)[0]
             accumulated += 1
 
-    return indices, values, count_row
+    return indices, values, offsets, count_row
 
 
 class TestPersistence(unittest.TestCase):
@@ -261,12 +262,12 @@ class TestPersistence(unittest.TestCase):
         data = ['True', 'False', 'None', 'false', 'true', 'Wrong', 'incorrect', 'FALSE', 'TRUE', 'OFF',
                   'ON', 'off', '', 'no', 'on', '-1', None, 'N', 'on', 'n',
                   'yes', '0', None, 'f', 'F', 'YES', '1', 'y', 'Y']
-        indices, values, written_row_count = one_dim_data_to_indexed(data)
-
+        indices, values, offsets, written_row_count = one_dim_data_to_indexed(data, 30)
+        
         with h5py.File(bio, 'w') as hf:
             hf.create_group('test')
             foo = rw.NumericImporter(datastore, hf, 'foo', 'bool', persistence.try_str_to_bool, validation_mode='relaxed', timestamp=ts)
-            foo.transform_and_write_part(indices, values, 0, written_row_count)
+            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
             
             foo = rw.NumericReader(datastore, hf['foo'])[:]
             foo_valid = rw.NumericReader(datastore, hf['foo_valid'])[:]
@@ -293,11 +294,11 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             data = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
-            indices, values, written_row_count = one_dim_data_to_indexed(data) 
+            indices, values, offsets, written_row_count = one_dim_data_to_indexed(data, 30) 
 
             foo = rw.NumericImporter(datastore, hf, 'foo', 'float32',
                                               persistence.try_str_to_float, validation_mode='relaxed',timestamp=ts)
-            foo.transform_and_write_part(indices, values, 0, written_row_count)
+            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
 
             r = rw.NumericReader(datastore, hf['foo'])[:]
             expected = [0.0, 0.0, 2.0, 3.0, 40.0, 5.21e-2, 0.0, -6.0, -7.0, -80.0, -9.21e-2,
@@ -319,13 +320,13 @@ class TestPersistence(unittest.TestCase):
         bio = BytesIO()
         data = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                   '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
-        indices, values, written_row_count = one_dim_data_to_indexed(data)
+        indices, values, offsets, written_row_count = one_dim_data_to_indexed(data, 30)
 
         with h5py.File(bio, 'w') as hf:
             foo = rw.NumericImporter(datastore, hf, 'foo', 'float32',
                                               persistence.try_str_to_float, validation_mode='relaxed', timestamp=ts)
 
-            foo.transform_and_write_part(indices, values, 0, written_row_count)
+            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
 
         with h5py.File(bio, 'r') as hf:
             foo = rw.NumericReader(datastore, hf['foo'])
@@ -407,12 +408,12 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             data = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
-            indices, values, written_row_count = one_dim_data_to_indexed(data)
+            indices, values, offsets, written_row_count = one_dim_data_to_indexed(data, 30)
 
             foo = rw.NumericImporter(datastore, hf, 'foo', 'int32',
                                               persistence.try_str_to_int, validation_mode='relaxed', timestamp=ts)
 
-            foo.transform_and_write_part(indices, values, 0, written_row_count)
+            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
 
             # expected = [0, 0, 2, 0, 0, 0, 0, -6, 0, 0, 0,
             #             0, 0, 2, 0, 0, 0, 0, -6, 0, 0, 0]
@@ -432,12 +433,12 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             data = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       0, 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
-            indices, values, written_row_count = one_dim_data_to_indexed(data)
+            indices, values, offsets, written_row_count = one_dim_data_to_indexed(data, 30)
 
             foo = rw.NumericImporter(datastore, hf, 'foo', 'int32',
                                               persistence.try_str_to_float_to_int, validation_mode='relaxed', timestamp=ts)
 
-            foo.transform_and_write_part(indices, values, 0, written_row_count)
+            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
             foo.flush()
             # for f in persistence.numeric_iterator(hf['foo']):
             #     print(f[0], f[1])
@@ -462,11 +463,11 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             data = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
-            indices, values, written_row_count = one_dim_data_to_indexed(data)
+            indices, values, offsets, written_row_count = one_dim_data_to_indexed(data, 30)
 
             foo = rw.NumericImporter(datastore, hf, 'foo', 'uint32',
                                               persistence.try_str_to_int, validation_mode='relaxed', timestamp=ts)
-            foo.transform_and_write_part(indices, values, 0, written_row_count)
+            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
 
             expected = [0, 0, 2, 3, 40, 0, 0, 4294967290, 4294967289, 4294967216, 0,
                         0, 0, 2, 3, 40, 0, 0, 4294967290, 4294967289, 4294967216, 0]
@@ -485,12 +486,12 @@ class TestPersistence(unittest.TestCase):
         bio = BytesIO()
         with h5py.File(bio, 'w') as hf:
             data = ['', 'True', 'False', 'False', '', '', 'True', 'False', 'True', '']
-            indices, values, written_row_count = one_dim_data_to_indexed(data)
+            indices, values, offsets, written_row_count = one_dim_data_to_indexed(data, 5)
 
             foo = rw.CategoricalImporter(datastore, hf, 'foo',
                                                   {'': 0, 'False': 1, 'True': 2}, ts)
 
-            foo.transform_and_write_part(indices, values, 0, written_row_count)
+            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
 
             self.assertListEqual([0, 2, 1, 1, 0, 0, 2, 1, 2, 0],
                                  datastore.get_reader(hf['foo'])[:].tolist())
@@ -527,12 +528,12 @@ class TestPersistence(unittest.TestCase):
                       '', 'True', 'False', 'False', '']
             value_map = {'': 0, 'False': 1, 'True': 2}
 
-            indices, values, written_row_count = one_dim_data_to_indexed(data)
+            indices, values, offsets, written_row_count = one_dim_data_to_indexed(data, 5)
 
             foo = rw.CategoricalImporter(datastore, hf, 'foo',
                                                   {'': 0, 'False': 1, 'True': 2}, ts)
 
-            foo.transform_and_write_part(indices, values, 0, written_row_count)
+            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
 
         with h5py.File(bio, 'r') as hf:
             foo_int = rw.CategoricalReader(datastore, hf['foo'])
