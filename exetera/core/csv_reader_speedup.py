@@ -53,8 +53,6 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, colu
     WHITE_SPACE_VALUE = np.frombuffer(b' ', dtype='S1')[0][0]
     #CARRIAGE_RETURN_VALUE = np.frombuffer(b'\r', dtype='S1')[0][0]
 
-    # TODO, add show_progress_ever
-
     time0 = time.time()
 
     total_byte_size, count_columns, count_rows, val_row_count, val_threshold, chunk_byte_size = get_file_stat(source, chunk_row_size)
