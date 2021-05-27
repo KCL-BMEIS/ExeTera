@@ -558,13 +558,13 @@ class IndexedStringMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
-        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_filter_to_indexed_field(self, filter_to_apply, target, in_place)
 
@@ -574,13 +574,13 @@ class IndexedStringMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
-        :param: index_to_apply: a Field or numpy array that contains the indices
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_index_to_indexed_field(self, index_to_apply, target, in_place)
 
@@ -636,13 +636,13 @@ class FixedStringMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
-        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
 
@@ -652,13 +652,13 @@ class FixedStringMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
-        :param: index_to_apply: a Field or numpy array that contains the indices
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
@@ -710,13 +710,13 @@ class NumericMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
-        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
 
@@ -726,13 +726,13 @@ class NumericMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
-        :param: index_to_apply: a Field or numpy array that contains the indices
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
@@ -883,13 +883,13 @@ class CategoricalMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
-        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param target: if set, this is the field that is written to. This field must be writable. If 'target' is set, 
+            'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
 
@@ -899,13 +899,13 @@ class CategoricalMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
-        :param: index_to_apply: a Field or numpy array that contains the indices
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
@@ -974,13 +974,13 @@ class TimestampMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
-        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
 
@@ -990,13 +990,13 @@ class TimestampMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
-        :param: index_to_apply: a Field or numpy array that contains the indices
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
@@ -1222,13 +1222,13 @@ class IndexedStringField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
-        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
         return FieldDataOps.apply_filter_to_indexed_field(self, filter_to_apply, target, in_place)
@@ -1239,13 +1239,13 @@ class IndexedStringField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
-        :param: index_to_apply: a Field or numpy array that contains the indices
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
         return FieldDataOps.apply_index_to_indexed_field(self, index_to_apply, target, in_place)
@@ -1316,13 +1316,13 @@ class FixedStringField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
-        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
@@ -1333,13 +1333,13 @@ class FixedStringField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
-        :param: index_to_apply: a Field or numpy array that contains the indices
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
@@ -1405,13 +1405,13 @@ class NumericField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
-        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
@@ -1422,13 +1422,13 @@ class NumericField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
-        :param: index_to_apply: a Field or numpy array that contains the indices
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
@@ -1641,13 +1641,13 @@ class CategoricalField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
-        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
@@ -1658,13 +1658,13 @@ class CategoricalField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
-        :param: index_to_apply: a Field or numpy array that contains the indices
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
@@ -1754,13 +1754,13 @@ class TimestampField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
-        :param: filter_to_apply: a Field or numpy array that contains the boolean filter data
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param filter_to_apply: a Field or numpy array that contains the boolean filter data
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
         return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
@@ -1771,13 +1771,13 @@ class TimestampField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
-        :param: index_to_apply: a Field or numpy array that contains the indices
-        :param: target: if set, this is the field that is written do. This field must be writable.
-        If 'target' is set, 'in_place' must be False.
-        :param: in_place: if True, perform the operation destructively on this field. This field
-        must be writable. If 'in_place' is True, 'target' must be None
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
         :return: The reindexed field. This is a new field instance unless 'target' is set, in which
-        case it is the target field, or unless 'in_place' is True, in which case it is this field.
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)

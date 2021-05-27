@@ -29,7 +29,7 @@ exetera.core.dataset module
    :show-inheritance:
 
 exetera.core.dataframe module
----------------------------
+-----------------------------
 
 .. automodule:: exetera.core.dataframe
    :members:
