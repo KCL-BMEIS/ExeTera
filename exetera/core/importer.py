@@ -174,25 +174,18 @@ class DatasetImporter:
                         f"'early_filter': tuple element zero must be a key that is in the dataset")
                 early_key_index = available_keys.index(early_filter[0])
 
-            field_importer_list = list() # only for field_to_use
-            
+            field_importer_list = list() # only for field_to_use          
             for i_n in range(len(fields_to_use)):
                 field_name = fields_to_use[i_n]
                 sch = schema.fields[field_name]
                 field_importer = sch.importer(datastore, group, field_name, timestamp)
                 field_importer_list.append(field_importer)
 
-
             column_offsets = np.zeros(len(csvf_fieldnames) + 1, dtype=np.int64)
-            column_val_counts = np.zeros(len(csvf_fieldnames), dtype=np.int64)
             for i, field_name in enumerate(csvf_fieldnames):
                 sch = schema.fields[field_name]
-                column_val_counts[i] = sch.field_size * chunk_row_size
                 column_offsets[i + 1] = column_offsets[i] + sch.field_size * chunk_row_size
-
-            # print(column_offset)
-            # exit()
         
-        read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, column_val_counts, index_map, field_importer_list, stop_after_rows=stop_after)
+        read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, index_map, field_importer_list, stop_after_rows=stop_after)
 
 
