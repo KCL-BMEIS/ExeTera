@@ -10,7 +10,7 @@ from exetera.core import fields, utils
 
 DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62
-MAX_DATETIME = datetime(year=9999, month=1, day=1) #.timestamp()
+MAX_DATETIME = datetime(year=3000, month=1, day=1) #.timestamp()
 
 
 def chunks(length, chunksize=1 << 20):
@@ -23,7 +23,7 @@ def chunks(length, chunksize=1 << 20):
 
 def safe_map(field, map_field, map_filter, empty_value=None):
     if isinstance(field, Field):
-        if isinstance(field, fields.IndexedStringField):
+        if field.indexed:
             return safe_map_indexed_values(
                 field.indices[:], field.values[:], map_field, map_filter, empty_value)
         else:
@@ -61,7 +61,8 @@ def safe_map_indexed_values(data_indices, data_values, map_field, map_filter, em
             dst = offset
             dse = offset + empty_value_len
             i_result[i+1] = dse
-            v_result[dst:dse] = empty_value
+            if empty_value is not None:
+                v_result[dst:dse] = empty_value
             offset += dse - dst
 
     return i_result, v_result
@@ -151,7 +152,6 @@ def data_iterator(data_field, chunksize=1 << 20):
         for v in range(c[0], c[1]):
             yield data[v]
 
-
 @njit
 def apply_filter_to_index_values(index_filter, indices, values):
     # pass 1 - determine the destination lengths
@@ -207,7 +207,7 @@ def apply_indices_to_index_values(indices_to_apply, indices, values):
 
 
 def get_spans_for_field(ndarray):
-    results = np.zeros(len(ndarray) + 1, dtype=np.bool)
+    results = np.zeros(len(ndarray) + 1, dtype=bool)
     if np.issubdtype(ndarray.dtype, np.number):
         fn = np.not_equal
     else:
@@ -218,6 +218,8 @@ def get_spans_for_field(ndarray):
     results[-1] = True
     return np.nonzero(results)[0]
 
+
+@njit
 def _get_spans_for_2_fields_by_spans(span0, span1):
     spans = []
     j=0
@@ -233,6 +235,8 @@ def _get_spans_for_2_fields_by_spans(span0, span1):
         spans.extend(span1[j:])
     return spans
 
+
+@njit
 def _get_spans_for_2_fields(ndarray0, ndarray1):
     count = 0
     spans = np.zeros(len(ndarray0)+1, dtype=np.uint32)
@@ -272,6 +276,84 @@ def apply_spans_index_of_min(spans, src_array, dest_array):
             dest_array[i] = cur
         else:
             dest_array[i] = cur + src_array[cur:next].argmin()
+
+    return dest_array
+
+
+@njit
+def apply_spans_index_of_min_indexed(spans, src_indices, src_values, dest_array):
+    for i in range(len(spans)-1):
+        cur = spans[i]
+        next = spans[i+1]
+
+        if next - cur == 1:
+            dest_array[i] = cur
+        else:
+            minind = cur
+            minstart = src_indices[cur]
+            minend = src_indices[cur+1]
+            minlen = minend - minstart
+            for j in range(cur+1, next):
+                curstart = src_indices[j]
+                curend = src_indices[j+1]
+                curlen = curend - curstart
+                shortlen = min(curlen, minlen)
+                found = False
+                for k in range(shortlen):
+                    if src_values[curstart+k] < src_values[minstart+k]:
+                        minind = j
+                        minstart = curstart
+                        minend = curend
+                        found = True
+                        break
+                    elif src_values[curstart+k] > src_values[minstart+k]:
+                        found = True
+                        break
+                if not found and curlen < minlen:
+                    minind = j
+                    minstart = curstart
+                    minend = curend
+
+            dest_array[i] = minind
+
+    return dest_array
+
+
+@njit
+def apply_spans_index_of_max_indexed(spans, src_indices, src_values, dest_array):
+    for i in range(len(spans)-1):
+        cur = spans[i]
+        next = spans[i+1]
+
+        if next - cur == 1:
+            dest_array[i] = cur
+        else:
+            minind = cur
+            minstart = src_indices[cur]
+            minend = src_indices[cur+1]
+            minlen = minend - minstart
+            for j in range(cur+1, next):
+                curstart = src_indices[j]
+                curend = src_indices[j+1]
+                curlen = curend - curstart
+                shortlen = min(curlen, minlen)
+                found = False
+                for k in range(shortlen):
+                    if src_values[curstart+k] > src_values[minstart+k]:
+                        minind = j
+                        minstart = curstart
+                        minlen = curend - curstart
+                        found = True
+                        break
+                    elif src_values[curstart+k] < src_values[minstart+k]:
+                        found = True
+                        break
+                if not found and curlen > minlen:
+                    minind = j
+                    minstart = curstart
+                    minlen = curend - curstart
+
+            dest_array[i] = minind
 
     return dest_array
 
@@ -1141,7 +1223,7 @@ def streaming_sort_merge(src_index_f, src_value_f, tgt_index_f, tgt_value_f,
         tgt_value_f.data.write(dest_values[:index_delta])
         target_index += index_delta
 
-        chunk_filter = np.ones(segment_count, dtype=np.bool)
+        chunk_filter = np.ones(segment_count, dtype=bool)
         for i in range(segment_count):
             if in_chunk_indices[i] == in_chunk_lengths[i]:
                 chunk_indices[i] += 1

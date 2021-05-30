@@ -11,6 +11,14 @@ exetera.processing.numpy\_buffer module
    :members:
    :undoc-members:
    :show-inheritance:
+   
+exetera.processing.date\_time_\helpers module
+---------------------------------------------
+
+.. automodule:: exetera.processing.date_time_helpers
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 Module contents
 ---------------

@@ -242,9 +242,10 @@ class IndexedStringWriter(Writer):
         return [None] * length     
 
     def write_part(self, values):
-        """Writes a list of strings in indexed string form to a field
-        Args:
-            values: a list of utf8 strings
+        """
+        Writes a list of strings in indexed string form to a field.
+        
+        :param values: a list of utf8 strings
         """
         if not self.ever_written:
             self.indices[0] = self.accumulated
@@ -427,8 +428,7 @@ class CategoricalWriter(Writer):
         # string:number
         self.keys = categories
 
-        self.field = group[name]
-
+        # self.field = group[name]
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype='int8')
@@ -483,8 +483,8 @@ class NumericImporter:
         Given a list of strings, parse the strings and write the parsed values. Values that
         cannot be parsed are written out as zero for the values, and zero for the flags to
         indicate that that entry is not valid.
-        Args:
-            values: a list of strings to be parsed
+        
+        :param values: a list of strings to be parsed
         """
         elements = np.zeros(len(values), dtype=self.data_writer.nformat)
         validity = np.zeros(len(values), dtype='bool')
@@ -828,10 +828,10 @@ class OptionalDateImporter:
         # TODO: use a timestamp writer instead of a datetime writer and do the conversion here
         self.date.write_part(values)
         if self.create_day_field:
-            days=self._get_days(values)
+            days = self._get_days(values)
             self.datestr.write_part(days)
         if self.dateset is not None:
-            flags=self._get_flags(values)
+            flags = self._get_flags(values)
             self.dateset.write_part(flags)
 
     def _get_days(self, values):

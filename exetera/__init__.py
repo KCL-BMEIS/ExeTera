@@ -1,4 +1,4 @@
 
 from . import core, processing
 
-__version__ = '0.4.0.4'
+from ._version import __version__
