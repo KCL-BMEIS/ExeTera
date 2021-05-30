@@ -1733,9 +1733,9 @@ def transform_to_values(column_inds, column_vals, column_offsets, col_idx, writt
         data.append(val)
     return data
 
-
 @njit
-def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, written_row_count, strlen):
+def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, written_row_count,
+                        strlen):
     data = []
     col_offset = column_offsets[col_idx]
     for row_idx in range(written_row_count):
@@ -1744,3 +1744,15 @@ def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, wr
         val = column_vals[col_offset + start_row_idx: col_offset + end_row_idx]
         data.append(val)
     return data
+
+@njit
+def fixed_string_transform_2(column_inds, column_vals, column_offsets, col_idx, written_row_count,
+                           strlen, memory):
+    col_offset = column_offsets[col_idx]
+    for i in range(written_row_count):
+        a = i * strlen
+        start_idx = column_inds[col_idx, i] + col_offset
+        end_idx = column_inds[col_idx, i+1] + col_offset
+        for c in range(start_idx, end_idx):
+            memory[a] = column_vals[c]
+            a += 1

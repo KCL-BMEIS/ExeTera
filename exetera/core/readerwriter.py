@@ -597,14 +597,22 @@ class FixedStringWriter(Writer):
         self.strlen = strlen
 
     def chunk_factory(self, length):
-        return np.zeros(length, dtype=f'S{self.strlen}')
+        return np.zeros(length, dtype='S{}'.format(self.strlen))
 
     def write_part(self, values):
         DataWriter.write(self.field, 'values', values, len(values))
 
+    # def transform_and_write_part(self, column_inds, column_vals, column_offsets,  col_idx, written_row_count):
+    #     data = ops.fixed_string_transform(column_inds, column_vals, column_offsets, col_idx,
+    #                                       written_row_count, self.strlen)
+    #     values = [x.tobytes().strip() for x in data]
+    #     self.write_part(values)
+
     def transform_and_write_part(self, column_inds, column_vals, column_offsets,  col_idx, written_row_count):
-        data = ops.fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, written_row_count, self.strlen)
-        values = [x.tobytes().strip() for x in data]
+        values = np.zeros(written_row_count, dtype='S{}'.format(self.strlen))
+        ops.fixed_string_transform_2(column_inds, column_vals, column_offsets, col_idx,
+                                     written_row_count, self.strlen, values.data.cast('b'))
+        # values = [x.tobytes().strip() for x in data]
         self.write_part(values)
 
     def flush(self):
