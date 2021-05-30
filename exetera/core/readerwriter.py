@@ -236,6 +236,7 @@ class IndexedStringWriter(Writer):
         self.value_index = 0
         self.index_index = 0
         self.chunk_accumulated = 0
+        DataWriter.write(self.field, 'index', [0], 1)
 
     def chunk_factory(self, length):
         return [None] * length     
