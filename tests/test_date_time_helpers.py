@@ -180,3 +180,26 @@ class TestGetDays(unittest.TestCase):
         actual = dth.get_days(tss, start_date=start_date)
         expected = self._get_expected(tss, start_date=start_date)
         self.assertListEqual(expected.tolist(), actual[0].tolist())
+
+
+class TestGeneratePeriodOffsetMap(unittest.TestCase):
+
+    def test_generate_period_offset_map(self):
+        start_dt = D(2020, 3, 1)
+        end_dt = D(2021, 3, 1)
+        periods = dth.get_periods(end_dt, start_dt, 'week', -1)
+        periods.reverse()
+        print(periods)
+
+
+class TestGetPeriodOffsets(unittest.TestCase):
+
+    def test_get_period_offsets_with_out_of_range(self):
+        periods_by_day = np.asarray([0, 0, 0, 1, 1, 1, 2], dtype=np.int32)
+        in_range = np.asarray([1, 1, 1, 1, 1, 1, 1, 0], dtype=bool)
+        days = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype=np.int32)
+        with self.assertRaises(IndexError):
+            dth.get_period_offsets(periods_by_day, days)
+        actual = dth.get_period_offsets(periods_by_day, days, in_range)
+        expected = np.asarray([0, 0, 0, 1, 1, 1, 2, -1])
+        self.assertListEqual(actual.tolist(), expected.tolist())

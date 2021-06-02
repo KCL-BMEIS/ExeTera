@@ -28,6 +28,14 @@ exetera.core.dataset module
    :undoc-members:
    :show-inheritance:
 
+exetera.core.dataframe module
+-----------------------------
+
+.. automodule:: exetera.core.dataframe
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 exetera.core.exporter module
 ----------------------------
 

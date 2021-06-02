@@ -9,6 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Callable, IO, Optional, Tuple, Union
 import os
 import uuid
 from datetime import datetime, timezone
@@ -19,7 +20,7 @@ import pandas as pd
 
 import h5py
 
-from exetera.core.abstract_types import Field
+from exetera.core.abstract_types import Field, AbstractSession
 from exetera.core import operations
 from exetera.core import persistence as per
 from exetera.core import fields as fld
@@ -28,50 +29,28 @@ from exetera.core import validation as val
 from exetera.core import operations as ops
 from exetera.core import dataset as ds
 from exetera.core import dataframe as df
-from exetera.core import utils
 
 
-# TODO:
-"""
- * joins: get mapping and map multiple fields using mapping
-   * can use pandas for initial functionality and then improve
-   * mark fields has having sorted order if they are sorted
-     * would have to check field
-   * for sorted, can use fast
-   * aggregation
-     * aggregate and join / join and aggregate
-       * if they resolve to being the same thing, best to aggregate first
- * everything can accept groups
- * groups are registered and given names
- * indices can be built from merging pk and fks and mapping to values
- * everything can accept tuples instead of groups and operate on all of them
- * advanced sorting / filtering
-   * FilteredReader / FilteredWriter for applying filters without copying data
-   * SortedReader / SortedWriter for applying sorts without copying data
-   * Filters corresponding to the presence or absence of elements of a maybe field
-     * should be marked indicating that they are related to that field. This allows
-       a user to query all the filters generated for different fields, whether the
-       values are valid or whether they are a standard filtering for different
-       categories (age sub-ranges, for example)
- * reader/writers
+class Session(AbstractSession):
+    """
+    Session is the top-level object that is used to create and open ExeTera Datasets. It also
+    provides operations that can be performed on Fields. For a more detailed explanation of
+    Session and examples of its usage, please refer to
+    https://github.com/KCL-BMEIS/ExeTera/wiki/Session-API
+    
+    :param chunksize: Change the default chunksize that fields created with this dataset use.
+        Note this is a hint parameter and future versions of Session may choose to ignore it if it
+        is no longer required. In general, it should only be changed for testing.
+    :param timestamp: Set the official timestamp for the Session's creation rather than taking
+        the current date/time.
+    """
 
-   * soft sorting / filtering
-     rw = s.get(name)
-     rw.add_transform(filter)
-     rw.add_transform(sort)
-     rw.writeable[:] = data # can this be done?
-     rw.clean()
-     rw.write(data)
-
-    * refactor: encapsulate dataset handling into session
-      * provide group objects with api
-      * provide field objects with additional api
-"""
-
-class Session:
-
-    def __init__(self, chunksize=ops.DEFAULT_CHUNKSIZE,
-                 timestamp=str(datetime.now(timezone.utc))):
+    def __init__(self,
+                 chunksize: int = ops.DEFAULT_CHUNKSIZE,
+                 timestamp: str = str(datetime.now(timezone.utc))):
+        """
+        Create a new Session object.
+        """
         if not isinstance(timestamp, str):
             error_str = "'timestamp' must be a string but is of type {}"
             raise ValueError(error_str.format(type(timestamp)))
@@ -79,34 +58,39 @@ class Session:
         self.timestamp = timestamp
         self.datasets = dict()
 
-
     def __enter__(self):
+        """Context manager enter."""
         return self
 
-
     def __exit__(self, etype, evalue, etraceback):
+        """Context manager exit closes any open datasets."""
         self.close()
 
-
-    def open_dataset(self, dataset_path, mode, name):
+    def open_dataset(self,
+                     dataset_path: Union[str, IO[bytes]],
+                     mode: str,
+                     name: str):
         """
-        Open a dataset with the given access mode
+        Open a dataset with the given access mode.
+        
         :param dataset_path: the path to the dataset
         :param mode: the mode in which the dataset should be opened. This is one of "r", "r+" or "w".
+        :param name: the name that is associated with this dataset. This can be used to retrieve the dataset when
+            calling :py:meth:`~session.Session.get_dataset`.
         :return: The top-level dataset object
         """
         h5py_modes = {"r": "r", "r+": "r+", "w": "w"}
         if name in self.datasets:
             raise ValueError("A dataset with name '{}' is already open, and must be closed first.".format(name))
 
-        #self.datasets[name] = h5py.File(dataset_path, h5py_modes[mode])
-        self.datasets[name] = ds.HDF5Dataset(dataset_path,mode,name)
+        self.datasets[name] = ds.HDF5Dataset(self, dataset_path, mode, name)
         return self.datasets[name]
 
-
-    def close_dataset(self, name):
+    def close_dataset(self,
+                      name: str):
         """
         Close the dataset with the given name. If there is no dataset with that name, do nothing.
+        
         :param name: The name of the dataset to be closed
         :return: None
         """
@@ -114,44 +98,63 @@ class Session:
             self.datasets[name].close()
             del self.datasets[name]
 
-
     def list_datasets(self):
+        """
+        List the open datasets for this Session object. This is returned as a tuple of strings
+        rather than the datasets themselves. The individual datasets can be fetched using
+        :py:meth:`~exetera.session.Session.get_dataset`.
+        
+        Example::
+        
+            names = s.list_datasets()
+            datasets = [s.get_dataset(n) for n in names]
+            
+        :return: A tuple containing the names of the currently open datasets for this Session object
+        """
         return tuple(n for n in self.datasets.keys())
 
-
-    def get_dataset(self, name):
+    def get_dataset(self,
+                    name: str):
+        """
+        Get the dataset with the given name. If there is no dataset with that name, raise a KeyError
+        indicating that the dataset with that name is not present.
+        
+        :param name: Name of the dataset to be fetched. This is the name that was given to it
+            when it was opened through :py:meth:`~session.Session.open_dataset`.
+        :return: Dataset with that name.
+        """
         return self.datasets[name]
-
 
     def close(self):
         """
-        Close all open datasets
+        Close all open datasets.
+        
         :return: None
         """
         for v in self.datasets.values():
             v.close()
         self.datasets = dict()
 
-
-    def get_shared_index(self, keys):
+    def get_shared_index(self, keys: Tuple[np.ndarray]):
         """
-        Create a shared index based on a tuple numpy arrays containing keys.
+        Create a shared index based on a tuple of numpy arrays containing keys.
         This function generates the sorted union of a tuple of key fields and
         then maps the individual arrays to their corresponding indices in the
         sorted union.
 
-        Example:
+        :param keys: a tuple of groups, fields or ndarrays whose contents represent keys
+
+        Example::
+        
             key_1 = ['a', 'b', 'e', 'g', 'i']
             key_2 = ['b', 'b', 'c', 'c, 'e', 'g', 'j']
             key_3 = ['a', 'c' 'd', 'e', 'g', 'h', 'h', 'i']
-
+            
             sorted_union = ['a', 'b', 'c', 'd', 'e', 'g', 'h', 'i', 'j']
-
+            
             key_1_index = [0, 1, 4, 5, 7]
             key_2_index = [1, 1, 2, 2, 4, 5, 8]
             key_3_index = [0, 2, 3, 4, 5, 6, 6, 7]
-
-            :param keys: a tuple of groups, fields or ndarrays whose contents represent keys
         """
         if not isinstance(keys, tuple):
             raise ValueError("'keys' must be a tuple")
@@ -169,13 +172,13 @@ class Session:
 
         return tuple(np.searchsorted(concatted, k) for k in raw_keys)
 
-
-    def set_timestamp(self, timestamp=str(datetime.now(timezone.utc))):
+    def set_timestamp(self,
+                      timestamp: str = str(datetime.now(timezone.utc))):
         """
-        Set the default timestamp to be used when creating fields without an explicit
-        timestamp specified.
+        Set the default timestamp to be used when creating fields without specifying
+        an explicit timestamp.
 
-        :param timestamp a string representing a valid Datetime
+        :param timestamp: a string representing a valid Datetime
         :return: None
         """
         if not isinstance(timestamp, str):
@@ -183,9 +186,10 @@ class Session:
             raise ValueError(error_str.format(type(timestamp)))
         self.timestamp = timestamp
 
-
-
-    def sort_on(self, src_group, dest_group, keys,
+    def sort_on(self,
+                src_group: h5py.Group,
+                dest_group: h5py.Group,
+                keys: Union[tuple, list],
                 timestamp=datetime.now(timezone.utc), write_mode='write', verbose=True):
         """
         Sort a group (src_group) of fields by the specified set of keys, and write the
@@ -195,10 +199,10 @@ class Session:
         :param dest_group: the group into which sorted fields are written
         :param keys: fields to sort on
         :param timestamp: optional - timestamp to write on the sorted fields
-        :param write_mode: optional - write mode to use if the destination fields already
-        exist
+        :param write_mode: optional - write mode to use if the destination fields already exist
         :return: None
         """
+
         # TODO: fields is being ignored at present
         def print_if_verbose(*args):
             if verbose:
@@ -221,22 +225,21 @@ class Session:
                 del w
             else:
                 r = self.get(src_group[k]).writeable()
-                if isinstance(r, fld.IndexedStringField):
+                if r.indexed:
                     i, v = self.apply_index(sorted_index, r)
                     r.indices[:] = i
                     r.values[:] = v
                 else:
                     r.data[:] = self.apply_index(sorted_index, r)
                 del r
-                print_if_verbose(f"  '{k}' reordered in {time.time() - t1}s")
+            print_if_verbose(f"  '{k}' reordered in {time.time() - t1}s")
         print_if_verbose(f"fields reordered in {time.time() - t0}s")
-
-
 
     def dataset_sort_index(self, sort_indices, index=None):
         """
         Generate a sorted index based on a set of fields upon which to sort and an optional
-        index to apply to the sort_indices
+        index to apply to the sort_indices.
+        
         :param sort_indices: a tuple or list of indices that determine the sorted order
         :param index: optional - the index by which the initial field should be permuted
         :return: the resulting index that can be used to permute unsorted fields
@@ -264,7 +267,6 @@ class Session:
 
         return acc_index
 
-
     def apply_filter(self, filter_to_apply, src, dest=None):
         """
         Apply a filter to an a src field. The filtered field is written to dest if it set,
@@ -280,20 +282,19 @@ class Session:
         writer_ = None
         if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
-        if isinstance(src, fld.IndexedStringField):
-            newfld = src.apply_filter(filter_to_apply_,writer_)
-            return newfld.indices, newfld.values
-        elif isinstance(src,fld.Field):
-            newfld = src.apply_filter(filter_to_apply_,writer_)
-            return newfld.data[:]
-        #elif isinstance(src, df.datafrme):
+        if isinstance(src, Field):
+            newfld = src.apply_filter(filter_to_apply_, writer_)
+            if src.indexed:
+                return newfld.indices[:], newfld.values[:]
+            else:
+                return newfld.data[:]
+        # elif isinstance(src, df.datafrme):
         else:
             reader_ = val.array_from_parameter(self, 'reader', src)
             result = reader_[filter_to_apply]
             if writer_:
                 writer_.data.write(result)
             return result
-
 
     def apply_index(self, index_to_apply, src, dest=None):
         """
@@ -310,14 +311,20 @@ class Session:
         writer_ = None
         if dest is not None:
             writer_ = val.field_from_parameter(self, 'writer', dest)
-        if isinstance(src, fld.IndexedStringField):
-            dest_indices, dest_values = \
-                ops.apply_indices_to_index_values(index_to_apply_,
-                                                  src.indices[:], src.values[:])
-            return dest_indices, dest_values
-        elif isinstance(src,fld.Field):
-            newfld = src.apply_index(index_to_apply_,writer_)
-            return newfld.data[:]
+        if isinstance(src, Field):
+            newfld = src.apply_index(index_to_apply_, writer_)
+            if src.indexed:
+                return newfld.indices[:], newfld.values[:]
+            else:
+                return newfld.data[:]
+        # if src.indexed:
+        #     dest_indices, dest_values = \
+        #         ops.apply_indices_to_index_values(index_to_apply_,
+        #                                           src.indices[:], src.values[:])
+        #     return dest_indices, dest_values
+        # elif isinstance(src, Field):
+        #     newfld = src.apply_index(index_to_apply_, writer_)
+        #     return newfld.data[:]
         else:
             reader_ = val.array_from_parameter(self, 'reader', src)
             result = reader_[index_to_apply]
@@ -325,9 +332,8 @@ class Session:
                 writer_.data.write(result)
             return result
 
-
-    # TODO: write distinct with new readers / writers rather than deleting this
     def distinct(self, field=None, fields=None, filter=None):
+
         if field is None and fields is None:
             return ValueError("One of 'field' and 'fields' must be set")
         if field is not None and fields is not None:
@@ -345,8 +351,8 @@ class Session:
         results = [uniques[f'{i}'] for i in range(len(fields))]
         return results
 
-
-    def get_spans(self, field=None, fields=None):
+    def get_spans(self, field: Union[Field, np.ndarray] = None,
+                  dest: Field = None, **kwargs):
         """
         Calculate a set of spans that indicate contiguous equal values.
         The entries in the result array correspond to the inclusive start and
@@ -358,25 +364,69 @@ class Session:
         than one field specified, the fields are effectively zipped and the check
         for spans is carried out on each corresponding tuple in the zipped field.
 
-        Example:
+        Example::
+        
             field: [1, 2, 2, 1, 1, 1, 3, 4, 4, 4, 2, 2, 2, 2, 2]
             result: [0, 1, 3, 6, 7, 10, 15]
+
+        :param field: A Field or numpy array to be evaluated for spans
+        :param dest: A destination Field to store the result
+        :param \*\*kwargs: See below. For parameters set in both argument and kwargs, use kwargs
+
+        :Keyword Arguments:
+            * field -- Similar to field parameter, in case user specify field as keyword
+            * fields -- A tuple of Fields or tuple of numpy arrays to be evaluated for spans
+            * dest -- Similar to dest parameter, in case user specify as keyword
+
+        :return: The resulting set of spans as a numpy array
         """
-        if fields is not None:
-            if isinstance(fields[0],fld.Field):
-                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(),fields[1].get_spans())
-            if isinstance(fields[0],np.ndarray):
-                return ops._get_spans_for_2_fields(fields[0],fields[1])
+        fields = []
+        result = None
+        if len(kwargs) > 0:
+            for k in kwargs.keys():
+                if k == 'field':
+                    field = kwargs[k]
+                elif k == 'fields':
+                    fields = kwargs[k]
+                elif k == 'dest':
+                    dest = kwargs[k]
+        if dest is not None and not isinstance(dest, Field):
+            raise TypeError(f"'dest' must be one of 'Field' but is {type(dest)}")
+
+        if field is not None:
+            if isinstance(field, Field):
+                result = field.get_spans()
+            elif isinstance(field, np.ndarray):
+                result = ops.get_spans_for_field(field)
+        elif len(fields) > 0:
+            if isinstance(fields[0], Field):
+                result = ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(), fields[1].get_spans())
+            elif isinstance(fields[0], np.ndarray):
+                result = ops._get_spans_for_2_fields(fields[0], fields[1])
         else:
-            if isinstance(field,fld.Field):
-                return field.get_spans()
-            if isinstance(field,np.ndarray):
-                return ops.get_spans_for_field(field)
+            raise ValueError("One of 'field' and 'fields' must be set")
 
+        if dest is not None:
+            dest.data.write(result)
+            return dest
+        else:
+            return result
 
+    def _apply_spans_no_src(self,
+                            predicate: Callable[[np.ndarray, np.ndarray], None],
+                            spans: np.ndarray,
+                            dest: Field = None) -> np.ndarray:
+        """
+        An implementation method for span applications that are carried out on the spans themselves rather than a target
+        field.
+        
+        :param predicate: a predicate function that carries out the operation on the spans and produces the result
+        :param spans: the numpy array of spans to be applied
+        :param dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        assert (dest is None or isinstance(dest, Field))
 
-    def _apply_spans_no_src(self, predicate, spans, dest=None):
-        assert(dest is None or isinstance(dest, Field))
         if dest is not None:
             dest_f = val.field_from_parameter(self, 'dest', dest)
             results = np.zeros(len(spans) - 1, dtype=dest_f.data.dtype)
@@ -388,66 +438,177 @@ class Session:
             predicate(spans, results)
             return results
 
-    def _apply_spans_src(self, predicate, spans, src, dest=None):
-        assert(dest is None or isinstance(dest, Field))
-        src_ = val.array_from_parameter(self, 'src', src)
-        if len(src) != spans[-1]:
-            error_msg = ("'src' (length {}) must be one element shorter than 'spans' "
+    def _apply_spans_src(self,
+                         predicate: Callable[[np.ndarray, np.ndarray, np.ndarray], None],
+                         spans: np.ndarray,
+                         target: np.ndarray,
+                         dest: Field = None) -> np.ndarray:
+        """
+        An implementation method for span applications that are carried out on a target field.
+        
+        :param predicate: a predicate function that carries out the operation on the spans and a target field, and
+            produces the result
+        :param spans: the numpy array of spans to be applied
+        :param target: the field to which the spans and predicate are applied
+        :param dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        assert (dest is None or isinstance(dest, Field))
+        target_ = val.array_from_parameter(self, 'target', target)
+        if len(target) != spans[-1]:
+            error_msg = ("'target' (length {}) must be one element shorter than 'spans' "
                          "(length {})")
-            raise ValueError(error_msg.format(len(src_), len(spans)))
+            raise ValueError(error_msg.format(len(target_), len(spans)))
 
         if dest is not None:
             dest_f = val.field_from_parameter(self, 'dest', dest)
             results = np.zeros(len(spans) - 1, dtype=dest_f.data.dtype)
-            predicate(spans, src_, results)
+            predicate(spans, target_, results)
             dest_f.data.write(results)
             return results
         else:
-            results = np.zeros(len(spans) - 1, dtype=src_.dtype)
-            predicate(spans, src_, results)
+            results = np.zeros(len(spans) - 1, dtype=target_.dtype)
+            predicate(spans, target_, results)
             return results
 
-    def apply_spans_index_of_min(self, spans, src, dest=None):
-        return self._apply_spans_src(ops.apply_spans_index_of_min, spans, src, dest)
+    def apply_spans_index_of_min(self,
+                                 spans: np.ndarray,
+                                 target: np.ndarray,
+                                 dest: Field = None):
+        """
+        Finds the index of the minimum value within each span on a target field.
+        
+        :param spans: the numpy array of spans to be applied
+        :param target: the field to which the spans are applied
+        :param dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self._apply_spans_src(ops.apply_spans_index_of_min, spans, target, dest)
 
-    def apply_spans_index_of_max(self, spans, src, dest=None):
-        return self._apply_spans_src(ops.apply_spans_index_of_max, spans, src, dest)
+    def apply_spans_index_of_max(self,
+                                 spans: np.ndarray,
+                                 target: np.ndarray,
+                                 dest: Field = None):
+        """
+        Finds the index of the maximum value within each span on a target field.
+        
+        :param spans: the numpy array of spans to be applied
+        :param target: the field to which the spans are applied
+        :param dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self._apply_spans_src(ops.apply_spans_index_of_max, spans, target, dest)
 
-    def apply_spans_index_of_first(self, spans, dest=None):
+    def apply_spans_index_of_first(self,
+                                   spans: np.ndarray,
+                                   dest: Field = None):
+        """
+        Finds the index of the first entry within each span.
+        
+        :param spans: the numpy array of spans to be applied
+        :param dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
         return self._apply_spans_no_src(ops.apply_spans_index_of_first, spans, dest)
 
-    def apply_spans_index_of_last(self, spans, dest=None):
+    def apply_spans_index_of_last(self,
+                                  spans: np.ndarray,
+                                  dest: Field = None):
+        """
+        Finds the index of the last entry within each span.
+        
+        :param spans: the numpy array of spans to be applied
+        :param dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
         return self._apply_spans_no_src(ops.apply_spans_index_of_last, spans, dest)
 
-    def apply_spans_count(self, spans, src=None, dest=None):
+    def apply_spans_count(self,
+                          spans: np.ndarray,
+                          dest: Field = None):
+        """
+        Finds the number of entries within each span.
+        
+        :param spans: the numpy array of spans to be applied
+        :param dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
         return self._apply_spans_no_src(ops.apply_spans_count, spans, dest)
 
-    def apply_spans_min(self, spans, src, dest=None):
-        return self._apply_spans_src(ops.apply_spans_min, spans, src, dest)
+    def apply_spans_min(self,
+                        spans: np.ndarray,
+                        target: np.ndarray,
+                        dest: Field = None):
+        """
+        Finds the minimum value within span on a target field.
+        
+        :param spans: the numpy array of spans to be applied
+        :param target: the field to which the spans are applied
+        :param dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self._apply_spans_src(ops.apply_spans_min, spans, target, dest)
 
-    def apply_spans_max(self, spans, src, dest=None):
-        return self._apply_spans_src(ops.apply_spans_max, spans, src, dest)
+    def apply_spans_max(self,
+                        spans: np.ndarray,
+                        target: np.ndarray,
+                        dest: Field = None):
+        """
+        Finds the maximum value within each span on a target field.
+        
+        :param spans: the numpy array of spans to be applied
+        :param target: the field to which the spans are applied
+        :param dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self._apply_spans_src(ops.apply_spans_max, spans, target, dest)
 
-    def apply_spans_first(self, spans, src, dest=None):
-        return self._apply_spans_src(ops.apply_spans_first, spans, src, dest)
+    def apply_spans_first(self,
+                          spans: np.ndarray,
+                          target: np.ndarray,
+                          dest: Field = None):
+        """
+        Finds the first entry within each span on a target field.
+        
+        :param spans: the numpy array of spans to be applied
+        :param target: the field to which the spans are applied
+        :param dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self._apply_spans_src(ops.apply_spans_first, spans, target, dest)
 
-    def apply_spans_last(self, spans, src, dest=None):
-        return self._apply_spans_src(ops.apply_spans_last, spans, src, dest)
+    def apply_spans_last(self,
+                         spans: np.ndarray,
+                         target: np.ndarray,
+                         dest: Field = None):
+        """
+        Finds the last entry within each span on a target field.
+        
+        :param spans: the numpy array of spans to be applied
+        :param target: the field to which the spans are applied
+        :param dest: if set, the field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self._apply_spans_src(ops.apply_spans_last, spans, target, dest)
 
-    def apply_spans_concat(self, spans, src, dest,
-                           src_chunksize=None, dest_chunksize=None, chunksize_mult=None):
-        if not isinstance(src, fld.IndexedStringField):
-            raise ValueError(f"'src' must be one of 'IndexedStringField' but is {type(src)}")
-        if not isinstance(dest, fld.IndexedStringField):
+    def apply_spans_concat(self,
+                           spans,
+                           target,
+                           dest,
+                           src_chunksize=None,
+                           dest_chunksize=None,
+                           chunksize_mult=None):
+        if not target.indexed:
+            raise ValueError(f"'target' must be one of 'IndexedStringField' but is {type(target)}")
+        if not dest.indexed:
             raise ValueError(f"'dest' must be one of 'IndexedStringField' but is {type(dest)}")
 
-        src_chunksize = src.chunksize if src_chunksize is None else src_chunksize
+        src_chunksize = target.chunksize if src_chunksize is None else src_chunksize
         dest_chunksize = dest.chunksize if dest_chunksize is None else dest_chunksize
         chunksize_mult = 16 if chunksize_mult is None else chunksize_mult
 
-
-        src_index = src.indices[:]
-        src_values = src.values[:]
+        src_index = target.indices[:]
+        src_values = target.values[:]
         dest_index = np.zeros(src_chunksize, src_index.dtype)
         dest_values = np.zeros(dest_chunksize * chunksize_mult, src_values.dtype)
 
@@ -481,8 +642,20 @@ class Session:
         #         dest.write_raw(dest_index[:index_i], dest_values[:index_v])
         # dest.complete()
 
-
-    def _aggregate_impl(self, predicate, index, src=None, dest=None):
+    def _aggregate_impl(self, predicate, index, target=None, dest=None):
+        """
+        An implementation method for aggregation of fields via various predicates. This method takes a predicate that
+        defines an operation to be carried out, an 'index' array or field that determines the groupings over which the
+        predicate applies, and a 'target' array or field that the operation is carried out upon, should a target be
+        needed. If a 'dest' Field is supplied, the results will be written to it.
+        
+        :param predicate: a predicate function that carries out the operation on the spans and produces the result
+        :param index: A numpy array or field representing the sub-ranges that can be aggregated
+        :param target: A numpy array upon which the operation is required. This only needs to be set for certain
+            operations.
+        :param dest: If set, the Field to which the results are written
+        :returns: A numpy array containing the resulting values
+        """
         index_ = val.raw_array_from_parameter(self, "index", index)
 
         dest_field = None
@@ -491,49 +664,118 @@ class Session:
 
         fkey_index_spans = self.get_spans(field=index)
 
-        # execute the predicate (note that not every predicate requires a reader)
-        results = predicate(fkey_index_spans, src, dest_field)
+        # execute the predicate (note that not every predicate requires a target)
+        if target is None:
+            results = predicate(fkey_index_spans, dest_field)
+        else:
+            results = predicate(fkey_index_spans, target, dest_field)
 
         return dest if dest is not None else results
 
+    def aggregate_count(self, index, dest=None):
+        """
+         Finds the number of entries within each sub-group of index.
+         
+         Example::
+         
+         
+             Index:  a a a b b x a c c d d d
+             Result: 3     2   1 1 2   3
+         
+         :param index: A numpy array or Field containing the index that defines the ranges over which count is applied.
+         :param dest: If set, a Field to which the resulting counts are written
+         :returns: A numpy array containing the resulting values
+         """
+        return self._aggregate_impl(self.apply_spans_count, index, None, dest)
 
-    def aggregate_count(self, index=None, src=None, dest=None):
-        return self._aggregate_impl(self.apply_spans_count, index, src, dest)
+    def aggregate_first(self, index, target=None, dest=None):
+        """
+        Finds the first entries within each sub-group of index.
+        
+        Example:
+        
+            Index:  a a a b b x a c c d d d
+            Target: 1 2 3 4 5 6 7 8 9 0 1 2
+            Result: 1     4   6 7 8   0
+        
+        :param index: A numpy array or Field containing the index that defines the ranges over which count is applied.
+        :param target: A numpy array to which the index and predicate are applied
+        :param dest: If set, a Field to which the resulting counts are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self.aggregate_custom(self.apply_spans_first, index, target, dest)
 
+    def aggregate_last(self, index, target=None, dest=None):
+        """
+        Finds the first entries within each sub-group of index.
+        
+        Example::
+        
+            Index:  a a a b b x a c c d d d
+            Target: 1 2 3 4 5 6 7 8 9 0 1 2
+            Result: 3     5   6 7 9   2
+        
+        :param index: A numpy array or Field containing the index that defines the ranges over which count is applied.
+        :param target: A numpy array to which the index and predicate are applied
+        :param dest: If set, a Field to which the resulting counts are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self.aggregate_custom(self.apply_spans_last, index, target, dest)
 
-    def aggregate_first(self, index, src=None, dest=None):
-        return self.aggregate_custom(self.apply_spans_first, index, src, dest)
+    def aggregate_min(self, index, target=None, dest=None):
+        """
+        Finds the minimum value within each sub-group of index.
+        
+        Example::
+        
+            Index:  a a a b b x a c c d d d
+            Target: 1 2 3 5 4 6 7 8 9 2 1 0
+            Result: 1     4   6 7 8   0
+        
+        :param index: A numpy array or Field containing the index that defines the ranges over which min is applied.
+        :param target: A numpy array to which the index and predicate are applied
+        :param dest: If set, a Field to which the resulting counts are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self.aggregate_custom(self.apply_spans_min, index, target, dest)
 
+    def aggregate_max(self, index, target=None, dest=None):
+        """
+        Finds the maximum value within each sub-group of index.
+        
+        Example:
+        
+            Index:  a a a b b x a c c d d d
+            Target: 1 2 3 5 4 6 7 8 9 2 1 0
+            Result: 3     5   6 7 9   2
+        
+        :param index: A numpy array or Field containing the index that defines the ranges over which max is applied.
+        :param target: A numpy array to which the index and predicate are applied
+        :param dest: If set, a Field to which the resulting counts are written
+        :returns: A numpy array containing the resulting values
+        """
+        return self.aggregate_custom(self.apply_spans_max, index, target, dest)
 
-    def aggregate_last(self, index, src=None, dest=None):
-        return self.aggregate_custom(self.apply_spans_last, index, src, dest)
-
-
-    def aggregate_min(self, index, src=None, dest=None):
-        return self.aggregate_custom(self.apply_spans_min, index, src, dest)
-
-
-    def aggregate_max(self, index, src=None, dest=None):
-        return self.aggregate_custom(self.apply_spans_max, index, src, dest)
-
-
-    def aggregate_custom(self, predicate, index, src=None, dest=None):
-        if src is None:
+    def aggregate_custom(self, predicate, index, target=None, dest=None):
+        if target is None:
             raise ValueError("'src' must not be None")
-        val.ensure_valid_field_like("src", src)
+        val.ensure_valid_field_like("src", target)
         if dest is not None:
             val.ensure_valid_field("dest", dest)
 
-        return self._aggregate_impl(predicate, index, src, dest)
-
+        return self._aggregate_impl(predicate, index, target, dest)
 
     def join(self,
              destination_pkey, fkey_indices, values_to_join,
              writer=None, fkey_index_spans=None):
+        """
+        This method is due for removal and should not be used.
+        Please use the merge or ordered_merge functions instead.
+        """
 
-        if isinstance(destination_pkey, fld.IndexedStringField):
+        if isinstance(destination_pkey, Field) and destination_pkey.indexed:
             raise ValueError("'destination_pkey' must not be an indexed string field")
-        if isinstance(fkey_indices, fld.IndexedStringField):
+        if isinstance(fkey_indices, Field) and fkey_indices.indexed:
             raise ValueError("'fkey_indices' must not be an indexed string field")
         if isinstance(values_to_join, rw.IndexedStringReader):
             raise ValueError("Joins on indexed string fields are not supported")
@@ -561,9 +803,8 @@ class Session:
         safe_values_to_join = raw_values_to_join[invalid_filter]
 
         # now get the memory that the results will be mapped to
-        #destination_space_values = writer.chunk_factory(len(destination_pkey))
+        # destination_space_values = writer.chunk_factory(len(destination_pkey))
         destination_space_values = np.zeros(len(destination_pkey), dtype=raw_values_to_join.dtype)
-
 
         # finally, map the results from the source space to the destination space
         destination_space_values[safe_unique_fkey_indices] = safe_values_to_join
@@ -573,10 +814,13 @@ class Session:
         else:
             return destination_space_values
 
-
     def predicate_and_join(self,
                            predicate, destination_pkey, fkey_indices,
                            reader=None, writer=None, fkey_index_spans=None):
+        """
+        This method is due for removal and should not be used.
+        Please use the merge or ordered_merge functions instead.
+        """
         if reader is not None:
             if not isinstance(reader, rw.Reader):
                 raise ValueError(f"'reader' must be a type of Reader but is {type(reader)}")
@@ -602,7 +846,7 @@ class Session:
             dtype = reader.dtype()
         else:
             dtype = np.uint32
-        results = np.zeros(len(fkey_index_spans)-1, dtype=dtype)
+        results = np.zeros(len(fkey_index_spans) - 1, dtype=dtype)
         predicate(fkey_index_spans, reader, results)
 
         # the predicate results are in the same space as the unique_fkey_indices, which
@@ -616,8 +860,27 @@ class Session:
 
         writer.write(destination_space_values)
 
-
-    def get(self, field):
+    def get(self,
+            field: Union[Field, h5py.Group]):
+        """
+        Get a Field from a h5py Group.
+        
+        Example::
+        
+            # this code for context
+            with Session() as s:
+    
+              # open a dataset about wildlife
+              src = s.open_dataset("/my/wildlife/dataset.hdf5", "r", "src")
+    
+              # fetch the group containing bird data
+              birds = src['birds']
+    
+              # get the bird decibel field
+              bird_decibels = s.get(birds['decibels'])
+              
+        :param field: The Field or Group object to retrieve.
+        """
         if isinstance(field, Field):
             return field
 
@@ -636,10 +899,24 @@ class Session:
         }
 
         fieldtype = field.attrs['fieldtype'].split(',')[0]
-        return fieldtype_map[fieldtype](self, field)
-
+        return fieldtype_map[fieldtype](self, field, None, field.name)
 
     def create_like(self, field, dest_group, dest_name, timestamp=None, chunksize=None):
+        """
+        Create a field of the same type as an existing field, in the location and with the name provided.
+        
+        Example::
+        
+            with Session as s:
+              ...
+              a = s.get(table_1['a'])
+              b = s.create_like(a, table_2, 'a_times_2')
+              b.data.write(a.data[:] * 2)
+
+        :param field: The Field whose type is to be copied
+        :param dest_group: The group in which the new field should be created
+        :param dest_name: The name of the new field
+        """
         if isinstance(field, h5py.Group):
             if 'fieldtype' not in field.attrs.keys():
                 raise ValueError("{} is not a well-formed field".format(field))
@@ -650,51 +927,161 @@ class Session:
         else:
             raise ValueError("'field' must be either a Field or a h5py.Group, but is {}".format(type(field)))
 
-
     def create_indexed_string(self, group, name, timestamp=None, chunksize=None):
-        if isinstance(group,ds.Dataset):
-            pass
-        elif isinstance(group,df.DataFrame):
-            return group.create_indexed_string(self,name, timestamp,chunksize)
+        """
+        Create an indexed string field in the given DataFrame with the given name.
 
+        :param group: The group in which the new field should be created
+        :param name: The name of the new field
+        :param timestamp: If set, the timestamp that should be given to the new field. If not set
+            datetime.now() is used.
+        :param chunksize: If set, the chunksize that should be used to create the new field. In general, this should
+            not be set unless you are writing unit tests.
+        """
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
+
+        if isinstance(group, h5py.Group):
+            fld.indexed_string_field_constructor(self, group, name, timestamp, chunksize)
+            return fld.IndexedStringField(self, group[name], None, write_enabled=True)
+        else:
+            return group.create_indexed_string(name, timestamp, chunksize)
 
     def create_fixed_string(self, group, name, length, timestamp=None, chunksize=None):
-        if isinstance(group,ds.Dataset):
-            pass
-        elif isinstance(group,df.DataFrame):
-            return group.create_fixed_string(self,name,  length,timestamp,chunksize)
+        """
+        Create a fixed string field in the given DataFrame, given name, and given max string length per entry.
 
+        :param group: The group in which the new field should be created
+        :param name: The name of the new field
+        :param length: The maximum length in bytes that each entry can have.
+        :param timestamp: If set, the timestamp that should be given to the new field. If not set
+            datetime.now() is used.
+        :param chunksize: If set, the chunksize that should be used to create the new field. In general, this should
+            not be set unless you are writing unit tests.
+        """
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
+        if isinstance(group, h5py.Group):
+            fld.fixed_string_field_constructor(self, group, name, length, timestamp, chunksize)
+            return fld.FixedStringField(self, group[name], None, write_enabled=True)
+        else:
+            return group.create_fixed_string(name, length, timestamp, chunksize)
 
-    def create_categorical(self, group, name, nformat, key,
-                           timestamp=None, chunksize=None):
-        if isinstance(group, ds.Dataset):
-            pass
-        elif isinstance(group, df.DataFrame):
-            return group.create_categorical(self, name, nformat,key,timestamp,chunksize)
+    def create_categorical(self, group, name, nformat, key, timestamp=None, chunksize=None):
+        """
+        Create a categorical field in the given DataFrame with the given name. This function also takes a numerical 
+        format for the numeric representation of the categories, and a key that maps numeric values to their string
+        string descriptions.
 
+        :param group: The group in which the new field should be created
+        :param name: The name of the new field
+        :param nformat: A numerical type in the set (int8, uint8, int16, uint18, int32, uint32, int64). It is
+            recommended to use 'int8'.
+        :param key: A dictionary that maps numerical values to their string representations
+        :param timestamp: If set, the timestamp that should be given to the new field. If not set
+            datetime.now() is used.
+        :param chunksize: If set, the chunksize that should be used to create the new field. In general, this should
+            not be set unless you are writing unit tests.
+        """
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
+
+        if isinstance(group, h5py.Group):
+            fld.categorical_field_constructor(self, group, name, nformat, key, timestamp, chunksize)
+            return fld.CategoricalField(self, group[name], None, write_enabled=True)
+        else:
+            return group.create_categorical(name, nformat, key, timestamp, chunksize)
 
     def create_numeric(self, group, name, nformat, timestamp=None, chunksize=None):
-        if isinstance(group,ds.Dataset):
-            pass
-        elif isinstance(group,df.DataFrame):
-            return group.create_numeric(self,name, nformat, timestamp, chunksize)
+        """
+        Create a numeric field in the given DataFrame with the given name.
 
+        :param group: The group in which the new field should be created
+        :param name: The name of the new field
+        :param nformat: A numerical type in the set (int8, uint8, int16, uint18, int32, uint32, int64, uint64,
+            float32, float64). It is recommended to avoid uint64 as certain operations in numpy cause conversions to
+            floating point values.
+        :param timestamp: If set, the timestamp that should be given to the new field. If not set
+            datetime.now() is used.
+        :param chunksize: If set, the chunksize that should be used to create the new field. In general, this should
+            not be set unless you are writing unit tests.
+        """
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
 
+        if isinstance(group, h5py.Group):
+            fld.numeric_field_constructor(self, group, name, nformat, timestamp, chunksize)
+            return fld.NumericField(self, group[name], None, write_enabled=True)
+        else:
+            return group.create_numeric(name, nformat, timestamp, chunksize)
 
     def create_timestamp(self, group, name, timestamp=None, chunksize=None):
-        if isinstance(group,ds.Dataset):
-            pass
-        elif isinstance(group,df.DataFrame):
-            return group.create_timestamp(self,name, timestamp, chunksize)
+        """
+        Create a timestamp field in the given group with the given name.
+        """
+        if not isinstance(group, (df.DataFrame, h5py.Group)):
+            if isinstance(group, ds.Dataset):
+                raise ValueError("'group' must be an ExeTera DataFrame rather than a"
+                                 " top-level Dataset")
+            else:
+                raise ValueError("'group' must be an Exetera DataFrame but a "
+                                 "{} was passed to it".format(type(group)))
+
+        if isinstance(group, h5py.Group):
+            fld.timestamp_field_constructor(self, group, name, timestamp, chunksize)
+            return fld.TimestampField(self, group[name], None, write_enabled=True)
+        else:
+            return group.create_timestamp(name, timestamp, chunksize)
+
+    def get_or_create_group(self,
+                            group: Union[h5py.Group, h5py.File],
+                            name: str):
+        """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
 
 
-    def get_or_create_group(self, group, name):
+        """
         if name in group:
             return group[name]
         return group.create_group(name)
 
+    def chunks(self,
+               length: int,
+               chunksize: Optional[int] = None):
+        """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
 
-    def chunks(self, length, chunksize=None):
+        'chunks' is a convenience method that, given an overall length and a chunksize, will yield
+        a set of ranges for the chunks in question.
+        ie.
+        chunks(1048576, 500000) -> (0, 500000), (500000, 1000000), (1000000, 1048576)
+
+        :param length: The range to be split into chunks
+        :param chunksize: Optional parameter detailing the size of each chunk. If not set, the
+            chunksize that the Session was initialized with is used.
+        """
         if chunksize is None:
             chunksize = self.chunksize
         cur = 0
@@ -703,49 +1090,64 @@ class Session:
             yield cur, next
             cur = next
 
-
-    def process(self, inputs, outputs, predicate):
-
-        # TODO: modifying the dictionaries in place is not great
-        input_readers = dict()
-        for k, v in inputs.items():
-            if isinstance(v, rw.Reader):
-                input_readers[k] = v
-            else:
-                input_readers[k] = self.get_reader(v)
-        output_writers = dict()
-        output_arrays = dict()
-        for k, v in outputs.items():
-            if isinstance(v, rw.Writer):
-                output_writers[k] = v
-            else:
-                raise ValueError("'outputs': all values must be 'Writers'")
-
-        reader = next(iter(input_readers.values()))
-        input_length = len(reader)
-        writer = next(iter(output_writers.values()))
-        chunksize = writer.chunksize
-        required_chunksize = min(input_length, chunksize)
-        for k, v in outputs.items():
-            output_arrays[k] = output_writers[k].chunk_factory(required_chunksize)
-
-        for c in self.chunks(input_length, chunksize):
-            kwargs = dict()
-
-            for k, v in inputs.items():
-                kwargs[k] = v[c[0]:c[1]]
-            for k, v in output_arrays.items():
-                kwargs[k] = v[:c[1] - c[0]]
-            predicate(**kwargs)
-
-            # TODO: write back to the writer
-            for k in output_arrays.keys():
-                output_writers[k].write_part(kwargs[k])
-        for k, v in output_writers.items():
-            output_writers[k].flush()
-
+    # def process(self,
+    #             inputs,
+    #             outputs,
+    #             predicate):
+    #     """
+    #     Note: this function is deprecated, and provided only for compatibility with existing scripts.
+    #     It will be removed in a future version.
+    #     """
+    #
+    #     # TODO: modifying the dictionaries in place is not great
+    #     input_readers = dict()
+    #     for k, v in inputs.items():
+    #         if isinstance(v, fld.Field):
+    #             input_readers[k] = v
+    #         else:
+    #             input_readers[k] = self.get(v)
+    #     output_writers = dict()
+    #     output_arrays = dict()
+    #     for k, v in outputs.items():
+    #         if isinstance(v, fld.Field):
+    #             output_writers[k] = v
+    #         else:
+    #             raise ValueError("'outputs': all values must be 'Writers'")
+    #
+    #     reader = next(iter(input_readers.values()))
+    #     input_length = len(reader)
+    #     writer = next(iter(output_writers.values()))
+    #     chunksize = writer.chunksize
+    #     required_chunksize = min(input_length, chunksize)
+    #     for k, v in outputs.items():
+    #         output_arrays[k] = output_writers[k].chunk_factory(required_chunksize)
+    #
+    #     for c in self.chunks(input_length, chunksize):
+    #         kwargs = dict()
+    #
+    #         for k, v in inputs.items():
+    #             kwargs[k] = v.data[c[0]:c[1]]
+    #         for k, v in output_arrays.items():
+    #             kwargs[k] = v.data[:c[1] - c[0]]
+    #         predicate(**kwargs)
+    #
+    #         # TODO: write back to the writer
+    #         for k in output_arrays.keys():
+    #             output_writers[k].data.write_part(kwargs[k])
+    #     for k, v in output_writers.items():
+    #         output_writers[k].data.complete()
 
     def get_index(self, target, foreign_key, destination=None):
+        """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+        Please make use of Dataframe.merge functionality instead. This method can be emulated by
+        adding an index (via np.arange) to a dataframe, performing a merge and then fetching the
+        mapped index field.
+
+        'get_index' maps a primary key ('target') into the space of a foreign key ('foreign_key').
+        """
         print('  building patient_id index')
         t0 = time.time()
         target_lookup = dict()
@@ -778,29 +1180,28 @@ class Session:
         else:
             return foreign_key_index
 
-
-    def get_trash_group(self, group):
-
-        group_names = group.name[1:].split('/')
-
-        while True:
-            id = str(uuid.uuid4())
-            try:
-                result = group.create_group(f"/trash/{'/'.join(group_names[:-1])}/{id}")
-                return result
-            except KeyError:
-                pass
-
-
     def temp_filename(self):
         uid = str(uuid.uuid4())
         while os.path.exists(uid + '.hdf5'):
             uid = str(uuid.uuid4())
         return uid + '.hdf5'
 
-
     def merge_left(self, left_on, right_on,
                    right_fields=tuple(), right_writers=None):
+        """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+        Please use DataFrame.merge instead.
+
+        Perform a database-style left join on right_fields, outputting the result to right_writers, if set.
+        
+        :param left_on: The key to perform the join on on the left hand side
+        :param right_on: The key to perform the join on on the right hand side
+        :param right_fields: The fields to be mapped from right to left
+        :param right_writers: Optional parameter providing the fields to which the mapped data should
+            be written. If this is not set, the mapped data is returned as numpy arrays and lists instead.
+        """
         l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
@@ -815,19 +1216,53 @@ class Session:
 
         right_results = list()
         for irf, rf in enumerate(right_fields):
-            rf_raw = val.raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
-            joined_field = ops.safe_map(rf_raw, r_to_l_map, r_to_l_filt)
-            # joined_field = per._safe_map(rf_raw, r_to_l_map, r_to_l_filt)
-            if right_writers is None:
-                right_results.append(joined_field)
+            if isinstance(rf, Field):
+                if rf.indexed:
+                    indices, values = ops.safe_map_indexed_values(rf.indices[:], rf.values[:],
+                                                                  r_to_l_map, r_to_l_filt)
+                    if right_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].indices.write(indices)
+                        right_writers[irf].values.write(values)
+                else:
+                    values = ops.safe_map_values(rf.data[:], r_to_l_map, r_to_l_filt)
+                    if right_writers is None:
+                        result = rf.create_like()
+                        result.data.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].data.write(values)
             else:
-                right_writers[irf].data.write(joined_field)
+                values = ops.safe_map_values(rf, r_to_l_map, r_to_l_filt)
+
+                if right_writers is None:
+                    right_results.append(values)
+                else:
+                    right_writers[irf].data.write(values)
 
         return right_results
 
-
     def merge_right(self, left_on, right_on,
-                    left_fields=None, left_writers=None):
+                    left_fields=tuple(), left_writers=None):
+        """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+        Please use DataFrame.merge instead.
+
+        Perform a database-style right join on left_fields, outputting the result to left_writers, if set.
+        
+        :param left_on: The key to perform the join on on the left hand side
+        :param right_on: The key to perform the join on on the right hand side
+        :param left_fields: The fields to be mapped from right to left
+        :param left_writers: Optional parameter providing the fields to which the mapped data should
+            be written. If this is not set, the mapped data is returned as numpy arrays and lists instead.
+        """
+
         l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
@@ -842,18 +1277,55 @@ class Session:
 
         left_results = list()
         for ilf, lf in enumerate(left_fields):
-            lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
-            joined_field = ops.safe_map(lf_raw, l_to_r_map, l_to_r_filt)
-            if left_writers is None:
-                left_results.append(joined_field)
+            if isinstance(lf, Field):
+                if lf.indexed:
+                    indices, values = ops.safe_map_indexed_values(lf.indices[:], lf.values[:],
+                                                                  l_to_r_map, l_to_r_filt)
+                    if left_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].indices.write(indices)
+                        left_writers[ilf].values.write(values)
+                else:
+                    values = ops.safe_map_values(lf.data[:], l_to_r_map, l_to_r_filt)
+                    if left_writers is None:
+                        result = lf.create_like()
+                        result.data.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].data.write(values)
             else:
-                left_writers[ilf].data.write(joined_field)
+                values = ops.safe_map_values(lf, l_to_r_map, l_to_r_filt)
+
+                if left_writers is None:
+                    left_results.append(values)
+                else:
+                    left_writers[ilf].data.write(values)
 
         return left_results
 
-
     def merge_inner(self, left_on, right_on,
                     left_fields=None, left_writers=None, right_fields=None, right_writers=None):
+        """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+        
+        Please use DataFrame.merge instead.
+
+        Perform a database-style inner join on left_fields, outputting the result to left_writers, if set.
+        
+        :param left_on: The key to perform the join on on the left hand side
+        :param right_on: The key to perform the join on on the right hand side
+        :param left_fields: The fields to be mapped from left to inner
+        :param left_writers: Optional parameter providing the fields to which the mapped data should
+            be written. If this is not set, the mapped data is returned as numpy arrays and lists instead.
+        :param right_fields: The fields to be mapped from right to inner
+        :param right_writers: Optional parameter providing the fields to which the mapped data should
+            be written. If this is not set, the mapped data is returned as numpy arrays and lists instead.
+        """
         l_key_raw = val.raw_array_from_parameter(self, 'left_on', left_on)
         l_index = np.arange(len(l_key_raw), dtype=np.int64)
         l_df = pd.DataFrame({'l_k': l_key_raw, 'l_index': l_index})
@@ -870,24 +1342,65 @@ class Session:
 
         left_results = list()
         for ilf, lf in enumerate(left_fields):
-            lf_raw = val.raw_array_from_parameter(self, 'left_fields[{}]'.format(ilf), lf)
-            joined_field = ops.safe_map(lf_raw, l_to_i_map, l_to_i_filt)
-            if left_writers is None:
-                left_results.append(joined_field)
+            if isinstance(lf, Field):
+                if lf.indexed:
+                    indices, values = ops.safe_map_indexed_values(lf.indices[:], lf.values[:],
+                                                                  l_to_i_map, l_to_i_filt)
+                    if left_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].indices.write(indices)
+                        left_writers[ilf].values.write(values)
+                else:
+                    values = ops.safe_map_values(lf.data[:], l_to_i_map, l_to_i_filt)
+                    if left_writers is None:
+                        result = lf.create_like()
+                        result.data.write(values)
+                        left_results.append(result)
+                    else:
+                        left_writers[ilf].data.write(values)
             else:
-                left_writers[ilf].data.write(joined_field)
+                values = ops.safe_map_values(lf, l_to_i_map, l_to_i_filt)
+
+                if left_writers is None:
+                    left_results.append(values)
+                else:
+                    left_writers[ilf].data.write(values)
 
         right_results = list()
         for irf, rf in enumerate(right_fields):
-            rf_raw = val.raw_array_from_parameter(self, 'right_fields[{}]'.format(irf), rf)
-            joined_field = ops.safe_map(rf_raw, r_to_i_map, r_to_i_filt)
-            if right_writers is None:
-                right_results.append(joined_field)
+            if isinstance(rf, Field):
+                if rf.indexed:
+                    indices, values = ops.safe_map_indexed_values(rf.indices[:], rf.values[:],
+                                                                  r_to_i_map, r_to_i_filt)
+                    if right_writers is None:
+                        result = fld.IndexedStringMemField(self)
+                        result.indices.write(indices)
+                        result.values.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].indices.write(indices)
+                        right_writers[irf].values.write(values)
+                else:
+                    values = ops.safe_map_values(rf.data[:], r_to_i_map, r_to_i_filt)
+                    if right_writers is None:
+                        result = rf.create_like()
+                        result.data.write(values)
+                        right_results.append(result)
+                    else:
+                        right_writers[irf].data.write(values)
             else:
-                right_writers[irf].data.write(joined_field)
+                values = ops.safe_map_values(rf, r_to_i_map, r_to_i_filt)
+
+                if right_writers is None:
+                    right_results.append(values)
+                else:
+                    right_writers[irf].data.write(values)
 
         return left_results, right_results
-
 
     def _map_fields(self, field_map, field_sources, field_sinks):
         rtn_sinks = None
@@ -913,7 +1426,6 @@ class Session:
                 ops.map_valid(src_, field_map, snk_)
         return None if rtn_sinks is None else tuple(rtn_sinks)
 
-
     def _streaming_map_fields(self, field_map, field_sources, field_sinks):
         # field map must be a field
         # field sources must be fields
@@ -925,29 +1437,26 @@ class Session:
             snk_ = val.field_from_parameter(self, 'field_sinks', snk)
             ops.ordered_map_valid_stream(src_, map_, snk_)
 
-
     def ordered_merge_left(self, left_on, right_on, right_field_sources=tuple(), left_field_sinks=None,
                            left_to_right_map=None, left_unique=False, right_unique=False):
         """
-        Generate the results of a left join apply it to the fields described in the tuple
+        Generate the results of a left join and apply it to the fields described in the tuple
         'left_field_sources'. If 'left_field_sinks' is set, the mapped values are written
         to the fields / arrays set there.
         Note: in order to achieve best scalability, you should use groups / fields rather
         than numpy arrays and provide a tuple of groups/fields to left_field_sinks, so
         that the session and compute the merge and apply the mapping in a streaming
         fashion.
+        
         :param left_on: the group/field/numba array that contains the left key values
         :param right_on: the group/field/numba array that contains the right key values
         :param left_to_right_map: a group/field/numba array that the map is written to. If
-        it is a numba array, it must be the size of the resulting merge
-        :param left_field_sources: a tuple of group/fields/numba arrays that contain the
-        fields to be joined
+            it is a numba array, it must be the size of the resulting merge
+        :param left_field_sources: a tuple of group/fields/numba arrays that contain the fields to be joined
         :param left_field_sinks: optional - a tuple of group/fields/numba arrays that
-        the mapped fields should be written to
-        :param left_unique: a hint to indicate whether the 'left_on' field contains unique
-        values
-        :param right_unique: a hint to indicate whether the 'right_on' field contains
-        unique values
+            the mapped fields should be written to
+        :param left_unique: a hint to indicate whether the 'left_on' field contains unique values
+        :param right_unique: a hint to indicate whether the 'right_on' field contains unique values
         :return: If left_field_sinks is not set, a tuple of the output fields is returned
         """
         if left_field_sinks is not None:
@@ -975,7 +1484,7 @@ class Session:
                 if streamable:
                     has_unmapped = \
                         ops.ordered_map_to_right_right_unique_streamed(left_on, right_on,
-                                                                      left_to_right_map)
+                                                                       left_to_right_map)
                     result = left_to_right_map
                 else:
                     result = np.zeros(len(left_on), dtype=np.int64)
@@ -1001,41 +1510,58 @@ class Session:
             rtn_left_sinks = self._map_fields(result, right_field_sources, left_field_sinks)
             return rtn_left_sinks
 
-
     def ordered_merge_right(self, left_on, right_on,
                             left_field_sources=tuple(), right_field_sinks=None,
                             right_to_left_map=None, left_unique=False, right_unique=False):
         """
-        Generate the results of a right join apply it to the fields described in the tuple
+        Generate the results of a right join and apply it to the fields described in the tuple
         'right_field_sources'. If 'right_field_sinks' is set, the mapped values are written
         to the fields / arrays set there.
+        
         Note: in order to achieve best scalability, you should use groups / fields rather
         than numpy arrays and provide a tuple of groups/fields to right_field_sinks, so
         that the session and compute the merge and apply the mapping in a streaming
         fashion.
+        
         :param left_on: the group/field/numba array that contains the left key values
         :param right_on: the group/field/numba array that contains the right key values
         :param right_to_left_map: a group/field/numba array that the map is written to. If
-        it is a numba array, it must be the size of the resulting merge
-        :param right_field_sources: a tuple of group/fields/numba arrays that contain the
-        fields to be joined
+            it is a numba array, it must be the size of the resulting merge
+        :param right_field_sources: a tuple of group/fields/numba arrays that contain the fields to be joined
         :param right_field_sinks: optional - a tuple of group/fields/numba arrays that
-        the mapped fields should be written to
-        :param left_unique: a hint to indicate whether the 'left_on' field contains unique
-        values
-        :param right_unique: a hint to indicate whether the 'right_on' field contains
-        unique values
+            the mapped fields should be written to
+        :param left_unique: a hint to indicate whether the 'left_on' field contains unique values
+        :param right_unique: a hint to indicate whether the 'right_on' field contains unique values
         :return: If right_field_sinks is not set, a tuple of the output fields is returned
         """
         return self.ordered_merge_left(right_on, left_on, left_field_sources, right_field_sinks,
                                        right_to_left_map, right_unique, left_unique)
 
-
     def ordered_merge_inner(self, left_on, right_on,
                             left_field_sources=tuple(), left_field_sinks=None,
                             right_field_sources=tuple(), right_field_sinks=None,
                             left_unique=False, right_unique=False):
-
+        """
+        Generate the results of an inner join and apply it to the fields described in the tuple
+        'right_field_sources'. If 'right_field_sinks' is set, the mapped values are written
+        to the fields / arrays set there.
+        
+        Note: in order to achieve best scalability, you should use groups / fields rather
+        than numpy arrays and provide a tuple of groups/fields to right_field_sinks, so
+        that the session and compute the merge and apply the mapping in a streaming
+        fashion.
+        
+        :param left_on: the group/field/numba array that contains the left key values
+        :param right_on: the group/field/numba array that contains the right key values
+        :param right_to_left_map: a group/field/numba array that the map is written to. If
+            it is a numba array, it must be the size of the resulting merge
+        :param right_field_sources: a tuple of group/fields/numba arrays that contain the fields to be joined
+        :param right_field_sinks: optional - a tuple of group/fields/numba arrays that
+            the mapped fields should be written to
+        :param left_unique: a hint to indicate whether the 'left_on' field contains unique values
+        :param right_unique: a hint to indicate whether the 'right_on' field contains unique values
+        :return: If right_field_sinks is not set, a tuple of the output fields is returned
+        """
         if left_field_sinks is not None:
             if len(left_field_sources) != len(left_field_sinks):
                 msg = ("{} and {} should be of the same length but are length {} and {} "

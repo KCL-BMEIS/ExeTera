@@ -11,7 +11,7 @@ class IndexedArray:
         if isinstance(index, slice):
             return ops.apply_slice_to_index_values(index, self._indices, self._values)
         if isinstance(index, np.ndarray):
-            if index.dtype == np.bool:
+            if index.dtype == bool:
                 return ops.apply_filter_to_index_values(index, self._indices, self._values)
             if np.issubdtype(index.dtype, np.integer):
                 return ops.apply_indices_to_index_values(index, self._indices, self._values)

@@ -9,6 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import csv
 from datetime import datetime, MAXYEAR
 from itertools import accumulate
@@ -36,7 +37,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
 
     schema = None
     if isinstance(schema_file, str):
-        with open(schema_file) as sf:
+        with open(schema_file, encoding='utf-8') as sf:
             schema = load_schema(sf)
     elif isinstance(schema_file, StringIO):
         schema = load_schema(schema_file)
@@ -68,6 +69,8 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
     else:
         mode = 'r+'
 
+    if not os.path.exists(dest_file_name):
+        mode = 'w'
     with h5py.File(dest_file_name, mode) as hf:
         for sk in schema.keys():
             if sk in reserved_column_names:
@@ -78,8 +81,8 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
                 continue
 
             fields = schema[sk].fields
-    
-            with open(files[sk]) as f:
+
+            with open(files[sk], encoding='utf-8') as f:
                 ds = dataset.Dataset(f, stop_after=1)
             names = set([n.strip() for n in ds.names_])
             missing_names = names.difference(fields.keys())
@@ -136,7 +139,7 @@ class DatasetImporter:
             hf.create_group(space)
         group = hf[space]
 
-        with open(source) as sf:
+        with open(source, encoding='utf-8') as sf:
             csvf = csv.DictReader(sf, delimiter=',', quotechar='"')
 
             available_keys = [k.strip() for k in csvf.fieldnames if k.strip() in schema.fields]

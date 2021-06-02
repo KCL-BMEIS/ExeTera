@@ -2,7 +2,6 @@ from typing import Optional, Sequence, Tuple, Union
 from datetime import datetime, timedelta
 
 import numpy as np
-from numpy.typing import ArrayLike
 
 from exetera.core.utils import SECONDS_PER_DAY
 
@@ -18,12 +17,12 @@ def get_periods(start_date: datetime,
     Delta controls whether the sequence of periods is generated from an start point
     or an end point. When delta is positive, the sequence is generated forwards in time.
     When delta is negative, the sequence is generate backwards in time.
+    
     :param start_date: a ``datetime.datetime`` object for the starting period
     :param end_date: a ``datetime.datetime`` object for tne ending period, exclusive
-    :param period: a string representing the unit in which the delta is calculated
-    ('day', 'days', 'week', 'weeks')
+    :param period: a string representing the unit in which the delta is calculated ('day', 'days', 'week', 'weeks')
     :param delta: an integer representing the delta.
-    :return:
+    :return: a list of dates
     """
 
     period_map = {
@@ -63,25 +62,29 @@ def get_periods(start_date: datetime,
     return dates
 
 
-def get_days(date_field: ArrayLike,
-             date_filter: ArrayLike = None,
+def get_days(date_field: np.ndarray,
+             date_filter: Optional[np.ndarray] = None,
              start_date: Optional[np.float64] = None,
              end_date: Optional[np.float64] = None
-             ) -> Tuple[ArrayLike, Optional[ArrayLike]]:
+             ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
     """
-    get_days converts a field of timestamps into a field of relative elapsed days.
+    This converts a field of timestamps into a field of relative elapsed days.
     The precise behaviour depends on the optional parameters but essentially, the lowest
     valid day is taken as day 0, and all other timestamps are converted to whole numbers
     of days elapsed since this timestamp:
+    
     * If ``start_date`` is set, the start_date is used as the zero-date
     * If ``start_date`` is not set:
+    
       * If ``date_filter`` is not set, the lowest timestamp is used as the zero-date
       * If ``date_filter`` is set, the lowest unfiltered timestamp is used as the zero-date
 
     As well as returning the elapsed days, this method can also return a filter for which
     elapsed dates are valid. This is determined as follows:
+    
     * If ``date_filter``, ``start_date`` and ``end_date`` are None, None is returned
     * otherwise:
+    
       * If ``date_filter`` is not provided, the filter represents all dates that are out
         of range with respect to the start_date and end_date parameters
       * If ``date_filter`` is provided, the filter is all dates out of range with respect to
@@ -113,23 +116,19 @@ def get_days(date_field: ArrayLike,
 
 
 def generate_period_offset_map(periods: Sequence[datetime]
-                               ) -> ArrayLike:
+                               ) -> np.ndarray:
     """
     Given a list of ordered datetimes relating to period boundaries, generate a numpy
     array of days that map each day to a period.
 
-    Example:
+    Example::
 
-    .. code-block:: python
-
-      [datetime(2020,1,5), datetime(2020,1,12), datatime(2020,1,19), datetime(2020,1,26)]
+        [datetime(2020,1,5), datetime(2020,1,12), datatime(2020,1,19), datetime(2020,1,26)]
 
 
-    generates the following output
-
-    .. code-block:: python
-
-      [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2]
+    generates the following output::
+    
+        [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2]
 
     In the above example, each period spans a week, and periods cover a total of 3 weeks.
     As a result, the output is 21 entries long, one for each day covered by the period, and
@@ -142,36 +141,32 @@ def generate_period_offset_map(periods: Sequence[datetime]
     return period_per_day
 
 
-def get_period_offsets(periods_by_day: ArrayLike,
-                       days: ArrayLike
-                       ) -> ArrayLike:
+def get_period_offsets(periods_by_day: np.ndarray,
+                       days: np.ndarray,
+                       in_range: Optional[np.ndarray] = None
+                       ) -> np.ndarray:
     """
     Given a ``periods_by_day``, a numpy array of days mapping to periods and ``days``, a numpy array of days to be mapped to
     periods, perform the mapping to generate a numpy array indicating which period a day is
     in for each element.
 
-    Example:
+    Example::
 
-    .. code-block:: python
+        periods_by_day: [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2]
+        days: [3, 18, 4, 7, 10, 0, 0, 2, 19, 20, 16, 17, 19, 4, 5, 9, 8, 15]
 
-      periods_by_day: [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2]
-      days: [3, 18, 4, 7, 10, 0, 0, 2, 19, 20, 16, 17, 19, 4, 5, 9, 8, 15]
+    generates the following output::
 
-    generates the following output:
+        [0, 2, 0, 1, 1, 0, 0, 0, 2, 2, 2, 2, 2, 0, 0, 1, 1, 2]
 
-    .. code-block:: python
-      [0, 2, 0, 1, 1, 0, 0, 0, 2, 2, 2, 2, 2, 0, 0, 1, 1, 2]
+    This function should generally be used in concert with generate_period_offset_map, as follows::
 
-    This function should generally be used in concert with generate_period_offset_map, as follows:
-
-    .. code-block:: python
-
-      start_date = # a start date
-      end_date = # an end date
-      periods = get_periods(start_date, end_date, 'week', 1)
-
-      days = get_days(session.get(src['my_table']['my_timestamps']).data[:])
-      result = get_period_offsets(generate_period_offset_map(periods), days)
+        start_date = # a start date
+        end_date = # an end date
+        periods = get_periods(start_date, end_date, 'week', 1)
+        
+        days = get_days(session.get(src['my_table']['my_timestamps']).data[:])
+        result = get_period_offsets(generate_period_offset_map(periods), days)
 
     """
     if not isinstance(periods_by_day, np.ndarray) and\
@@ -181,5 +176,11 @@ def get_period_offsets(periods_by_day: ArrayLike,
             days.dtype not in (np.int8, np.int16, np.int32, np.int64):
         raise ValueError("'days' must be a numpy array of a signed integer type")
 
-    periods = periods_by_day[days]
+    if in_range is None:
+        periods = periods_by_day[days]
+    else:
+        periods = np.where(in_range, days, 0)
+        periods = periods_by_day[periods]
+        periods = np.where(in_range, periods, -1)
+
     return periods

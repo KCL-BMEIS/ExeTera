@@ -272,19 +272,6 @@ def temp_dataset():
         hd.flush()
         hd.close()
 
-
-# def _get_spans(field, fields):
-#
-#     if field is not None:
-#         return _get_spans_for_field(field)
-#     elif len(fields) == 1:
-#         return _get_spans_for_field(fields[0])
-#     elif len(fields) == 2:
-#         return _get_spans_for_2_fields(*fields)
-#     else:
-#         raise NotImplementedError("This operation does not support more than two fields at present")
-
-
 @njit
 def _index_spans(spans, results):
     sp_sta = spans[:-1]
@@ -292,30 +279,6 @@ def _index_spans(spans, results):
     for s in range(len(sp_sta)):
         results[sp_sta[s]:sp_end[s]] = s
     return results
-
-
-# def _get_spans_for_field(field0):
-#     results = np.zeros(len(field0) + 1, dtype=np.bool)
-#     if np.issubdtype(field0.dtype, np.number):
-#         fn = np.not_equal
-#     else:
-#         fn = np.char.not_equal
-#     results[1:-1] = fn(field0[:-1], field0[1:])
-#
-#     results[0] = True
-#     results[-1] = True
-#     return np.nonzero(results)[0]
-
-# def _get_spans_for_2_fields(field0, field1):
-#     count = 0
-#     spans = np.zeros(len(field0)+1, dtype=np.uint32)
-#     spans[0] = 0
-#     for i in np.arange(1, len(field0)):
-#         if field0[i] != field0[i-1] or field1[i] != field1[i-1]:
-#             count += 1
-#             spans[count] = i
-#     spans[count+1] = len(field0)
-#     return spans[:count+2]
 
 
 @njit
@@ -640,10 +603,11 @@ def _values_from_reader_or_ndarray(name, field):
 
 # TODO: handle usage of reader
 def filter_duplicate_fields(field):
-
-    filter_ = np.ones(len(field), dtype=np.bool)
-    _filter_duplicate_fields(field, filter_)
+    field_ = val.array_from_field_or_lower('field', field)
+    filter_ = np.ones(len(field_), dtype=bool)
+    _filter_duplicate_fields(field_, filter_)
     return filter_
+
 
 def _filter_duplicate_fields(field, filter):
     seen_ids = dict()
@@ -669,14 +633,14 @@ def foreign_key_is_in_primary_key(primary_key, foreign_key):
     else:
         fk = foreign_key
 
-    result = np.zeros(len(fk), dtype=np.bool)
+    result = np.zeros(len(fk), dtype=bool)
     return _filter_non_orphaned_foreign_keys(pk, fk, result)
 
 
 def _filter_non_orphaned_foreign_keys(primary_key, foreign_key, results):
     pkids = dict()
-    trueval = np.bool(True)
-    falseval = np.bool(False)
+    trueval = bool(True)
+    falseval = bool(False)
     for p in primary_key:
         pkids[p] = trueval
 
@@ -891,16 +855,22 @@ class DataStore:
 
 
     def get_spans(self, field=None, fields=None):
-        if fields is not None:
-            if isinstance(fields[0], fld.Field):
-                return ops._get_spans_for_2_fields_by_spans(fields[0].get_spans(), fields[1].get_spans())
-            if isinstance(fields[0], np.ndarray):
-                return ops._get_spans_for_2_fields(fields[0], fields[1])
+        if field is None and fields is None:
+            raise ValueError("One of 'field' and 'fields' must be set")
+        if field is not None and fields is not None:
+            raise ValueError("Only one of 'field' and 'fields' may be set")
+        raw_field = None
+        raw_fields = None
+        if field is not None:
+            val._check_is_reader_or_ndarray('field', field)
+            raw_field = field[:] if isinstance(field, rw.Reader) else field
+            return ops.get_spans_for_field(raw_field)
         else:
-            if isinstance(field, fld.Field):
-                return field.get_spans()
-            if isinstance(field, np.ndarray):
-                return ops.get_spans_for_field(field)
+            raw_fields = []
+            for f in fields:
+                val._check_is_reader_or_ndarray('elements of tuple/list fields', f)
+                raw_fields.append(f[:] if isinstance(f, rw.Reader) else f)
+            return ops._get_spans_for_2_fields(raw_fields[0], raw_fields[1])
 
 
 
