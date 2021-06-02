@@ -1752,7 +1752,7 @@ def fixed_string_transform_2(column_inds, column_vals, column_offsets, col_idx, 
     for i in range(written_row_count):
         a = i * strlen
         start_idx = column_inds[col_idx, i] + col_offset
-        end_idx = column_inds[col_idx, i+1] + col_offset
+        end_idx = min(column_inds[col_idx, i+1] + col_offset, start_idx + strlen)
         for c in range(start_idx, end_idx):
             memory[a] = column_vals[c]
             a += 1
