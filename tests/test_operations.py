@@ -629,6 +629,29 @@ class TestFieldImporter(unittest.TestCase):
             "The following numeric value in the field 'int_field' can not be parsed: 10..8"
         ) 
 
+    def test_numeric_transform_exception_input_is_string(self):
+        column_inds, column_vals, column_offsets, written_row_count = self._one_dim_data_to_indexed(['1', '100', '10.23', 'one'], 30)
+
+        elements = np.zeros(written_row_count, dtype=np.float32)
+        validity = np.zeros(written_row_count, dtype='bool')
+
+        parser = per.try_str_to_float
+        invalid_value = 0
+        validation_mode = 'strict'
+        field_name = np.frombuffer(bytes('int_field', "utf-8"), dtype=np.uint8)
+        
+        exception_message, exception_args = ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, parser, invalid_value, validation_mode, field_name)    
+
+        self.assertEqual(exception_message, 2)
+        self.assertEqual(len(exception_args), 2)
+
+        with self.assertRaises(Exception) as context:
+            ops.raiseNumericException(exception_message, exception_args)
+
+        self.assertEqual(
+            str(context.exception),
+            "The following numeric value in the field 'int_field' can not be parsed: one"
+        ) 
 
     def test_transform_to_values(self):
         written_row_count = 4

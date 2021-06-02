@@ -177,7 +177,7 @@ def fast_csv_reader(source, column_inds, column_vals, column_offsets, hasHeader,
 
         elif c == newline_value:
             # \n \n - last line may have two newline_value
-            while index + 1 < len(source) and source[index] + 1 == newline_value:
+            while index + 1 < len(source) and source[index + 1] == newline_value:
                 index += 1
 
             if not escaped:

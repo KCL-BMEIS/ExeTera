@@ -58,7 +58,7 @@ def _make_test_data(schema, count, chunk_row_size, fields_to_use=None):
         elif s['type'] == 'int':
             arr = rng.randint(10, size = count)
             columns[s['name']] = arr
-        elif s['type'] == 'str':
+        elif s['type'] == 'str' or s['type'] == 'fixed_str':
             vals = s['vals']
             arr = rng.randint(low=0, high=len(vals), size=count)
             str_arr = [None] * count
@@ -257,7 +257,26 @@ class TestReadFile(TestCase):
 
         csv_buffer, df, writer_list, index_map, column_offsets = _make_test_data(TEST_SCHEMA, file_lines, chunk_row_size, fields_to_use)
         mock_fromfile.return_value = np.frombuffer(csv_buffer.getvalue().encode(), dtype=np.uint8)
+        # print(csv_buffer.getvalue().encode())
+
+        read_file_using_fast_csv_reader(csv_buffer, chunk_row_size, column_offsets, index_map, field_importer_list=writer_list)
         
+        for ith, field in enumerate(fields_to_use):
+            result = writer_list[ith].result
+            # print(result)
+            # print(df[field])
+            self.assertEqual(len(result), len(df[field]))
+            self.assertListEqual(result, list(df[field]))
+
+
+    @mock.patch("numpy.fromfile")
+    def test_read_file_on_only_indexed_string_field(self, mock_fromfile):
+        file_lines, chunk_row_size = 50, 100
+        fields_to_use = [s['name'] for s in TEST_SCHEMA if s['type'] == 'str']
+
+        csv_buffer, df, writer_list, index_map, column_offsets = _make_test_data(TEST_SCHEMA, file_lines, chunk_row_size, fields_to_use)
+        mock_fromfile.return_value = np.frombuffer(csv_buffer.getvalue().encode(), dtype=np.uint8)
+
         read_file_using_fast_csv_reader(csv_buffer, chunk_row_size, column_offsets, index_map, field_importer_list=writer_list)
         
         for ith, field in enumerate(fields_to_use):
@@ -267,9 +286,9 @@ class TestReadFile(TestCase):
 
 
     @mock.patch("numpy.fromfile")
-    def test_read_file_on_only_indexed_string_field(self, mock_fromfile):
+    def test_read_file_on_only_fixed_string_field(self, mock_fromfile):
         file_lines, chunk_row_size = 50, 100
-        fields_to_use = [s['name'] for s in TEST_SCHEMA if s['type'] == 'str']
+        fields_to_use = [s['name'] for s in TEST_SCHEMA if s['type'] == 'fixed_str']
 
         csv_buffer, df, writer_list, index_map, column_offsets = _make_test_data(TEST_SCHEMA, file_lines, chunk_row_size, fields_to_use)
         mock_fromfile.return_value = np.frombuffer(csv_buffer.getvalue().encode(), dtype=np.uint8)
