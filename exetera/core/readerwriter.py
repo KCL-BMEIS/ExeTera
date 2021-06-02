@@ -302,8 +302,8 @@ class IndexedStringWriter(Writer):
 
     def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         # broadcast accumulated size to current index array
-        index = column_inds[col_idx, :written_row_count] + self.chunk_accumulated
-        self.chunk_accumulated += column_inds[col_idx, written_row_count]
+        index = column_inds[col_idx, 1:written_row_count+1] + self.chunk_accumulated
+        self.chunk_accumulated += column_inds[col_idx, written_row_count+1]
 
         col_offset = column_offsets[col_idx]
         values = column_vals[col_offset : col_offset + column_inds[col_idx, written_row_count]]
