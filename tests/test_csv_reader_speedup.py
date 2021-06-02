@@ -124,7 +124,7 @@ class TestFastCSVReader(TestCase):
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
         column_vals = np.zeros(column_offsets[-1], dtype=np.uint8)
 
-        _, written_row_count, _, _, _ = fast_csv_reader(content, column_inds, column_vals, column_offsets, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        _, written_row_count, _, _, _ = fast_csv_reader(content, 0, column_inds, column_vals, column_offsets, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
         self.assertEqual(written_row_count, 1)
         self.assertEqual(column_inds[1, 1], 3)  # abc
         self.assertEqual(column_inds[2, 1], 5)  # a"b"c
@@ -143,7 +143,7 @@ class TestFastCSVReader(TestCase):
         column_vals = np.zeros(column_offsets[-1], dtype=np.uint8)
 
         with self.assertRaises(Exception) as context:
-            fast_csv_reader(content, column_inds, column_vals, column_offsets, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)    
+            fast_csv_reader(content, 0, column_inds, column_vals, column_offsets, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)    
             
         self.assertEqual(str(context.exception), 'double quote should start at the beginning of the cell') 
 
@@ -160,7 +160,7 @@ class TestFastCSVReader(TestCase):
         column_vals = np.zeros(column_offsets[-1], dtype=np.uint8)
 
         with self.assertRaises(Exception) as context:
-            fast_csv_reader(content, column_inds, column_vals, column_offsets, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)    
+            fast_csv_reader(content, 0, column_inds, column_vals, column_offsets, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)    
         
         self.assertEqual(str(context.exception), 'invalid double quote')   
 
@@ -175,7 +175,7 @@ class TestFastCSVReader(TestCase):
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
         column_vals = np.zeros(column_offsets[-1], dtype=np.uint8)
         
-        _, written_row_count, _, _, _ = fast_csv_reader(content, column_inds, column_vals, column_offsets, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        _, written_row_count, _, _, _ = fast_csv_reader(content, 0, column_inds, column_vals, column_offsets, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
 
         self.assertEqual(written_row_count, 3)
         self.assertListEqual(list(column_inds[0][:written_row_count + 1]), [0, 3, 5, 9])
@@ -214,7 +214,7 @@ class TestFastCSVReader(TestCase):
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
         column_vals = np.zeros( column_offsets[-1], dtype=np.uint8)
 
-        _, _, is_indices_full, is_values_full, _ = fast_csv_reader(content, column_inds, column_vals, column_offsets, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        _, _, is_indices_full, is_values_full, _ = fast_csv_reader(content, 0, column_inds, column_vals, column_offsets, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
 
         self.assertTrue(is_indices_full)
         self.assertFalse(is_values_full)
@@ -242,7 +242,7 @@ class TestFastCSVReader(TestCase):
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) 
         column_vals = np.zeros( column_offsets[-1], dtype=np.uint8)
 
-        _, _, is_indices_full, is_values_full, val_full_col_idx = fast_csv_reader(content, column_inds, column_vals, column_offsets, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        _, _, is_indices_full, is_values_full, val_full_col_idx = fast_csv_reader(content, 0, column_inds, column_vals, column_offsets, True, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
         self.assertFalse(is_indices_full)
         self.assertTrue(is_values_full)
         self.assertEqual(val_full_col_idx, 0)

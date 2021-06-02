@@ -1,5 +1,6 @@
 import csv
 import time
+from tracemalloc import start
 from numba import njit,jit
 import numpy as np
 from exetera.core import utils
@@ -80,22 +81,29 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
             # when indices or values is full, we need to call fast_csv_reader again, but we don't want to read same content again
             if not is_indices_full and not is_values_full:
                 content = np.fromfile(source, count=chunk_byte_size, offset=chunk_index, dtype=np.uint8)
+                start_index = 0
 
-            length_content = content.shape[0]
-            if length_content == 0:
-                break
+                length_content = content.shape[0]
+                if length_content == 0:
+                    break
 
-            # check if there's newline at EOF in the last chunk. add one if it's missing
-            if chunk_index + length_content == total_byte_size and content[-1] != NEWLINE_VALUE:
-                content = np.append(content, NEWLINE_VALUE)
+                # check if there's newline at EOF in the last chunk. add one if it's missing
+                if chunk_index + length_content == total_byte_size and content[-1] != NEWLINE_VALUE:
+                    content = np.append(content, NEWLINE_VALUE)
             
-            offset_pos, written_row_count, is_indices_full, is_values_full, val_full_col_idx = fast_csv_reader(content, column_inds, column_vals, column_offsets, hasHeader, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+            offset_pos, written_row_count, is_indices_full, is_values_full, val_full_col_idx = fast_csv_reader(content, start_index, column_inds, column_vals, column_offsets, hasHeader, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
             # print('====== after csv reader =====')
             # print('chunk_index', chunk_index)
             # print('offset_pos', offset_pos)
             # print('written_row_count', written_row_count)
             # print('column_inds', column_inds)
             # print('column_vals', column_vals)
+
+            # convert and write
+            for ith, i_c in enumerate(index_map):     
+                if field_importer_list and field_importer_list[ith]: 
+                    field_importer_list[ith].transform_and_write_part(column_inds, column_vals, column_offsets, i_c, written_row_count)
+                    field_importer_list[ith].flush()
 
             # make column_inds larger if it gets full before reach the end of chunk
             if is_indices_full:
@@ -114,18 +122,15 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
                 
             # reassign
             if is_indices_full or is_values_full:
-                continue
+                start_index = offset_pos
+            else:
+                chunk_index += offset_pos
 
             hasHeader = False
-            chunk_index += offset_pos
+            # chunk_index += offset_pos
             accumulated_written_rows += written_row_count
             ch += 1
 
-            # convert and write
-            for ith, i_c in enumerate(index_map):     
-                if field_importer_list and field_importer_list[ith]: 
-                    field_importer_list[ith].transform_and_write_part(column_inds, column_vals, column_offsets, i_c, written_row_count)
-                    field_importer_list[ith].flush()
            
             print(f"{ch} chunks, {accumulated_written_rows} accumulated_written_rows parsed in {time.time() - time0}s")
 
@@ -136,11 +141,11 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
 
 
 @njit
-def fast_csv_reader(source, column_inds, column_vals, column_offsets, hasHeader, escape_value, separator_value, newline_value, whitespace_value ):
+def fast_csv_reader(source, start_index, column_inds, column_vals, column_offsets, hasHeader, escape_value, separator_value, newline_value, whitespace_value ):
     colcount = column_inds.shape[0]
     maxrowcount = np.int64(column_inds.shape[1] - 1)  # -1: minus the first element (0) in the row that created for prefix
     
-    index = np.int64(0)
+    index = np.int64(start_index)
     index_for_end_line = np.int64(0)
     
     col_index = np.int64(0)
