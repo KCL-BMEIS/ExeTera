@@ -69,8 +69,9 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
     else:
         mode = 'r+'
 
-    if not os.path.exists(dest_file_name):
+    if isinstance(dest_file_name, str) and not os.path.exists(dest_file_name):
         mode = 'w'
+        
     with h5py.File(dest_file_name, mode) as hf:
         for sk in schema.keys():
             if sk in reserved_column_names:

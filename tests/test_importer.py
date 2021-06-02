@@ -270,7 +270,7 @@ class TestImporter(unittest.TestCase):
             indices = hf['schema_key']['name']['index'][:]
             values = hf['schema_key']['name']['values'][:]
 
-        self.assertListEqual(list(indices), [0,1,3,6,10])
+        self.assertListEqual(list(indices), [0,1,3,6,10,15])
         self.assertEqual(values[indices[0]:indices[1]].tobytes(), b'a')
         self.assertEqual(values[indices[3]:indices[4]].tobytes(), b'dddd')
 

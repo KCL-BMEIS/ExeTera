@@ -364,9 +364,9 @@ class LeakyCategoricalImporter:
 
         ops.leaky_categorical_transform(chunk, freetext_indices_chunk, freetext_values_chunk, col_idx, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values)
 
-        freetext_indices = freetext_indices_chunk + self.freetext_index_accumulated # broadcast
-        self.freetext_index_accumulated += freetext_indices_chunk[written_row_count]
-        freetext_values = freetext_values_chunk[:freetext_indices_chunk[written_row_count]]
+        freetext_indices = freetext_indices_chunk[1:] + self.freetext_index_accumulated # broadcast
+        self.freetext_index_accumulated += freetext_indices_chunk[-1]
+        freetext_values = freetext_values_chunk[:freetext_indices_chunk[-1]]
         self.writer.write(chunk)
         self.other_values.write_part_raw(freetext_indices, freetext_values)
 
