@@ -6,7 +6,7 @@ import os
 import pandas as pd
 import exetera.core.operations as ops
 from io import StringIO
-import mock
+from unittest.mock import patch
 
 TEST_SCHEMA = [{'name': 'a', 'type': 'cat', 'vals': ('','a', 'bb', 'ccc', 'dddd', 'eeeee'), 'field_size':5,
                                             'strings_to_values': {'':0,'a':1, 'bb':2, 'ccc':3, 'dddd':4, 'eeeee':5}},
@@ -233,7 +233,7 @@ class TestFastCSVReader(TestCase):
 
             return csv_buffer, df, column_offsets
 
-        chunk_row_size = 100
+        chunk_row_size = 10
 
         csv_buffer, df, column_offsets = _make_column_val_full_data(chunk_row_size)        
         content = np.frombuffer(csv_buffer.getvalue().encode(), dtype=np.uint8)
@@ -250,7 +250,7 @@ class TestFastCSVReader(TestCase):
 
 class TestReadFile(TestCase):
 
-    @mock.patch("numpy.fromfile")
+    @patch("numpy.fromfile")
     def test_read_file_on_only_categorical_field(self, mock_fromfile):
         file_lines, chunk_row_size = 100, 100
         fields_to_use = [s['name'] for s in TEST_SCHEMA if s['type'] == 'cat']
@@ -269,7 +269,7 @@ class TestReadFile(TestCase):
             self.assertListEqual(result, list(df[field]))
 
 
-    @mock.patch("numpy.fromfile")
+    @patch("numpy.fromfile")
     def test_read_file_on_only_indexed_string_field(self, mock_fromfile):
         file_lines, chunk_row_size = 50, 100
         fields_to_use = [s['name'] for s in TEST_SCHEMA if s['type'] == 'str']
@@ -285,7 +285,7 @@ class TestReadFile(TestCase):
             self.assertListEqual(result, list(df[field]))
 
 
-    @mock.patch("numpy.fromfile")
+    @patch("numpy.fromfile")
     def test_read_file_on_only_fixed_string_field(self, mock_fromfile):
         file_lines, chunk_row_size = 50, 100
         fields_to_use = [s['name'] for s in TEST_SCHEMA if s['type'] == 'fixed_str']
@@ -301,7 +301,7 @@ class TestReadFile(TestCase):
             self.assertListEqual(result, list(df[field]))
 
     
-    @mock.patch("numpy.fromfile")
+    @patch("numpy.fromfile")
     def test_read_file_on_only_numeric_field(self, mock_fromfile):
         file_lines, chunk_row_size = 100, 100
         fields_to_use = [s['name'] for s in TEST_SCHEMA if s['type'] in ('int', 'float')]

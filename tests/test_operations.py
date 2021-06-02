@@ -567,12 +567,12 @@ class TestFieldImporter(unittest.TestCase):
         elements = np.zeros(written_row_count, dtype=np.uint8)
         validity = np.zeros(written_row_count, dtype='bool')
 
-        parser = per.try_str_to_int
+        # parser = per.try_str_to_int
         invalid_value = 0
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('int_field', "utf-8"), dtype=np.uint8)
         
-        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, parser, invalid_value, validation_mode, field_name)          
+        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, invalid_value, validation_mode, field_name)          
 
         expected_elements = np.array([1, 1, 1, -1, 100, 10, 10, 10], dtype = np.uint8)
         
@@ -586,12 +586,12 @@ class TestFieldImporter(unittest.TestCase):
         elements = np.zeros(written_row_count, dtype=np.float32)
         validity = np.zeros(written_row_count, dtype='bool')
 
-        parser = per.try_str_to_float
+        # parser = per.try_str_to_float
         invalid_value = 0
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('float_field', "utf-8"), dtype=np.uint8)
 
-        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, parser, invalid_value, validation_mode, field_name)              
+        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, invalid_value, validation_mode, field_name)              
 
         expected_elements = np.array([1, 0.1, 1, 10.23, 3.5], dtype = np.float32)  
 
@@ -605,12 +605,12 @@ class TestFieldImporter(unittest.TestCase):
         elements = np.zeros(written_row_count, dtype=np.float32)
         validity = np.zeros(written_row_count, dtype='bool')
 
-        parser = per.try_str_to_float
+        # parser = per.try_str_to_float
         invalid_value = 0
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('float_field', "utf-8"), dtype=np.uint8)
 
-        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, parser, invalid_value, validation_mode, field_name)              
+        ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, invalid_value, validation_mode, field_name)              
 
         expected_elements = np.array([10, 10, 10, 0.1, 150], dtype = np.float32)  
 
@@ -625,12 +625,12 @@ class TestFieldImporter(unittest.TestCase):
         elements = np.zeros(written_row_count, dtype=np.float32)
         validity = np.zeros(written_row_count, dtype='bool')
 
-        parser = per.try_str_to_float
+        # parser = per.try_str_to_float
         invalid_value = 0
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('int_field', "utf-8"), dtype=np.uint8)
         
-        exception_message, exception_args = ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, parser, invalid_value, validation_mode, field_name)    
+        exception_message, exception_args = ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, invalid_value, validation_mode, field_name)    
 
         self.assertEqual(exception_message, 2)
         self.assertEqual(len(exception_args), 2)
@@ -649,12 +649,12 @@ class TestFieldImporter(unittest.TestCase):
         elements = np.zeros(written_row_count, dtype=np.float32)
         validity = np.zeros(written_row_count, dtype='bool')
 
-        parser = per.try_str_to_float
+        # parser = per.try_str_to_float
         invalid_value = 0
         validation_mode = 'strict'
         field_name = np.frombuffer(bytes('int_field', "utf-8"), dtype=np.uint8)
         
-        exception_message, exception_args = ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, parser, invalid_value, validation_mode, field_name)    
+        exception_message, exception_args = ops.numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, 0, written_row_count, invalid_value, validation_mode, field_name)    
 
         self.assertEqual(exception_message, 2)
         self.assertEqual(len(exception_args), 2)

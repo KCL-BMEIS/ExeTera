@@ -109,7 +109,6 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
                 continue
 
             fields = schema[sk].fields
-            show_every = 100000
 
             DatasetImporter(datastore, files[sk], hf, sk, schema[sk], timestamp,
                             include=include, exclude=exclude,

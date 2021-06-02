@@ -1,6 +1,5 @@
 import csv
 import time
-from tracemalloc import start
 from numba import njit,jit
 import numpy as np
 from exetera.core import utils
@@ -127,7 +126,6 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
                 chunk_index += offset_pos
 
             hasHeader = False
-            # chunk_index += offset_pos
             accumulated_written_rows += written_row_count
             ch += 1
 

@@ -1403,7 +1403,7 @@ def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, c
 
 @njit
 def numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, col_idx, written_row_count,
-                                parser, invalid_value, validation_mode, field_name):
+                                invalid_value, validation_mode, field_name, int_flag=False):
     """
     Transform method for numeric importer (int, float) in readerwriter.py
     """          
@@ -1510,23 +1510,14 @@ def numeric_int_float_transform(elements, validity, column_inds, column_vals, co
             empty = True
             valid_input = False
 
-        # Checking if all input valid to stop if already invalid
-        if not valid_input:
-            elements[row_idx] = invalid_value
-            validity[row_idx] = False
+        if int_flag:
+            value = int(value)
 
-        # TODO: This logic can be written cleaner
-        valid, val = parser(value, invalid_value)
-
-        if not valid or not valid_input:
-            valid = False
-            val = invalid_value
-        
-        elements[row_idx] = val
-        validity[row_idx] = valid
+        elements[row_idx] = value if valid_input else invalid_value
+        validity[row_idx] = valid_input  
 
         # Optimized exception handling to avoid creating strings inside loop in Numba
-        if not valid:
+        if not valid_input:
             if validation_mode == 'strict':
                 if empty:
                     exception_message = 1
@@ -1548,7 +1539,7 @@ def numeric_int_float_transform(elements, validity, column_inds, column_vals, co
 
 @njit
 def numeric_bool_transform(elements, validity, column_inds, column_vals, column_offsets, col_idx, written_row_count,
-                            parser, invalid_value, validation_mode, field_name):
+                           invalid_value, validation_mode, field_name):
     """
     Transform method for numeric importer (bool) in readerwriter.py
     """  
@@ -1621,23 +1612,12 @@ def numeric_bool_transform(elements, validity, column_inds, column_vals, column_
             else:
                 valid_input = False
 
-        # Checking if all input valid to stop if already invalid
-        if not valid_input:
-            elements[row_idx] = invalid_value
-            validity[row_idx] = False
 
-        # TODO: This logic can be written cleaner
-        valid, val = parser(value, invalid_value)
-
-        if not valid or not valid_input:
-            valid = False
-            val = invalid_value
-
-        elements[row_idx] = val
-        validity[row_idx] = valid
+        elements[row_idx] = value if valid_input else invalid_value
+        validity[row_idx] = valid_input
 
         # Optimized exception handling to avoid creating strings inside loop in Numba
-        if not valid:
+        if not valid_input:
             if validation_mode == 'strict':
                 if empty:
                     exception_message = 1

@@ -114,13 +114,14 @@ class TestImporter(unittest.TestCase):
 
         # schema can use StringIO to replace csv file
         self.schema = StringIO(TEST_SCHEMA)
+        self.chunk_row_size = 100
 
 
     def test_importer_with_arg_include(self):
         include, exclude = {'schema_key': ['id', 'name']}, {}
 
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, include, exclude)
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, include, exclude, chunk_row_size=self.chunk_row_size)
         with h5py.File(bio, 'r') as hf:
             self.assertListEqual(list(hf.keys()), ['schema_key'])
             self.assertTrue(set(hf['schema_key'].keys()) >= set(['id', 'name']))
@@ -132,7 +133,7 @@ class TestImporter(unittest.TestCase):
         include, exclude = {'schema_wrong_key': ['id', 'name']}, {}
 
         with self.assertRaises(Exception) as context:
-            importer.import_with_schema(self.ts, bio, self.schema, self.files, False, include, exclude)
+            importer.import_with_schema(self.ts, bio, self.schema, self.files, False, include, exclude, chunk_row_size=self.chunk_row_size)
         
         self.assertEqual(str(context.exception), "-n/--include: the following include table(s) are not part of any input files: {'schema_wrong_key'}")
                     
@@ -141,7 +142,7 @@ class TestImporter(unittest.TestCase):
         bio = BytesIO()
         include, exclude = {}, {'schema_key':['updated_at']}
 
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, include, exclude)
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, include, exclude, chunk_row_size=self.chunk_row_size)
         with h5py.File(bio, 'r') as hf:
             self.assertListEqual(list(hf.keys()), ['schema_key'])
             self.assertTrue('updated_at' not in set(hf['schema_key'].keys()))
@@ -150,7 +151,7 @@ class TestImporter(unittest.TestCase):
 
     def test_date_importer_without_create_day_field(self):     
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {})
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
         with h5py.File(bio, 'r') as hf:
             self.assertTrue('birthday' in set(hf['schema_key'].keys()))  
             self.assertEqual(datetime.fromtimestamp(hf['schema_key']['birthday']['values'][1]).strftime("%Y-%m-%d"), '1980-03-04')
@@ -160,7 +161,7 @@ class TestImporter(unittest.TestCase):
 
     def test_datetime_importer_with_create_day_field_True(self):
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {})
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
         with h5py.File(bio, 'r') as hf:
             self.assertTrue('updated_at' in set(hf['schema_key'].keys()))                
             self.assertEqual(datetime.fromtimestamp(hf['schema_key']['updated_at']['values'][1]).strftime("%Y-%m-%d %H:%M:%S"), '2020-05-13 01:00:00')  
@@ -173,7 +174,7 @@ class TestImporter(unittest.TestCase):
         chunk_size = 1000
 
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {})
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
 
         # numeric int field
         expected_age_list = list(np.array([30,40,50,60,70], dtype = np.int32 ))
@@ -203,7 +204,7 @@ class TestImporter(unittest.TestCase):
         
         bio = BytesIO()
         with self.assertRaises(Exception) as context:
-            importer.import_with_schema(self.ts, bio, self.schema, files, False, {}, {})
+            importer.import_with_schema(self.ts, bio, self.schema, files, False, {}, {}, chunk_row_size=self.chunk_row_size)
         
         self.assertEqual(str(context.exception), "Numeric value in the field 'id' can not be empty in strict mode")
         
@@ -225,7 +226,7 @@ class TestImporter(unittest.TestCase):
         
         bio = BytesIO()
         with self.assertRaises(Exception) as context:
-            importer.import_with_schema(self.ts, bio, self.schema, files, False, {}, {})
+            importer.import_with_schema(self.ts, bio, self.schema, files, False, {}, {}, chunk_row_size=self.chunk_row_size)
         
         self.assertEqual(str(context.exception), "The following numeric value in the field 'id' can not be parsed: 5@")
 
@@ -234,7 +235,7 @@ class TestImporter(unittest.TestCase):
 
     def test_numeric_importer_with_non_empty_valid_value_in_strict_mode(self):
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {})
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
         with h5py.File(bio, 'r') as hf:
             self.assertTrue('id' in set(hf['schema_key'].keys()))  
             self.assertTrue('id_valid' not in set(hf['schema_key'].keys()))
@@ -252,7 +253,7 @@ class TestImporter(unittest.TestCase):
 
     def test_numeric_importer_in_relaxed_mode(self):
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {})
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
         with h5py.File(bio, 'r') as hf:
             self.assertTrue('height' in set(hf['schema_key'].keys()))
             self.assertTrue('height_valid' not in set(hf['schema_key'].keys()))
@@ -265,7 +266,7 @@ class TestImporter(unittest.TestCase):
         chunk_row_size = 20 # chunk_row_size * column_count < total_bytes
 
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size = chunk_row_size)
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
         with h5py.File(bio, 'r') as hf:
             indices = hf['schema_key']['name']['index'][:]
             values = hf['schema_key']['name']['values'][:]
@@ -279,17 +280,17 @@ class TestImporter(unittest.TestCase):
         chunk_row_size = 20 # chunk_row_size * column_count < total_bytes
         
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size = chunk_row_size)
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
         with h5py.File(bio, 'r') as hf:
             expected_postcode_value_list = [1, 3, 2, 0, 4]
             self.assertEqual(list(hf['schema_key']['postcode']['values'][:]), expected_postcode_value_list)
 
 
     def test_fixed_string_field_importer(self):
-        chunk_size = 1000
+        chunk_row_size = 100
 
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {})
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
 
         expected_patient_id_value_list = [b'E1', b'E123', b'E234', b'', b'E456']
         with h5py.File(bio, 'r') as hf:
@@ -297,10 +298,10 @@ class TestImporter(unittest.TestCase):
 
 
     def test_leaky_categorical_field_importer(self):
-        chunk_size = 1000
+        chunk_row_size = 100
 
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {})
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
 
         expected_degree_value_list = [1, 2, 0, -1, 3]
         expected_degree_freetext_index_list = [0, 0, 0, 0, 4, 4]
