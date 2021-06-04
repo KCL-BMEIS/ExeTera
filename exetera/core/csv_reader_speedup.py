@@ -28,10 +28,8 @@ def get_file_stat(source, chunk_row_size):
         header = csv.DictReader(source)
         count_columns = len(header.fieldnames)     
 
-    # margin = 10
     count_rows = chunk_row_size
     chunk_byte_size = count_rows * count_columns
-    # print('count_columns', count_columns, 'count_rows', count_rows, 'chunk_byte_size', chunk_byte_size)
 
     return total_byte_size, count_columns, count_rows, chunk_byte_size
 
@@ -41,7 +39,6 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
     SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
     NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
     WHITE_SPACE_VALUE = np.frombuffer(b' ', dtype='S1')[0][0]
-    #CARRIAGE_RETURN_VALUE = np.frombuffer(b'\r', dtype='S1')[0][0]
 
     chunk_row_size *= 2
     time0 = time.time()
@@ -55,7 +52,6 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
         hasHeader = True
 
         accumulated_written_rows = 0
-        # total_col = [[], []]
 
         # initialize column_inds, column_vals ouside of while-loop
         column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
@@ -72,7 +68,6 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
 
         ch = 0
         while chunk_index < total_byte_size:
-            # print("cols", count_columns, "rows", count_rows)
             if stop_after_rows and accumulated_written_rows >= stop_after_rows:
                 break
 
@@ -91,12 +86,6 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
                     content = np.append(content, NEWLINE_VALUE)
             
             offset_pos, written_row_count, is_indices_full, is_values_full, val_full_col_idx = fast_csv_reader(content, start_index, column_inds, column_vals, column_offsets, hasHeader, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
-            # print('====== after csv reader =====')
-            # print('chunk_index', chunk_index)
-            # print('offset_pos', offset_pos)
-            # print('written_row_count', written_row_count)
-            # print('column_inds', column_inds)
-            # print('column_vals', column_vals)
 
             # convert and write
             for ith, i_c in enumerate(index_map):     
@@ -117,7 +106,6 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
                 column_offsets = np.concatenate((column_offsets[:val_full_col_idx + 1], column_offsets[val_full_col_idx + 1:] + np.int64(delta)))
                 column_val_total_count = column_offsets[-1]
                 column_vals = np.zeros(np.int64(column_val_total_count), dtype=np.uint8)
-
                 
             # reassign
             if is_indices_full or is_values_full:
@@ -128,12 +116,8 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
             hasHeader = False
             accumulated_written_rows += written_row_count
             ch += 1
-
            
             print(f"{ch} chunks, {accumulated_written_rows} accumulated_written_rows parsed in {time.time() - time0}s")
-
-        # print("i_c", 0, Counter(total_col[0]))
-        # print("i_c", 1, Counter(total_col[1]))
     
     print(f"Total time {time.time() - time0}s")
 
@@ -172,7 +156,7 @@ def fast_csv_reader(source, start_index, column_inds, column_vals, column_offset
         end_line = False
 
         c = source[index]
-        #print(c)
+
         if c == separator_value:
             if not escaped:
                 end_cell = True

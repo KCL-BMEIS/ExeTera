@@ -1653,42 +1653,6 @@ def calculate_value(length, decimal_index, num_before_decimal, num_after_decimca
     val = sign * (num_before_decimal + num_after_decimcal)
     return val
 
-# def numeric_transform(elements, validity, column_inds, column_vals, col_idx, written_row_count,
-#                         parser, invalid_value, validation_mode, field_name):
-
-#     exception_message, exception_args = 0, [field_name]
-                        
-#     data = transform_to_values(column_inds, column_vals, col_idx, written_row_count)
-
-#     for row_idx, val in enumerate(data):
-#         val = val.tobytes().strip()
-#         empty = len(val) == 0
-
-#         valid, value = parser(val, invalid_value)
-
-#         elements[row_idx] = value
-#         validity[row_idx] = valid
-
-#         if not valid:
-#             if validation_mode == 'strict':
-#                 if empty:
-#                     exception_message = 1
-#                     exception_args = [field_name]
-#                     break
-#                 else:
-#                     exception_message = 2
-#                     non_parsable = column_vals[col_idx, column_inds[col_idx, row_idx] : column_inds[col_idx, row_idx + 1]]
-#                     exception_args = [field_name, non_parsable]
-#                     break
-#             if validation_mode == 'allow_empty':
-#                 if not empty:
-#                     exception_message = 2
-#                     non_parsable = column_vals[col_idx, column_inds[col_idx, row_idx] : column_inds[col_idx, row_idx + 1]]
-#                     exception_args = [field_name, non_parsable]
-#                     break
-
-#     return exception_message, exception_args
-
 
 def raiseNumericException(exception_message, exception_args):
     exceptions = {
@@ -1713,20 +1677,9 @@ def transform_to_values(column_inds, column_vals, column_offsets, col_idx, writt
         data.append(val)
     return data
 
-@njit
-def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, written_row_count,
-                        strlen):
-    data = []
-    col_offset = column_offsets[col_idx]
-    for row_idx in range(written_row_count):
-        start_row_idx = column_inds[col_idx, row_idx]
-        end_row_idx = min(column_inds[col_idx, row_idx + 1], start_row_idx + strlen)
-        val = column_vals[col_offset + start_row_idx: col_offset + end_row_idx]
-        data.append(val)
-    return data
 
 @njit
-def fixed_string_transform_2(column_inds, column_vals, column_offsets, col_idx, written_row_count,
+def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, written_row_count,
                            strlen, memory):
     col_offset = column_offsets[col_idx]
     for i in range(written_row_count):

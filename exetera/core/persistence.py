@@ -76,22 +76,6 @@ chunk_sizes = {
 #     return result
 
 
-# def str_to_float(value):
-#     try:
-#         return float(value)
-#     except ValueError:
-#         return None
-
-
-# def str_to_int(value):
-#     try:
-#         return int(value)
-#     except ValueError:
-#         return None
-
-from numba import njit
-
-@njit
 def try_str_to_float_to_int(value, invalid=0):
     try:
         return True, int(float(value))
