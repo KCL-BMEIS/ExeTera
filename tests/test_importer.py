@@ -171,8 +171,6 @@ class TestImporter(unittest.TestCase):
 
 
     def test_numeric_field_importer_with_small_chunk_size(self):
-        chunk_size = 1000
-
         bio = BytesIO()
         importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
 
@@ -266,7 +264,7 @@ class TestImporter(unittest.TestCase):
         chunk_row_size = 20 # chunk_row_size * column_count < total_bytes
 
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=chunk_row_size)
         with h5py.File(bio, 'r') as hf:
             indices = hf['schema_key']['name']['index'][:]
             values = hf['schema_key']['name']['values'][:]
@@ -280,15 +278,18 @@ class TestImporter(unittest.TestCase):
         chunk_row_size = 20 # chunk_row_size * column_count < total_bytes
         
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=chunk_row_size)
         with h5py.File(bio, 'r') as hf:
             expected_postcode_value_list = [1, 3, 2, 0, 4]
+            expected_key_names = [b'', b'NW1', b'E1', b'SW1P', b'NW3']
+            expected_key_values = [0,1,2,3,4]
+
             self.assertEqual(list(hf['schema_key']['postcode']['values'][:]), expected_postcode_value_list)
+            self.assertEqual(list(hf['schema_key']['postcode']['key_names'][:]), expected_key_names)
+            self.assertEqual(list(hf['schema_key']['postcode']['key_values'][:]), expected_key_values)
 
 
     def test_fixed_string_field_importer(self):
-        chunk_row_size = 100
-
         bio = BytesIO()
         importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
 
@@ -298,8 +299,6 @@ class TestImporter(unittest.TestCase):
 
 
     def test_leaky_categorical_field_importer(self):
-        chunk_row_size = 100
-
         bio = BytesIO()
         importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
 

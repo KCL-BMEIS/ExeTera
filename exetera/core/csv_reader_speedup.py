@@ -91,7 +91,6 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
             for ith, i_c in enumerate(index_map):     
                 if field_importer_list and field_importer_list[ith]: 
                     field_importer_list[ith].transform_and_write_part(column_inds, column_vals, column_offsets, i_c, written_row_count)
-                    field_importer_list[ith].flush()
 
             # make column_inds larger if it gets full before reach the end of chunk
             if is_indices_full:
@@ -118,7 +117,11 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
             ch += 1
            
             print(f"{ch} chunks, {accumulated_written_rows} accumulated_written_rows parsed in {time.time() - time0}s")
-    
+
+        # flush at the end
+        for ith in range(len(index_map)):
+            field_importer_list[ith].flush()
+
     print(f"Total time {time.time() - time0}s")
 
 

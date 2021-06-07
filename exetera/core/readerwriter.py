@@ -305,7 +305,7 @@ class IndexedStringWriter(Writer):
             index = column_inds[col_idx, 0 : written_row_count + 1] # keep leading 0
         else:
             index = column_inds[col_idx, 1 : written_row_count + 1] + self.chunk_accumulated # abandon leading 0 and add broadcast
-            
+          
         self.chunk_accumulated += column_inds[col_idx, written_row_count]
 
         col_offset = column_offsets[col_idx]
@@ -374,7 +374,7 @@ class LeakyCategoricalImporter:
 
         self.freetext_index_accumulated += freetext_indices_chunk[written_row_count]
         freetext_values = freetext_values_chunk[:freetext_indices_chunk[written_row_count]]
-        self.writer.write(chunk)
+        self.writer.write_part(chunk)
         self.other_values.write_part_raw(freetext_indices, freetext_values)
 
 
@@ -417,7 +417,7 @@ class CategoricalImporter:
         cat_keys, cat_index, cat_values = self.byte_map
                 
         ops.categorical_transform(chunk, col_idx, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values)
-        self.writer.write(chunk)
+        self.writer.write_part(chunk)
 
 
 class CategoricalWriter(Writer):
@@ -434,8 +434,6 @@ class CategoricalWriter(Writer):
         self.datastore = datastore
         # string:number
         self.keys = categories
-
-        # self.field = group[name]
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype='int8')
@@ -609,7 +607,6 @@ class FixedStringWriter(Writer):
 
     def write_part(self, values):
         DataWriter.write(self.field, 'values', values, len(values))
-
 
     def transform_and_write_part(self, column_inds, column_vals, column_offsets,  col_idx, written_row_count):
         values = np.zeros(written_row_count, dtype='S{}'.format(self.strlen))
