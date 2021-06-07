@@ -493,6 +493,7 @@ class TestPersistence(unittest.TestCase):
                                                   {'': 0, 'False': 1, 'True': 2}, ts)
 
             foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.flush()
 
             self.assertListEqual([0, 2, 1, 1, 0, 0, 2, 1, 2, 0],
                                  datastore.get_reader(hf['foo'])[:].tolist())
@@ -535,6 +536,7 @@ class TestPersistence(unittest.TestCase):
                                                   {'': 0, 'False': 1, 'True': 2}, ts)
 
             foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.flush()
 
         with h5py.File(bio, 'r') as hf:
             foo_int = rw.CategoricalReader(datastore, hf['foo'])
