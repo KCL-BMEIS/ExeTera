@@ -7,6 +7,7 @@ import numpy as np
 from exetera.core import persistence as pers
 from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
+from exetera.core.utils import Timer
 
 class Reader:
     def __init__(self, field):
@@ -514,7 +515,7 @@ class NumericImporter:
 
     def transform_and_write_part(self, column_ids, column_vals, column_offsets, col_idx, written_row_count):
         elements = np.zeros(written_row_count, dtype=self.data_writer.nformat)
-        validity = np.zeros(written_row_count, dtype='bool')
+        validity = np.ones(written_row_count, dtype=bool)
         
         if self.data_writer.nformat == 'bool':
             exception_message, exception_args = ops.numeric_bool_transform(
@@ -523,13 +524,19 @@ class NumericImporter:
                 self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8)
             )
 
-        else:
+        elif self.data_writer.nformat in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64') :
             exception_message, exception_args = ops.numeric_int_float_transform(
                 elements, validity, column_ids, column_vals, column_offsets, col_idx,
                 written_row_count, self.invalid_value,
                 self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8), 
-                int_flag = 'int' in self.data_writer.nformat
+                int_flag = True
             )
+
+        else:
+            with Timer(f'field_name {self.field_name} took: '):        
+                ops.transform_float(elements, validity, column_ids, column_vals, column_offsets, col_idx, written_row_count)               
+                # TODO: move excption logic into transform_float
+                exception_message, exception_args = 0, []          
 
         if exception_message != 0:
             ops.raiseNumericException(exception_message, exception_args)

@@ -1493,8 +1493,6 @@ def numeric_int_float_transform(elements, validity, column_inds, column_vals, co
                 window = length - 1 - decimal_index # fraction part
                 pos = byte_idx - decimal_index
                 num_after_decimcal += (val - 48) * 10 ** (window - pos)
-
-  
         if not has_power: # no power e
             value = calculate_value(length, decimal_index, num_before_decimal, num_after_decimcal, sign)
         else:
@@ -1676,6 +1674,18 @@ def transform_to_values(column_inds, column_vals, column_offsets, col_idx, writt
         val = column_vals[col_offset + column_inds[col_idx, row_idx]: col_offset + column_inds[col_idx, row_idx + 1]]
         data.append(val)
     return data
+
+
+def transform_float(values, valid, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    col_off = column_offsets[col_idx]
+    col_ind = column_inds[col_idx]
+    for i in range(written_row_count):
+        start = col_ind[i]
+        end = col_ind[i+1]
+        if start == end:
+            valid[i] = False
+        else:
+            values[i] = float(column_vals[col_off+start:col_off+end].tobytes())
 
 
 @njit

@@ -99,7 +99,7 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
 
             # make column_values larger if it gets full before reach the end of chunk             
             if is_values_full and val_full_col_idx != -1:
-                print('hello', val_full_col_idx)
+                # print('hello', val_full_col_idx)
                 col_val_count = column_offsets[val_full_col_idx + 1] - column_offsets[val_full_col_idx]
                 delta = col_val_count * (larger_factor - 1)
                 column_offsets = np.concatenate((column_offsets[:val_full_col_idx + 1], column_offsets[val_full_col_idx + 1:] + np.int64(delta)))
@@ -168,8 +168,8 @@ def fast_csv_reader(source, start_index, column_inds, column_vals, column_offset
 
         elif c == newline_value:
             # \n \n - last line may have two newline_value
-            while index + 1 < len(source) and source[index + 1] == newline_value:
-                index += 1
+            # while index + 1 < len(source) and source[index + 1] == newline_value:
+            #     index += 1
 
             if not escaped:
                 end_cell = True
