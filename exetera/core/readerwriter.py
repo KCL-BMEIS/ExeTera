@@ -304,7 +304,7 @@ class IndexedStringWriter(Writer):
     def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         # broadcast accumulated size to current index array
         index = column_inds[col_idx, 1:written_row_count + 1] + self.chunk_accumulated
-        self.chunk_accumulated += column_inds[col_idx, written_row_count + 1]
+        self.chunk_accumulated += column_inds[col_idx, written_row_count]
 
         col_offset = column_offsets[col_idx]
         values = column_vals[col_offset: col_offset + column_inds[col_idx, written_row_count]]
@@ -365,10 +365,10 @@ class LeakyCategoricalImporter:
 
         ops.leaky_categorical_transform(chunk, freetext_indices_chunk, freetext_values_chunk, col_idx, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values)
 
-        freetext_indices = freetext_indices_chunk + self.freetext_index_accumulated # broadcast
+        freetext_indices = freetext_indices_chunk[1:] + self.freetext_index_accumulated # broadcast
         self.freetext_index_accumulated += freetext_indices_chunk[written_row_count]
         freetext_values = freetext_values_chunk[:freetext_indices_chunk[written_row_count]]
-        self.writer.write(chunk)
+        self.writer.write_part(chunk)
         self.other_values.write_part_raw(freetext_indices, freetext_values)
 
 
