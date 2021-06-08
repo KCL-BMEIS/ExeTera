@@ -237,6 +237,7 @@ class IndexedStringWriter(Writer):
         self.value_index = 0
         self.index_index = 0
         self.chunk_accumulated = 0
+        self.index_ever_written = False
 
     def chunk_factory(self, length):
         return [None] * length     
@@ -302,8 +303,9 @@ class IndexedStringWriter(Writer):
 
     def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         # broadcast accumulated size to current index array
-        if self.chunk_accumulated == 0:
-            index = column_inds[col_idx, 0 : written_row_count + 1] # keep leading 0
+        if not self.index_ever_written:
+            index = column_inds[col_idx, 0 : written_row_count + 1]    # keep leading 0
+            self.index_ever_written = True
         else:
             index = column_inds[col_idx, 1 : written_row_count + 1] + self.chunk_accumulated # abandon leading 0 and add broadcast
           
@@ -328,6 +330,7 @@ class LeakyCategoricalImporter:
         self.field_size = max([len(k) for k in categories.keys()])
         self.byte_map = ops.get_byte_map(categories)
         self.freetext_index_accumulated = 0
+        self.freetext_index_ever_written = False
 
     def chunk_factory(self, length):
         return np.zeros(length, dtype=f'U{self.field_size}')
@@ -368,9 +371,10 @@ class LeakyCategoricalImporter:
 
         ops.leaky_categorical_transform(chunk, freetext_indices_chunk, freetext_values_chunk, col_idx, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values)
 
-        if self.freetext_index_accumulated == 0:
-            freetext_indices = freetext_indices_chunk  # keep the leading 0
-        else:
+        if not self.freetext_index_ever_written:
+            freetext_indices = freetext_indices_chunk[0:]
+            self.freetext_index_ever_written = True
+        else:   
             freetext_indices = freetext_indices_chunk[1:] + self.freetext_index_accumulated # abandon leading 0 and add broadcast
 
         self.freetext_index_accumulated += freetext_indices_chunk[written_row_count]
@@ -531,12 +535,11 @@ class NumericImporter:
                 self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8), 
                 int_flag = True
             )
-
         else:
-            with Timer(f'field_name {self.field_name} took: '):        
-                ops.transform_float(elements, validity, column_ids, column_vals, column_offsets, col_idx, written_row_count)               
-                # TODO: move excption logic into transform_float
-                exception_message, exception_args = 0, []          
+            exception_message, exception_args = ops.transform_float(
+                elements, validity, column_ids, column_vals, column_offsets, col_idx, 
+                written_row_count, self.invalid_value, 
+                self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"),dtype=np.uint8))                        
 
         if exception_message != 0:
             ops.raiseNumericException(exception_message, exception_args)
