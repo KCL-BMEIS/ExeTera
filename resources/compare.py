@@ -26,38 +26,50 @@ with Session() as s:
     newdf = new[schema_key]
 
     keys = olddf.keys()
-    keys = ['cancer_clinical_trial_site', 'cancer_type', 'clinical_study_institutions', 
-            'clinical_study_names', 'clinical_study_nct_ids', 'se_postcode' ]
+    # keys = ['cancer_clinical_trial_site', 'cancer_type', 'clinical_study_institutions', 
+    #         'clinical_study_names', 'clinical_study_nct_ids', 'se_postcode' ]
     # keys = ['diabetes_oral_other_medication','outward_postcode_region', 'vs_other']
     
 
     for k in keys:
+        old_ = olddf[k].data[:]
+        new_ = newdf[k].data[:]
         if k.startswith('j_valid_from') or k.startswith('j_valid_to'):
             continue
 
-        if olddf[k].indexed:
-            # print(k, len(olddf[k].indices[:]), len(newdf[k].indices[:])) 
-            indice_equal = np.array_equal(olddf[k].indices[:], newdf[k].indices[:])
-            values_equal = np.array_equal(olddf[k].values[:], newdf[k].values[:])
-            # data_equal = np.array_equal(olddf[k].data[:], newdf[k].data[:])
+        for i in range(len(old_)):   
+        
+            if old_[i] != new_[i]:
+                print('======')
+                print(k, i)
+                print('old: ', old_[i])
+                print('*******')
+                print('new: ', new_[i])
+            
 
-            if indice_equal == False or values_equal == False:
-                print(olddf[k], k, indice_equal, values_equal)
+        # if olddf[k].indexed:
+        #     # print(k, len(olddf[k].indices[:]), len(newdf[k].indices[:])) 
+        #     indice_equal = np.array_equal(olddf[k].indices[:], newdf[k].indices[:])
+        #     values_equal = np.array_equal(olddf[k].values[:], newdf[k].values[:])
+        #     # data_equal = np.array_equal(olddf[k].data[:], newdf[k].data[:])
 
-                print('old_length', len(olddf[k]), 'new_length', len(newdf[k]))
+        #     if indice_equal == False or values_equal == False:
+        #         print(olddf[k], k, indice_equal, values_equal)
 
-                old_ins = olddf[k].indices[:]
-                new_ins = newdf[k].indices[:]
+        #         print('old_length', len(olddf[k]), 'new_length', len(newdf[k]))
 
-                for i in range(len(olddf[k])):   
+        #         old_ins = olddf[k].indices[:]
+        #         new_ins = newdf[k].indices[:]
+
+        #         for i in range(len(olddf[k])):   
                     
-                    if old_ins[i] != new_ins[i]:
-                        print('======')
-                        print(k, i)
-                        print('old: ', old_ins[i])
-                        print('*******')
-                        print('new: ', new_ins[i])
-                        break
+        #             if old_ins[i] != new_ins[i]:
+        #                 print('======')
+        #                 print(k, i)
+        #                 print('old: ', old_ins[i])
+        #                 print('*******')
+        #                 print('new: ', new_ins[i])
+        #                 break
 
 
         # else:
