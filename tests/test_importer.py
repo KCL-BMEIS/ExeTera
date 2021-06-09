@@ -201,10 +201,11 @@ class TestImporter(unittest.TestCase):
         files = {'schema_key': csv_file_name}
         
         bio = BytesIO()
-        with self.assertRaises(Exception) as context:
-            importer.import_with_schema(self.ts, bio, self.schema, files, False, {}, {}, chunk_row_size=self.chunk_row_size)
-        
-        self.assertEqual(str(context.exception), "Numeric value in the field 'id' can not be empty in strict mode")
+        expected = ("Field 'id' contains values that cannot "
+                    "be converted to float in 'strict' mode")
+        with self.assertRaises(ValueError) as context:
+            importer.import_with_schema(self.ts, bio, self.schema, files, False, {}, {},
+                                        chunk_row_size=self.chunk_row_size)
         
         os.close(fd_csv)
 
@@ -223,17 +224,19 @@ class TestImporter(unittest.TestCase):
         files = {'schema_key': csv_file_name}
         
         bio = BytesIO()
-        with self.assertRaises(Exception) as context:
-            importer.import_with_schema(self.ts, bio, self.schema, files, False, {}, {}, chunk_row_size=self.chunk_row_size)
-        
-        self.assertEqual(str(context.exception), "The following numeric value in the field 'id' can not be parsed: 5@")
+        expected = ("Field 'id' contains values that cannot "
+                    "be converted to float in 'strict' mode")
+        with self.assertRaises(ValueError, msg=expected):
+            importer.import_with_schema(self.ts, bio, self.schema, files, False, {}, {},
+                                        chunk_row_size=self.chunk_row_size)
 
         os.close(fd_csv)
 
 
     def test_numeric_importer_with_non_empty_valid_value_in_strict_mode(self):
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {},
+                                    chunk_row_size=self.chunk_row_size)
         with h5py.File(bio, 'r') as hf:
             self.assertTrue('id' in set(hf['schema_key'].keys()))  
             self.assertTrue('id_valid' not in set(hf['schema_key'].keys()))

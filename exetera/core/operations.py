@@ -1459,140 +1459,6 @@ def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, c
 
 
 @njit
-def numeric_int_float_transform(elements, validity, column_inds, column_vals, column_offsets, col_idx, written_row_count,
-                                invalid_value, validation_mode, field_name, int_flag=False):
-    """
-    Transform method for numeric importer (int, float) in readerwriter.py
-    """          
-    col_offset = column_offsets[col_idx] 
-    exception_message, exception_args = 0, [field_name]
-
-    for row_idx in range(written_row_count):
-        
-        empty = False  
-        valid_input = True # Start by assuming number is valid
-
-        row_start_idx = column_inds[col_idx, row_idx]
-        row_end_idx = column_inds[col_idx, row_idx + 1]
-
-        # number of bytes in this row (number) 
-        length = row_end_idx - row_start_idx
-
-        value = 0
-        bytes_start_index = 0 # Start by assuming no whitespace
-        sign = 1 # Start by assuming not negative
-
-        has_decimal = False  # Start by assuming no decimal
-        decimal_index = length
-
-        num_before_decimal= 0.0 # stores sum before decimal
-        num_after_decimcal = 0.0 # stores sum after decimal
-
-        num_of_nums_in_result = 0 # Counts nums for validation
-
-        has_power = False # Start by assuming no power e
-        val_before_e = 0.0  # store val before e
-        val_after_0 = 0.0   # store val after e
-
-        # For each byte, check the meaning and build real number
-        for byte_idx in range(length):
-            val = column_vals[col_offset + row_start_idx + byte_idx]
-            if val == 32: # empty space
-                if not has_power:
-                    bytes_start_index = byte_idx + 1
-                else:
-                    valid_input = False
-                continue
-            elif val == 45 or val == 43: # 45: - (negative) symbol, 43: + (positive) symbol
-                sign = -1 if val == 45 else 1
-                bytes_start_index = byte_idx + 1
-                continue
-            elif val == 46: # . (decimal) symbol
-                if has_decimal: # more than one decimal
-                    valid_input = False    
-                else:
-                    has_decimal = True
-                    decimal_index = byte_idx
-                continue
-
-            elif val == 101: # e (power) symbol
-                if has_power: # more than one e symbol
-                    valid_input = False
-                elif byte_idx == length - 1: # e symbol is last char, no digit after e symbol
-                    valid_input = False
-                elif num_of_nums_in_result == 0: # e symbol is first char, no digit before e symbol
-                    valid_input = False
-                else:
-                    has_power = True
-                    # Calculate the first part before e:
-                    decimal_index = decimal_index if has_decimal else byte_idx
-                    val_before_e = calculate_value(length, decimal_index, num_before_decimal, num_after_decimcal, sign)
-                    # Reset values
-                    value = 0
-                    sign = 1 # Start by assuming not negative
-                    bytes_start_index = byte_idx + 1 # start to record part after e
-                    has_decimal = False  # Start by assuming no decimal
-                    decimal_index = length
-                    num_before_decimal = 0
-                    num_after_decimcal = 0
-                continue
-            elif val < 48 or val > 57: # if not 0-9 (except those tested abow), invalidate
-                valid_input = False
-                #break
-
-            num_of_nums_in_result += 1
-            # Builds number based on value before or after decimal
-            if byte_idx < decimal_index:
-                window = decimal_index - bytes_start_index  # integral part
-                pos = byte_idx - bytes_start_index
-                num_before_decimal += (val - 48) * 10 ** (window - pos - 1)
-            else:
-                window = length - 1 - decimal_index # fraction part
-                pos = byte_idx - decimal_index
-                num_after_decimcal += (val - 48) * 10 ** (window - pos)
-        if not has_power: # no power e
-            value = calculate_value(length, decimal_index, num_before_decimal, num_after_decimcal, sign)
-        else:
-            # after e, can't be float
-            if has_decimal:
-                valid_input = False
-            else:
-                val_after_e = sign * num_before_decimal
-                value = val_before_e * 10 ** val_after_e
-
-        # If we could only find empty space
-        if length == bytes_start_index or num_of_nums_in_result == 0:
-            empty = True
-            valid_input = False
-
-        if int_flag:
-            value = int(value)
-
-        elements[row_idx] = value if valid_input else invalid_value
-        validity[row_idx] = valid_input  
-
-        # Optimized exception handling to avoid creating strings inside loop in Numba
-        if not valid_input:
-            if validation_mode == 'strict':
-                if empty:
-                    exception_message = 1
-                    exception_args = [field_name]
-                    break
-                else:
-                    exception_message = 2
-                    non_parsable = column_vals[col_offset + row_start_idx : col_offset + row_end_idx]
-                    exception_args = [field_name, non_parsable]
-                    break
-            if validation_mode == 'allow_empty':
-                if not empty:
-                    exception_message = 2
-                    non_parsable = column_vals[col_offset + row_start_idx : col_offset + row_end_idx]
-                    exception_args = [field_name, non_parsable]
-                    break
-    return exception_message, exception_args
-
-
-@njit
 def numeric_bool_transform(elements, validity, column_inds, column_vals, column_offsets, col_idx, written_row_count,
                            invalid_value, validation_mode, field_name):
     """
@@ -1770,7 +1636,7 @@ def transform_int_2(column_inds, column_vals, column_offsets, col_idx,
         try:
             results = results.astype(data_type)
         except ValueError as e:
-            msg = ("field '{}' contains values that cannot "
+            msg = ("Field '{}' contains values that cannot "
                    "be converted to float in '{}' mode").format(field_name, validation_mode)
             raise ValueError(msg) from e
     elif validation_mode == 'relaxed':
@@ -1802,7 +1668,7 @@ def transform_float_2(column_inds, column_vals, column_offsets, col_idx,
         try:
           results = elements.astype(data_type)
         except ValueError as e:
-            msg = ("field '{}' contains values that cannot "
+            msg = ("Field '{}' contains values that cannot "
                    "be converted to float in '{}' mode").format(field_name, validation_mode)
             raise ValueError(msg) from e
         valids = None
@@ -1813,7 +1679,7 @@ def transform_float_2(column_inds, column_vals, column_offsets, col_idx,
         try:
             results = results.astype(data_type)
         except ValueError as e:
-            msg = ("field '{}' contains values that cannot "
+            msg = ("Field '{}' contains values that cannot "
                    "be converted to float in '{}' mode").format(field_name, validation_mode)
             raise ValueError(msg) from e
     elif validation_mode == 'relaxed':
