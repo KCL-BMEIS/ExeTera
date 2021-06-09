@@ -13,6 +13,63 @@ INVALID_INDEX = 1 << 62
 MAX_DATETIME = datetime(year=3000, month=1, day=1) #.timestamp()
 
 
+def dtype_to_str(dtype):
+    if isinstance(dtype, str):
+        return dtype
+
+    if dtype == bool:
+        return 'bool'
+    elif dtype == np.int8:
+        return 'int8'
+    elif dtype == np.int16:
+        return 'int16'
+    elif dtype == np.int32:
+        return 'int32'
+    elif dtype == np.int64:
+        return 'int64'
+    elif dtype == np.uint8:
+        return 'uint8'
+    elif dtype == np.uint16:
+        return 'uint16'
+    elif dtype == np.uint32:
+        return 'uint32'
+    elif dtype == np.uint64:
+        return 'uint64'
+    elif dtype == np.float32:
+        return 'float32'
+    elif dtype == np.float64:
+        return 'float64'
+
+    raise ValueError("Unsupported dtype '{}'".format(dtype))
+
+
+def str_to_dtype(str_dtype):
+    if str_dtype == 'bool':
+        return bool
+    elif str_dtype == 'int8':
+        return np.int8
+    elif str_dtype == 'int16':
+        return np.int16
+    elif str_dtype == 'int32':
+        return np.int32
+    elif str_dtype == 'int64':
+        return np.int64
+    elif str_dtype == 'uint8':
+        return np.uint8
+    elif str_dtype == 'uint16':
+        return np.uint16
+    elif str_dtype == 'uint32':
+        return np.uint32
+    elif str_dtype == 'uint64':
+        return np.uint64
+    elif str_dtype == 'float32':
+        return np.float32
+    elif str_dtype == 'float64':
+        return np.float64
+
+    raise ValueError("Unsupported dtype '{}'".format(str_dtype))
+
+
 def chunks(length, chunksize=1 << 20):
     cur = 0
     while cur < length:
@@ -1649,6 +1706,130 @@ def calculate_value(length, decimal_index, num_before_decimal, num_after_decimca
     # Calculate and set final number
     val = sign * (num_before_decimal + num_after_decimcal)
     return val
+
+
+def transform_int(elements, validity, column_inds, column_vals, column_offsets, col_idx,
+                  written_row_count, invalid_value, validation_mode, field_name):
+
+    col_offset = column_offsets[col_idx]
+    exception_message, exception_args = 0, [field_name]
+
+    for i in range(written_row_count):
+        start = column_inds[col_idx, i]
+        end = column_inds[col_idx, i + 1]
+        val = column_vals[col_offset + start : col_offset + end].tobytes()
+        empty = val.strip() == b''
+
+        try:
+            value, valid = int(val), True
+        except:
+            value, valid = invalid_value, False
+
+        elements[i] = value
+        validity[i] = valid
+
+        if not valid:
+            if validation_mode == 'strict':
+                if empty:
+                    exception_message = 1
+                    exception_args = [field_name]
+                    break
+                else:
+                    exception_message = 2
+                    exception_args = [field_name, val]
+                    break
+            if validation_mode == 'allow_empty':
+                if not empty:
+                    exception_message = 2
+                    exception_args = [field_name, val]
+                    break
+    return exception_message, exception_args
+
+
+def transform_int_2(column_inds, column_vals, column_offsets, col_idx,
+                    written_row_count, invalid_value, validation_mode, data_type, field_name):
+
+    widths = column_inds[col_idx, 1:written_row_count + 1] - column_inds[col_idx, :written_row_count]
+    width = widths.max()
+    elements = np.zeros(written_row_count, 'S{}'.format(width))
+    fixed_string_transform(column_inds, column_vals, column_offsets, col_idx,
+                           written_row_count, width, elements.data.cast('b'))
+
+    if validation_mode == 'strict':
+        try:
+          results = elements.astype(data_type)
+        except ValueError as e:
+            msg = ("field '{}' contains values that cannot "
+                   "be converted to float in '{}' mode").format(field_name, validation_mode)
+            raise ValueError(msg) from e
+        valid = None
+    elif validation_mode == 'allow_empty':
+        str_invalid_value = str(invalid_value).encode()
+        valid = np.char.not_equal(elements, b'')
+        results = np.where(valid, elements, str_invalid_value)
+        try:
+            results = results.astype(data_type)
+        except ValueError as e:
+            msg = ("field '{}' contains values that cannot "
+                   "be converted to float in '{}' mode").format(field_name, validation_mode)
+            raise ValueError(msg) from e
+    elif validation_mode == 'relaxed':
+        results = np.zeros(written_row_count, dtype=data_type)
+        valid = np.ones(written_row_count, dtype=bool)
+        for i in range(len(written_row_count)):
+            try:
+                value, valid = int(val), True
+            except:
+                value, valid = invalid_value, False
+            results[i] = value
+            valid[i] = valid
+    else:
+        raise ValueError("'{}' is not a valid value for 'validation_mode'")
+
+    return results, valid
+
+
+def transform_float_2(column_inds, column_vals, column_offsets, col_idx,
+                      written_row_count, invalid_value, validation_mode, data_type, field_name):
+
+    widths = column_inds[col_idx, 1:written_row_count + 1] - column_inds[col_idx, :written_row_count]
+    width = widths.max()
+    elements = np.zeros(written_row_count, 'S{}'.format(width))
+    fixed_string_transform(column_inds, column_vals, column_offsets, col_idx,
+                           written_row_count, width, elements.data.cast('b'))
+
+    if validation_mode == 'strict':
+        try:
+          results = elements.astype(data_type)
+        except ValueError as e:
+            msg = ("field '{}' contains values that cannot "
+                   "be converted to float in '{}' mode").format(field_name, validation_mode)
+            raise ValueError(msg) from e
+        valid = None
+    elif validation_mode == 'allow_empty':
+        str_invalid_value = str(invalid_value).encode()
+        valid = np.char.not_equal(elements, b'')
+        results = np.where(valid, elements, str_invalid_value)
+        try:
+            results = results.astype(data_type)
+        except ValueError as e:
+            msg = ("field '{}' contains values that cannot "
+                   "be converted to float in '{}' mode").format(field_name, validation_mode)
+            raise ValueError(msg) from e
+    elif validation_mode == 'relaxed':
+        results = np.zeros(written_row_count, dtype=data_type)
+        valid = np.ones(written_row_count, dtype=bool)
+        for i in range(len(written_row_count)):
+            try:
+                value, valid = float(val), True
+            except:
+                value, valid = invalid_value, False
+            results[i] = value
+            valid[i] = valid
+    else:
+        raise ValueError("'{}' is not a valid value for 'validation_mode'")
+
+    return results, valid
 
 
 def transform_float(elements, validity, column_inds, column_vals, column_offsets, col_idx,

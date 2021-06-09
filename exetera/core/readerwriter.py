@@ -535,11 +535,47 @@ class NumericImporter:
             self.flag_writer.write_part(validity)
 
 
+    # def transform_and_write_part(self, column_ids, column_vals, column_offsets, col_idx, written_row_count):
+    #     elements = np.zeros(written_row_count, dtype=self.data_writer.nformat)
+    #     validity = np.ones(written_row_count, dtype=bool)
+    #
+    #     if self.data_writer.nformat == 'bool':
+    #         exception_message, exception_args = ops.numeric_bool_transform(
+    #             elements, validity, column_ids, column_vals, column_offsets, col_idx,
+    #             written_row_count, self.invalid_value,
+    #             self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8)
+    #         )
+    #
+    #     elif self.data_writer.nformat in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64') :
+    #         exception_message, exception_args = ops.numeric_int_float_transform(
+    #             elements, validity, column_ids, column_vals, column_offsets, col_idx,
+    #             written_row_count, self.invalid_value,
+    #             self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8),
+    #             int_flag = True
+    #         )
+    #     else:
+    #         exception_message, exception_args = ops.transform_float(
+    #             elements, validity, column_ids, column_vals, column_offsets, col_idx,
+    #             written_row_count, self.invalid_value,
+    #             self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8))
+    #
+    #     if exception_message != 0:
+    #         ops.raiseNumericException(exception_message, exception_args)
+    #
+    #     self.data_writer.write_part(elements)
+    #     if self.flag_writer is not None:
+    #         self.flag_writer.write_part(validity)
+
+
     def transform_and_write_part(self, column_ids, column_vals, column_offsets, col_idx, written_row_count):
-        elements = np.zeros(written_row_count, dtype=self.data_writer.nformat)
-        validity = np.ones(written_row_count, dtype=bool)
-        
+        # elements = np.zeros(written_row_count, dtype=self.data_writer.nformat)
+        # validity = np.ones(written_row_count, dtype=bool)
+
+        value_dtype = ops.str_to_dtype(self.data_writer.nformat)
+
         if self.data_writer.nformat == 'bool':
+            elements = np.zeros(written_row_count, dtype=self.data_writer.nformat)
+            validity = np.ones(written_row_count, dtype=bool)
             exception_message, exception_args = ops.numeric_bool_transform(
                 elements, validity, column_ids, column_vals, column_offsets, col_idx,
                 written_row_count, self.invalid_value,
@@ -547,17 +583,23 @@ class NumericImporter:
             )
 
         elif self.data_writer.nformat in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64') :
-            exception_message, exception_args = ops.numeric_int_float_transform(
-                elements, validity, column_ids, column_vals, column_offsets, col_idx,
-                written_row_count, self.invalid_value,
-                self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8), 
-                int_flag = True
-            )
+            # exception_message, exception_args = ops.numeric_int_float_transform(
+            #     elements, validity, column_ids, column_vals, column_offsets, col_idx,
+            #     written_row_count, self.invalid_value,
+            #     self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8),
+            #     int_flag = True
+            # )
+            exception_message, exception_args = 0, []
+            elements, validity = ops.transform_int_2(
+                column_ids, column_vals, column_offsets, col_idx,
+                written_row_count, self.invalid_value, self.validation_mode,
+                value_dtype, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8))
         else:
-            exception_message, exception_args = ops.transform_float(
-                elements, validity, column_ids, column_vals, column_offsets, col_idx, 
-                written_row_count, self.invalid_value, 
-                self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"),dtype=np.uint8))                        
+            exception_message, exception_args = 0, []
+            elements, validity = ops.transform_float_2(
+                column_ids, column_vals, column_offsets, col_idx,
+                written_row_count, self.invalid_value, self.validation_mode,
+                value_dtype, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8))
 
         if exception_message != 0:
             ops.raiseNumericException(exception_message, exception_args)
