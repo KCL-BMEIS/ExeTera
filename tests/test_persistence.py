@@ -444,11 +444,11 @@ class TestPersistence(unittest.TestCase):
             # for f in persistence.numeric_iterator(hf['foo']):
             #     print(f[0], f[1])
 
-        expected = np.asarray([0, 0, 2, 3, 40, 0, 0, -6, -7, -80, 0,
-                               0, 0, 2, 3, 40, 0, 0, -6, -7, -80, 0], dtype=np.int32)
+        expected = np.asarray([0, 0, 2, 0, 0, 0, 0, -6, 0, 0, 0,
+                               0, 0, 2, 0, 0, 0, 0, -6, 0, 0, 0], dtype=np.int32)
         expected_valid =\
-            np.asarray([False, False, True, True, True, True, False, True, True, True, True,
-                        True, False, True, True, True, True, False, True, True, True, True],
+            np.asarray([False, False, True, False, False, False, False, True, False, False, False,
+                        True, False, True, False, False, False, False, True, False, False, False],
                        dtype=bool)
         with h5py.File(bio, 'r') as hf:
             foo = rw.NumericReader(datastore, hf['foo'])

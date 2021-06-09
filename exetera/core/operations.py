@@ -1762,11 +1762,11 @@ def transform_int_2(column_inds, column_vals, column_offsets, col_idx,
             msg = ("field '{}' contains values that cannot "
                    "be converted to float in '{}' mode").format(field_name, validation_mode)
             raise ValueError(msg) from e
-        valid = None
+        valids = None
     elif validation_mode == 'allow_empty':
         str_invalid_value = str(invalid_value).encode()
-        valid = np.char.not_equal(elements, b'')
-        results = np.where(valid, elements, str_invalid_value)
+        valids = np.char.not_equal(elements, b'')
+        results = np.where(valids, elements, str_invalid_value)
         try:
             results = results.astype(data_type)
         except ValueError as e:
@@ -1775,18 +1775,18 @@ def transform_int_2(column_inds, column_vals, column_offsets, col_idx,
             raise ValueError(msg) from e
     elif validation_mode == 'relaxed':
         results = np.zeros(written_row_count, dtype=data_type)
-        valid = np.ones(written_row_count, dtype=bool)
-        for i in range(len(written_row_count)):
+        valids = np.ones(written_row_count, dtype=bool)
+        for i in range(written_row_count):
             try:
-                value, valid = int(val), True
+                value, valid = int(elements[i]), True
             except:
                 value, valid = invalid_value, False
             results[i] = value
-            valid[i] = valid
+            valids[i] = valid
     else:
         raise ValueError("'{}' is not a valid value for 'validation_mode'")
 
-    return results, valid
+    return results, valids
 
 
 def transform_float_2(column_inds, column_vals, column_offsets, col_idx,
@@ -1805,11 +1805,11 @@ def transform_float_2(column_inds, column_vals, column_offsets, col_idx,
             msg = ("field '{}' contains values that cannot "
                    "be converted to float in '{}' mode").format(field_name, validation_mode)
             raise ValueError(msg) from e
-        valid = None
+        valids = None
     elif validation_mode == 'allow_empty':
         str_invalid_value = str(invalid_value).encode()
-        valid = np.char.not_equal(elements, b'')
-        results = np.where(valid, elements, str_invalid_value)
+        valids = np.char.not_equal(elements, b'')
+        results = np.where(valids, elements, str_invalid_value)
         try:
             results = results.astype(data_type)
         except ValueError as e:
@@ -1818,18 +1818,18 @@ def transform_float_2(column_inds, column_vals, column_offsets, col_idx,
             raise ValueError(msg) from e
     elif validation_mode == 'relaxed':
         results = np.zeros(written_row_count, dtype=data_type)
-        valid = np.ones(written_row_count, dtype=bool)
-        for i in range(len(written_row_count)):
+        valids = np.ones(written_row_count, dtype=bool)
+        for i in range(written_row_count):
             try:
-                value, valid = float(val), True
+                value, valid = float(elements[i]), True
             except:
                 value, valid = invalid_value, False
             results[i] = value
-            valid[i] = valid
+            valids[i] = valid
     else:
         raise ValueError("'{}' is not a valid value for 'validation_mode'")
 
-    return results, valid
+    return results, valids
 
 
 def transform_float(elements, validity, column_inds, column_vals, column_offsets, col_idx,

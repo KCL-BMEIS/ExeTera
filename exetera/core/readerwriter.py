@@ -567,7 +567,7 @@ class NumericImporter:
     #         self.flag_writer.write_part(validity)
 
 
-    def transform_and_write_part(self, column_ids, column_vals, column_offsets, col_idx, written_row_count):
+    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         # elements = np.zeros(written_row_count, dtype=self.data_writer.nformat)
         # validity = np.ones(written_row_count, dtype=bool)
 
@@ -577,7 +577,7 @@ class NumericImporter:
             elements = np.zeros(written_row_count, dtype=self.data_writer.nformat)
             validity = np.ones(written_row_count, dtype=bool)
             exception_message, exception_args = ops.numeric_bool_transform(
-                elements, validity, column_ids, column_vals, column_offsets, col_idx,
+                elements, validity, column_inds, column_vals, column_offsets, col_idx,
                 written_row_count, self.invalid_value,
                 self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8)
             )
@@ -591,13 +591,13 @@ class NumericImporter:
             # )
             exception_message, exception_args = 0, []
             elements, validity = ops.transform_int_2(
-                column_ids, column_vals, column_offsets, col_idx,
+                column_inds, column_vals, column_offsets, col_idx,
                 written_row_count, self.invalid_value, self.validation_mode,
                 value_dtype, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8))
         else:
             exception_message, exception_args = 0, []
             elements, validity = ops.transform_float_2(
-                column_ids, column_vals, column_offsets, col_idx,
+                column_inds, column_vals, column_offsets, col_idx,
                 written_row_count, self.invalid_value, self.validation_mode,
                 value_dtype, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8))
 
