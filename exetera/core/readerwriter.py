@@ -229,15 +229,17 @@ class IndexedStringWriter(Writer):
         self.fieldtype = fieldtype
         self.timestamp = timestamp
         self.datastore = datastore
-
-        self.values = np.zeros(self.datastore.chunksize, dtype=np.uint8)
-        self.indices = np.zeros(self.datastore.chunksize, dtype=np.int64)
-        self.ever_written = False
-        self.accumulated = 0
-        self.value_index = 0
-        self.index_index = 0
         self.chunk_accumulated = 0
-        DataWriter.write(self.field, 'index', [0], 1)
+
+        # self.values = np.zeros(self.datastore.chunksize, dtype=np.uint8)
+        # self.indices = np.zeros(self.datastore.chunksize, dtype=np.int64)
+        # self.ever_written = False
+        # self.accumulated = 0
+        # self.value_index = 0
+        # self.index_index = 0
+        # self.chunk_accumulated = 0
+        if 'index' not in self.field.keys():
+            DataWriter.write(self.field, 'index', [0], 1)
 
     def chunk_factory(self, length):
         return [None] * length
@@ -248,11 +250,35 @@ class IndexedStringWriter(Writer):
 
         :param values: a list of utf8 strings
         """
-        if not self.ever_written:
-            self.indices[0] = self.accumulated
-            self.index_index = 1
-            self.ever_written = True
+        # if not self.ever_written:
+        #     self.indices[0] = self.accumulated
+        #     self.index_index = 1
+        #     self.ever_written = True
+        #
+        # for s in values:
+        #     if isinstance(s, str):
+        #         evalue = s.encode()
+        #     else:
+        #         evalue = s
+        #
+        #     for v in evalue:
+        #         self.values[self.value_index] = v
+        #         self.value_index += 1
+        #         if self.value_index == self.datastore.chunksize:
+        #             DataWriter.write(self.field, 'values', self.values, self.value_index)
+        #             self.value_index = 0
+        #         self.accumulated += 1
+        #     self.indices[self.index_index] = self.accumulated
+        #     self.index_index += 1
+        #     if self.index_index == self.datastore.chunksize:
+        #         DataWriter.write(self.field, 'index', self.indices, self.index_index)
+        #         self.index_index = 0
 
+        accumulated = self.field['index'][-1]
+        indices = np.zeros(len(values), dtype=np.int64)
+        chars = np.zeros(self.chunksize, dtype=np.uint8)
+        index_index = 0
+        char_index = 0
         for s in values:
             if isinstance(s, str):
                 evalue = s.encode()
@@ -260,25 +286,28 @@ class IndexedStringWriter(Writer):
                 evalue = s
 
             for v in evalue:
-                self.values[self.value_index] = v
-                self.value_index += 1
-                if self.value_index == self.datastore.chunksize:
-                    DataWriter.write(self.field, 'values', self.values, self.value_index)
-                    self.value_index = 0
-                self.accumulated += 1
-            self.indices[self.index_index] = self.accumulated
-            self.index_index += 1
-            if self.index_index == self.datastore.chunksize:
-                DataWriter.write(self.field, 'index', self.indices, self.index_index)
-                self.index_index = 0
+                chars[char_index] = v
+                char_index += 1
+                if char_index == len(chars):
+                    DataWriter.write(self.field, 'values', chars, char_index)
+                    char_index = 0
+                accumulated += 1
+            indices[index_index] = accumulated
+            index_index += 1
+
+        if index_index > 0:
+            DataWriter.write(self.field, 'index', indices, index_index)
+        if char_index > 0:
+            DataWriter.write(self.field, 'values', chars, char_index)
+
 
     def flush(self):
-        if self.value_index != 0 or 'values' not in self.field:
-            DataWriter.write(self.field, 'values', self.values, self.value_index)
-            self.value_index = 0
-        if self.index_index != 0:
-            DataWriter.write(self.field, 'index', self.indices, self.index_index)
-            self.index_index = 0
+        # if self.value_index != 0 or 'values' not in self.field:
+        #     DataWriter.write(self.field, 'values', self.values, self.value_index)
+        #     self.value_index = 0
+        # if self.index_index != 0:
+        #     DataWriter.write(self.field, 'index', self.indices, self.index_index)
+        #     self.index_index = 0
         # self.field.attrs['fieldtype'] = self.fieldtype
         # self.field.attrs['timestamp'] = self.timestamp
         # self.field.attrs['chunksize'] = self.chunksize
@@ -294,7 +323,7 @@ class IndexedStringWriter(Writer):
             raise ValueError(f"'index' must be an ndarray of '{np.int64}'")
         if values.dtype not in (np.uint8, 'S1'):
             raise ValueError(f"'values' must be an ndarray of '{np.uint8}' or 'S1'")
-        DataWriter.write(self.field, 'index', index, len(index))
+        DataWriter.write(self.field, 'index', index[1:], len(index)-1)
         DataWriter.write(self.field, 'values', values, len(values))
 
     def write_raw(self, index, values):
@@ -303,8 +332,8 @@ class IndexedStringWriter(Writer):
 
     def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         # broadcast accumulated size to current index array
-        index = column_inds[col_idx, 1:written_row_count + 1] + self.chunk_accumulated
-        self.chunk_accumulated += column_inds[col_idx, written_row_count + 1]
+        index = column_inds[col_idx, :written_row_count + 1] + self.chunk_accumulated
+        self.chunk_accumulated += column_inds[col_idx, written_row_count]
 
         col_offset = column_offsets[col_idx]
         values = column_vals[col_offset: col_offset + column_inds[col_idx, written_row_count]]

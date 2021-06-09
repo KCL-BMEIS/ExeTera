@@ -1651,7 +1651,8 @@ def calculate_value(length, decimal_index, num_before_decimal, num_after_decimca
     return val
 
 
-def transform_float(elements, validity, column_inds, column_vals, column_offsets, col_idx, written_row_count, invalid_value, validation_mode, field_name):
+def transform_float(elements, validity, column_inds, column_vals, column_offsets, col_idx,
+                    written_row_count, invalid_value, validation_mode, field_name):
 
     col_offset = column_offsets[col_idx]
     exception_message, exception_args = 0, [field_name]
