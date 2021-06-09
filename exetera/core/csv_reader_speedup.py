@@ -207,7 +207,7 @@ def fast_csv_reader(source, start_index, column_inds, column_vals, column_offset
             column_vals[col_offset + cur_cell_start + cur_cell_char_count] = c
             cur_cell_char_count += 1
 
-            if  cur_cell_start + cur_cell_char_count > col_val_count:
+            if cur_cell_start + cur_cell_char_count >= col_val_count:
                 is_column_vals_full = True
                 val_full_col_idx = col_index
                                 
