@@ -121,6 +121,10 @@ class TestOpsUtils(unittest.TestCase):
 
     def test_next_map_subchunk(self):
 
+        map_values = np.asarray([-1, -1, -1, -1, -1, -1])
+        result = ops.next_map_subchunk(map_values, 0, -1, 4)
+        self.assertEqual(result, 6)
+
         map_values = np.asarray([-1, 1, 10, 10, 11])
         result = ops.next_map_subchunk(map_values, 0, -1, 4)
         self.assertEqual(result, 2)
