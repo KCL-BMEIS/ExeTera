@@ -12,26 +12,35 @@
 import os
 import csv
 from datetime import datetime, MAXYEAR
+from itertools import accumulate
 import time
 
 import numpy as np
 import h5py
+from numba import njit,jit, prange, vectorize, float64
+from numba.typed import List
 
+from collections import Counter
 from exetera.core import csvdataset as dataset
 from exetera.core import persistence as per
 from exetera.core import utils
 from exetera.core import operations as ops
 from exetera.core.load_schema import load_schema
+from exetera.core.csv_reader_speedup import read_file_using_fast_csv_reader
+from io import StringIO
 
-
-def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite, include, exclude):
+def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite, include, exclude, chunk_row_size = 1 << 20):
 
     print(timestamp)
     print(schema_file)
     print(files)
-    
-    with open(schema_file, encoding='utf-8') as sf:
-        schema = load_schema(sf)
+
+    schema = None
+    if isinstance(schema_file, str):
+        with open(schema_file, encoding='utf-8') as sf:
+            schema = load_schema(sf)
+    elif isinstance(schema_file, StringIO):
+        schema = load_schema(schema_file)
 
     any_parts_present = False
     for sk in schema.keys():
@@ -60,8 +69,9 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
     else:
         mode = 'r+'
 
-    if not os.path.exists(dest_file_name):
+    if isinstance(dest_file_name, str) and not os.path.exists(dest_file_name):
         mode = 'w'
+        
     with h5py.File(dest_file_name, mode) as hf:
         for sk in schema.keys():
             if sk in reserved_column_names:
@@ -82,7 +92,7 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
                 print("Warning:", msg.format(files[sk], missing_names))
                 # raise ValueError(msg.format(files[sk], missing_names))
 
-            # check if included/exclude fields are in the file  
+            # check if included/exclude fields are in the file
             include_missing_names = set(include.get(sk, [])).difference(names)
             if len(include_missing_names) > 0:
                 msg = "The following include fields are not part of the {}: {}"
@@ -99,12 +109,11 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
                 continue
 
             fields = schema[sk].fields
-            show_every = 100000
 
             DatasetImporter(datastore, files[sk], hf, sk, schema[sk], timestamp,
                             include=include, exclude=exclude,
                             stop_after=stop_after.get(sk, None),
-                            show_progress_every=show_every)
+                            chunk_row_size=chunk_row_size)
 
             print(sk, hf.keys())
             table = hf[sk]
@@ -121,17 +130,10 @@ def import_with_schema(timestamp, dest_file_name, schema_file, files, overwrite,
 
 
 class DatasetImporter:
-    def __init__(self, datastore, source, hf, space, schema, timestamp, 
-                 include=None, exclude=None,
-                 keys=None,
-                 stop_after=None, show_progress_every=None, filter_fn=None,
-                 early_filter=None):
-        # self.names_ = list()
-        self.index_ = None
-
-        time0 = time.time()
-
-        seen_ids = set()
+    def __init__(self, datastore, source, hf, space, schema, timestamp,
+                 include=None, exclude=None, keys=None,
+                 stop_after=None, chunk_row_size = (1 << 20)) :
+                 
 
         if space not in hf.keys():
             hf.create_group(space)
@@ -139,7 +141,6 @@ class DatasetImporter:
 
         with open(source, encoding='utf-8') as sf:
             csvf = csv.DictReader(sf, delimiter=',', quotechar='"')
-            # self.names_ = csvf.fieldnames
 
             available_keys = [k.strip() for k in csvf.fieldnames if k.strip() in schema.fields]
             if space in include and len(include[space]) > 0:
@@ -147,95 +148,30 @@ class DatasetImporter:
             if space in exclude and len(exclude[space]) > 0:
                 available_keys = [k for k in available_keys if k not in exclude[space]]
 
-            # available_keys = csvf.fieldnames
-
             if not keys:
                 fields_to_use = available_keys
-                # index_map = [csvf.fieldnames.index(k) for k in fields_to_use]
-                # index_map = [i for i in range(len(fields_to_use))]
             else:
                 for k in keys:
                     if k not in available_keys:
                         raise ValueError(f"key '{k}' isn't in the available keys ({keys})")
                 fields_to_use = keys
-                # index_map = [csvf.fieldnames.index(k) for k in fields_to_use]
 
             csvf_fieldnames = [k.strip() for k in csvf.fieldnames]
             index_map = [csvf_fieldnames.index(k) for k in fields_to_use]
 
-            early_key_index = None
-            if early_filter is not None:
-                if early_filter[0] not in available_keys:
-                    raise ValueError(
-                        f"'early_filter': tuple element zero must be a key that is in the dataset")
-                early_key_index = available_keys.index(early_filter[0])
 
-            chunk_size = 1 << 20
-            new_fields = dict()
-            new_field_list = list()
-            field_chunk_list = list()
-            categorical_map_list = list()
-            # TODO: categorical writers should use the datatype specified in the schema
+            field_importer_list = list() # only for field_to_use          
             for i_n in range(len(fields_to_use)):
                 field_name = fields_to_use[i_n]
                 sch = schema.fields[field_name]
-                writer = sch.importer(datastore, group, field_name, timestamp)
-                # TODO: this list is required because we convert the categorical values to
-                # numerical values ahead of adding them. We could use importers that handle
-                # that transform internally instead
-                categorical_map_list.append(
-                    sch.strings_to_values if sch.out_of_range_label is None else None)
-                new_fields[field_name] = writer
-                new_field_list.append(writer)
-                field_chunk_list.append(writer.chunk_factory(chunk_size))
+                field_importer = sch.importer(datastore, group, field_name, timestamp)
+                field_importer_list.append(field_importer)
 
-            csvf = csv.reader(sf, delimiter=',', quotechar='"')
-            ecsvf = iter(csvf)
+            column_offsets = np.zeros(len(csvf_fieldnames) + 1, dtype=np.int64)
+            for i, field_name in enumerate(csvf_fieldnames):
+                sch = schema.fields[field_name]
+                column_offsets[i + 1] = column_offsets[i] + sch.field_size * chunk_row_size
+        
+        read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, index_map, field_importer_list, stop_after_rows=stop_after)
 
-            chunk_index = 0
-            try:
-                for i_r, row in enumerate(ecsvf):
-                    if show_progress_every:
-                        if i_r % show_progress_every == 0:
-                            print(f"{i_r} rows parsed in {time.time() - time0}s")
-
-                    if early_filter is not None:
-                        if not early_filter[1](row[early_key_index]):
-                            continue
-
-                    if i_r == stop_after:
-                        break
-
-                    if not filter_fn or filter_fn(i_r):
-                        for i_df, i_f in enumerate(index_map):
-                            f = row[i_f]
-                            categorical_map = categorical_map_list[i_df]
-                            if categorical_map is not None:
-                                if f not in categorical_map:
-                                    error = "'{}' not valid: must be one of {} for field '{}'"
-                                    raise KeyError(
-                                        error.format(f, categorical_map, available_keys[i_f]))
-                                f = categorical_map[f]
-                            field_chunk_list[i_df][chunk_index] = f
-                        chunk_index += 1
-                        if chunk_index == chunk_size:
-                            for i_df in range(len(index_map)):
-                                # with utils.Timer("writing to {}".format(self.names_[i_df])):
-                                #     new_field_list[i_df].write_part(field_chunk_list[i_df])
-                                new_field_list[i_df].write_part(field_chunk_list[i_df])
-                            chunk_index = 0
-
-            except Exception as e:
-                msg = "row {}: caught exception {}\nprevious row {}"
-                print(msg.format(i_r + 1, e, row))
-                raise
-
-            if chunk_index != 0:
-                for i_df in range(len(index_map)):
-                    new_field_list[i_df].write_part(field_chunk_list[i_df][:chunk_index])
-
-            for i_df in range(len(index_map)):
-                new_field_list[i_df].flush()
-
-            print(f"{i_r} rows parsed in {time.time() - time0}s")
 

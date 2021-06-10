@@ -57,6 +57,7 @@ class NewDataSchema:
             vals_to_strs = None
             out_of_range_label = None
             value_type = None
+            field_size = 0
 
             if field_type == 'categorical':
                 NewDataSchema._require_key(fk, 'categorical', fv)
@@ -69,13 +70,17 @@ class NewDataSchema:
                 NewDataSchema._require_key(fk, 'value_type', categorical)
                 importer = data_schema.new_field_importers[field_type](strs_to_vals,
                                                                        out_of_range_label)
+                field_size = max([len(k) for k in strs_to_vals])
+
             elif field_type == 'string':
                 importer = data_schema.new_field_importers[field_type]()
+                field_size = 10 # guessing
 
             elif field_type == 'fixed_string':
                 NewDataSchema._require_key(fk, 'length', fv)
                 length = int(fv['length'])
                 importer = data_schema.new_field_importers[field_type](length)
+                field_size = length
 
             elif field_type == 'numeric':
                 NewDataSchema._require_key(fk, 'value_type', fv)
@@ -87,17 +92,21 @@ class NewDataSchema:
                                " to int32 but is {} and {}, respectively")
                         raise ValueError(msg.format(fk, raw_type, value_type))
                     converter = per.try_str_to_float_to_int
+                    field_size = 30
                 else:
                     if value_type not in permitted_numeric_types:
                         msg = "Field {} has an invalid value_type '{}'. Permitted types are {}"
                         raise ValueError(msg.format(fk, value_type, permitted_numeric_types))
                     if value_type in ('float', 'float32', 'float64'):
                         converter = per.try_str_to_float
+                        field_size = 30
                     elif value_type == 'bool':
                         converter = per.try_str_to_bool
+                        field_size = 5
                     elif value_type in ('int', 'int8', 'int16', 'int32', 'int64',
                                         'uint8', 'uint16', 'uint32', 'uint64'):
                         converter = per.try_str_to_int
+                        field_size = 20
                     else:
                         msg = "Unrecognised value_type '{}' in field '{}'"
                         raise ValueError(msg.format(value_type, fk))
@@ -123,12 +132,14 @@ class NewDataSchema:
                 create_day_field = fv.get('create_day_field', False)
                 optional = fv.get('optional', False)
                 importer = data_schema.new_field_importers[field_type](create_day_field, optional)
+                # datettime: 32, date:10
+                field_size = 32 if field_type == 'datetime' else 10
             else:
                 msg = "'{}' is an unsupported field type (For field '{}')."
                 raise ValueError(msg.format(field_type, fk))
 
             fd = data_schema.FieldDesc(fk, importer, strs_to_vals, vals_to_strs, value_type,
-                                       out_of_range_label)
+                                       out_of_range_label, field_size)
 
             #fe = data_schema.FieldEntry(fd, 1, None)
             entries[fk] = fd
