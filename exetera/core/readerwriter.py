@@ -550,22 +550,19 @@ class NumericImporter:
                 written_row_count, self.invalid_value,
                 self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8)
             )
-        elif self.data_writer.nformat in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64') :
+            if exception_message != 0:
+                ops.raiseNumericException(exception_message, exception_args)
 
-            exception_message, exception_args = 0, []
-            elements, validity = ops.transform_int_2(
+        elif self.data_writer.nformat in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64') :
+            elements, validity = ops.transform_int(
                 column_inds, column_vals, column_offsets, col_idx,
                 written_row_count, self.invalid_value, self.validation_mode,
                 value_dtype, self.field_name)
         else:
-            exception_message, exception_args = 0, []
-            elements, validity = ops.transform_float_2(
+            elements, validity = ops.transform_float(
                 column_inds, column_vals, column_offsets, col_idx,
                 written_row_count, self.invalid_value, self.validation_mode,
                 value_dtype, self.field_name)
-
-        if exception_message != 0:
-            ops.raiseNumericException(exception_message, exception_args)
 
         self.data_writer.write_part(elements)
         if self.flag_writer is not None:

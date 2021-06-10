@@ -78,29 +78,32 @@ chunk_sizes = {
 
 def try_str_to_float_to_int(value, invalid=0):
     try:
-        return True, int(float(value))
-    except Exception:
+        v = int(float(value))
+        return True, v
+    except ValueError:
+        return False, invalid
+
+def try_str_to_int(value, invalid=0):
+    try:
+        v = int(value)
+        return True, v
+    except ValueError:
         return False, invalid
 
 
 def try_str_to_bool(value, invalid=0):
     try:
-        return True, bool(value)
-    except Exception:
-        return False, invalid
-
-
-def try_str_to_int(value, invalid=0):
-    try:
-        return True, int(value)
-    except Exception:
+        v = bool(str(value))
+        return True, v
+    except ValueError:
         return False, invalid
 
 
 def try_str_to_float(value, invalid=0):
     try:
-        return True, float(value)
-    except Exception:
+        v = float(value)
+        return True, v
+    except ValueError:
         return False, invalid
 
 
