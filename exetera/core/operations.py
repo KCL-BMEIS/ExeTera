@@ -13,6 +13,63 @@ INVALID_INDEX = 1 << 62
 MAX_DATETIME = datetime(year=3000, month=1, day=1) #.timestamp()
 
 
+def dtype_to_str(dtype):
+    if isinstance(dtype, str):
+        return dtype
+
+    if dtype == bool:
+        return 'bool'
+    elif dtype == np.int8:
+        return 'int8'
+    elif dtype == np.int16:
+        return 'int16'
+    elif dtype == np.int32:
+        return 'int32'
+    elif dtype == np.int64:
+        return 'int64'
+    elif dtype == np.uint8:
+        return 'uint8'
+    elif dtype == np.uint16:
+        return 'uint16'
+    elif dtype == np.uint32:
+        return 'uint32'
+    elif dtype == np.uint64:
+        return 'uint64'
+    elif dtype == np.float32:
+        return 'float32'
+    elif dtype == np.float64:
+        return 'float64'
+
+    raise ValueError("Unsupported dtype '{}'".format(dtype))
+
+
+def str_to_dtype(str_dtype):
+    if str_dtype == 'bool':
+        return bool
+    elif str_dtype == 'int8':
+        return np.int8
+    elif str_dtype == 'int16':
+        return np.int16
+    elif str_dtype == 'int32':
+        return np.int32
+    elif str_dtype == 'int64':
+        return np.int64
+    elif str_dtype == 'uint8':
+        return np.uint8
+    elif str_dtype == 'uint16':
+        return np.uint16
+    elif str_dtype == 'uint32':
+        return np.uint32
+    elif str_dtype == 'uint64':
+        return np.uint64
+    elif str_dtype == 'float32':
+        return np.float32
+    elif str_dtype == 'float64':
+        return np.float64
+
+    raise ValueError("Unsupported dtype '{}'".format(str_dtype))
+
+
 def chunks(length, chunksize=1 << 20):
     cur = 0
     while cur < length:
@@ -1294,3 +1351,424 @@ def is_ordered(field):
     else:
         fn = np.char.greater
     return not np.any(fn(field[:-1], field[1:]))
+
+
+#======== method for transform functions that called in readerwriter.py ==========#
+
+def get_byte_map(string_map):
+    """
+    Getting byte indices and byte values from categorical key-value pair
+    """
+    # sort by length of key first, and then sort alphabetically
+    sorted_string_map = {k: v for k, v in sorted(string_map.items(), key=lambda item: item[0])}
+    sorted_string_key = [(len(k), np.frombuffer(k.encode(), dtype=np.uint8), v) for k, v in sorted_string_map.items()]
+    sorted_string_values = list(sorted_string_map.values())
+    
+    # assign byte_map_key_lengths, byte_map_value
+    total_bytes_keys = 0
+    byte_map_value = np.zeros(len(sorted_string_map), dtype=np.uint8)
+
+    for i, (length, _, v)  in enumerate(sorted_string_key):
+        total_bytes_keys += length
+        byte_map_value[i] = v
+
+    # assign byte_map_keys, byte_map_key_indices
+    byte_map_keys = np.zeros(total_bytes_keys, dtype=np.uint8)
+    byte_map_key_indices = np.zeros(len(sorted_string_map)+1, dtype=np.uint8)
+    
+    idx_pointer = 0
+    for i, (_, b_key, _) in enumerate(sorted_string_key):   
+        for b in b_key:
+            byte_map_keys[idx_pointer] = b
+            idx_pointer += 1
+
+        byte_map_key_indices[i + 1] = idx_pointer  
+
+    byte_map = [byte_map_keys, byte_map_key_indices, byte_map_value]
+    return byte_map
+
+
+@njit           
+def categorical_transform(chunk, i_c, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values):
+    """
+    Tranform method for categorical importer in readerwriter.py
+    """   
+    col_offset = column_offsets[i_c]
+
+    for row_idx in range(len(column_inds[i_c]) - 1):
+        if row_idx >= chunk.shape[0]:
+            break
+
+        key_start = column_inds[i_c, row_idx]
+        key_end = column_inds[i_c, row_idx + 1]
+        key_len = key_end - key_start
+
+        for i in range(len(cat_index) - 1):
+            sc_key_len = cat_index[i + 1] - cat_index[i]
+            if key_len != sc_key_len:
+                continue
+
+            index = i
+            for j in range(key_len):
+                entry_start = cat_index[i]
+                if column_vals[col_offset + key_start + j] != cat_keys[entry_start + j]:
+                    index = -1
+                    break
+
+            if index != -1:
+                chunk[row_idx] = cat_values[index]
+                
+
+@njit           
+def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values):
+    """
+    Tranform method for categorical importer in readerwriter.py
+    """   
+    col_offset = column_offsets[i_c] 
+
+    for row_idx in range(len(column_inds[i_c]) - 1):
+        if row_idx >= chunk.shape[0]:   # reach the end of chunk
+            break
+
+        key_start = column_inds[i_c, row_idx]
+        key_end = column_inds[i_c, row_idx + 1]
+        key_len = key_end - key_start
+
+        is_found = False
+        for i in range(len(cat_index) - 1):
+            sc_key_len = cat_index[i + 1] - cat_index[i]
+            if key_len != sc_key_len:
+                continue
+
+            index = i
+            for j in range(key_len):
+                entry_start = cat_index[i]
+                if column_vals[col_offset + key_start + j] != cat_keys[entry_start + j]:
+                    index = -1
+                    break
+
+            if index != -1:
+                is_found = True
+                chunk[row_idx] = cat_values[index]
+                freetext_indices[row_idx + 1] = freetext_indices[row_idx]
+
+        if not is_found:
+            chunk[row_idx] = -1 
+            freetext_indices[row_idx + 1] = freetext_indices[row_idx] + key_len
+            freetext_values[freetext_indices[row_idx]: freetext_indices[row_idx + 1]] = column_vals[col_offset + key_start: col_offset + key_end]
+
+
+@njit
+def numeric_bool_transform(elements, validity, column_inds, column_vals, column_offsets, col_idx, written_row_count,
+                           invalid_value, validation_mode, field_name):
+    """
+    Transform method for numeric importer (bool) in readerwriter.py
+    """  
+    col_offset = column_offsets[col_idx]  
+    exception_message, exception_args = 0, [field_name]     
+
+    for row_idx in range(written_row_count):
+        
+        empty = False  
+        valid_input = True # Start by assuming number is valid
+        value = -1 # start by assuming value is -1, the valid result will be 1 or 0 for bool
+
+        row_start_idx = column_inds[col_idx, row_idx]
+        row_end_idx = column_inds[col_idx, row_idx + 1]
+
+        length = row_end_idx - row_start_idx
+
+        byte_start_idx, byte_end_idx = 0, length - 1
+        # ignore heading whitespace
+        while byte_start_idx < length and column_vals[col_offset + row_start_idx + byte_start_idx] == 32:
+            byte_start_idx += 1
+        # ignore tailing whitespace 
+        while byte_end_idx >= 0 and column_vals[col_offset + row_start_idx + byte_end_idx] == 32:
+            byte_end_idx -= 1
+        
+        # actual length after removing heading and trailing whitespace
+        actual_length = byte_end_idx - byte_start_idx + 1
+
+        if actual_length <= 0:
+            empty = True
+            valid_input = False
+        else:
+        
+            val = column_vals[col_offset + row_start_idx + byte_start_idx: col_offset + row_start_idx + byte_start_idx + actual_length]
+            if actual_length == 1:
+                if val in (49, 89, 121, 84, 116): # '1', 'Y', 'y', 'T', 't'
+                    value = 1
+                elif val in (48, 78, 110, 70, 102):   # '0', 'N', 'n', 'F', 'f'
+                    value = 0
+                else:
+                    valid_input = False
+
+            elif actual_length == 2:
+                if val[0] in (79, 111) and val[1] in (78, 110): # val.lower() == 'on': val[0] in ('O', 'o'), val[1] in ('N', 'n')
+                    value = 1
+                elif val[0] in (78, 110) and val[1] in (79, 111): # val.lower() == 'no'
+                    value = 0
+                else:
+                    valid_input = False
+
+            elif actual_length == 3:
+                if val[0] in (89, 121) and val[1] in (69, 101) and val[2] in (83, 115): # 'yes'
+                    value = 1
+                elif val[0] in (79, 111) and val[1] in (70, 102) and val[2] in (70, 102): # 'off'
+                    value = 0
+                else:
+                    valid_input = False
+
+            elif actual_length == 4: 
+                if val[0] in (84, 116) and val[1] in (82, 114) and val[2] in (85, 117) and val[3] in (69, 101): # 'true'
+                    value = 1
+                else:
+                    valid_input = False
+
+            elif actual_length == 5:
+                if val[0] in (70, 102) and val[1] in (65, 97) and val[2] in (76, 108) and val[3] in (83, 115) and val[4] in (69, 101): # 'false'
+                    value = 0
+                else:
+                    valid_input = False
+            else:
+                valid_input = False
+
+
+        elements[row_idx] = value if valid_input else invalid_value
+        validity[row_idx] = valid_input
+
+        # Optimized exception handling to avoid creating strings inside loop in Numba
+        if not valid_input:
+            if validation_mode == 'strict':
+                if empty:
+                    exception_message = 1
+                    exception_args = [field_name]
+                    break
+                else:
+                    exception_message = 2
+                    non_parsable = column_vals[col_offset + row_start_idx : col_offset + row_end_idx]
+                    exception_args = [field_name, non_parsable]
+                    break
+            if validation_mode == 'allow_empty':
+                if not empty:
+                    exception_message = 2
+                    non_parsable = column_vals[col_offset + row_start_idx : col_offset + row_end_idx]
+                    exception_args = [field_name, non_parsable]
+                    break
+    return exception_message, exception_args      
+
+           
+@njit
+def calculate_value(length, decimal_index, num_before_decimal, num_after_decimcal, sign):
+    # Adjust for adding too many zeroes before we knew we had a decimal
+    divided = 10 ** (length - decimal_index)
+    num_before_decimal = num_before_decimal // divided  # actual integral part
+
+    # Adjust number after decimal based on length
+    if decimal_index != length:
+        divided = 10 ** (length - decimal_index - 1)
+        num_after_decimcal = num_after_decimcal / divided   # actual fractional part
+
+    # Calculate and set final number
+    val = sign * (num_before_decimal + num_after_decimcal)
+    return val
+
+
+def transform_int(elements, validity, column_inds, column_vals, column_offsets, col_idx,
+                  written_row_count, invalid_value, validation_mode, field_name):
+
+    col_offset = column_offsets[col_idx]
+    exception_message, exception_args = 0, [field_name]
+
+    for i in range(written_row_count):
+        start = column_inds[col_idx, i]
+        end = column_inds[col_idx, i + 1]
+        val = column_vals[col_offset + start : col_offset + end].tobytes()
+        empty = val.strip() == b''
+
+        try:
+            value, valid = int(val), True
+        except:
+            value, valid = invalid_value, False
+
+        elements[i] = value
+        validity[i] = valid
+
+        if not valid:
+            if validation_mode == 'strict':
+                if empty:
+                    exception_message = 1
+                    exception_args = [field_name]
+                    break
+                else:
+                    exception_message = 2
+                    exception_args = [field_name, val]
+                    break
+            if validation_mode == 'allow_empty':
+                if not empty:
+                    exception_message = 2
+                    exception_args = [field_name, val]
+                    break
+    return exception_message, exception_args
+
+
+def transform_int_2(column_inds, column_vals, column_offsets, col_idx,
+                    written_row_count, invalid_value, validation_mode, data_type, field_name):
+
+    widths = column_inds[col_idx, 1:written_row_count + 1] - column_inds[col_idx, :written_row_count]
+    width = widths.max()
+    elements = np.zeros(written_row_count, 'S{}'.format(width))
+    fixed_string_transform(column_inds, column_vals, column_offsets, col_idx,
+                           written_row_count, width, elements.data.cast('b'))
+
+    if validation_mode == 'strict':
+        try:
+          results = elements.astype(data_type)
+        except ValueError as e:
+            msg = ("field '{}' contains values that cannot "
+                   "be converted to float in '{}' mode").format(field_name, validation_mode)
+            raise ValueError(msg) from e
+        valids = None
+    elif validation_mode == 'allow_empty':
+        str_invalid_value = str(invalid_value).encode()
+        valids = np.char.not_equal(elements, b'')
+        results = np.where(valids, elements, str_invalid_value)
+        try:
+            results = results.astype(data_type)
+        except ValueError as e:
+            msg = ("Field '{}' contains values that cannot "
+                   "be converted to float in '{}' mode").format(field_name, validation_mode)
+            raise ValueError(msg) from e
+    elif validation_mode == 'relaxed':
+        results = np.zeros(written_row_count, dtype=data_type)
+        valids = np.ones(written_row_count, dtype=bool)
+        for i in range(written_row_count):
+            try:
+                value, valid = int(elements[i]), True
+            except:
+                value, valid = invalid_value, False
+            results[i] = value
+            valids[i] = valid
+    else:
+        raise ValueError("'{}' is not a valid value for 'validation_mode'")
+
+    return results, valids
+
+
+def transform_float_2(column_inds, column_vals, column_offsets, col_idx,
+                      written_row_count, invalid_value, validation_mode, data_type, field_name):
+
+    widths = column_inds[col_idx, 1:written_row_count + 1] - column_inds[col_idx, :written_row_count]
+    width = widths.max()
+    elements = np.zeros(written_row_count, 'S{}'.format(width))
+    fixed_string_transform(column_inds, column_vals, column_offsets, col_idx,
+                           written_row_count, width, elements.data.cast('b'))
+
+    if validation_mode == 'strict':
+        try:
+          results = elements.astype(data_type)
+        except ValueError as e:
+            msg = ("Field '{}' contains values that cannot "
+                   "be converted to float in '{}' mode").format(field_name, validation_mode)
+            raise ValueError(msg) from e
+        valids = None
+    elif validation_mode == 'allow_empty':
+        str_invalid_value = str(invalid_value).encode()
+        valids = np.char.not_equal(elements, b'')
+        results = np.where(valids, elements, str_invalid_value)
+        try:
+            results = results.astype(data_type)
+        except ValueError as e:
+            msg = ("Field '{}' contains values that cannot "
+                   "be converted to float in '{}' mode").format(field_name, validation_mode)
+            raise ValueError(msg) from e
+    elif validation_mode == 'relaxed':
+        results = np.zeros(written_row_count, dtype=data_type)
+        valids = np.ones(written_row_count, dtype=bool)
+        for i in range(written_row_count):
+            try:
+                value, valid = float(elements[i]), True
+            except:
+                value, valid = invalid_value, False
+            results[i] = value
+            valids[i] = valid
+    else:
+        raise ValueError("'{}' is not a valid value for 'validation_mode'")
+
+    return results, valids
+
+
+def transform_float(elements, validity, column_inds, column_vals, column_offsets, col_idx,
+                    written_row_count, invalid_value, validation_mode, field_name):
+
+    col_offset = column_offsets[col_idx]
+    exception_message, exception_args = 0, [field_name]
+
+    for i in range(written_row_count):
+        start = column_inds[col_idx, i]
+        end = column_inds[col_idx, i + 1]
+        val = column_vals[col_offset + start : col_offset + end].tobytes()
+        empty = val.strip() == b''
+
+        try:
+            value, valid = float(val), True
+        except:
+            value, valid = invalid_value, False
+
+        elements[i] = value
+        validity[i] = valid
+
+        if not valid:
+            if validation_mode == 'strict':
+                if empty:
+                    exception_message = 1
+                    exception_args = [field_name]
+                    break
+                else:
+                    exception_message = 2
+                    exception_args = [field_name, val]
+                    break
+            if validation_mode == 'allow_empty':
+                if not empty:
+                    exception_message = 2
+                    exception_args = [field_name, val]
+                    break
+    return exception_message, exception_args  
+
+
+def raiseNumericException(exception_message, exception_args):
+    exceptions = {
+        1: "Numeric value in the field '{0}' can not be empty in strict mode",
+        2: "The following numeric value in the field '{0}' can not be parsed: {1}"
+    }
+
+    raise Exception(exceptions[exception_message].format(
+        *[x.tobytes().decode('utf-8').strip() for x in exception_args]
+    ))
+
+
+@njit
+def transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    """
+    Trasnform method for byte data from np.int to np.bytes_
+    """
+    data = []
+    col_offset = column_offsets[col_idx]
+    for row_idx in range(written_row_count):
+        val = column_vals[col_offset + column_inds[col_idx, row_idx]: col_offset + column_inds[col_idx, row_idx + 1]]
+        data.append(val)
+    return data
+
+
+
+@njit
+def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, written_row_count,
+                           strlen, memory):
+    col_offset = column_offsets[col_idx]
+    for i in range(written_row_count):
+        a = i * strlen
+        start_idx = column_inds[col_idx, i] + col_offset
+        end_idx = min(column_inds[col_idx, i+1] + col_offset, start_idx + strlen)
+        for c in range(start_idx, end_idx):
+            memory[a] = column_vals[c]
+            a += 1

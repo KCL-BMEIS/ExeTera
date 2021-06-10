@@ -87,19 +87,20 @@ new_field_importers = {
     'numeric': lambda typestr, parser, default, vmode, is_flag, flag_suffix:
         lambda ds, g, n, ts: rw.NumericImporter(ds, g, n, typestr, parser, default, vmode, is_flag, flag_suffix, ts),
     'categorical': lambda stv, oor=None:
-        lambda ds, g, n, ts: rw.CategoricalWriter(ds, g, n, stv, ts) if oor is None else
+        lambda ds, g, n, ts: rw.CategoricalImporter(ds, g, n, stv, ts) if oor is None else
         rw.LeakyCategoricalImporter(ds, g, n, stv, oor, ts)
 }
 
 class FieldDesc:
     def __init__(self, field, importer, strings_to_values, values_to_strings, to_datatype,
-                 out_of_range_label):
+                 out_of_range_label, field_size):
         self.field = field
         self.importer = importer
         self.to_datatype = to_datatype
         self.strings_to_values = strings_to_values
         self.values_to_strings = values_to_strings
         self.out_of_range_label = out_of_range_label
+        self.field_size = field_size
 
     def __str__(self):
         output = 'FieldDesc(field={}, strings_to_values={}, values_to_strings={})'

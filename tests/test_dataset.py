@@ -151,3 +151,5 @@ class TestDataSet(unittest.TestCase):
             self.assertListEqual(tcontents1.tolist(), df1['t_foo'].data[:].tolist())
             self.assertListEqual(tcontents2.tolist(), df2['t_foo'].data[:].tolist())
 
+    def test_dataset_ops(self):
+        pass
