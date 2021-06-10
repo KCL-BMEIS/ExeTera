@@ -255,7 +255,8 @@ class MemoryFieldArray:
 
     def __getitem__(self, item):
         if self._dataset is None:
-            raise ValueError("Cannot get data from an empty Field")
+            # raise ValueError("Cannot get data from an empty Field")
+            return np.zeros(0, dtype=np.uint8)
         return self._dataset[item]
 
     def __setitem__(self, key, value):
@@ -379,6 +380,8 @@ class WriteableIndexedFieldArray:
                 # TODO: validate slice
 
                 index = self._indices[start:stop+1]
+                if len(index) == 0:
+                    return []
                 bytestr = self._values[index[0]:index[-1]]
                 results = [None] * (len(index) - 1)
                 startindex = start
@@ -548,6 +551,7 @@ class IndexedStringMemField(MemoryField):
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
 
 class FixedStringMemField(MemoryField):
     def __init__(self, session, length):

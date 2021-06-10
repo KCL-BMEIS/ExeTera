@@ -310,7 +310,6 @@ class TestDataFrameCopyMove(unittest.TestCase):
             df1.create_numeric('fb', 'int32').data.write(sb)
             fa = df1['fa']
             fc = dataframe.move(df1['fa'], df1, 'fc')
-            print(fa.name, fa.data[:])
             self.assertEqual('fc', fc.name)
             self.assertEqual('fb', df1['fb'].name)
 
