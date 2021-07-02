@@ -435,6 +435,40 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, in_place=True)
             return self
 
+    def sort_values(self, by, ascending=True, ddf=None):
+        """
+        Sort by the values
+        
+        :param by: Name (str) or list of names (str) to sort by.
+        :param ascending: bool or list of bool, default True. Sort ascending vs. descending. 
+        :param ddf: optional - the destination data frame
+        :returns: DataFrame with sorted values or None if ddf=None.
+        """
+        keys = None
+        if isinstance(by, str):
+            keys = [by]
+        elif isinstance(by, list):
+            keys = by
+        else:
+            raise ValueError('the value sorted by should either be string or list of string')
+
+        readers = tuple(self._columns[k] for k in keys)
+
+        sorted_index = self._dataset.session.dataset_sort_index(
+            readers, np.arange(len(readers[0].data), dtype=np.uint32))
+
+        if ddf is not None:
+            if not isinstance(ddf, DataFrame):
+                raise TypeError("The destination object must be an instance of DataFrame.")
+            for name, field in self._columns.items():
+                newfld = field.create_like(ddf, name)
+                field.apply_index(sorted_index, target=newfld)
+            return ddf
+        else:
+            for field in self._columns.values():
+                field.apply_index(sorted_index, in_place=True)
+            return self
+
 
 def copy(field: fld.Field, dataframe: DataFrame, name: str):
     """

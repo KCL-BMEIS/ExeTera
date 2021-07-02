@@ -482,3 +482,59 @@ class TestDataFrameMerge(unittest.TestCase):
             self.assertEqual(expected, ddf['r_vals'].data[:])
             self.assertEqual(ddf['l_id_1'].data[:].tolist(), ddf['r_id_1'].data[:].tolist())
             self.assertEqual(ddf['r_id_2'].data[:].tolist(), ddf['r_id_2'].data[:].tolist())
+
+
+class TestDataFrameSort(unittest.TestCase):
+
+    def test_sort_values_on_original_df(self):
+        idx = np.asarray([b'a', b'e', b'b', b'd', b'c'], dtype='S1')
+        val = np.asarray([10, 20, 30, 40, 50], dtype=np.int32)
+        val2 = ['a', 'ee', 'bbb', 'dddd', 'ccccc']
+
+        bio = BytesIO()
+        with session.Session(10) as s:
+            dst = s.open_dataset(bio, "w", "src")
+            src_df = dst.create_dataframe('ds')
+            idx_f = s.create_fixed_string(src_df, "idx", 1)
+            val_f = s.create_numeric(src_df, "val", "int32")
+            val2_f = s.create_indexed_string(src_df, "val2")
+            idx_f.data.write(idx)
+            val_f.data.write(val)
+            val2_f.data.write(val2)
+
+            src_df.sort_values(by = 'idx')
+
+            self.assertListEqual([b'a', b'b', b'c', b'd', b'e'], idx_f.data[:].tolist())
+            self.assertListEqual([10, 30, 50, 40, 20], val_f.data[:].tolist())
+            self.assertListEqual(['a', 'bbb', 'ccccc', 'dddd', 'ee'], val2_f.data[:])
+
+
+    def test_sort_values_on_other_df(self):
+        idx = np.asarray([b'a', b'e', b'b', b'd', b'c'], dtype='S1')
+        val = np.asarray([10, 20, 30, 40, 50], dtype=np.int32)
+        val2 = ['a', 'ee', 'bbb', 'dddd', 'ccccc']
+
+        bio = BytesIO()
+        with session.Session(10) as s:
+            dst = s.open_dataset(bio, "w", "src")
+            src_df = dst.create_dataframe('ds')
+            idx_f = s.create_fixed_string(src_df, "idx", 1)
+            val_f = s.create_numeric(src_df, "val", "int32")
+            val2_f = s.create_indexed_string(src_df, "val2")
+            idx_f.data.write(idx)
+            val_f.data.write(val)
+            val2_f.data.write(val2)
+
+            ddf = dst.create_dataframe('ddf')
+
+            src_df.sort_values(by = 'idx', ddf = ddf)
+
+            self.assertListEqual(list(idx), idx_f.data[:].tolist())
+            self.assertListEqual(list(val), val_f.data[:].tolist())
+            self.assertListEqual(list(val2), val2_f.data[:])
+
+            self.assertListEqual([b'a', b'b', b'c', b'd', b'e'], ddf['idx'].data[:].tolist())
+            self.assertListEqual([10, 30, 50, 40, 20], ddf['val'].data[:].tolist())
+            self.assertListEqual(['a', 'bbb', 'ccccc', 'dddd', 'ee'], ddf['val2'].data[:])
+
+    
