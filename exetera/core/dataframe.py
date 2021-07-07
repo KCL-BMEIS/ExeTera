@@ -8,12 +8,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Mapping, Optional, Sequence, Tuple, Union
+from typing import Mapping, Optional, Sequence, Tuple, Union, List
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from exetera.core.abstract_types import Dataset, DataFrame
+from exetera.core.abstract_types import Dataset, DataFrame, Field
 from exetera.core import fields as fld
 from exetera.core import operations as ops
 from exetera.core import validation as val
@@ -435,22 +435,18 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, in_place=True)
             return self
 
-    def sort_values(self, by, ascending=True, ddf=None):
+    def sort_values(self, by: Union[str, List[str]], 
+                        #   ascending: bool = True, (TODO?)
+                          ddf: DataFrame = None):
         """
-        Sort by the values
+        Sort by values of a field or a list of field, return a dataframe with sorted values or None.
         
         :param by: Name (str) or list of names (str) to sort by.
         :param ascending: bool or list of bool, default True. Sort ascending vs. descending. 
         :param ddf: optional - the destination data frame
         :returns: DataFrame with sorted values or None if ddf=None.
         """
-        keys = None
-        if isinstance(by, str):
-            keys = [by]
-        elif isinstance(by, list):
-            keys = by
-        else:
-            raise ValueError('the value sorted by should either be string or list of string')
+        keys = val.validate_sort_and_groupby_keys(by)
 
         readers = tuple(self._columns[k] for k in keys)
 
@@ -468,6 +464,94 @@ class HDF5DataFrame(DataFrame):
             for field in self._columns.values():
                 field.apply_index(sorted_index, in_place=True)
             return self
+
+
+    def distinct(self, by: Union[str, List[str]], ddf: DataFrame):
+        """
+        Distinct values of a field or a list of field, return a dataframe with distinct values.
+        
+        :param by: Name (str) or list of names (str) to distinct.
+        :param ddf: optional - the destination data frame
+        :returns: DataFrame with distinct values.
+        """
+        keys = val.validate_sort_and_groupby_keys(by)
+
+        if not isinstance(ddf, DataFrame):
+            raise TypeError("The destination object must be an instance of DataFrame.")
+    
+        fields = tuple(self._columns[k] for k in keys)
+        results = []
+
+        if len(keys) == 1:
+            results = [np.unique(fields[0].data)]
+
+        elif len(keys) > 1:
+            entries = [(f'{i}', f.data.dtype) for i, f in enumerate(fields)]
+            unified = np.empty_like(fields[0].data, dtype=np.dtype(entries))
+            for i, f in enumerate(fields):
+                unified[f'{i}'] = f.data
+
+            uniques = np.unique(unified)
+            results = [uniques[f'{i}'] for i in range(len(fields))]
+
+        for i, field in enumerate(fields):
+            newfld = field.create_like(ddf, field.name)
+            newfld.data.write(results[i])
+
+        return ddf
+        
+    
+    def groupby_count(self, by: Union[str, List[str]], 
+                            ddf: DataFrame):
+        """
+        Group by a field or a list of field, count distinct values, return a dataframe with the count number.
+        
+        :param by: Name (str) or list of names (str) to group by and count.
+        :param ddf: optional - the destination data frame
+        :returns: DataFrame with count of distinct values.
+        """
+        keys = val.validate_sort_and_groupby_keys(by)
+
+        if not isinstance(ddf, DataFrame):
+            raise TypeError("The destination object must be an instance of DataFrame.")
+    
+        fields = tuple(self._columns[k] for k in keys)
+
+        if len(keys) == 1:
+            result, counts = np.unique(fields[0].data, return_counts=True)
+            results = [result]
+
+        else:
+            entries = [(f'{i}', f.data.dtype) for i, f in enumerate(fields)]
+            unified = np.empty_like(fields[0].data, dtype=np.dtype(entries))
+            for i, f in enumerate(fields):
+                unified[f'{i}'] = f.data
+
+            uniques, counts = np.unique(unified, return_counts = True)
+            results = [uniques[f'{i}'] for i in range(len(fields))]
+
+        # write distinct values into ddf
+        for i, field in enumerate(fields):
+            newfld = field.create_like(ddf, field.name)
+            newfld.data.write(results[i])
+            
+        # write count into ddf
+        ddf.create_numeric(name = 'count', nformat='int64').data.write(counts)
+
+        return ddf
+
+
+    def groupby_max(self):
+        pass
+
+    def groupby_min(self):
+        pass
+
+        
+
+        
+        
+        
 
 
 def copy(field: fld.Field, dataframe: DataFrame, name: str):
