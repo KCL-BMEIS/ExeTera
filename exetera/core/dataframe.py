@@ -466,7 +466,8 @@ class HDF5DataFrame(DataFrame):
             return self
 
 
-    def distinct(self, by: Union[str, List[str]], ddf: DataFrame):
+    def distinct(self, by: Union[str, List[str]], 
+                       ddf: DataFrame = None):
         """
         Distinct values of a field or a list of field, return a dataframe with distinct values.
         
@@ -476,7 +477,7 @@ class HDF5DataFrame(DataFrame):
         """
         keys = val.validate_sort_and_groupby_keys(by)
 
-        if not isinstance(ddf, DataFrame):
+        if ddf is not None and not isinstance(ddf, DataFrame):
             raise TypeError("The destination object must be an instance of DataFrame.")
     
         fields = tuple(self._columns[k] for k in keys)
@@ -494,6 +495,9 @@ class HDF5DataFrame(DataFrame):
             uniques = np.unique(unified)
             results = [uniques[f'{i}'] for i in range(len(fields))]
 
+        if ddf is None:
+            ddf = self._dataset.create_dataframe('ddf')
+
         for i, field in enumerate(fields):
             newfld = field.create_like(ddf, field.name)
             newfld.data.write(results[i])
@@ -502,7 +506,7 @@ class HDF5DataFrame(DataFrame):
         
     
     def groupby_count(self, by: Union[str, List[str]], 
-                            ddf: DataFrame):
+                            ddf: DataFrame = None):
         """
         Group by a field or a list of field, count distinct values, return a dataframe with the count number.
         
@@ -512,7 +516,7 @@ class HDF5DataFrame(DataFrame):
         """
         keys = val.validate_sort_and_groupby_keys(by)
 
-        if not isinstance(ddf, DataFrame):
+        if ddf is not None and not isinstance(ddf, DataFrame):
             raise TypeError("The destination object must be an instance of DataFrame.")
     
         fields = tuple(self._columns[k] for k in keys)
@@ -530,26 +534,123 @@ class HDF5DataFrame(DataFrame):
             uniques, counts = np.unique(unified, return_counts = True)
             results = [uniques[f'{i}'] for i in range(len(fields))]
 
+        if ddf is None:
+            ddf = self._dataset.create_dataframe('ddf')
+
         # write distinct values into ddf
         for i, field in enumerate(fields):
             newfld = field.create_like(ddf, field.name)
             newfld.data.write(results[i])
-            
+
         # write count into ddf
         ddf.create_numeric(name = 'count', nformat='int64').data.write(counts)
 
         return ddf
 
 
-    def groupby_max(self):
-        pass
+    def groupby_helper(self, by: Union[str, List[str]], 
+                             target: Union[str, List[str]] = None,
+                             ddf: DataFrame = None):
+        # validate
+        keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
+        targets = val.validate_groupby_target(target, by, self._columns.keys())
+        
+        if ddf is not None and not isinstance(ddf, DataFrame):
+            raise TypeError("The destination object must be an instance of DataFrame.")
 
-    def groupby_min(self):
-        pass
+        # sort by reversed groups keys 
+        by_fields_data = tuple(self._columns[k].data for k in reversed(keys))
+
+        sorted_index = np.lexsort(by_fields_data)
+        print(sorted_index)
+
+        # create a temp df to store sorted fields (by + target)
+        temp = self._dataset.create_dataframe('temp')
+
+        by_and_target_fields = tuple(self._columns[k] for k in keys + targets)
+
+        for field in by_and_target_fields:
+            newfld = field.create_like(temp, field.name)
+            field.apply_index(sorted_index, target=newfld)
+        
+        # get span based on non-reversed group keys
+        temp_by_fields = np.asarray([temp._columns[k] for k in keys]) 
+        temp_by_fields_data = np.asarray([temp._columns[k].data for k in keys])
+        spans = ops._get_spans_for_multi_fields(temp_by_fields_data)
+        print(spans)
+
+        # create result dataframe
+        if ddf is None:
+            ddf = self._dataset.create_dataframe('ddf') # uuid name ?
+
+        for field in temp_by_fields:
+            newfld = field.create_like(ddf, field.name)
+            field.apply_filter(spans[:-1], newfld)
+            print('newfld', newfld.name, newfld.data[:])
+
+        # apply spans to result df to get max
+        temp_target_fields = tuple(temp._columns[k] for k in targets)
+
+        return ddf, temp_target_fields, spans
+
+
+    def groupby_max(self, by: Union[str, List[str]], 
+                          target: Union[str, List[str]] = None,
+                          ddf: DataFrame = None):
+        
+        ddf, temp_target_fields, spans = self.groupby_helper(by, target, ddf)
+
+        for field in temp_target_fields:
+            tf = field.create_like(ddf, field.name)
+            field.apply_spans_max(spans, tf)
+
+        return ddf
+
+
+    def groupby_min(self, by: Union[str, List[str]], 
+                          target: Union[str, List[str]] = None,
+                          ddf: DataFrame = None):
+        
+        ddf, temp_target_fields, spans = self.groupby_helper(by, target, ddf)
+
+        for field in temp_target_fields:
+            tf = field.create_like(ddf, field.name)
+            field.apply_spans_min(spans, tf)
+
+        return ddf
+
+
+    def groupby_first(self, by: Union[str, List[str]], 
+                          target: Union[str, List[str]] = None,
+                          ddf: DataFrame = None):
+        
+        ddf, temp_target_fields, spans = self.groupby_helper(by, target, ddf)
+
+        for field in temp_target_fields:
+            tf = field.create_like(ddf, field.name)
+            field.apply_spans_first(spans, tf)
+
+        return ddf
+
+    def groupby_last(self, by: Union[str, List[str]], 
+                          target: Union[str, List[str]] = None,
+                          ddf: DataFrame = None):
+        
+        ddf, temp_target_fields, spans = self.groupby_helper(by, target, ddf)
+
+        for field in temp_target_fields:
+            tf = field.create_like(ddf, field.name)
+            field.apply_spans_last(spans, tf)
+
+        return ddf
 
         
+    def groupby_sum(self):
+        pass
 
-        
+
+    def groupby_mean(self):
+        pass
         
         
 
