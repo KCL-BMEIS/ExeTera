@@ -683,8 +683,6 @@ def _get_spans_for_2_fields(ndarray0, ndarray1):
 
 @njit
 def _get_spans_for_multi_fields(fields_data):
-    print('field_data', fields_data)
-
     count = 0
     length = len(fields_data[0])
     spans = np.zeros(length + 1, dtype = np.uint32)

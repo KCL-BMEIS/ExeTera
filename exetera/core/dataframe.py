@@ -434,7 +434,41 @@ class HDF5DataFrame(DataFrame):
             for field in self._columns.values():
                 field.apply_index(index_to_apply, in_place=True)
             return self
+<<<<<<< HEAD
             
+=======
+
+    def sort_values(self, by: Union[str, List[str]], 
+                        #   ascending: bool = True, (TODO?)
+                          ddf: DataFrame = None):
+        """
+        Sort by values of a field or a list of field, return a dataframe with sorted values or None.
+        
+        :param by: Name (str) or list of names (str) to sort by.
+        :param ascending: bool or list of bool, default True. Sort ascending vs. descending. 
+        :param ddf: optional - the destination data frame
+        :returns: DataFrame with sorted values or None if ddf=None.
+        """
+        keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
+
+        readers = tuple(self._columns[k] for k in keys)
+
+        sorted_index = self._dataset.session.dataset_sort_index(
+            readers, np.arange(len(readers[0].data), dtype=np.uint32))
+
+        if ddf is not None:
+            if not isinstance(ddf, DataFrame):
+                raise TypeError("The destination object must be an instance of DataFrame.")
+            for name, field in self._columns.items():
+                newfld = field.create_like(ddf, name)
+                field.apply_index(sorted_index, target=newfld)
+            return ddf
+        else:
+            for field in self._columns.values():
+                field.apply_index(sorted_index, in_place=True)
+            return self
+
+>>>>>>> 040c5e2... fix unittest for groupby max/min/first/last
 
     def distinct(self, by: Union[str, List[str]], 
                        ddf: DataFrame = None):
@@ -445,7 +479,7 @@ class HDF5DataFrame(DataFrame):
         :param ddf: optional - the destination data frame
         :returns: DataFrame with distinct values.
         """
-        keys = val.validate_sort_and_groupby_keys(by)
+        keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
 
         if ddf is not None and not isinstance(ddf, DataFrame):
             raise TypeError("The destination object must be an instance of DataFrame.")
@@ -484,7 +518,7 @@ class HDF5DataFrame(DataFrame):
         :param ddf: optional - the destination data frame
         :returns: DataFrame with count of distinct values.
         """
-        keys = val.validate_sort_and_groupby_keys(by)
+        keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
 
         if ddf is not None and not isinstance(ddf, DataFrame):
             raise TypeError("The destination object must be an instance of DataFrame.")
@@ -523,7 +557,7 @@ class HDF5DataFrame(DataFrame):
                              ddf: DataFrame = None):
         # validate
         keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
-        targets = val.validate_groupby_target(target, by, self._columns.keys())
+        targets = val.validate_groupby_target(target, keys, self._columns.keys())
         
         if ddf is not None and not isinstance(ddf, DataFrame):
             raise TypeError("The destination object must be an instance of DataFrame.")
@@ -532,7 +566,6 @@ class HDF5DataFrame(DataFrame):
         by_fields_data = tuple(self._columns[k].data for k in reversed(keys))
 
         sorted_index = np.lexsort(by_fields_data)
-        print(sorted_index)
 
         # create a temp df to store sorted fields (by + target)
         temp = self._dataset.create_dataframe('temp')
@@ -543,11 +576,15 @@ class HDF5DataFrame(DataFrame):
             newfld = field.create_like(temp, field.name)
             field.apply_index(sorted_index, target=newfld)
         
-        # get span based on non-reversed group keys
+        # temp - sorted df
         temp_by_fields = np.asarray([temp._columns[k] for k in keys]) 
         temp_by_fields_data = np.asarray([temp._columns[k].data for k in keys])
+        temp_target_fields = tuple(temp._columns[k] for k in targets)
+
+        # get span based on non-reversed group keys
         spans = ops._get_spans_for_multi_fields(temp_by_fields_data)
-        print(spans)
+
+        del temp
 
         # create result dataframe
         if ddf is None:
@@ -556,10 +593,6 @@ class HDF5DataFrame(DataFrame):
         for field in temp_by_fields:
             newfld = field.create_like(ddf, field.name)
             field.apply_filter(spans[:-1], newfld)
-            print('newfld', newfld.name, newfld.data[:])
-
-        # apply spans to result df to get max
-        temp_target_fields = tuple(temp._columns[k] for k in targets)
 
         return ddf, temp_target_fields, spans
 
@@ -570,8 +603,9 @@ class HDF5DataFrame(DataFrame):
         
         ddf, temp_target_fields, spans = self.groupby_helper(by, target, ddf)
 
-        for field in temp_target_fields:
-            tf = field.create_like(ddf, field.name)
+        # apply spans to result df to get max
+        for field in temp_target_fields:             
+            tf = field.create_like(ddf, field.name + '_max')
             field.apply_spans_max(spans, tf)
 
         return ddf
@@ -584,7 +618,7 @@ class HDF5DataFrame(DataFrame):
         ddf, temp_target_fields, spans = self.groupby_helper(by, target, ddf)
 
         for field in temp_target_fields:
-            tf = field.create_like(ddf, field.name)
+            tf = field.create_like(ddf, field.name + '_min')
             field.apply_spans_min(spans, tf)
 
         return ddf
@@ -597,7 +631,7 @@ class HDF5DataFrame(DataFrame):
         ddf, temp_target_fields, spans = self.groupby_helper(by, target, ddf)
 
         for field in temp_target_fields:
-            tf = field.create_like(ddf, field.name)
+            tf = field.create_like(ddf, field.name + '_first')
             field.apply_spans_first(spans, tf)
 
         return ddf
@@ -609,7 +643,7 @@ class HDF5DataFrame(DataFrame):
         ddf, temp_target_fields, spans = self.groupby_helper(by, target, ddf)
 
         for field in temp_target_fields:
-            tf = field.create_like(ddf, field.name)
+            tf = field.create_like(ddf, field.name + '_last')
             field.apply_spans_last(spans, tf)
 
         return ddf
