@@ -8,12 +8,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Mapping, Optional, Sequence, Tuple, Union, List
+from typing import Mapping, Optional, Sequence, Tuple, Union
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from exetera.core.abstract_types import Dataset, DataFrame, Field
+from exetera.core.abstract_types import Dataset, DataFrame
 from exetera.core import fields as fld
 from exetera.core import operations as ops
 from exetera.core import validation as val
@@ -435,18 +435,22 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, in_place=True)
             return self
 
-    def sort_values(self, by: Union[str, List[str]], 
-                        #   ascending: bool = True, (TODO?)
-                          ddf: DataFrame = None):
+    def sort_values(self, by, ascending=True, ddf=None):
         """
-        Sort by values of a field or a list of field, return a dataframe with sorted values or None.
+        Sort by the values
         
         :param by: Name (str) or list of names (str) to sort by.
         :param ascending: bool or list of bool, default True. Sort ascending vs. descending. 
         :param ddf: optional - the destination data frame
         :returns: DataFrame with sorted values or None if ddf=None.
         """
-        keys = val.validate_sort_and_groupby_keys(by)
+        keys = None
+        if isinstance(by, str):
+            keys = [by]
+        elif isinstance(by, list):
+            keys = by
+        else:
+            raise ValueError('the value sorted by should either be string or list of string')
 
         readers = tuple(self._columns[k] for k in keys)
 
@@ -466,6 +470,7 @@ class HDF5DataFrame(DataFrame):
             return self
 
 
+<<<<<<< HEAD
     def distinct(self, by: Union[str, List[str]], ddf: DataFrame):
         """
         Distinct values of a field or a list of field, return a dataframe with distinct values.
@@ -544,6 +549,8 @@ class HDF5DataFrame(DataFrame):
         
 
 
+=======
+>>>>>>> parent of a47d41d... implement distinct and groupby
 def copy(field: fld.Field, dataframe: DataFrame, name: str):
     """
     Copy a field to another dataframe as well as underlying dataset.

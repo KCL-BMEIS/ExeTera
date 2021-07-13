@@ -287,12 +287,3 @@ def validate_and_normalize_categorical_key(param_name, key):
             return {k: v.encode() for k, v, in key}
         else:
             return key
-
-
-def validate_sort_and_groupby_keys(by):
-    if isinstance(by, str):
-        return [by]
-    elif isinstance(by, list) and len(by) > 0:
-        return by
-    else:
-        raise ValueError('the value sorted by should either be string or list of string')
