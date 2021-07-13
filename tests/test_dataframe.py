@@ -604,10 +604,7 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             self.assertListEqual([0, 1, 2, 2, 3, 3], ddf['val'].data[:].tolist())        
             self.assertListEqual([b'b', b'a', b'b', b'c', b'c', b'd'], ddf['val2'].data[:].tolist())        
-<<<<<<< HEAD
             self.assertListEqual([1, 2, 2, 1, 2, 2], ddf['count'].data[:].tolist())
-=======
-            self.assertListEqual([1, 2, 2, 1, 2, 2], ddf['max'].data[:].tolist())
 
 
     def test_groupby_max_single_field(self):
@@ -648,4 +645,3 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())    
             self.assertListEqual([1, 2, 3, 4], ddf['max'].data[:].tolist())    
->>>>>>> parent of 040c5e2... fix unittest for groupby max/min/first/last

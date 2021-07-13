@@ -681,34 +681,6 @@ def _get_spans_for_2_fields(ndarray0, ndarray1):
     return spans[:count+2]
 
 
-@njit
-<<<<<<< HEAD
-=======
-def _get_spans_for_multi_fields(fields_data):
-    print('field_data', fields_data)
-
-    count = 0
-    length = len(fields_data[0])
-    spans = np.zeros(length + 1, dtype = np.uint32)
-    spans[0] = 0
-
-    for i in np.arange(1, length):
-        not_equal = False
-        for f_d in fields_data:
-            if f_d[i] != f_d[i - 1]:
-                not_equal = True
-                break
-        
-        if not_equal:
-            count += 1
-            spans[count] = i
-        
-    spans[count + 1] = length
-    return spans[:count + 2]
-
-
-@njit
->>>>>>> parent of 040c5e2... fix unittest for groupby max/min/first/last
 def _get_spans_for_index_string_field(indices,values):
     result = []
     result.append(0)
