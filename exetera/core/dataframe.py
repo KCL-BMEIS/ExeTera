@@ -446,7 +446,7 @@ class HDF5DataFrame(DataFrame):
         :param ddf: optional - the destination data frame
         :returns: DataFrame with sorted values or None if ddf=None.
         """
-        keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
+        keys = val.validate_sort_and_groupby_keys(by)
 
         readers = tuple(self._columns[k] for k in keys)
 
@@ -466,8 +466,7 @@ class HDF5DataFrame(DataFrame):
             return self
 
 
-    def distinct(self, by: Union[str, List[str]], 
-                       ddf: DataFrame = None):
+    def distinct(self, by: Union[str, List[str]], ddf: DataFrame):
         """
         Distinct values of a field or a list of field, return a dataframe with distinct values.
         
@@ -475,9 +474,9 @@ class HDF5DataFrame(DataFrame):
         :param ddf: optional - the destination data frame
         :returns: DataFrame with distinct values.
         """
-        keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
+        keys = val.validate_sort_and_groupby_keys(by)
 
-        if ddf is not None and not isinstance(ddf, DataFrame):
+        if not isinstance(ddf, DataFrame):
             raise TypeError("The destination object must be an instance of DataFrame.")
     
         fields = tuple(self._columns[k] for k in keys)
@@ -495,9 +494,6 @@ class HDF5DataFrame(DataFrame):
             uniques = np.unique(unified)
             results = [uniques[f'{i}'] for i in range(len(fields))]
 
-        if ddf is None:
-            ddf = self._dataset.create_dataframe('ddf')
-
         for i, field in enumerate(fields):
             newfld = field.create_like(ddf, field.name)
             newfld.data.write(results[i])
@@ -506,7 +502,7 @@ class HDF5DataFrame(DataFrame):
         
     
     def groupby_count(self, by: Union[str, List[str]], 
-                            ddf: DataFrame = None):
+                            ddf: DataFrame):
         """
         Group by a field or a list of field, count distinct values, return a dataframe with the count number.
         
@@ -514,9 +510,9 @@ class HDF5DataFrame(DataFrame):
         :param ddf: optional - the destination data frame
         :returns: DataFrame with count of distinct values.
         """
-        keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
+        keys = val.validate_sort_and_groupby_keys(by)
 
-        if ddf is not None and not isinstance(ddf, DataFrame):
+        if not isinstance(ddf, DataFrame):
             raise TypeError("The destination object must be an instance of DataFrame.")
     
         fields = tuple(self._columns[k] for k in keys)
@@ -534,26 +530,27 @@ class HDF5DataFrame(DataFrame):
             uniques, counts = np.unique(unified, return_counts = True)
             results = [uniques[f'{i}'] for i in range(len(fields))]
 
-        if ddf is None:
-            ddf = self._dataset.create_dataframe('ddf')
-
         # write distinct values into ddf
         for i, field in enumerate(fields):
             newfld = field.create_like(ddf, field.name)
             newfld.data.write(results[i])
-
+            
         # write count into ddf
         ddf.create_numeric(name = 'count', nformat='int64').data.write(counts)
 
         return ddf
 
 
+<<<<<<< HEAD
+    def groupby_max(self):
+        pass
+=======
     def groupby_helper(self, by: Union[str, List[str]], 
                              target: Union[str, List[str]] = None,
                              ddf: DataFrame = None):
         # validate
         keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
-        targets = val.validate_groupby_target(target, keys, self._columns.keys())
+        targets = val.validate_groupby_target(target, by, self._columns.keys())
         
         if ddf is not None and not isinstance(ddf, DataFrame):
             raise TypeError("The destination object must be an instance of DataFrame.")
@@ -562,6 +559,7 @@ class HDF5DataFrame(DataFrame):
         by_fields_data = tuple(self._columns[k].data for k in reversed(keys))
 
         sorted_index = np.lexsort(by_fields_data)
+        print(sorted_index)
 
         # create a temp df to store sorted fields (by + target)
         temp = self._dataset.create_dataframe('temp')
@@ -572,15 +570,11 @@ class HDF5DataFrame(DataFrame):
             newfld = field.create_like(temp, field.name)
             field.apply_index(sorted_index, target=newfld)
         
-        # temp - sorted df
+        # get span based on non-reversed group keys
         temp_by_fields = np.asarray([temp._columns[k] for k in keys]) 
         temp_by_fields_data = np.asarray([temp._columns[k].data for k in keys])
-        temp_target_fields = tuple(temp._columns[k] for k in targets)
-
-        # get span based on non-reversed group keys
         spans = ops._get_spans_for_multi_fields(temp_by_fields_data)
-
-        del temp
+        print(spans)
 
         # create result dataframe
         if ddf is None:
@@ -589,6 +583,10 @@ class HDF5DataFrame(DataFrame):
         for field in temp_by_fields:
             newfld = field.create_like(ddf, field.name)
             field.apply_filter(spans[:-1], newfld)
+            print('newfld', newfld.name, newfld.data[:])
+
+        # apply spans to result df to get max
+        temp_target_fields = tuple(temp._columns[k] for k in targets)
 
         return ddf, temp_target_fields, spans
 
@@ -599,9 +597,8 @@ class HDF5DataFrame(DataFrame):
         
         ddf, temp_target_fields, spans = self.groupby_helper(by, target, ddf)
 
-        # apply spans to result df to get max
-        for field in temp_target_fields:             
-            tf = field.create_like(ddf, field.name + '_max')
+        for field in temp_target_fields:
+            tf = field.create_like(ddf, field.name)
             field.apply_spans_max(spans, tf)
 
         return ddf
@@ -614,7 +611,7 @@ class HDF5DataFrame(DataFrame):
         ddf, temp_target_fields, spans = self.groupby_helper(by, target, ddf)
 
         for field in temp_target_fields:
-            tf = field.create_like(ddf, field.name + '_min')
+            tf = field.create_like(ddf, field.name)
             field.apply_spans_min(spans, tf)
 
         return ddf
@@ -627,30 +624,26 @@ class HDF5DataFrame(DataFrame):
         ddf, temp_target_fields, spans = self.groupby_helper(by, target, ddf)
 
         for field in temp_target_fields:
-            tf = field.create_like(ddf, field.name + '_first')
+            tf = field.create_like(ddf, field.name)
             field.apply_spans_first(spans, tf)
+>>>>>>> parent of 040c5e2... fix unittest for groupby max/min/first/last
 
-        return ddf
+    def groupby_min(self):
+        pass
 
-    def groupby_last(self, by: Union[str, List[str]], 
-                          target: Union[str, List[str]] = None,
-                          ddf: DataFrame = None):
         
+<<<<<<< HEAD
+=======
         ddf, temp_target_fields, spans = self.groupby_helper(by, target, ddf)
 
         for field in temp_target_fields:
-            tf = field.create_like(ddf, field.name + '_last')
+            tf = field.create_like(ddf, field.name)
             field.apply_spans_last(spans, tf)
 
         return ddf
+>>>>>>> parent of 040c5e2... fix unittest for groupby max/min/first/last
 
         
-    def groupby_sum(self):
-        pass
-
-
-    def groupby_mean(self):
-        pass
         
         
 

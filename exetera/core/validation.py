@@ -289,46 +289,10 @@ def validate_and_normalize_categorical_key(param_name, key):
             return key
 
 
-def validate_sort_and_groupby_keys(by, all):
+def validate_sort_and_groupby_keys(by):
     if isinstance(by, str):
-        if by in all:
-            return [by]
-        else: 
-            raise ValueError('by = {} is not an existing field'.format(by))
-    elif isinstance(by, list):
-        if len(by) == 0:
-            raise ValueError('by should not be empty list')
-        else:
-            extra = set(by) - set(all)
-            if len(extra) > 0:
-                raise ValueError('by = {} is/are not exising field(s)'.format(extra))
-            else:
-                return by
+        return [by]
+    elif isinstance(by, list) and len(by) > 0:
+        return by
     else:
-        raise ValueError('by should either be string or list of string')
-
-
-def validate_groupby_target(target, by, all):
-    if target is None:
-        target = list(set(all) - set(by))
-        if len(target) == 0:
-            raise ValueError('there is no field to do calculation after groupby')
-        else:
-            return target
-
-    elif isinstance(target, str):
-        if target in all:
-            return [target]
-        else: 
-            raise ValueError('target = {} is not an existing field'.format(target))
-    elif isinstance(target, list):
-        if len(target) == 0:
-            raise ValueError('by should not be empty list')
-        else:
-            extra = set(target) - set(all)
-            if len(extra) > 0:
-                raise ValueError('target = {} is/are not exising field(s)'.format(extra))
-            else:
-                return target
-    else:
-        raise ValueError('target should either be string or list of string')
+        raise ValueError('the value sorted by should either be string or list of string')

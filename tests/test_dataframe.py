@@ -604,25 +604,28 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             self.assertListEqual([0, 1, 2, 2, 3, 3], ddf['val'].data[:].tolist())        
             self.assertListEqual([b'b', b'a', b'b', b'c', b'c', b'd'], ddf['val2'].data[:].tolist())        
+<<<<<<< HEAD
             self.assertListEqual([1, 2, 2, 1, 2, 2], ddf['count'].data[:].tolist())
+=======
+            self.assertListEqual([1, 2, 2, 1, 2, 2], ddf['max'].data[:].tolist())
 
 
     def test_groupby_max_single_field(self):
-        val = np.asarray([3, 1, 1, 2, 2, 2, 3, 3, 3, 0], dtype=np.int32)
-        val2 = np.asarray([9, 8, 2, 6, 4, 5, 3, 7, 1, 0], dtype=np.int64)
+        val = np.asarray([1, 2, 1, 2], dtype=np.int32)
+        val2 = np.asarray(['a', 'c', 'a', 'b'], dtype = 'S1')
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio, "w", "src")
             df = dst.create_dataframe('ds')
             df.create_numeric("val", "int32").data.write(val)
-            df.create_numeric("val2", "int64").data.write(val2)
+            df.create_fixed_string("val2", 1).data.write(val2)
 
             ddf = dst.create_dataframe('ddf')
 
             df.groupby_max(by = 'val', ddf = ddf)
-            
-            self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
-            self.assertListEqual([0, 8, 6, 9], ddf['val2_max'].data[:].tolist())    
+
+            # self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())    
+            # self.assertListEqual([1, 2, 3, 4], ddf['max'].data[:].tolist())    
 
 
     def test_groupby_max_multi_fields(self):
@@ -643,85 +646,6 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             df.groupby_max(by = ['val', 'val2'], ddf = ddf)
 
-            self.assertListEqual([1, 2, 2], ddf['val'].data[:].tolist())    
-            self.assertListEqual([b'a', b'b', b'c'], ddf['val2'].data[:].tolist())    
-            self.assertListEqual([5, 6, 4], ddf['val3_max'].data[:].tolist())    
-            self.assertListEqual(['cd', 'def', 'ab'], ddf['val4_max'].data[:])    
-
-
-    def test_groupby_min_single_field(self):
-        val = np.asarray([3, 1, 1, 2, 2, 2, 3, 3, 3, 0], dtype=np.int32)
-        val2 = np.asarray([9, 8, 2, 6, 4, 5, 3, 7, 1, 0], dtype=np.int64)
-        bio = BytesIO()
-        with session.Session() as s:
-            dst = s.open_dataset(bio, "w", "src")
-            df = dst.create_dataframe('ds')
-            df.create_numeric("val", "int32").data.write(val)
-            df.create_numeric("val2", "int64").data.write(val2)
-
-            ddf = dst.create_dataframe('ddf')
-
-            df.groupby_min(by = 'val', ddf = ddf)
-            
-            self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
-            self.assertListEqual([0, 2, 4, 1], ddf['val2_min'].data[:].tolist())    
-
-
-    def test_groupby_min_multi_fields(self):
-        val = np.asarray([1, 2, 1, 2], dtype=np.int32)
-        val2 = np.asarray(['a', 'c', 'a', 'b'], dtype = 'S1')
-        val3 = np.asarray([3, 4, 5, 6])
-        val4 = np.asarray(['aa', 'ab', 'cd', 'def'])
-        bio = BytesIO()
-        with session.Session() as s:
-            dst = s.open_dataset(bio, "w", "src")
-            df = dst.create_dataframe('ds')
-            df.create_numeric("val", "int32").data.write(val)
-            df.create_fixed_string("val2", 1).data.write(val2)
-            df.create_numeric("val3", "int32").data.write(val3)
-            df.create_indexed_string("val4").data.write(val4)
-
-            ddf = dst.create_dataframe('ddf')
-
-            df.groupby_min(by = ['val', 'val2'], ddf = ddf)
-
-            self.assertListEqual([1, 2, 2], ddf['val'].data[:].tolist())    
-            self.assertListEqual([b'a', b'b', b'c'], ddf['val2'].data[:].tolist())    
-            self.assertListEqual([3, 6, 4], ddf['val3_min'].data[:].tolist())    
-            self.assertListEqual(['aa', 'def', 'ab'], ddf['val4_min'].data[:])    
-
-
-    def test_groupby_first_single_field(self):
-        val = np.asarray([3, 1, 1, 2, 2, 2, 3, 3, 3, 0], dtype=np.int32)
-        val2 = np.asarray([9, 8, 2, 6, 4, 5, 3, 7, 1, 0], dtype=np.int64)
-        bio = BytesIO()
-        with session.Session() as s:
-            dst = s.open_dataset(bio, "w", "src")
-            df = dst.create_dataframe('ds')
-            df.create_numeric("val", "int32").data.write(val)
-            df.create_numeric("val2", "int64").data.write(val2)
-
-            ddf = dst.create_dataframe('ddf')
-
-            df.groupby_first(by = 'val', ddf = ddf)
-            
-            self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
-            self.assertListEqual([0, 8, 6, 9], ddf['val2_first'].data[:].tolist())    
-
-
-    def test_groupby_last_single_field(self):
-        val = np.asarray([3, 1, 1, 2, 2, 2, 3, 3, 3, 0], dtype=np.int32)
-        val2 = np.asarray([9, 8, 2, 6, 4, 5, 3, 7, 1, 0], dtype=np.int64)
-        bio = BytesIO()
-        with session.Session() as s:
-            dst = s.open_dataset(bio, "w", "src")
-            df = dst.create_dataframe('ds')
-            df.create_numeric("val", "int32").data.write(val)
-            df.create_numeric("val2", "int64").data.write(val2)
-
-            ddf = dst.create_dataframe('ddf')
-
-            df.groupby_last(by = 'val', ddf = ddf)
-            
-            self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
-            self.assertListEqual([0, 2, 5, 1], ddf['val2_last'].data[:].tolist())    
+            self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())    
+            self.assertListEqual([1, 2, 3, 4], ddf['max'].data[:].tolist())    
+>>>>>>> parent of 040c5e2... fix unittest for groupby max/min/first/last
