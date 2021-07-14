@@ -287,3 +287,31 @@ def validate_and_normalize_categorical_key(param_name, key):
             return {k: v.encode() for k, v, in key}
         else:
             return key
+
+
+def validate_sort_parameter(axis, ascending, kind):
+    if axis != 0:
+        raise ValueError("Currently api sort_values() only support axis = 0")
+    elif ascending != True:
+        raise ValueError("Currently api sort_values() only support ascending = True")
+    elif kind != 'stable':
+        raise ValueError("Currently api sort_values() only support kind='stable'")
+
+
+def validate_sort_and_groupby_keys(by, all):
+    if isinstance(by, str):
+        if by in all:
+            return [by]
+        else: 
+            raise ValueError('by = {} is not an existing field'.format(by))
+    elif isinstance(by, list):
+        if len(by) == 0:
+            raise ValueError('by should not be empty list')
+        else:
+            extra = set(by) - set(all)
+            if len(extra) > 0:
+                raise ValueError('by = {} is/are not exising field(s)'.format(extra))
+            else:
+                return by
+    else:
+        raise ValueError('by should either be string or list of string')
