@@ -309,26 +309,22 @@ def validate_sort_and_groupby_keys(by, all):
 
 
 def validate_groupby_target(target, by, all):
-    if target is None:
-        target = list(set(all) - set(by))
-        if len(target) == 0:
-            raise ValueError('there is no field to do calculation after groupby')
-        else:
-            return target
-
-    elif isinstance(target, str):
-        if target in all:
-            return [target]
-        else: 
-            raise ValueError('target = {} is not an existing field'.format(target))
+    result = []
+    if isinstance(target, str):
+        result = [target]
     elif isinstance(target, list):
         if len(target) == 0:
-            raise ValueError('by should not be empty list')
+            raise ValueError('target should not be empty list')
         else:
-            extra = set(target) - set(all)
-            if len(extra) > 0:
-                raise ValueError('target = {} is/are not exising field(s)'.format(extra))
-            else:
-                return target
+            result = target
     else:
         raise ValueError('target should either be string or list of string')
+
+    overlap_1 = set(result) - set(all)
+    overlap_2 = set(result) - set(by)
+    if len(overlap_1) > 0:
+        raise ValueError('target = {} should be existing field(s)'.format(overlap_1))
+    elif len(overlap_2) > 0:
+        raise ValueError('target = {} should not overlap groupby keys'.format(overlap_2))
+    else:
+        return result

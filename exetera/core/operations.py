@@ -704,6 +704,25 @@ def _get_spans_for_multi_fields(fields_data):
 
 
 @njit
+def check_if_sorted_for_multi_fields(fields_data):
+    is_sorted = np.ones(len(fields_data), dtype='bool')
+    length = len(fields_data[0])
+    
+    for i, f in enumerate(fields_data):
+        bigger_flag = False
+        for j in np.arange(1, length):
+            if f[j] > f[j - 1]:
+                bigger_flag = True
+                break
+
+        if bigger_flag:
+            is_sorted[i] = False
+
+    return is_sorted
+
+    
+
+@njit
 def _get_spans_for_index_string_field(indices,values):
     result = []
     result.append(0)
