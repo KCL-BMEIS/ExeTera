@@ -14,7 +14,7 @@ import numpy as np
 
 import h5py
 
-from exetera.core.abstract_types import Field
+from exetera.core.abstract_types import DataFrame, Field
 from exetera.core import readerwriter as rw
 from exetera.core import fields as flds
 
@@ -218,6 +218,15 @@ def validate_and_get_key_fields(side, df, key):
             raise ValueError("'{}': field is indexed; indexed fields cannot be "
                              "used as keys".format(side))
         return (field,)
+
+
+def validate_all_field_length_in_df(df:DataFrame):
+    lens = set()
+    for name, field in df._columns.items():
+        lens.add(len(field.data))
+        if len(lens) > 1:
+            raise ValueError("There are consistent lengths in dataframe '{}'. "
+                             "The following length were observed: {}".format(df.name, lens))
 
 
 def validate_key_lengths(side, df, key):

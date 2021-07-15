@@ -424,6 +424,8 @@ class HDF5DataFrame(DataFrame):
         :returns: a dataframe contains all the fields re-indexed, self if ddf is not set
         """
         if ddf is not None:
+            val.validate_all_field_length_in_df(ddf)
+
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self._columns.items():
@@ -431,6 +433,8 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, target=newfld)
             return ddf
         else:
+            val.validate_all_field_length_in_df(self) 
+
             for field in self._columns.values():
                 field.apply_index(index_to_apply, in_place=True)
             return self
@@ -448,11 +452,11 @@ class HDF5DataFrame(DataFrame):
         :returns: DataFrame with sorted values or None if ddf=None.
         """
         if axis != 0:
-            raise ValueError("Currently api sort_values() only supports axis = 0")
+            raise ValueError("Currently sort_values() only supports axis = 0")
         elif ascending != True:
-            raise ValueError("Currently api sort_values() only supports ascending = True")
+            raise ValueError("Currently sort_values() only supports ascending = True")
         elif kind != 'stable':
-            raise ValueError("Currently api sort_values() only supports kind='stable'")
+            raise ValueError("Currently sort_values() only supports kind='stable'")
 
         keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
 
@@ -461,17 +465,7 @@ class HDF5DataFrame(DataFrame):
         sorted_index = self._dataset.session.dataset_sort_index(
             readers, np.arange(len(readers[0].data), dtype=np.uint32))
 
-        if ddf is not None:
-            if not isinstance(ddf, DataFrame):
-                raise TypeError("The destination object must be an instance of DataFrame.")
-            for name, field in self._columns.items():
-                newfld = field.create_like(ddf, name)
-                field.apply_index(sorted_index, target=newfld)
-            return ddf
-        else:
-            for field in self._columns.values():
-                field.apply_index(sorted_index, in_place=True)
-            return self
+        return self.apply_index(sorted_index, ddf)
 
 
 def copy(field: fld.Field, dataframe: DataFrame, name: str):
