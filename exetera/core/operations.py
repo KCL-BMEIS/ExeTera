@@ -680,7 +680,7 @@ def _get_spans_for_2_fields(ndarray0, ndarray1):
     spans[count+1] = len(ndarray0)
     return spans[:count+2]
 
-
+    
 @njit
 def _get_spans_for_multi_fields(fields_data):
     count = 0
