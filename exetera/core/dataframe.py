@@ -447,7 +447,13 @@ class HDF5DataFrame(DataFrame):
 
         :returns: DataFrame with sorted values or None if ddf=None.
         """
-        val.validate_sort_parameter(axis, ascending, kind)
+        if axis != 0:
+            raise ValueError("Currently api sort_values() only supports axis = 0")
+        elif ascending != True:
+            raise ValueError("Currently api sort_values() only supports ascending = True")
+        elif kind != 'stable':
+            raise ValueError("Currently api sort_values() only supports kind='stable'")
+
         keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
 
         readers = tuple(self._columns[k] for k in keys)

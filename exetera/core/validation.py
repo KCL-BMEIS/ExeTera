@@ -289,15 +289,6 @@ def validate_and_normalize_categorical_key(param_name, key):
             return key
 
 
-def validate_sort_parameter(axis, ascending, kind):
-    if axis != 0:
-        raise ValueError("Currently api sort_values() only support axis = 0")
-    elif ascending != True:
-        raise ValueError("Currently api sort_values() only support ascending = True")
-    elif kind != 'stable':
-        raise ValueError("Currently api sort_values() only support kind='stable'")
-
-
 def validate_sort_and_groupby_keys(by, all):
     if isinstance(by, str):
         if by in all:
