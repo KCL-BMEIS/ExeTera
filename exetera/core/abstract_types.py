@@ -258,6 +258,27 @@ class DataFrame(ABC):
         raise NotImplementedError()
 
 
+class DataFrameGroupBy(ABC):
+    """
+    DataFrameGroupBy is an object returned after group by on dataframe
+    """
+    @abstractmethod
+    def max(self, field):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def min(self, field):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def first(self, field):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def last(self, field):
+        raise NotImplementedError()
+
+
 class AbstractSession(ABC):
 
     @abstractmethod

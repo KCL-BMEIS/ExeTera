@@ -533,11 +533,10 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             ddf = dst.create_dataframe('ddf')
 
-            df.groupby_count(by = 'val', ddf = ddf)
+            df.groupby(by = 'val').max(ddf = ddf)
 
             self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())    
             self.assertListEqual([1, 2, 3, 4], ddf['count'].data[:].tolist())    
-
         
 
     def test_groupby_count_multi_fields(self):

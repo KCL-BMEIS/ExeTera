@@ -13,7 +13,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from exetera.core.abstract_types import Dataset, DataFrame, Field
+from exetera.core.abstract_types import Dataset, DataFrame, DataFrameGroupBy, Field
 from exetera.core import fields as fld
 from exetera.core import operations as ops
 from exetera.core import validation as val
@@ -435,6 +435,35 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, in_place=True)
             return self
 
+
+    def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):
+        """
+        Sort by the values of a field or a list of fields
+        
+        :param by: Name (str) or list of names (str) to sort by.
+        :param ddf: optional - the destination data frame
+        :param axis: Axis to be sorted. Currently only support 0
+        :param ascending: Sort ascending vs. descending. Currently only support ascending=True.
+        :param kind: Choice of sorting algorithm. Currently only support "stable"
+
+        :returns: DataFrame with sorted values or None if ddf=None.
+        """
+        if axis != 0:
+            raise ValueError("Currently sort_values() only supports axis = 0")
+        elif ascending != True:
+            raise ValueError("Currently sort_values() only supports ascending = True")
+        elif kind != 'stable':
+            raise ValueError("Currently sort_values() only supports kind='stable'")
+
+        keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
+
+        readers = tuple(self._columns[k] for k in keys)
+
+        sorted_index = self._dataset.session.dataset_sort_index(
+            readers, np.arange(len(readers[0].data), dtype=np.uint32))
+
+        return self.apply_index(sorted_index, ddf)
+
             
     def distinct(self, by: Union[str, List[str]], 
                        ddf: DataFrame = None):
@@ -475,11 +504,6 @@ class HDF5DataFrame(DataFrame):
         return ddf
 
         
-    def sort_values(self, by, ddf):
-        # dummy sort_values api
-        return ddf
-
-
     def groupby(self, by: Union[str, List[str]]):                  
         # validate groupby keys
         by = val.validate_sort_and_groupby_keys(by, self._columns.keys())
@@ -503,14 +527,14 @@ class HDF5DataFrame(DataFrame):
         # delete temporary df
         self._dataset.delete_dataframe('tmp_df')
 
-        return DataFrameGroupBy(by, self._columns.keys(), spans, sorted_df)
+        return HDF5DataFrameGroupBy(by, spans, sorted_df)
 
 
-class DataFrameGroupBy:
+class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
-    def __init__(self, by, all, spans, sorted_df):
+    def __init__(self, by, spans, sorted_df):
         self._by = by
-        self._all = all
+        self._all = sorted_df._columns.keys()
         self._spans = spans
         self._sorted_df = sorted_df
 
