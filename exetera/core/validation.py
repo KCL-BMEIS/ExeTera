@@ -321,7 +321,7 @@ def validate_groupby_target(target, by, all):
         raise ValueError('target should either be string or list of string')
 
     overlap_1 = set(result) - set(all)
-    overlap_2 = set(result) - set(by)
+    overlap_2 = set(result) & set(by)
     if len(overlap_1) > 0:
         raise ValueError('target = {} should be existing field(s)'.format(overlap_1))
     elif len(overlap_2) > 0:

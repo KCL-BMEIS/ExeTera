@@ -509,13 +509,14 @@ class HDF5DataFrame(DataFrame):
         by = val.validate_sort_and_groupby_keys(by, self._columns.keys())
 
         # check if keys is sorted
-        by_fields_data = tuple(self._columns[k].data for k in by)
+        by_fields_data = np.asarray([self._columns[k].data for k in by])
         by_is_sorted = ops.check_if_sorted_for_multi_fields(by_fields_data)
 
         if np.any(by_is_sorted) == False:
             # if not sorted, create a temp df to store sorted df
-            tmp_df = self._dataset.create_dataframe('tmp_df') # uuid??
+            tmp_df = self._dataset.create_dataframe('tmp_df') # uuid???????
             sorted_df = self.sort_values(by, tmp_df)
+
         else:
             # if sorted, then no need to sort
             sorted_df = self
@@ -524,19 +525,17 @@ class HDF5DataFrame(DataFrame):
         sorted_by_fields_data = np.asarray([sorted_df._columns[k].data for k in by])
         spans = ops._get_spans_for_multi_fields(sorted_by_fields_data)
 
-        # delete temporary df
-        self._dataset.delete_dataframe('tmp_df')
-
-        return HDF5DataFrameGroupBy(by, spans, sorted_df)
+        return HDF5DataFrameGroupBy(by, self._columns.keys(), spans, sorted_df, self._dataset)
 
 
 class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
-    def __init__(self, by, spans, sorted_df):
+    def __init__(self, by, all, spans, sorted_df, dataset):
         self._by = by
-        self._all = sorted_df._columns.keys()
+        self._all = all
         self._spans = spans
         self._sorted_df = sorted_df
+        self._dataset = dataset
 
 
     def _write_groupby_keys(self, ddf: DataFrame, write_keys=True):    
@@ -550,7 +549,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
                 field.apply_filter(self._spans[:-1], newfld)
 
     
-    def count(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
+    def count(self, ddf: DataFrame, write_keys=True) -> DataFrame:
         """
         Compute max of group values.
 
@@ -560,16 +559,12 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         
         :return: dataframe with count of group values
         """
-        targets = val.validate_groupby_target(target, self._by, self._all)
-
         self._write_groupby_keys(ddf, write_keys)
 
-        # apply spans to target fields
-        sorted_target_fields = tuple(self._sorted_df._columns[k] for k in targets)
+        counts = np.zeros(len(self._spans)-1, dtype='int64')
+        ops.apply_spans_count(self._spans, counts)
 
-        for field in sorted_target_fields:             
-            tf = field.create_like(ddf, field.name + '_count')
-            field.apply_spans_count(self._spans, tf)
+        ddf.create_numeric(name = 'count', nformat='int64').data.write(counts)
 
         return ddf
 

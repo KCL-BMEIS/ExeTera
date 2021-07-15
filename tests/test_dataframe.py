@@ -533,7 +533,7 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             ddf = dst.create_dataframe('ddf')
 
-            df.groupby(by = 'val').max(ddf = ddf)
+            df.groupby(by = 'val').count(ddf = ddf)
 
             self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())    
             self.assertListEqual([1, 2, 3, 4], ddf['count'].data[:].tolist())    
@@ -551,7 +551,7 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             ddf = dst.create_dataframe('ddf')
 
-            df.groupby_count(by = ['val', 'val2'], ddf = ddf)
+            df.groupby(by = ['val', 'val2']).count(ddf = ddf)
 
             self.assertListEqual([0, 1, 2, 2, 3, 3], ddf['val'].data[:].tolist())        
             self.assertListEqual([b'b', b'a', b'b', b'c', b'c', b'd'], ddf['val2'].data[:].tolist())        
@@ -570,7 +570,7 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             ddf = dst.create_dataframe('ddf')
 
-            df.groupby_max(by = 'val', ddf = ddf)
+            df.groupby(by = 'val').max(target ='val2', ddf = ddf)
             
             self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
             self.assertListEqual([0, 8, 6, 9], ddf['val2_max'].data[:].tolist())    
@@ -592,7 +592,7 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             ddf = dst.create_dataframe('ddf')
 
-            df.groupby_max(by = ['val', 'val2'], ddf = ddf)
+            df.groupby(by = ['val', 'val2']).max(['val3', 'val4'], ddf = ddf)
 
             self.assertListEqual([1, 2, 2], ddf['val'].data[:].tolist())    
             self.assertListEqual([b'a', b'b', b'c'], ddf['val2'].data[:].tolist())    
@@ -612,7 +612,7 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             ddf = dst.create_dataframe('ddf')
 
-            df.groupby_min(by = 'val', ddf = ddf)
+            df.groupby(by = 'val').min(target ='val2', ddf = ddf)
             
             self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
             self.assertListEqual([0, 2, 4, 1], ddf['val2_min'].data[:].tolist())    
@@ -634,7 +634,8 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             ddf = dst.create_dataframe('ddf')
 
-            df.groupby_min(by = ['val', 'val2'], ddf = ddf)
+            df.groupby(by = ['val', 'val2']).min(['val3', 'val4'], ddf = ddf)
+
             self.assertListEqual([1, 2, 2], ddf['val'].data[:].tolist())    
             self.assertListEqual([b'a', b'b', b'c'], ddf['val2'].data[:].tolist())    
             self.assertListEqual([3, 6, 4], ddf['val3_min'].data[:].tolist())    
@@ -653,7 +654,7 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             ddf = dst.create_dataframe('ddf')
 
-            df.groupby_first(by = 'val', ddf = ddf)
+            df.groupby(by = 'val').first(target ='val2', ddf = ddf)
             
             self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
             self.assertListEqual([0, 8, 6, 9], ddf['val2_first'].data[:].tolist())    
@@ -671,7 +672,7 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             ddf = dst.create_dataframe('ddf')
 
-            df.groupby_last(by = 'val', ddf = ddf)
+            df.groupby(by = 'val').last(target ='val2', ddf = ddf)
             
             self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
             self.assertListEqual([0, 2, 5, 1], ddf['val2_last'].data[:].tolist())    
