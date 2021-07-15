@@ -445,9 +445,9 @@ class HDF5DataFrame(DataFrame):
         
         :param by: Name (str) or list of names (str) to sort by.
         :param ddf: optional - the destination data frame
-        :param axis: Axis to be sorted. Currently only support 0
-        :param ascending: Sort ascending vs. descending. Currently only support ascending=True.
-        :param kind: Choice of sorting algorithm. Currently only support "stable"
+        :param axis: Axis to be sorted. Currently only supports 0
+        :param ascending: Sort ascending vs. descending. Currently only supports ascending=True.
+        :param kind: Choice of sorting algorithm. Currently only supports "stable"
 
         :returns: DataFrame with sorted values or None if ddf=None.
         """
