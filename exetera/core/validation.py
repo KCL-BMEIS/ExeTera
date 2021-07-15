@@ -14,7 +14,7 @@ import numpy as np
 
 import h5py
 
-from exetera.core.abstract_types import Field
+from exetera.core.abstract_types import DataFrame, Field
 from exetera.core import readerwriter as rw
 from exetera.core import fields as flds
 
@@ -220,6 +220,15 @@ def validate_and_get_key_fields(side, df, key):
         return (field,)
 
 
+def validate_all_field_length_in_df(df:DataFrame):
+    lens = set()
+    for name, field in df._columns.items():
+        lens.add(len(field.data))
+        if len(lens) > 1:
+            raise ValueError("There are consistent lengths in dataframe '{}'. "
+                             "The following length were observed: {}".format(df.name, lens))
+
+
 def validate_key_lengths(side, df, key):
     lens = set()
     if isinstance(key, tuple):
@@ -287,3 +296,22 @@ def validate_and_normalize_categorical_key(param_name, key):
             return {k: v.encode() for k, v, in key}
         else:
             return key
+
+
+def validate_sort_and_groupby_keys(by, all):
+    if isinstance(by, str):
+        if by in all:
+            return [by]
+        else: 
+            raise ValueError('by = {} is not an existing field'.format(by))
+    elif isinstance(by, list):
+        if len(by) == 0:
+            raise ValueError('by should not be empty list')
+        else:
+            extra = set(by) - set(all)
+            if len(extra) > 0:
+                raise ValueError('by = {} is/are not exising field(s)'.format(extra))
+            else:
+                return by
+    else:
+        raise ValueError('by should either be string or list of string')
