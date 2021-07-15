@@ -439,6 +439,7 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, in_place=True)
             return self
 
+
     def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):
         """
         Sort by the values of a field or a list of fields
@@ -448,35 +449,6 @@ class HDF5DataFrame(DataFrame):
         :param axis: Axis to be sorted. Currently only supports 0
         :param ascending: Sort ascending vs. descending. Currently only supports ascending=True.
         :param kind: Choice of sorting algorithm. Currently only supports "stable"
-
-        :returns: DataFrame with sorted values or None if ddf=None.
-        """
-        if axis != 0:
-            raise ValueError("Currently sort_values() only supports axis = 0")
-        elif ascending != True:
-            raise ValueError("Currently sort_values() only supports ascending = True")
-        elif kind != 'stable':
-            raise ValueError("Currently sort_values() only supports kind='stable'")
-
-        keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
-
-        readers = tuple(self._columns[k] for k in keys)
-
-        sorted_index = self._dataset.session.dataset_sort_index(
-            readers, np.arange(len(readers[0].data), dtype=np.uint32))
-
-        return self.apply_index(sorted_index, ddf)
-
-
-    def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):
-        """
-        Sort by the values of a field or a list of fields
-        
-        :param by: Name (str) or list of names (str) to sort by.
-        :param ddf: optional - the destination data frame
-        :param axis: Axis to be sorted. Currently only support 0
-        :param ascending: Sort ascending vs. descending. Currently only support ascending=True.
-        :param kind: Choice of sorting algorithm. Currently only support "stable"
 
         :returns: DataFrame with sorted values or None if ddf=None.
         """
