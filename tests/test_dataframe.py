@@ -1,12 +1,17 @@
+from exetera.core.operations import INVALID_INDEX
+from exetera.core.abstract_types import DataFrame
 import unittest
 from io import BytesIO
 import numpy as np
+import tempfile
+import os
 
 from exetera.core import session
 from exetera.core import fields
 from exetera.core import persistence as per
 from exetera.core import dataframe
-
+from exetera.core.field_mapping import Categorical, Numeric, String, DateTime, Date
+import exetera
 
 class TestDataFrameCreateFields(unittest.TestCase):
 
@@ -482,3 +487,49 @@ class TestDataFrameMerge(unittest.TestCase):
             self.assertEqual(expected, ddf['r_vals'].data[:])
             self.assertEqual(ddf['l_id_1'].data[:].tolist(), ddf['r_id_1'].data[:].tolist())
             self.assertEqual(ddf['r_id_2'].data[:].tolist(), ddf['r_id_2'].data[:].tolist())
+
+
+class TestDataFrameReadCSV(unittest.TestCase):
+
+    def setUp(self):
+        TEST_CSV_CONTENTS = '\n'.join((
+            'name, id, age, birthday,  height, weight_change, BMI,  postcode, patient_id,   degree, updated_at',
+            'a,     1, 30, 1990-01-01, 170.9,    21.2,        20.5,      NW1,         E1, bachelor, 2020-05-12 07:00:00',
+            'bb,    2, 40, 1980-03-04, 180.2,        ,        25.4,     SW1P,       E123,   master, 2020-05-13 01:00:00',
+            'ccc,   3, 50, 1970-04-05,      ,   -17.5,        27.2,       E1,       E234,         , 2020-05-14 03:00:00',
+            'dddd,  4, 60, 1960-04-05,      ,   -17.5,        27.2,         ,           ,     prof, 2020-05-15 03:00:00',
+            'eeeee, 5, 70, 1950-04-05, 161.0,     2.5,        20.2,      NW3,    E456789,   doctor, 2020-05-16 03:00:00',
+        ))
+
+        self.fd_csv, self.csv_file_name = tempfile.mkstemp(suffix='.csv')
+        with open(self.csv_file_name, 'w') as fcsv:
+            fcsv.write(TEST_CSV_CONTENTS)
+        
+        self.field_mapping = {  'name': String(),
+                                'id': Numeric('int32', validation_mode='strict'),
+                                'age': Numeric('int32'),
+                                'height': Numeric('float32', invalid_value = 160.5, validation_mode='relaxed', flag_field_name= '_valid_test'),
+                                'weight_change': Numeric('float32', invalid_value= 'min', create_flag_field= False),
+                                'BMI': Numeric('float64', validation_mode='relaxed'),
+                                'updated_at': DateTime(create_day_field= True),
+                                'birthday': Date(),
+                                'postcode': Categorical(categories={"": 0, "NW1":1, "E1":2, "SW1P":3, "NW3":4}),
+                                'patient_id': String(fixed_length=4),
+                                'degree': Categorical(categories={"":0, "bachelor":1, "master":2, "doctor":3}, allow_freetext=True)
+                            }
+
+    def test_read_csv_only_categorical_field(self):
+        
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+
+            exetera.read_csv(self.csv_file_name, df, self.field_mapping, include=['postcode'])
+
+            expected_postcode_value_list = [1, 3, 2, 0, 4]
+            # self.assertEqual(df['postcode'].data[:], expected_postcode_value_list)
+
+
+    def tearDown(self):
+        os.close(self.fd_csv)
