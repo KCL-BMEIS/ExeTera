@@ -119,7 +119,7 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
 
         # flush at the end
         for ith in range(len(index_map)):
-            field_importer_list[ith].flush()
+            field_importer_list[ith].complete()
 
     print(f"Total time {time.time() - time0}s")
 

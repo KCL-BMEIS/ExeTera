@@ -3,7 +3,7 @@ import json
 
 from exetera.core import data_schema
 from exetera.core import persistence as per
-from ctypes import sizeof, c_float, c_double, c_int8, c_uint8, c_int16, c_uint16, c_int32, c_uint32, c_int64
+from exetera.core import utils
 
 class NewDataSchema:
     def __init__(self, name, schema_dict, verbosity=0):
@@ -119,7 +119,7 @@ class NewDataSchema:
                         if value_type == 'bool':
                             raise ValueError('Field {} is bool type. It should not have min/max as default value')
                         else:
-                            (min_value, max_value) = NewDataSchema._get_min_max(value_type)
+                            (min_value, max_value) = utils.get_min_max(value_type)
                             invalid_value = min_value if invalid_value.strip() == 'min' else max_value
                 
                 validation_mode = fv.get('validation_mode', 'allow_empty')
@@ -145,17 +145,6 @@ class NewDataSchema:
             entries[fk] = fd
 
         return entries
-
-    @staticmethod
-    def _get_min_max(value_type):
-        mapping = {'float32': c_float, 'float64': c_double, 'int8': c_int8, 'uint8': c_uint8, 
-                                       'int16': c_int16, 'uint16': c_uint16, 'int32': c_int32, 'uint32': c_uint32, 'int64': c_int64}
-        c_type = mapping[value_type]
-
-        signed = c_type(-1).value < c_type(0).value
-        bit_size = sizeof(c_type) * 8
-        signed_limit = 2 ** (bit_size - 1)
-        return (-signed_limit, signed_limit - 1) if signed else (0, 2 * signed_limit - 1)
 
 
 def load_schema(source, verbosity=0):

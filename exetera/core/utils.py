@@ -17,6 +17,7 @@ from io import StringIO
 
 import numpy as np
 from numba import njit
+from ctypes import sizeof, c_float, c_double, c_int8, c_uint8, c_int16, c_uint16, c_int32, c_uint32, c_int64
 
 
 SECONDS_PER_DAY = 86400
@@ -359,3 +360,14 @@ class Timer:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         print(self.end_msg + f' {time.time() - self.t0} seconds')
+
+
+def get_min_max(value_type):
+    mapping = {'float32': c_float, 'float64': c_double, 'int8': c_int8, 'uint8': c_uint8, 
+                                    'int16': c_int16, 'uint16': c_uint16, 'int32': c_int32, 'uint32': c_uint32, 'int64': c_int64}
+    c_type = mapping[value_type]
+
+    signed = c_type(-1).value < c_type(0).value
+    bit_size = sizeof(c_type) * 8
+    signed_limit = 2 ** (bit_size - 1)
+    return (-signed_limit, signed_limit - 1) if signed else (0, 2 * signed_limit - 1)
