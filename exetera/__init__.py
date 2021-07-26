@@ -83,13 +83,13 @@ def read_csv(filepath: str,
         field_importer_list = list() # only for field_to_use     
         for field_name in fields_to_use:
             importer_definition = field_mapping[field_name]
-            field_importer = importer_definition.importer(ddf.dataset.session, ddf, field_name, ts)
+            field_importer = importer_definition._importer(ddf.dataset.session, ddf, field_name, ts)
             field_importer_list.append(field_importer)
 
         column_offsets = np.zeros(len(csvf_fieldnames) + 1, dtype=np.int64)
         for i, field_name in enumerate(csvf_fieldnames):
             importer_definition = field_mapping[field_name]
-            column_offsets[i + 1] = column_offsets[i] + importer_definition.field_size * chunk_row_size
+            column_offsets[i + 1] = column_offsets[i] + importer_definition._field_size * chunk_row_size
     
     read_file_using_fast_csv_reader(filepath, chunk_row_size, column_offsets, index_map, field_importer_list, stop_after_rows = None)
 

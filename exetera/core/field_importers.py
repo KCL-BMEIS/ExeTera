@@ -5,6 +5,7 @@ from exetera.core import fields as fld
 from exetera.core import operations as ops
 from exetera.core.data_writer import DataWriter
 from exetera.core import utils
+from datetime import datetime, date
 
 FIELD_MAPPING_TO_IMPORTER = {
     'categorical': lambda categories, value_type, allow_freetext:
@@ -13,13 +14,17 @@ FIELD_MAPPING_TO_IMPORTER = {
                lambda s, df, name, ts: NumericImporter(s, df, name, dtype, invalid_value, validation_mode, create_flag_field, flag_field_name, timestamp=ts),
     'string': lambda fixed_length:
               lambda s, df, name, ts: IndexedStringImporter(s, df, name, ts) if fixed_length is None else FixedStringImporter(s, df, name, fixed_length, ts),
+    'datetime': lambda create_day_field, create_flag_field:
+                lambda s, df, name, ts: DateTimeImporter(s, df, name, create_day_field, create_flag_field, ts),
+    'date': lambda create_flag_field:
+            lambda s, df, name, ts: DateImporter(s, df, name, create_flag_field, ts),
 }
 
 #========= ImporterDefinition, include Categorical, Numeric, , , Datetime =========
 class ImporterDefinition:
     def __init__(self):
-        self.field_size = 0
-        self.importer = None
+        self._field_size = 0
+        self._importer = None
 
 
 class Categorical(ImporterDefinition):
@@ -28,42 +33,45 @@ class Categorical(ImporterDefinition):
         :param categories: dictionary that contain key/value pair for Categorical Field
         :param value_type: value type in the dictionary. Default is 'int8'.
         """
-        self.field_size = max([len(k) for k in categories.keys()])
+        self._field_size = max([len(k) for k in categories.keys()])
 
-        self.importer = FIELD_MAPPING_TO_IMPORTER['categorical'](categories, value_type, allow_freetext)
+        self._importer = FIELD_MAPPING_TO_IMPORTER['categorical'](categories, value_type, allow_freetext)
 
 
 class Numeric(ImporterDefinition):
     def __init__(self, dtype, invalid_value=0, validation_mode='allow_empty', create_flag_field = 'True', flag_field_name='_valid'):
         if dtype in ('int', 'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64'):
-            self.field_size = 20
+            self._field_size = 20
         elif dtype in ('float', 'float32', 'float64'):
-            self.field_size = 30
+            self._field_size = 30
         elif dtype == 'bool':
-            self.field_size = 5
+            self._field_size = 5
         else:
             raise ValueError("Unrecognised numeric type '{}' in the field".format(dtype))
 
-        self.importer = FIELD_MAPPING_TO_IMPORTER['numeric'](dtype, invalid_value, validation_mode, create_flag_field, flag_field_name)
+        self._importer = FIELD_MAPPING_TO_IMPORTER['numeric'](dtype, invalid_value, validation_mode, create_flag_field, flag_field_name)
 
 
 class String(ImporterDefinition):
     def __init__(self, fixed_length: int = None):
         if fixed_length:
-            self.field_size = fixed_length
+            self._field_size = fixed_length
         else:
-            self.field_size = 10 # guessing
+            self._field_size = 10 # guessing
 
-        self.importer = FIELD_MAPPING_TO_IMPORTER['string'](fixed_length)
+        self._importer = FIELD_MAPPING_TO_IMPORTER['string'](fixed_length)
 
 
 class DateTime(ImporterDefinition):
-    def __init__(self, create_day_field=False):
-        self.field_size = 32
+    def __init__(self, create_day_field=False, create_flag_field=False):
+        self._field_size = 32
+        self._importer = FIELD_MAPPING_TO_IMPORTER['datetime'](create_day_field, create_flag_field)
+
 
 class Date(ImporterDefinition):
-    def __init__(self):
-        self.field_size = 10
+    def __init__(self, create_flag_field=False):
+        self._field_size = 10
+        self._importer = FIELD_MAPPING_TO_IMPORTER['date'](create_flag_field)
 
 
 #============= Field Importers ============
@@ -165,7 +173,7 @@ class NumericImporter:
 
             if exception_message != 0:
                 ops.raiseNumericException(exception_message, exception_args)
-                
+
         elif self.dtype in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64') :
             elements, validity = ops.transform_int(
                 column_inds, column_vals, column_offsets, col_idx,
@@ -231,9 +239,77 @@ class FixedStringImporter:
     def transform_and_write_part(self, column_inds, column_vals, column_offsets,  col_idx, written_row_count):
         values = np.zeros(written_row_count, dtype='S{}'.format(self.strlen))
         ops.fixed_string_transform(column_inds, column_vals, column_offsets, col_idx,
-                                     written_row_count, self.strlen, values.data.cast('b'))
+                                   written_row_count, self.strlen, values.data.cast('b'))
         self.write_part(values)
 
     def complete(self):
         self.field.data.complete()
 
+
+class DateTimeImporter:
+    def __init__(self, session, df, name, create_day_field=False, create_flag_field=False, timestamp=None):
+        self.field = df.create_timestamp(name, timestamp, None)   
+        self.day_field = None
+        if create_day_field:
+            self.day_field = df.create_fixed_string(f"{name}_day", 10, timestamp, None)  
+
+        self.flag_field = None
+        if create_flag_field:
+            self.flag_field = df.create_numeric(f"{name}_is_set", 'bool', timestamp, None)
+
+    def write_part(self, values):
+        values_len = len(values)
+        datetime_ts = np.zeros(values_len, dtype=np.float64)
+        dates = np.zeros(values_len,dtype='S10')
+        flags = np.ones(values_len, dtype='bool')
+
+        for i in range(values_len):
+            value = values[i].strip()
+            if value == b'':
+                datetime_ts[i] = 0
+                flags[i] = False
+            else:
+                v_len = len(value)
+                if v_len == 32:
+                    # ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S.%f%z')
+                    v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
+                                          int(value[11:13]), int(value[14:16]), int(value[17:19]),
+                                          int(value[20:26]))
+                elif v_len == 25:
+                    # ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S%z')
+                    v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
+                                          int(value[11:13]), int(value[14:16]), int(value[17:19]))
+                elif v_len == 19:
+                    v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
+                                          int(value[11:13]), int(value[14:16]), int(value[17:19]))
+                else:
+                    raise ValueError(f"Date field '{self.field}' has unexpected format '{value}'")
+                datetime_ts[i] = v_datetime.timestamp()
+                dates[i] = value[:10]
+                
+        self.field.data.write_part(datetime_ts)
+        if self.day_field is not None:
+            self.day_field.data.write_part(dates)
+        if self.flag_field is not None:
+            self.flag_field.data.write_part(flags)
+
+    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+        data = ops.transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count)
+        data = [x.tobytes().strip() for x in data]
+        self.write_part(data)
+
+    def complete(self):
+        self.field.data.complete()
+
+
+class DateImporter:
+    def __init__(self, session, df, name, create_flag_field=False, timestamp=None, chunksize=None):
+        self.field = df.create_fixed_string(f"{name}", 10, timestamp, None)
+
+    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+        data = ops.transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count)
+        data = [x.tobytes().strip() for x in data]
+        self.field.data.write_part(data)
+
+    def complete(self):
+        self.field.data.complete()
