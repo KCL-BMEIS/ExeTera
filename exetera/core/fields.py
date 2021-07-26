@@ -1049,7 +1049,7 @@ def base_field_contructor(session, group, name, timestamp=None, chunksize=None):
 def indexed_string_field_constructor(session, group, name, timestamp=None, chunksize=None):
     field = base_field_contructor(session, group, name, timestamp, chunksize)
     field.attrs['fieldtype'] = 'indexedstring'
-    DataWriter.write(field, 'index', [0], 1, 'int64') 
+    DataWriter.write(field, 'index', [], 0, 'int64') 
     DataWriter.write(field, 'values', [], 0, 'uint8')
 
 

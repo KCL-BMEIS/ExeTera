@@ -104,11 +104,11 @@ class CategoricalImporter:
 class LeakyCategoricalImporter:
     def __init__(self, session, df:DataFrame, name:str, categories:Mapping[str, str],
                        value_type:str='int8', timestamp=None):
- 
-        self.field = df.create_categorical(name, value_type, categories, timestamp, None)
-        self.other_values_field = df.create_indexed_string(f"{name}_freetext", timestamp, None)
         self.byte_map = ops.get_byte_map(categories)
         self.freetext_index_accumulated = 0
+        self.field = df.create_categorical(name, value_type, categories, timestamp, None)
+        self.other_values_field = df.create_indexed_string(f"{name}_freetext", timestamp, None)
+        self.other_values_field.indices.write_part([0])
 
     def complete(self):
         # add a 'freetext' value to keys
@@ -204,18 +204,20 @@ class IndexedStringImporter:
     def __init__(self, session, df, name, timestamp=None):
         self.field = df.create_indexed_string(name, timestamp, None)
         self.chunk_accumulated = 0
+        self.field.indices.write_part([0])
 
     def write_part(self, index, values):
         if index.dtype != np.int64:
             raise ValueError(f"'index' must be an ndarray of '{np.int64}'")
         if values.dtype not in (np.uint8, 'S1'):
             raise ValueError(f"'values' must be an ndarray of '{np.uint8}' or 'S1'")
-
         self.field.indices.write_part(index[1:])
         self.field.values.write_part(values)
 
     def complete(self):
-        self.field.data.complete()
+        # self.field.data.complete()
+        self.field.indices.complete()
+        self.field.values.complete()
 
     def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         # broadcast accumulated size to current index array

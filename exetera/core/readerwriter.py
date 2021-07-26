@@ -553,13 +553,13 @@ class NumericImporter:
         elif self.data_writer.nformat in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64') :
 
             exception_message, exception_args = 0, []
-            elements, validity = ops.transform_int_2(
+            elements, validity = ops.transform_int(
                 column_inds, column_vals, column_offsets, col_idx,
                 written_row_count, self.invalid_value, self.validation_mode,
                 value_dtype, self.field_name)
         else:
             exception_message, exception_args = 0, []
-            elements, validity = ops.transform_float_2(
+            elements, validity = ops.transform_float(
                 column_inds, column_vals, column_offsets, col_idx,
                 written_row_count, self.invalid_value, self.validation_mode,
                 value_dtype, self.field_name)
