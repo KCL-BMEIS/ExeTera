@@ -681,7 +681,6 @@ def _get_spans_for_2_fields(ndarray0, ndarray1):
     return spans[:count+2]
 
 
-@njit
 def _get_spans_for_index_string_field(indices,values):
     result = []
     result.append(0)

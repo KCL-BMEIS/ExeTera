@@ -8,7 +8,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Mapping, Optional, Sequence, Tuple, Union
+from typing import Mapping, Optional, Sequence, Tuple, Union, List
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
@@ -424,6 +424,8 @@ class HDF5DataFrame(DataFrame):
         :returns: a dataframe contains all the fields re-indexed, self if ddf is not set
         """
         if ddf is not None:
+            val.validate_all_field_length_in_df(ddf)
+
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self._columns.items():
@@ -431,9 +433,39 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, target=newfld)
             return ddf
         else:
+            val.validate_all_field_length_in_df(self) 
+
             for field in self._columns.values():
                 field.apply_index(index_to_apply, in_place=True)
             return self
+
+    def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):
+        """
+        Sort by the values of a field or a list of fields
+        
+        :param by: Name (str) or list of names (str) to sort by.
+        :param ddf: optional - the destination data frame
+        :param axis: Axis to be sorted. Currently only supports 0
+        :param ascending: Sort ascending vs. descending. Currently only supports ascending=True.
+        :param kind: Choice of sorting algorithm. Currently only supports "stable"
+
+        :returns: DataFrame with sorted values or None if ddf=None.
+        """
+        if axis != 0:
+            raise ValueError("Currently sort_values() only supports axis = 0")
+        elif ascending != True:
+            raise ValueError("Currently sort_values() only supports ascending = True")
+        elif kind != 'stable':
+            raise ValueError("Currently sort_values() only supports kind='stable'")
+
+        keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
+
+        readers = tuple(self._columns[k] for k in keys)
+
+        sorted_index = self._dataset.session.dataset_sort_index(
+            readers, np.arange(len(readers[0].data), dtype=np.uint32))
+
+        return self.apply_index(sorted_index, ddf)
 
 
 def copy(field: fld.Field, dataframe: DataFrame, name: str):
