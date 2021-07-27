@@ -4,112 +4,55 @@ import json
 from exetera.core import data_schema
 from exetera.core import persistence as per
 from exetera.core import utils
-
-class NewDataSchema:
-    def __init__(self, name, schema_dict, verbosity=0):
-        self.name_ = name
-        self.verbosity_ = verbosity
-        if verbosity > 1:
-            print(name)
-        primary_keys = schema_dict.get('primary_keys', None)
-        foreign_keys = schema_dict.get('foreign_keys', None)
-        fields = schema_dict.get('fields', None)
-        self.permitted_numeric_types = ('float32', 'float64', 'bool', 'int8', 'uint8', 'int16', 'uint16', 'int32',
-                                        'uint32', 'int64')
-        self._field_entries = self._build_fields(fields, self.permitted_numeric_types)
-        if verbosity > 1:
-            print(self._field_entries)
+from exetera.core.field_importers import Categorical, Numeric, String, DateTime, Date
 
 
-    @property
-    def name(self):
-        return self.name_
+def validate_require_key(context, key, dictionary):
+    if key not in dictionary:
+        msg = "'{}': '{}' missing from fields".format(context, key)
+        raise ValueError(msg)
 
-    @property
-    def fields(self):
-        return copy.deepcopy(self._field_entries)
 
-    def categorical_maps(self):
-        pass
+def schema_file_to_dict(schema):
+    schema_dict = dict()
 
-    @staticmethod
-    def _invert_dictionary(src_dict):
-        inverse = dict()
-        for k, v in src_dict.items():
-            inverse[v] = k
-        return inverse
+    fields = schema.get('fields', None)
+    permitted_numeric_types = ('float32', 'float64', 'bool', 'int8', 'uint8', 
+                               'int16', 'uint16', 'int32', 'uint32', 'int64')
+    
+    for fk, fv in fields.items():
+        validate_require_key(fk, 'field_type', fv)
+        field_type = fv['field_type']
 
-    @staticmethod
-    def _require_key(context, key, dictionary):
-        if key not in dictionary:
-            msg = "'{}': '{}' missing from fields".format(context, key)
-            raise ValueError(msg)
+        if field_type == 'categorical':
+            validate_require_key(fk, 'categorical', fv)
+            categorical = fv['categorical']
+                
+            validate_require_key(fk, 'strings_to_values', categorical)
+            strs_to_vals = categorical['strings_to_values']
 
-    @staticmethod
-    def _build_fields(fields, permitted_numeric_types, verbosity=0):
-        entries = dict()
-        for fk, fv in fields.items():
-            if verbosity > 1:
-                print("  {}: {}".format(fk, fv))
-            NewDataSchema._require_key(fk, 'field_type', fv)
-            field_type = fv['field_type']
-            strs_to_vals = None
-            vals_to_strs = None
-            out_of_range_label = None
-            value_type = None
-            field_size = 0
+            validate_require_key(fk, 'value_type', categorical)
+            value_type = categorical['value_type']
 
-            if field_type == 'categorical':
-                NewDataSchema._require_key(fk, 'categorical', fv)
-                categorical = fv['categorical']
-                NewDataSchema._require_key(fk, 'strings_to_values', categorical)
-                strs_to_vals = categorical['strings_to_values']
-                vals_to_strs = NewDataSchema._invert_dictionary(strs_to_vals)
-                if 'out_of_range' in categorical:
-                    out_of_range_label = categorical['out_of_range']
-                NewDataSchema._require_key(fk, 'value_type', categorical)
-                importer = data_schema.new_field_importers[field_type](strs_to_vals,
-                                                                       out_of_range_label)
-                field_size = max([len(k) for k in strs_to_vals])
-
+            allow_freetext = True if 'out_of_range' in categorical else False
+                
+            importer_def = Categorical(strs_to_vals, value_type, allow_freetext)
+            
             elif field_type == 'string':
-                importer = data_schema.new_field_importers[field_type]()
-                field_size = 10 # guessing
+                importer_def = String()
 
             elif field_type == 'fixed_string':
-                NewDataSchema._require_key(fk, 'length', fv)
+                validate_require_key(fk, 'length', fv)
                 length = int(fv['length'])
-                importer = data_schema.new_field_importers[field_type](length)
-                field_size = length
-
+                importer_def = String(fixed_length = length)
+                
             elif field_type == 'numeric':
-                NewDataSchema._require_key(fk, 'value_type', fv)
+                validate_require_key(fk, 'value_type', fv)
                 value_type = fv['value_type']
-                if 'raw_type' in fv:
-                    raw_type = fv['raw_type']
-                    if raw_type != 'float32' and value_type != 'int32':
-                        msg = ("{}: if raw_type is specified the conversion must be float32 "
-                               " to int32 but is {} and {}, respectively")
-                        raise ValueError(msg.format(fk, raw_type, value_type))
-                    converter = per.try_str_to_float_to_int
-                    field_size = 30
-                else:
-                    if value_type not in permitted_numeric_types:
-                        msg = "Field {} has an invalid value_type '{}'. Permitted types are {}"
-                        raise ValueError(msg.format(fk, value_type, permitted_numeric_types))
-                    if value_type in ('float', 'float32', 'float64'):
-                        converter = per.try_str_to_float
-                        field_size = 30
-                    elif value_type == 'bool':
-                        converter = per.try_str_to_bool
-                        field_size = 5
-                    elif value_type in ('int', 'int8', 'int16', 'int32', 'int64',
-                                        'uint8', 'uint16', 'uint32', 'uint64'):
-                        converter = per.try_str_to_int
-                        field_size = 20
-                    else:
-                        msg = "Unrecognised value_type '{}' in field '{}'"
-                        raise ValueError(msg.format(value_type, fk))
+
+                if value_type not in permitted_numeric_types:
+                    msg = "Field {} has an invalid value_type '{}'. Permitted types are {}"
+                    raise ValueError(msg.format(fk, value_type, permitted_numeric_types))
             
                 # default value for invalid numeric value
                 invalid_value = 0
@@ -126,25 +69,24 @@ class NewDataSchema:
                 create_flag_field = fv.get('create_flag_field', True) if validation_mode in ('allow_empty', 'relaxed') else False
                 flag_field_suffix = fv.get('flag_field_name', '_valid') if create_flag_field else ''
 
-                importer = data_schema.new_field_importers[field_type](value_type, converter, invalid_value, validation_mode, create_flag_field, flag_field_suffix)
+                importer_def = Numeric(value_type, invalid_value, validation_mode, create_flag_field, flag_field_suffix)
 
-            elif field_type in ('datetime', 'date'):
+            elif field_type == 'datetime':
                 create_day_field = fv.get('create_day_field', False)
-                optional = fv.get('optional', False)
-                importer = data_schema.new_field_importers[field_type](create_day_field, optional)
-                # datettime: 32, date:10
-                field_size = 32 if field_type == 'datetime' else 10
+                create_flag_field = fv.get('create_flag_field', False)
+                importer_def = DateTime(create_day_field, create_flag_field)
+
+            elif field_type == 'date':
+                create_flag_field = fv.get('create_flag_field', False)
+                importer_def = Date(create_flag_field)
+                
             else:
                 msg = "'{}' is an unsupported field type (For field '{}')."
                 raise ValueError(msg.format(field_type, fk))
 
-            fd = data_schema.FieldDesc(fk, importer, strs_to_vals, vals_to_strs, value_type,
-                                       out_of_range_label, field_size)
+            schema_dict[fk] = importer_def
 
-            #fe = data_schema.FieldEntry(fd, 1, None)
-            entries[fk] = fd
-
-        return entries
+        return schema_dict
 
 
 def load_schema(source, verbosity=0):
@@ -172,9 +114,9 @@ def load_schema(source, verbosity=0):
     if 'schema' not in d.keys():
         raise ValueError("'schema' top-level tag is missing from the schema file")
 
-    fields = d['schema']
+    schemas = d['schema']
     spaces = dict()
-    for fk, fv in fields.items():
-        nds = NewDataSchema(fk, fv)
-        spaces[fk] = nds
+    for sk, sv in schemas.items():
+        schema_dict = schema_file_to_dict(sv)
+        spaces[sk] = schema_dict
     return spaces
