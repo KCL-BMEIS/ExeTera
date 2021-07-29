@@ -491,7 +491,6 @@ class TestDataFrameMerge(unittest.TestCase):
             self.assertEqual(ddf['r_id_2'].data[:].tolist(), ddf['r_id_2'].data[:].tolist())
 
 
-<<<<<<< HEAD
 class TestDataFrameReadCSV(unittest.TestCase):
 
     def setUp(self):
@@ -642,7 +641,8 @@ class TestDataFrameReadCSV(unittest.TestCase):
 
     def tearDown(self):
         os.close(self.fd_csv)
-=======
+
+        
 class TestDataFrameSort(unittest.TestCase):
 
     def test_sort_values_on_original_df(self):
@@ -708,4 +708,3 @@ class TestDataFrameSort(unittest.TestCase):
                 df.sort_values(by = 'idx')
 
             self.assertEqual(str(context.exception), "There are consistent lengths in dataframe 'ds'. The following length were observed: {4, 5}") 
->>>>>>> 4557bf3eb92421417937d6b4c7410ea567356009
