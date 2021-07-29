@@ -9,6 +9,8 @@ from exetera.core import session
 from exetera.core import fields
 from exetera.core import dataframe
 from exetera.core import persistence as per
+from exetera.core import utils
+from exetera.core import field_importers as fi
 
 
 class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
@@ -200,8 +202,8 @@ class TestSessionMerge(unittest.TestCase):
             dst = s.open_dataset(bio2,'w','dst')
             snk=dst.create_dataframe('snk')
             s.merge_left(s.get(src['a']['pid']), s.get(src['p']['id']),
-                             right_fields=(s.get(src['p']['val']),),
-                             right_writers=(s.create_numeric(snk, 'val', 'int32'),))
+                               right_fields=(s.get(src['p']['val']),),
+                               right_writers=(s.create_numeric(snk, 'val', 'int32'),))
             expected = [-1, -1, -1, -2, -2, -4, -4, -4, -4, -6, -6, -6, 0, 0, -9, -9, -9]
             actual = s.get(snk['val']).data[:]
             self.assertListEqual(expected, actual.data[:].tolist())
@@ -1101,60 +1103,61 @@ class TestSessionImporters(unittest.TestCase):
         with session.Session() as s:
             dst = s.open_dataset(bio, 'r+', 'dst')
             hf = dst.create_dataframe('hf')
-            values = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
+            data = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
                       '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
-            im = fields.IndexedStringImporter(s, hf, 'x')
-            im.write(values)
-            f = s.get(hf['x'])
+            indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)
+            foo = fi.IndexedStringImporter(s, hf, 'foo')
+            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
 
-            expected = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
-             '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
-            self.assertListEqual(expected, f.data[:])
+            expected_data_list = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
+                      '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
+            expected_indices_list = [0, 0, 0, 5, 5, 11, 16, 21, 26, 26, 26, 31, 36, 36, 41, 47, 52, 52]
+            expected_values_list = [49, 46, 48, 46, 48, 49, 46, 48, 46, 195,
+                                    164, 49, 46, 48, 46, 48, 49, 46, 48, 46,
+                                    48, 49, 46, 48, 46, 48, 49, 46, 48, 46,
+                                    48, 49, 46, 48, 46, 48, 49, 46, 48, 46,
+                                    48, 49, 46, 48, 46, 195, 164, 49, 46, 48, 46, 48]
+            self.assertListEqual(expected_data_list, hf['foo'].data[:])
+            self.assertListEqual(expected_indices_list, hf['foo'].indices[:].tolist())
+            self.assertListEqual(expected_values_list, hf['foo'].values[:].tolist())
 
-            expected = [0, 0, 0, 5, 5, 11, 16, 21, 26, 26, 26, 31, 36, 36, 41, 47, 52, 52]
-            self.assertListEqual(expected, f.indices[:].tolist())
-
-            expected = [49, 46, 48, 46, 48, 49, 46, 48, 46, 195,
-                        164, 49, 46, 48, 46, 48, 49, 46, 48, 46,
-                        48, 49, 46, 48, 46, 48, 49, 46, 48, 46,
-                        48, 49, 46, 48, 46, 48, 49, 46, 48, 46,
-                        48, 49, 46, 48, 46, 195, 164, 49, 46, 48,
-                        46, 48]
-            self.assertListEqual(expected, f.values[:].tolist())
 
     def test_fixed_string_importer(self):
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio, 'r+', 'dst')
             hf=dst.create_dataframe('hf')
-            values = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
+            data = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
                       '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
-            bvalues = [v.encode() for v in values]
-            im = fields.FixedStringImporter(s, hf, 'x', max(len(b) for b in bvalues))
-            im.write(bvalues)
-            f = s.get(hf['x'])
+            indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)            
+            foo = fi.FixedStringImporter(s, hf, 'foo', 6)
+            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+
             expected = [b'', b'', b'1.0.0', b'', b'1.0.\xc3\xa4', b'1.0.0', b'1.0.0',
                         b'1.0.0', b'', b'', b'1.0.0', b'1.0.0', b'', b'1.0.0',
                         b'1.0.\xc3\xa4', b'1.0.0', b'']
+            self.assertListEqual(expected, hf['foo'].data[:].tolist())
 
-            self.assertListEqual(expected, f.data[:].tolist())
 
     def test_numeric_importer(self):
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio, 'r+', 'dst')
             hf = dst.create_dataframe('hf')
-            values = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
+            data = ['', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2',
                       '', 'one', '2', '3.0', '4e1', '5.21e-2', 'foo', '-6', '-7.0', '-8e1', '-9.21e-2']
-            im = fields.NumericImporter(s, hf, 'x', 'float32', per.try_str_to_float)
-            im.write(values)
-            f = s.get(hf['x'])
+            indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)            
+          
+            foo = fi.NumericImporter(s, hf, 'foo', 'float32', validation_mode='relaxed')
+            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            
             expected = [0.0, 0.0, 2.0, 3.0, 40.0, 5.21e-2, 0.0, -6.0, -7.0, -80.0, -9.21e-2,
                         0.0, 0.0, 2.0, 3.0, 40.0, 5.21e-2, 0.0, -6.0, -7.0, -80.0, -9.21e-2]
-            actual = f.data[:].tolist()
+            actual = hf['foo'].data[:].tolist()
             self.assertEqual(len(expected), len(actual))
             for i, j in zip(expected, actual):
                 self.assertAlmostEqual(i, j)
+
 
     def test_date_importer(self):
         from datetime import datetime
@@ -1162,11 +1165,10 @@ class TestSessionImporters(unittest.TestCase):
         with session.Session() as s:
             dst = s.open_dataset(bio,'r+', 'dst')
             hf = dst.create_dataframe('hf')
-            values = ['2020-05-10', '2020-05-12', '2020-05-12', '2020-05-15']
-            im = fields.DateImporter(s, hf, 'x')
-            im.write(values)
-            f = s.get(hf['x'])
-            self.assertListEqual(
-                [datetime(year=int(v[0:4]), month=int(v[5:7]), day=int(v[8:10])
-                          ).timestamp() for v in values],
-                f.data[:].tolist())
+            data = ['2020-05-10', '2020-05-12', '2020-05-12', '2020-05-15']
+            indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)               
+            foo = fi.DateImporter(s, hf, 'foo')
+            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+
+            expected_date_list = [b'2020-05-10', b'2020-05-12', b'2020-05-12', b'2020-05-15']
+            self.assertListEqual(expected_date_list, hf['foo'].data[:].tolist())

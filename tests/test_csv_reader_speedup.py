@@ -108,7 +108,7 @@ class DummyWriter:
         else:
             self.result = [x.tobytes().decode('utf-8') for x in self.data]
 
-    def flush(self):
+    def complete(self):
         pass
  
 class TestFastCSVReader(TestCase):

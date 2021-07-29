@@ -371,3 +371,26 @@ def get_min_max(value_type):
     bit_size = sizeof(c_type) * 8
     signed_limit = 2 ** (bit_size - 1)
     return (-signed_limit, signed_limit - 1) if signed else (0, 2 * signed_limit - 1)
+
+
+def one_dim_data_to_indexed_for_test(data, field_size):
+    data = [str(s) for s in data]
+    count_row = len(data)
+    chunk_row_size = count_row
+
+    indices = np.zeros((1, count_row + 1), dtype = np.int64)
+    offsets = np.array([0, field_size], dtype=np.int64) * chunk_row_size
+    values = np.zeros(offsets[-1], dtype = np.uint8)
+
+    accumulated = 0
+    for i, s in enumerate(data):
+        length = 0
+        for j, c in enumerate(s):
+            encoded_c = np.frombuffer(c.encode(), dtype =np.uint8)
+            for e in encoded_c:
+                values[accumulated] = e
+                accumulated += 1
+                length += 1
+        indices[0, i + 1] = indices[0, i] + length
+         
+    return indices, values, offsets, count_row
