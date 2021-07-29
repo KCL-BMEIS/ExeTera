@@ -92,14 +92,6 @@ exetera.core.journal module
    :undoc-members:
    :show-inheritance:
 
-exetera.core.load\_schema module
---------------------------------
-
-.. automodule:: exetera.core.load_schema
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 exetera.core.operations module
 ------------------------------
 

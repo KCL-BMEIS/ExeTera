@@ -173,7 +173,7 @@ class HDF5Dataset(Dataset):
         :param name: The name of the dataframe.
         :return: The dataframe or throw Error if the name is not existed in this dataset.
         """
-        self.__getitem__(name)
+        return self.__getitem__(name)
 
     def __setitem__(self, name: str, dataframe: DataFrame):
         """

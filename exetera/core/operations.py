@@ -2743,7 +2743,7 @@ def transform_int(column_inds, column_vals, column_offsets, col_idx,
         try:
           results = elements.astype(data_type)
         except ValueError as e:
-            msg = ("field '{}' contains values that cannot "
+            msg = ("Field '{}' contains values that cannot "
                    "be converted to float in '{}' mode").format(field_name, validation_mode)
             raise ValueError(msg) from e
         valids = None

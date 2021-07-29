@@ -7,6 +7,7 @@ from exetera.core.data_writer import DataWriter
 from exetera.core import utils
 from datetime import datetime, date
 
+
 FIELD_MAPPING_TO_IMPORTER = {
     'categorical': lambda categories, value_type, allow_freetext:
                    lambda s, df, name, ts: LeakyCategoricalImporter(s, df, name, categories, value_type, ts) if allow_freetext else CategoricalImporter(s, df, name, categories, value_type, ts),
@@ -21,6 +22,7 @@ FIELD_MAPPING_TO_IMPORTER = {
 }
 
 #========= ImporterDefinition, include Categorical, Numeric, , , Datetime =========
+
 class ImporterDefinition:
     def __init__(self):
         self._field_size = 0
@@ -39,7 +41,7 @@ class Categorical(ImporterDefinition):
 
 
 class Numeric(ImporterDefinition):
-    def __init__(self, dtype, invalid_value=0, validation_mode='allow_empty', create_flag_field = 'True', flag_field_name='_valid'):
+    def __init__(self, dtype, invalid_value=0, validation_mode='allow_empty', create_flag_field='True', flag_field_name='_valid'):
         if dtype in ('int', 'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64'):
             self._field_size = 20
         elif dtype in ('float', 'float32', 'float64'):
@@ -87,18 +89,15 @@ class CategoricalImporter:
         self.byte_map = ops.get_byte_map(categories)
         self.field_size = max([len(k) for k in categories])
 
-    def write_part(self, values):
-        self.field.data.write_part(values)
-
-    def complete(self):
-        self.field.data.complete()
-
     def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         chunk = np.zeros(written_row_count, dtype=np.uint8)
         cat_keys, cat_index, cat_values = self.byte_map
                 
         ops.categorical_transform(chunk, col_idx, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values)
         self.field.data.write_part(chunk)
+
+    def complete(self):
+        self.field.data.complete()
 
 
 class LeakyCategoricalImporter:
@@ -110,11 +109,6 @@ class LeakyCategoricalImporter:
         self.other_values_field = df.create_indexed_string(f"{name}_freetext", timestamp, None)
         self.other_values_field.indices.write_part([0])
 
-    def complete(self):
-        # add a 'freetext' value to keys
-        self.field.keys['freetext'] = -1
-        self.field.data.complete()
-        self.other_values_field.data.complete()
 
     def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         cat_keys, cat_index, cat_values = self.byte_map
@@ -132,6 +126,13 @@ class LeakyCategoricalImporter:
         self.field.data.write_part(chunk)
         self.other_values_field.indices.write_part(freetext_indices[1:])
         self.other_values_field.values.write_part(freetext_values)
+
+
+    def complete(self):
+        # add a 'freetext' value to keys
+        self.field.keys['freetext'] = -1
+        self.field.data.complete()
+        self.other_values_field.data.complete()
         
 
 class NumericImporter:
@@ -206,6 +207,15 @@ class IndexedStringImporter:
         self.chunk_accumulated = 0
         self.field.indices.write_part([0])
 
+    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+        # broadcast accumulated size to current index array
+        index = column_inds[col_idx, :written_row_count + 1] + self.chunk_accumulated
+        self.chunk_accumulated += column_inds[col_idx, written_row_count]
+
+        col_offset = column_offsets[col_idx]
+        values = column_vals[col_offset: col_offset + column_inds[col_idx, written_row_count]]
+        self.write_part(index, values)
+
     def write_part(self, index, values):
         if index.dtype != np.int64:
             raise ValueError(f"'index' must be an ndarray of '{np.int64}'")
@@ -219,30 +229,18 @@ class IndexedStringImporter:
         self.field.indices.complete()
         self.field.values.complete()
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
-        # broadcast accumulated size to current index array
-        index = column_inds[col_idx, :written_row_count + 1] + self.chunk_accumulated
-        self.chunk_accumulated += column_inds[col_idx, written_row_count]
-
-        col_offset = column_offsets[col_idx]
-        values = column_vals[col_offset: col_offset + column_inds[col_idx, written_row_count]]
-        self.write_part(index, values)
-
 
 class FixedStringImporter:
     def __init__(self, session, df, name, strlen, timestamp = None):
         self.field = df.create_fixed_string(name, strlen, timestamp, None)  
         self.strlen = strlen
-        self.field_size = strlen
-
-    def write_part(self, values):
-        self.field.data.write_part(values)
+        self.field_size = strlen        
 
     def transform_and_write_part(self, column_inds, column_vals, column_offsets,  col_idx, written_row_count):
         values = np.zeros(written_row_count, dtype='S{}'.format(self.strlen))
         ops.fixed_string_transform(column_inds, column_vals, column_offsets, col_idx,
                                    written_row_count, self.strlen, values.data.cast('b'))
-        self.write_part(values)
+        self.field.data.write_part(values)
 
     def complete(self):
         self.field.data.complete()
@@ -288,7 +286,7 @@ class DateTimeImporter:
                     raise ValueError(f"Date field '{self.field}' has unexpected format '{value}'")
                 datetime_ts[i] = v_datetime.timestamp()
                 dates[i] = value[:10]
-                
+        
         self.field.data.write_part(datetime_ts)
         if self.day_field is not None:
             self.day_field.data.write_part(dates)
@@ -302,15 +300,21 @@ class DateTimeImporter:
 
     def complete(self):
         self.field.data.complete()
+        if self.day_field is not None:
+            self.day_field.data.complete()
+        if self.flag_field is not None:
+            self.flag_field.data.complete()
 
 
 class DateImporter:
     def __init__(self, session, df, name, create_flag_field=False, timestamp=None, chunksize=None):
-        self.field = df.create_fixed_string(f"{name}", 10, timestamp, None)
+        print('date', name)
+        self.field = df.create_fixed_string(name, 10, timestamp, None)
 
     def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         data = ops.transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count)
         data = [x.tobytes().strip() for x in data]
+        
         self.field.data.write_part(data)
 
     def complete(self):

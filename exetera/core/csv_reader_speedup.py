@@ -117,7 +117,7 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
            
             print(f"{ch} chunks, {accumulated_written_rows} accumulated_written_rows parsed in {time.time() - time0}s")
 
-        # flush at the end
+        # complete at the end
         for ith in range(len(index_map)):
             field_importer_list[ith].complete()
 
