@@ -308,7 +308,6 @@ class DateTimeImporter:
 
 class DateImporter:
     def __init__(self, session, df, name, create_flag_field=False, timestamp=None, chunksize=None):
-        print('date', name)
         self.field = df.create_fixed_string(name, 10, timestamp, None)
 
     def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
