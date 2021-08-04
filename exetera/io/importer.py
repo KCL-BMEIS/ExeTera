@@ -20,6 +20,7 @@ from exetera.core import utils
 
 
 def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_file, files, overwrite, include=None, exclude=None, chunk_row_size = 1 << 20):
+ 
     schema = load_schema.load_schema(schema_file)
 
     any_parts_present = False
@@ -48,11 +49,10 @@ def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_
     reserved_column_names = ('j_valid_from', 'j_valid_to')
     ts = utils.string_to_datetime(timestamp).timestamp()
         
-    for sk in schema.keys():
-        if sk in reserved_column_names:
-            msg = "{} is a reserved column name: reserved names are {}"
-            raise ValueError(msg.format(sk, reserved_column_names))
-
+    for sk in files.keys():
+        # if sk in reserved_column_names:
+        #     msg = "{} is a reserved column name: reserved names are {}"
+        #     raise ValueError(msg.format(sk, reserved_column_names))
         schema_dict = schema[sk]
         csv_file = files[sk]
 
@@ -60,7 +60,7 @@ def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_
         exclude_fields = exclude.get(sk, None) if exclude is not None else None
 
         ds = session.open_dataset(dest_file_name, mode, dataset_name)
-        ddf = ds.create_dataframe(sk) 
+        ddf = ds.require_dataframe(sk) 
 
         parsers.read_csv_with_schema_dict(csv_file, ddf, schema_dict, ts, include_fields, exclude_fields, chunk_row_size=chunk_row_size)
 

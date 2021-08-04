@@ -110,11 +110,11 @@ def schema_file_to_dict(schema):
 
         elif field_type == 'datetime':
             create_day_field = fv.get('create_day_field', False)
-            create_flag_field = fv.get('create_flag_field', False)
+            create_flag_field = fv.get('create_flag_field', False) or fv.get('optional', False)
             importer_def = DateTime(create_day_field, create_flag_field)
 
         elif field_type == 'date':
-            create_flag_field = fv.get('create_flag_field', False)
+            create_flag_field = fv.get('create_flag_field', False) or fv.get('optional', False)
             importer_def = Date(create_flag_field)
             
         else:

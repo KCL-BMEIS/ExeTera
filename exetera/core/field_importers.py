@@ -255,7 +255,7 @@ class DateTimeImporter:
 
         self.flag_field = None
         if create_flag_field:
-            self.flag_field = df.create_numeric(f"{name}_is_set", 'bool', timestamp, None)
+            self.flag_field = df.create_numeric(f"{name}_set", 'bool', timestamp, None)
 
     def write_part(self, values):
         values_len = len(values)

@@ -46,7 +46,7 @@ def main():
     parser_import.add_argument('-o', '--output_hdf5',
                                help='The location and name of the output hdf5 file. If this is an existing file, it will'
                                     ' be overwritten')
-    parser_import.add_argument('-w', '--overwrite', action='store_true',
+    parser_import.add_argument('-w', '--overwrite', action='store_false',
                                help="If set, overwrites an existing project rather than appending to it")
     parser_import.add_argument('-ts', '--timestamp', default=str(datetime.now(timezone.utc)),
                                help='Override for the import datetime (the current time is selected otherwise)')
