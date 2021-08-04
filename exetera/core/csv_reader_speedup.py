@@ -122,6 +122,7 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
             field_importer_list[ith].complete()
 
     print(f"Total time {time.time() - time0}s")
+    return accumulated_written_rows
 
 
 @njit

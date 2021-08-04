@@ -16,14 +16,10 @@ from io import StringIO
 
 from exetera.core import persistence as per
 from exetera.io import load_schema, parsers
+from exetera.core import utils
 
 
 def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_file, files, overwrite, include=None, exclude=None, chunk_row_size = 1 << 20):
-
-    print(timestamp)
-    print(schema_file)
-    print(files)
-
     schema = load_schema.load_schema(schema_file)
 
     any_parts_present = False
@@ -45,18 +41,12 @@ def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_
         extra_tables = exclude_tables.difference(input_file_tables)
         raise ValueError("-x/--exclude: the following exclude table(s) are not part of any input files: {}".format(extra_tables))
 
-    stop_after = {}
-    reserved_column_names = ('j_valid_from', 'j_valid_to')
-    datastore = per.DataStore()
-
-    if overwrite:
-        mode = 'w'
-    else:
-        mode = 'r+'
-
+    mode = 'w' if overwrite else 'r+'
     if isinstance(dest_file_name, str) and not os.path.exists(dest_file_name):
         mode = 'w'
 
+    reserved_column_names = ('j_valid_from', 'j_valid_to')
+    ts = utils.string_to_datetime(timestamp).timestamp()
         
     for sk in schema.keys():
         if sk in reserved_column_names:
@@ -72,21 +62,8 @@ def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_
         ds = session.open_dataset(dest_file_name, mode, dataset_name)
         ddf = ds.create_dataframe(sk) 
 
-        parsers.read_csv_with_schema_dict(csv_file, ddf, schema_dict, include_fields, exclude_fields, chunk_row_size=chunk_row_size)
-
-  
-        #     print(sk, hf.keys())
-        #     table = hf[sk]
-        #     ids = datastore.get_reader(table[list(table.keys())[0]])
-        #     jvf = datastore.get_timestamp_writer(table, 'j_valid_from')
-        #     ftimestamp = utils.string_to_datetime(timestamp).timestamp()
-        #     valid_froms = np.full(len(ids), ftimestamp)
-        #     jvf.write(valid_froms)
-        #     jvt = datastore.get_timestamp_writer(table, 'j_valid_to')
-        #     valid_tos = np.full(len(ids), ops.MAX_DATETIME.timestamp())
-        #     jvt.write(valid_tos)
-
-        # print(hf.keys())
+        parsers.read_csv_with_schema_dict(csv_file, ddf, schema_dict, ts, include_fields, exclude_fields, chunk_row_size=chunk_row_size)
 
 
 
+ 

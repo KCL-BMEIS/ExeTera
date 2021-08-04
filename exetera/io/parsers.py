@@ -2,11 +2,13 @@ from io import StringIO
 from typing import Mapping, List, Union
 import csv
 import numpy as np
+from datetime import datetime, timezone
 
 from exetera.core.abstract_types import DataFrame
-from exetera.core.field_importers import ImporterDefinition
+from exetera.core.field_importers import ImporterDefinition, TimestampImporter
 from exetera.core.csv_reader_speedup import read_file_using_fast_csv_reader
 from exetera.io import load_schema
+from exetera.core import operations as ops
 
 
 def read_csv(csv_file: str, 
@@ -16,7 +18,8 @@ def read_csv(csv_file: str,
              schema_key: str = None,
              include: List[str] = None,
              exclude: List[str] = None,
-             chunk_row_size: int = 1 << 20):
+             chunk_row_size: int = 1 << 20,
+             timestamp= datetime.now(timezone.utc).timestamp()):
     """
 
 
@@ -25,7 +28,6 @@ def read_csv(csv_file: str,
     :params schema_dictionary:
     :params chunk_row_size:
     """
-
     # params validation
     if not isinstance(ddf, DataFrame):
         raise TypeError("The destination object must be an instance of DataFrame.")
@@ -57,15 +59,18 @@ def read_csv(csv_file: str,
         else:
             raise ValueError("'schema_json_file' must not be empty.")
 
-    read_csv_with_schema_dict(csv_file, ddf, schema_dict, include, exclude, chunk_row_size)
+    read_csv_with_schema_dict(csv_file, ddf, schema_dict, timestamp, include, exclude, chunk_row_size)
 
 
 def read_csv_with_schema_dict(csv_file: str, 
                               ddf: DataFrame,
                               schema_dictionary: Mapping[str, ImporterDefinition],
+                              timestamp: float,
                               include: List[str] = None,
                               exclude: List[str] = None,
-                              chunk_row_size: int = 1 << 20):
+                              chunk_row_size: int = 1 << 20,
+                              stop_after_rows = None
+                              ):
     """
 
 
@@ -77,9 +82,6 @@ def read_csv_with_schema_dict(csv_file: str,
 
     # get field_mapping
     field_mapping = {k.strip(): v for k, v in schema_dictionary.items()}
-
-    # how to define timestamp??
-    ts = None
 
     with open(csv_file, encoding='utf-8') as sf:
         csvf = csv.DictReader(sf, delimiter=',', quotechar='"')
@@ -119,7 +121,7 @@ def read_csv_with_schema_dict(csv_file: str,
         field_importer_list = list() # only for field_to_use     
         for field_name in fields_to_use:
             importer_definition = field_mapping[field_name]
-            field_importer = importer_definition._importer(ddf.dataset.session, ddf, field_name, ts)
+            field_importer = importer_definition._importer(ddf.dataset.session, ddf, field_name, timestamp)
             field_importer_list.append(field_importer)
 
         column_offsets = np.zeros(len(csvf_fieldnames) + 1, dtype=np.int64)
@@ -127,5 +129,13 @@ def read_csv_with_schema_dict(csv_file: str,
             importer_definition = field_mapping[field_name]
             column_offsets[i + 1] = column_offsets[i] + importer_definition._field_size * chunk_row_size
     
-    read_file_using_fast_csv_reader(csv_file, chunk_row_size, column_offsets, index_map, field_importer_list, stop_after_rows = None)
+    total_rows = read_file_using_fast_csv_reader(csv_file, chunk_row_size, column_offsets, index_map, field_importer_list, stop_after_rows)
 
+    # create 'j_valid_from', 'j_valid_to' field in the end
+    jvf_field_importer = TimestampImporter(ddf.dataset.session, ddf, 'j_valid_from', timestamp)
+    valid_froms = np.full(total_rows, timestamp, dtype='float64')
+    jvf_field_importer.write(valid_froms)
+
+    jvt_field_importer = TimestampImporter(ddf.dataset.session, ddf, 'j_valid_to', timestamp)
+    valid_tos = np.full(total_rows, ops.MAX_DATETIME.timestamp(), dtype='float64')
+    jvt_field_importer.write(valid_tos)

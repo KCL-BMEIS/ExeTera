@@ -318,3 +318,18 @@ class DateImporter:
 
     def complete(self):
         self.field.data.complete()
+
+
+class TimestampImporter:
+    def __init__(self, session, df, name, timestamp=None, chunksize=None):
+        self.field = df.create_timestamp(name, timestamp, None)
+
+    def write_part(self, values):
+        self.field.data.write_part(values)
+
+    def complete(self):
+        self.field.data.complete()
+
+    def write(self, values):
+        self.write_part(values)
+        self.complete()

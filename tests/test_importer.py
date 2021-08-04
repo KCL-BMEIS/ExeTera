@@ -4,7 +4,7 @@ import tempfile
 import os
 import h5py
 from datetime import datetime, timezone
-from exetera.io import json_importer as importer
+from exetera.io import importer
 from exetera.core import utils, session
 import numpy as np
 from io import BytesIO, StringIO

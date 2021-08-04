@@ -25,7 +25,7 @@ except ModuleNotFoundError:
     sys.path.append(fixed_path)
     import exetera
 
-from exetera.io import json_importer 
+from exetera.io import importer 
 from exetera.core import session
 
 def main():
@@ -110,7 +110,7 @@ def main():
             exit(-1)
 
         with session.Session() as s:
-            json_importer.import_with_schema(s, args.timestamp, args.dataset, args.output_hdf5, args.schema, tokens, args.overwrite, include, exclude)
+            importer.import_with_schema(s, args.timestamp, args.dataset, args.output_hdf5, args.schema, tokens, args.overwrite, include, exclude)
         
 # elif args.command == 'process':
 #     timestamp = str(datetime.now(timezone.utc))

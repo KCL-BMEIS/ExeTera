@@ -3,12 +3,12 @@ import tempfile
 import os
 from io import BytesIO, StringIO
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
 
 from exetera.core.field_importers import Categorical, Numeric, String, DateTime, Date
-from exetera.core import utils, session
+from exetera.core import utils, session, operations as ops
 from exetera.io import parsers
-from .test_json_importer import TEST_SCHEMA, TEST_CSV_CONTENTS
+from .test_importer import TEST_SCHEMA, TEST_CSV_CONTENTS
 
 
 
@@ -182,6 +182,21 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
 
             expected_birthday_date = [b'1990-01-01', b'1980-03-04', b'1970-04-05', b'1960-04-05', b'1950-04-05']
             self.assertEqual(df['birthday'].data[:].tolist(), expected_birthday_date)
+
+    def test_read_csv_check_j_valid_from_to(self):
+        bio = BytesIO()
+        ts = datetime.now(timezone.utc).timestamp()
+
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+
+            parsers.read_csv(self.csv_file_name, df, self.schema_dict, timestamp=ts)  
+
+            self.assertEqual(df['j_valid_from'].data[:].tolist(), [ts]*5)
+            self.assertEqual(df['j_valid_to'].data[:].tolist(), [ops.MAX_DATETIME.timestamp()]*5)
+
+
         
 
 class TestSchemaJsonFileReadCSV(TestReadCSV):
