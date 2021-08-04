@@ -68,14 +68,6 @@ exetera.core.group module
    :undoc-members:
    :show-inheritance:
 
-exetera.core.importer module
-----------------------------
-
-.. automodule:: exetera.core.importer
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 exetera.core.indexed\_array module
 ----------------------------------
 
