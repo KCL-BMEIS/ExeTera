@@ -508,38 +508,51 @@ class HDF5DataFrame(DataFrame):
         return ddf
 
         
-    def groupby(self, by: Union[str, List[str]]):                  
+    def groupby(self, by: Union[str, List[str]], hint_keys_is_sorted=False):         
+        """
+        Group DataFrame using a field or a list of field, return a groupby object.
+
+        :param by: Name (str) or list of names (str) to group by.
+        :param hint_keys_is_sorted: an optional flag that users could set to skip the sorted check. \
+                                    Note that it runs faster and uses less memory when the dataframe is sorted, that is, hint_key_is_sorted=True. 
+
+        :returns: Returns a groupby object that contains information about the groups.
+        """         
         # validate groupby keys
         by = val.validate_sort_and_groupby_keys(by, self._columns.keys())
 
         # check if keys is sorted
-        by_fields_data = np.asarray([self._columns[k].data for k in by])
-        by_is_sorted = ops.check_if_sorted_for_multi_fields(by_fields_data)
+        by_fields_data = np.asarray([self._columns[k].data[:] for k in by])
 
-        if np.any(by_is_sorted) == False:
-            # if not sorted, create a temp df to store sorted df
-            tmp_df = self._dataset.create_dataframe('tmp_df') # uuid???????
-            sorted_df = self.sort_values(by, tmp_df)
+        is_sorted = True if hint_keys_is_sorted else False
+        if not hint_keys_is_sorted:
+            by_is_sorted = ops.check_if_sorted_for_multi_fields(by_fields_data)
+            is_sorted = np.all(by_is_sorted)
 
+        sorted_index = None
+        if not is_sorted:
+            # sort first if needed
+            readers = tuple(self._columns[k] for k in by)
+            sorted_index = self._dataset.session.dataset_sort_index(readers, np.arange(len(readers[0].data), dtype=np.uint32))
+
+            sorted_by_fields_data = np.asarray([self._columns[k].data[:][sorted_index] for k in by])
         else:
-            # if sorted, then no need to sort
-            sorted_df = self
-        
-        # get span based on non-reversed group keys
-        sorted_by_fields_data = np.asarray([sorted_df._columns[k].data for k in by])
+            sorted_by_fields_data = np.asarray([self._columns[k].data[:] for k in by])
+
         spans = ops._get_spans_for_multi_fields(sorted_by_fields_data)
 
-        return HDF5DataFrameGroupBy(by, self._columns.keys(), spans, sorted_df, self._dataset)
+        return HDF5DataFrameGroupBy(self._columns, by, sorted_index, spans)
+
 
 
 class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
-    def __init__(self, by, all, spans, sorted_df, dataset):
+    def __init__(self, columns, by, sorted_index, spans):
         self._by = by
-        self._all = all
+        self._columns = columns
+        self._all = columns.keys()
+        self._sorted_index = sorted_index
         self._spans = spans
-        self._sorted_df = sorted_df
-        self._dataset = dataset
 
 
     def _write_groupby_keys(self, ddf: DataFrame, write_keys=True):    
@@ -547,10 +560,14 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         Write groupby keys to ddf only if write_key = True
         """
         if write_keys: 
-            sorted_by_fields = np.asarray([self._sorted_df._columns[k] for k in self._by]) 
-            for field in sorted_by_fields:
+            by_fields = np.asarray([self._columns[k] for k in self._by]) 
+            for field in by_fields:
                 newfld = field.create_like(ddf, field.name)
-                field.apply_filter(self._spans[:-1], newfld)
+                
+                if self._sorted_index is not None: 
+                    field.apply_index(self._sorted_index, target=newfld)
+
+                newfld.apply_filter(self._spans[:-1], in_place=True)
 
     
     def count(self, ddf: DataFrame, write_keys=True) -> DataFrame:
@@ -562,7 +579,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
         
         :return: dataframe with count of group values
-        """
+        """        
         self._write_groupby_keys(ddf, write_keys)
 
         counts = np.zeros(len(self._spans)-1, dtype='int64')
@@ -586,13 +603,17 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         targets = val.validate_groupby_target(target, self._by, self._all)
 
         self._write_groupby_keys(ddf, write_keys)
+        
+        target_fields = tuple(self._columns[k] for k in targets)
+        for field in target_fields:       
+            newfld = field.create_like(ddf, field.name + '_max')
 
-        # apply spans to target fields
-        sorted_target_fields = tuple(self._sorted_df._columns[k] for k in targets)
+            # sort first if needed
+            if self._sorted_index is not None:
+                field.apply_index(self._sorted_index, target=newfld)
 
-        for field in sorted_target_fields:             
-            tf = field.create_like(ddf, field.name + '_max')
-            field.apply_spans_max(self._spans, tf)
+            # apply spans to target fields
+            newfld.apply_spans_max(self._spans, in_place=True)
 
         return ddf
 
@@ -611,12 +632,16 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
         self._write_groupby_keys(ddf, write_keys)
 
-        # apply spans to target fields
-        sorted_target_fields = tuple(self._sorted_df._columns[k] for k in targets)
-        
-        for field in sorted_target_fields:             
-            tf = field.create_like(ddf, field.name + '_min')
-            field.apply_spans_min(self._spans, tf)
+        target_fields = tuple(self._columns[k] for k in targets)
+        for field in target_fields:       
+            newfld = field.create_like(ddf, field.name + '_min')
+
+            # sort first if needed
+            if self._sorted_index is not None:
+                field.apply_index(self._sorted_index, target=newfld)
+
+            # apply spans to target fields
+            newfld.apply_spans_min(self._spans, in_place=True)
 
         return ddf
 
@@ -635,12 +660,16 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
         self._write_groupby_keys(ddf, write_keys)
 
-        # apply spans to target fields
-        sorted_target_fields = tuple(self._sorted_df._columns[k] for k in targets)
-        
-        for field in sorted_target_fields:             
-            tf = field.create_like(ddf, field.name + '_first')
-            field.apply_spans_first(self._spans, tf)
+        target_fields = tuple(self._columns[k] for k in targets)
+        for field in target_fields:       
+            newfld = field.create_like(ddf, field.name + '_first')
+
+            # sort first if needed
+            if self._sorted_index is not None:
+                field.apply_index(self._sorted_index, target=newfld)
+
+            # apply spans to target fields
+            newfld.apply_spans_first(self._spans, in_place=True)
 
         return ddf
 
@@ -659,15 +688,18 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
         self._write_groupby_keys(ddf, write_keys)
 
-        # apply spans to target fields
-        sorted_target_fields = tuple(self._sorted_df._columns[k] for k in targets)
-        
-        for field in sorted_target_fields:             
-            tf = field.create_like(ddf, field.name + '_last')
-            field.apply_spans_last(self._spans, tf)
+        target_fields = tuple(self._columns[k] for k in targets)
+        for field in target_fields:       
+            newfld = field.create_like(ddf, field.name + '_last')
 
+            # sort first if needed
+            if self._sorted_index is not None:
+                field.apply_index(self._sorted_index, target=newfld)
+
+            # apply spans to target fields
+            newfld.apply_spans_last(self._spans, in_place=True)
+            
         return ddf
-
 
 
 def copy(field: fld.Field, dataframe: DataFrame, name: str):

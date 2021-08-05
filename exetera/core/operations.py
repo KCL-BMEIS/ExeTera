@@ -709,13 +709,13 @@ def check_if_sorted_for_multi_fields(fields_data):
     length = len(fields_data[0])
     
     for i, f in enumerate(fields_data):
-        bigger_flag = False
+        smaller_flag = False
         for j in np.arange(1, length):
-            if f[j] > f[j - 1]:
-                bigger_flag = True
+            if f[j] < f[j - 1]:
+                smaller_flag = True
                 break
 
-        if bigger_flag:
+        if smaller_flag:
             is_sorted[i] = False
 
     return is_sorted
