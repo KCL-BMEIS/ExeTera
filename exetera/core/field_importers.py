@@ -258,12 +258,11 @@ class DateTimeImporter:
             self.flag_field = df.create_numeric(f"{name}_set", 'bool', timestamp, None)
 
     def write_part(self, values):
-        values_len = len(values)
-        datetime_ts = np.zeros(values_len, dtype=np.float64)
-        dates = np.zeros(values_len,dtype='S10')
-        flags = np.ones(values_len, dtype='bool')
+        datetime_ts = np.zeros(len(values), dtype=np.float64)
+        dates = np.zeros(len(values),dtype='S10')
+        flags = np.ones(len(values), dtype='bool')
 
-        for i in range(values_len):
+        for i in range(len(values)):
             value = values[i].strip()
             if value == b'':
                 datetime_ts[i] = 0
@@ -309,12 +308,22 @@ class DateTimeImporter:
 class DateImporter:
     def __init__(self, session, df, name, create_flag_field=False, timestamp=None, chunksize=None):
         self.field = df.create_fixed_string(name, 10, timestamp, None)
+        self.flag_field = None
+        if create_flag_field:
+            self.flag_field = df.create_numeric(f"{name}_set", 'bool', timestamp, None)
+    
+    def write_part(self, values):
+        self.field.data.write_part(values)    
+        if self.flag_field:
+            flags = np.ones(len(values), dtype='bool')
+            valid = np.char.not_equal(values, b'')
+            flags = np.where(valid, flags, False)
+            self.flag_field.data.write_part(flags)
 
     def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         data = ops.transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count)
         data = [x.tobytes().strip() for x in data]
-        
-        self.field.data.write_part(data)
+        self.write_part(data)
 
     def complete(self):
         self.field.data.complete()
