@@ -50,10 +50,13 @@ def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_
     ts = utils.string_to_datetime(timestamp).timestamp()
         
     for sk in files.keys():
-        # if sk in reserved_column_names:
-        #     msg = "{} is a reserved column name: reserved names are {}"
-        #     raise ValueError(msg.format(sk, reserved_column_names))
         schema_dict = schema[sk]
+        
+        for key in schema_dict.keys():
+            if key in reserved_column_names:
+                msg = "{} is a reserved column name: reserved names are {}"
+                raise ValueError(msg.format(sk, reserved_column_names))
+
         csv_file = files[sk]
 
         include_fields = include.get(sk, None) if include is not None else None
