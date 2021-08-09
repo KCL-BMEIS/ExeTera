@@ -98,7 +98,7 @@ class DummyWriter:
         self.data = []
         self.result = []
     
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         self.data.extend(ops.transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count))
             
         if self.type == 'int':

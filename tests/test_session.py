@@ -1107,7 +1107,7 @@ class TestSessionImporters(unittest.TestCase):
                       '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
             indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)
             foo = fi.IndexedStringImporter(s, hf, 'foo')
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
 
             expected_data_list = ['', '', '1.0.0', '', '1.0.ä', '1.0.0', '1.0.0', '1.0.0', '', '',
                       '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
@@ -1131,7 +1131,7 @@ class TestSessionImporters(unittest.TestCase):
                       '1.0.0', '1.0.0', '', '1.0.0', '1.0.ä', '1.0.0', '']
             indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)            
             foo = fi.FixedStringImporter(s, hf, 'foo', 6)
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
 
             expected = [b'', b'', b'1.0.0', b'', b'1.0.\xc3\xa4', b'1.0.0', b'1.0.0',
                         b'1.0.0', b'', b'', b'1.0.0', b'1.0.0', b'', b'1.0.0',
@@ -1149,7 +1149,7 @@ class TestSessionImporters(unittest.TestCase):
             indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)            
           
             foo = fi.NumericImporter(s, hf, 'foo', 'float32', validation_mode='relaxed')
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
             
             expected = [0.0, 0.0, 2.0, 3.0, 40.0, 5.21e-2, 0.0, -6.0, -7.0, -80.0, -9.21e-2,
                         0.0, 0.0, 2.0, 3.0, 40.0, 5.21e-2, 0.0, -6.0, -7.0, -80.0, -9.21e-2]
@@ -1168,7 +1168,7 @@ class TestSessionImporters(unittest.TestCase):
             data = ['2020-05-10', '2020-05-12', '2020-05-12', '2020-05-15']
             indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)               
             foo = fi.DateImporter(s, hf, 'foo')
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
 
             expected_date_list = [b'2020-05-10', b'2020-05-12', b'2020-05-12', b'2020-05-15']
             self.assertListEqual(expected_date_list, hf['foo'].data[:].tolist())

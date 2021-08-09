@@ -89,7 +89,7 @@ class CategoricalImporter:
         self.byte_map = ops.get_byte_map(categories)
         self.field_size = max([len(k) for k in categories])
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         chunk = np.zeros(written_row_count, dtype=np.uint8)
         cat_keys, cat_index, cat_values = self.byte_map
                 
@@ -110,7 +110,7 @@ class LeakyCategoricalImporter:
         self.other_values_field.indices.write_part([0])
 
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         cat_keys, cat_index, cat_values = self.byte_map
         chunk = np.zeros(written_row_count, dtype=np.int8) # use np.int8 instead of np.uint8, as we set -1 for leaky key
         freetext_indices_chunk = np.zeros(written_row_count + 1, dtype = np.int64)
@@ -159,7 +159,7 @@ class NumericImporter:
                 self.invalid_value = min_value if invalid_value.strip() == 'min' else max_value
 
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         value_dtype = ops.str_to_dtype(self.dtype)
 
         if self.dtype == 'bool':
@@ -207,7 +207,7 @@ class IndexedStringImporter:
         self.chunk_accumulated = 0
         self.field.indices.write_part([0])
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         # broadcast accumulated size to current index array
         index = column_inds[col_idx, :written_row_count + 1] + self.chunk_accumulated
         self.chunk_accumulated += column_inds[col_idx, written_row_count]
@@ -236,7 +236,7 @@ class FixedStringImporter:
         self.strlen = strlen
         self.field_size = strlen        
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets,  col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets,  col_idx, written_row_count):
         values = np.zeros(written_row_count, dtype='S{}'.format(self.strlen))
         ops.fixed_string_transform(column_inds, column_vals, column_offsets, col_idx,
                                    written_row_count, self.strlen, values.data.cast('b'))
@@ -292,7 +292,7 @@ class DateTimeImporter:
         if self.flag_field is not None:
             self.flag_field.data.write_part(flags)
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         data = ops.transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count)
         data = [x.tobytes().strip() for x in data]
         self.write_part(data)
@@ -320,7 +320,7 @@ class DateImporter:
             flags = np.where(valid, flags, False)
             self.flag_field.data.write_part(flags)
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         data = ops.transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count)
         data = [x.tobytes().strip() for x in data]
         self.write_part(data)

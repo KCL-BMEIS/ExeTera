@@ -164,7 +164,7 @@ class TestIndexedStringFields(unittest.TestCase):
             data = ['a', 'bb', 'ccc', 'dddd']
             indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)               
             foo = fi.IndexedStringImporter(s, hf, 'foo')
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
 
             self.assertListEqual([0, 1, 3, 6, 10], hf['foo'].indices[:].tolist())
 
@@ -185,7 +185,7 @@ class TestIndexedStringFields(unittest.TestCase):
             data = ['a', 'bb', 'ccc', 'dddd']
             indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)               
             foo = fi.IndexedStringImporter(s, hf, 'foo')
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
             self.assertListEqual([0, 1, 3, 6, 10], hf['foo'].indices[:].tolist())
 
             f2 = s.create_indexed_string(hf, 'bar')
@@ -204,7 +204,7 @@ class TestIndexedStringFields(unittest.TestCase):
             data = ['a', 'bb', 'ccc', 'dddd']
             indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)               
             foo = fi.IndexedStringImporter(s, hf, 'foo')
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
             self.assertListEqual([97, 98, 98, 99, 99, 99, 100, 100, 100, 100], hf['foo'].values[:].tolist())
 
 

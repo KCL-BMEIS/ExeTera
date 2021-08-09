@@ -252,7 +252,7 @@ class TestPersistence(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             hf.create_group('test')
             foo = rw.NumericImporter(datastore, hf, 'foo', 'bool', persistence.try_str_to_bool, validation_mode='relaxed', timestamp=ts)
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
             
             foo = rw.NumericReader(datastore, hf['foo'])[:]
             foo_valid = rw.NumericReader(datastore, hf['foo_valid'])[:]
@@ -283,7 +283,7 @@ class TestPersistence(unittest.TestCase):
 
             foo = rw.NumericImporter(datastore, hf, 'foo', 'float32',
                                               persistence.try_str_to_float, validation_mode='relaxed',timestamp=ts)
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
 
             r = rw.NumericReader(datastore, hf['foo'])[:]
             expected = [0.0, 0.0, 2.0, 3.0, 40.0, 5.21e-2, 0.0, -6.0, -7.0, -80.0, -9.21e-2,
@@ -311,7 +311,7 @@ class TestPersistence(unittest.TestCase):
             foo = rw.NumericImporter(datastore, hf, 'foo', 'float32',
                                               persistence.try_str_to_float, validation_mode='relaxed', timestamp=ts)
 
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
 
         with h5py.File(bio, 'r') as hf:
             foo = rw.NumericReader(datastore, hf['foo'])
@@ -398,7 +398,7 @@ class TestPersistence(unittest.TestCase):
             foo = rw.NumericImporter(datastore, hf, 'foo', 'int32',
                                               persistence.try_str_to_int, validation_mode='relaxed', timestamp=ts)
 
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
 
             # expected = [0, 0, 2, 0, 0, 0, 0, -6, 0, 0, 0,
             #             0, 0, 2, 0, 0, 0, 0, -6, 0, 0, 0]
@@ -423,7 +423,7 @@ class TestPersistence(unittest.TestCase):
             foo = rw.NumericImporter(datastore, hf, 'foo', 'int32',
                                               persistence.try_str_to_float_to_int, validation_mode='relaxed', timestamp=ts)
 
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
             foo.flush()
             # for f in persistence.numeric_iterator(hf['foo']):
             #     print(f[0], f[1])
@@ -452,7 +452,7 @@ class TestPersistence(unittest.TestCase):
 
     #         foo = rw.NumericImporter(datastore, hf, 'foo', 'uint32',
     #                                           persistence.try_str_to_int, validation_mode='relaxed', timestamp=ts)
-    #         foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+    #         foo.import_part(indices, values, offsets, 0, written_row_count)
 
     #         expected = [0, 0, 2, 3, 40, 0, 0, np.uint32(-6), np.uint32(-7.0), np.uint32(-8e1), 0,
     #                     0, 0, 2, 3, 40, 0, 0, np.uint32(-6), np.uint32(-7.0), np.uint32(-8e1), 0]
@@ -476,7 +476,7 @@ class TestPersistence(unittest.TestCase):
             foo = rw.CategoricalImporter(datastore, hf, 'foo',
                                                   {'': 0, 'False': 1, 'True': 2}, ts)
 
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
             foo.flush()
 
             self.assertListEqual([0, 2, 1, 1, 0, 0, 2, 1, 2, 0],
@@ -519,7 +519,7 @@ class TestPersistence(unittest.TestCase):
             foo = rw.CategoricalImporter(datastore, hf, 'foo',
                                                   {'': 0, 'False': 1, 'True': 2}, ts)
 
-            foo.transform_and_write_part(indices, values, offsets, 0, written_row_count)
+            foo.import_part(indices, values, offsets, 0, written_row_count)
             foo.flush()
 
         with h5py.File(bio, 'r') as hf:
