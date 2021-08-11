@@ -705,20 +705,30 @@ def _get_spans_for_multi_fields(fields_data):
 
 @njit
 def check_if_sorted_for_multi_fields(fields_data):
-    is_sorted = np.ones(len(fields_data), dtype='bool')
-    length = len(fields_data[0])
-    
-    for i, f in enumerate(fields_data):
-        smaller_flag = False
-        for j in np.arange(1, length):
-            if f[j] < f[j - 1]:
-                smaller_flag = True
+    """
+    Check if input fields data is sorted. Note that fields_data should be treat as a group key
+
+    pre_row[j] < cur_row[j], means these two rows are sorted, move to next row => i + 1
+    pre_row[j] = cur_row[j], means we need to check if next element is sorted => j + 1
+    pre_row[j] > cur_row[j], means input data is not sorted
+    """
+    field_count = len(fields_data)
+
+    total_row = len(fields_data[0])
+    if total_row == 0:
+        return True
+
+    pre_row = fields_data[:, 0]
+    for i in range(1, total_row):
+        cur_row = fields_data[:, i]
+
+        for j in range(field_count):
+            if pre_row[j] > cur_row[j]:
+                return False
+            elif pre_row[j] < cur_row[j]:
                 break
 
-        if smaller_flag:
-            is_sorted[i] = False
-
-    return is_sorted
+    return True
 
     
 
