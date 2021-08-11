@@ -1288,7 +1288,7 @@ class TestCheckIfSorted(unittest.TestCase):
 
 
     def test_check_if_sorted_for_multi_mixed_fields(self):
-        val1 = np.asarray([1, 1, 2, 3])
+        val1 = np.asarray([1, 3, 2, 1])
         val2 = np.asarray(['abc', 'a', 'da', 'efg'])
         bio = BytesIO()
         with session.Session() as s:

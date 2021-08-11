@@ -728,6 +728,8 @@ def check_if_sorted_for_multi_fields(fields_data):
             elif pre_row[j] < cur_row[j]:
                 break
 
+        pre_row = cur_row
+
     return True
 
     

@@ -524,10 +524,10 @@ class HDF5DataFrame(DataFrame):
         # check if keys is sorted
         by_fields_data = np.asarray([self._columns[k].data[:] for k in by])
 
-        is_sorted = True if hint_keys_is_sorted else False
         if not hint_keys_is_sorted:
-            by_is_sorted = ops.check_if_sorted_for_multi_fields(by_fields_data)
-            is_sorted = np.all(by_is_sorted)
+            is_sorted = ops.check_if_sorted_for_multi_fields(by_fields_data)
+        else:
+            is_sorted = True
 
         sorted_index = None
         if not is_sorted:
