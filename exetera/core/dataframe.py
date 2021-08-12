@@ -18,7 +18,7 @@ from exetera.core import fields as fld
 from exetera.core import operations as ops
 from exetera.core import validation as val
 import h5py
-
+import csv as csvlib
 
 class HDF5DataFrame(DataFrame):
     """
@@ -434,6 +434,38 @@ class HDF5DataFrame(DataFrame):
             for field in self._columns.values():
                 field.apply_index(index_to_apply, in_place=True)
             return self
+
+    def to_csv(self, filepath:str, chunk_row_size=1000):
+        """
+        Write object to a comma-separated values (csv) file.
+
+        :param filepath: File path.
+        """
+        column_names = self.keys()
+        column_fields = self.values()
+
+        with open(filepath, 'w') as f:
+            writer = csvlib.writer(f, delimiter=',',lineterminator='\n')
+
+            # write header names
+            writer.writerow(column_names)
+
+            start_row = 0
+            while True:
+                chunk_data = []
+                for field in column_fields:
+                    if field.indexed:
+                        chunk_data.append(field.data[start_row: start_row+chunk_row_size])
+                    else:
+                        chunk_data.append(field.data[start_row: start_row+chunk_row_size].tolist())
+
+                for row in zip(*chunk_data):
+                    writer.writerow(row)
+
+                if len(chunk_data[0]) < chunk_row_size:
+                    break
+                else:
+                    start_row += chunk_row_size
 
 
 def copy(field: fld.Field, dataframe: DataFrame, name: str):

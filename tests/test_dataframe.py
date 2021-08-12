@@ -6,7 +6,8 @@ from exetera.core import session
 from exetera.core import fields
 from exetera.core import persistence as per
 from exetera.core import dataframe
-
+import tempfile
+import os
 
 class TestDataFrameCreateFields(unittest.TestCase):
 
@@ -482,3 +483,45 @@ class TestDataFrameMerge(unittest.TestCase):
             self.assertEqual(expected, ddf['r_vals'].data[:])
             self.assertEqual(ddf['l_id_1'].data[:].tolist(), ddf['r_id_1'].data[:].tolist())
             self.assertEqual(ddf['r_id_2'].data[:].tolist(), ddf['r_id_2'].data[:].tolist())
+
+
+class TestDataFrameToCSV(unittest.TestCase):
+
+    def test_to_csv_file(self):
+        val1 = np.asarray([0, 1, 2, 3], dtype='int32')
+        val2 = ['zero', 'one', 'two', 'three']
+        bio = BytesIO()
+        
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('val1', 'int32').data.write(val1)
+            df.create_indexed_string('val2').data.write(val2)
+            df.to_csv(csv_file_name)
+
+        with open(csv_file_name, 'r') as f:
+            self.assertEqual(f.readlines(), ['val1,val2\n', '0,zero\n', '1,one\n', '2,two\n', '3,three\n'])
+      
+        os.close(fd_csv)
+
+
+    def test_to_csv_small_chunk_row_size(self):
+        val1 = np.asarray([0, 1, 2, 3], dtype='int32')
+        val2 = ['zero', 'one', 'two', 'three']
+        bio = BytesIO()
+        
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('val1', 'int32').data.write(val1)
+            df.create_indexed_string('val2').data.write(val2)
+            df.to_csv(csv_file_name, chunk_row_size=2)
+
+        with open(csv_file_name, 'r') as f:
+            self.assertEqual(f.readlines(), ['val1,val2\n', '0,zero\n', '1,one\n', '2,two\n', '3,three\n'])
+      
+        os.close(fd_csv)

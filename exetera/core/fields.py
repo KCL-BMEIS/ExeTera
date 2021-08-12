@@ -384,7 +384,7 @@ class WriteableIndexedFieldArray:
                     return []
                 bytestr = self._values[index[0]:index[-1]]
                 results = [None] * (len(index) - 1)
-                startindex = start
+                startindex = self._indices[start]
                 rmax = min(len(results), stop - start)
                 for ir in range(rmax):
                     rbytes = bytestr[index[ir] - np.int64(startindex):
