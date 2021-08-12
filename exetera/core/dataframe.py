@@ -439,7 +439,6 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, in_place=True)
             return self
 
-<<<<<<< HEAD
     def to_csv(self, filepath:str, chunk_row_size=1000):
         """
         Write object to a comma-separated values (csv) file.
@@ -471,7 +470,8 @@ class HDF5DataFrame(DataFrame):
                     break
                 else:
                     start_row += chunk_row_size
-=======
+
+                    
     def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):
         """
         Sort by the values of a field or a list of fields
@@ -499,7 +499,6 @@ class HDF5DataFrame(DataFrame):
             readers, np.arange(len(readers[0].data), dtype=np.uint32))
 
         return self.apply_index(sorted_index, ddf)
->>>>>>> 4557bf3eb92421417937d6b4c7410ea567356009
 
 
 def copy(field: fld.Field, dataframe: DataFrame, name: str):
