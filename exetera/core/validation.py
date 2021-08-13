@@ -298,20 +298,29 @@ def validate_and_normalize_categorical_key(param_name, key):
             return key
 
 
-def validate_sort_and_groupby_keys(by, all):
+def validate_selected_keys(by, all):
     if isinstance(by, str):
         if by in all:
             return [by]
         else: 
-            raise ValueError('by = {} is not an existing field'.format(by))
+            raise ValueError('{} is not an existing field'.format(by))
     elif isinstance(by, list):
         if len(by) == 0:
-            raise ValueError('by should not be empty list')
+            raise ValueError('Selected field names should not be empty list')
         else:
             extra = set(by) - set(all)
             if len(extra) > 0:
-                raise ValueError('by = {} is/are not exising field(s)'.format(extra))
+                raise ValueError('{} is/are not exising field(s)'.format(extra))
             else:
                 return by
     else:
-        raise ValueError('by should either be string or list of string')
+        raise ValueError('Selected field names should either be string or list of string')
+
+
+def validate_boolean_row_filter(name, field):
+    if isinstance(field, Field) and field._nformat != 'bool':
+        raise ValueError("'{}' must be boolean field, but is {}".format(name, field._nformat))
+
+    return array_from_field_or_lower(name, field), isinstance(field, Field)
+    
+        

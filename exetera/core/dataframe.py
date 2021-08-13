@@ -439,32 +439,45 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, in_place=True)
             return self
 
-    def to_csv(self, filepath:str, chunk_row_size=1000):
+    def to_csv(self, filepath:str, row_filter:Union[np.ndarray, fld.Field]=None, column_filter:Union[str, List[str]]=None, chunk_row_size:int=1000):
         """
         Write object to a comma-separated values (csv) file.
 
         :param filepath: File path.
+        :param row_filter: A boolean array / field. Only select rows when filter value is True
+        :param column_filter: A sequence of string names for the fields.
+        :chunk_row_size: Write rows for every chunk which has maximum chunk_row_size rows. The default is 1000. (???)
         """
-        column_names = self.keys()
-        column_fields = self.values()
+        field_name_to_use = list(self.keys())
+        if column_filter is not None:
+            field_name_to_use = val.validate_selected_keys(column_filter, self.keys())  
+
+        filter_array = None
+        if row_filter is not None:
+            filter_array, is_field = val.validate_boolean_row_filter('row_filter', row_filter)
+            if is_field and row_filter.name in field_name_to_use:
+                field_name_to_use.remove(row_filter.name)
+
+        fields_to_use = [self._columns[f] for f in field_name_to_use]
 
         with open(filepath, 'w') as f:
             writer = csvlib.writer(f, delimiter=',',lineterminator='\n')
 
             # write header names
-            writer.writerow(column_names)
+            writer.writerow(field_name_to_use)
 
             start_row = 0
             while True:
                 chunk_data = []
-                for field in column_fields:
+                for field in fields_to_use:
                     if field.indexed:
                         chunk_data.append(field.data[start_row: start_row+chunk_row_size])
                     else:
                         chunk_data.append(field.data[start_row: start_row+chunk_row_size].tolist())
 
-                for row in zip(*chunk_data):
-                    writer.writerow(row)
+                for i, row in enumerate(zip(*chunk_data)):
+                    if filter_array is None or filter_array[i + start_row] == True:
+                        writer.writerow(row)  
 
                 if len(chunk_data[0]) < chunk_row_size:
                     break
@@ -491,7 +504,7 @@ class HDF5DataFrame(DataFrame):
         elif kind != 'stable':
             raise ValueError("Currently sort_values() only supports kind='stable'")
 
-        keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
+        keys = val.validate_selected_keys(by, self._columns.keys())
 
         readers = tuple(self._columns[k] for k in keys)
 
