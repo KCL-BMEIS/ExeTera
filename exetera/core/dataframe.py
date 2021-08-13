@@ -476,7 +476,7 @@ class HDF5DataFrame(DataFrame):
                         chunk_data.append(field.data[start_row: start_row+chunk_row_size].tolist())
 
                 for i, row in enumerate(zip(*chunk_data)):
-                    if filter_array is None or filter_array.get(i + start_row, False) == True:
+                    if filter_array is None or (i + start_row <len(filter_array) and filter_array[i + start_row] == True):
                         writer.writerow(row)  
 
                 if len(chunk_data[0]) < chunk_row_size:
