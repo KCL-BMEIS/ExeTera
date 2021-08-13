@@ -103,6 +103,11 @@ class HDF5Dataset(Dataset):
         return _dataframe
 
     def require_dataframe(self, name):
+        """
+        Get a dataframe, creating it if it doesn’t exist.
+
+        :param name: name of the dataframe
+        """
         if self.__contains__(name):
             return self._dataframes[name]
         else:

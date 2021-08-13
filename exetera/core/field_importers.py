@@ -30,10 +30,16 @@ class ImporterDefinition:
 
 
 class Categorical(ImporterDefinition):
+    """
+    Categorical is an importer definition for categorical fields. It's the means that you define categorical field in the schema dictionary.
+
+    :param categories: dictionary that contain key/value pair for Categorical Field
+    :param value_type: value type in the dictionary. Default is 'int8'.
+    :param allow_freetext: If allow_freetext is True, will create extra column "**_freetext" for unexpected text.
+    """
     def __init__(self, categories, value_type='int8', allow_freetext=False):
         """
-        :param categories: dictionary that contain key/value pair for Categorical Field
-        :param value_type: value type in the dictionary. Default is 'int8'.
+        Create categorical importer definition.
         """
         self._field_size = max([len(k) for k in categories.keys()])
 
@@ -41,6 +47,16 @@ class Categorical(ImporterDefinition):
 
 
 class Numeric(ImporterDefinition):
+    """
+    Numeric is an importer definition for numeric fields. It's the means that you define numeric field in the schema dictionary.
+
+    :param dtype: datatype. The admitted datatype is as following: 'int', 'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 
+                  'uint32', 'uint64', 'float', 'float32', 'float64', 'bool'
+    :param invalid_value: replace the data with invalid_value when the data is invalid. The default is 0.
+    :param validation_mode: three validation mode: "strict", "allow_empty", "relaxed". The default is "allow_empty"
+    :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
+    :param flag_field_name: the suffix for the flag field. The default is "_valid".
+    """
     def __init__(self, dtype, invalid_value=0, validation_mode='allow_empty', create_flag_field='True', flag_field_name='_valid'):
         if dtype in ('int', 'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64'):
             self._field_size = 20
@@ -55,6 +71,11 @@ class Numeric(ImporterDefinition):
 
 
 class String(ImporterDefinition):
+    """
+    String is an importer definition for string fields. It's the means that you define string field in the schema dictionary.
+
+    :param fixed_length: set the fixed_length if the field type is fixed string.
+    """
     def __init__(self, fixed_length: int = None):
         if fixed_length:
             self._field_size = fixed_length
@@ -65,12 +86,23 @@ class String(ImporterDefinition):
 
 
 class DateTime(ImporterDefinition):
+    """
+    DateTime is an importer definition for DateTime fields. It's the means that you define DateTime field in the schema dictionary.
+
+    :param create_day_field: create extra field which contains the date information.
+    :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
+    """
     def __init__(self, create_day_field=False, create_flag_field=False):
         self._field_size = 32
         self._importer = FIELD_MAPPING_TO_IMPORTER['datetime'](create_day_field, create_flag_field)
 
 
 class Date(ImporterDefinition):
+    """
+    Date is an importer definition for Date fields. It's the means that you define Date field in the schema dictionary.
+
+    :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
+    """
     def __init__(self, create_flag_field=False):
         self._field_size = 10
         self._importer = FIELD_MAPPING_TO_IMPORTER['date'](create_flag_field)
@@ -81,7 +113,7 @@ class Date(ImporterDefinition):
 class CategoricalImporter:
     def __init__(self, session, df:DataFrame, name:str, categories:Mapping[str, str], value_type:str='int8', timestamp=None):
         if not isinstance(categories, dict):
-            raise ValueError("'categories' must be of type dict but is {} in the field '{}'".format(type(categories, name)))
+            raise ValueError("'categories' must be of type dict but is {} in the field '{}'".format(type(categories), name))
         elif len(categories) == 0:
             raise ValueError("'categories' must not be empty in the field '{}'".format(name))
 
