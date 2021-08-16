@@ -14,39 +14,43 @@ from exetera.core import operations as ops
 def read_csv(csv_file: str, 
              ddf: DataFrame,
              schema_dictionary: Mapping[str, ImporterDefinition] = None,
-             schema_json_file: Union[str, StringIO] = None,
+             schema_file: Union[str, StringIO] = None,
              schema_key: str = None,
              include: List[str] = None,
              exclude: List[str] = None,
              chunk_row_size: int = 1 << 20,
              timestamp= datetime.now(timezone.utc).timestamp()):
     """
+    Read a comma-separated values (csv) file into HDF5DataFrame.
 
-
-    :params filepath:
-    :params ddf:
-    :params schema_dictionary:
-    :params chunk_row_size:
+    :params csv_file: string path for csv file.
+    :params ddf: destination dataframe.
+    :params schema_dictionary: provide schema in dictionary format. Default is None.
+    :params schema_file: provide schema in file. Default is None.
+    :params include: a list of included field names. Default is None.
+    :params exclude: a list of excluded field names. Default in None.
+    :params chunk_row_size: read file chunk by chunk. Row sizes in each chunk is chunk_row_size. Default is 1 << 20.
+    :params timestamp: timestamp. Default is timestamp of current time.
     """
     # params validation
     if not isinstance(ddf, DataFrame):
         raise TypeError("The destination object must be an instance of DataFrame.")
         
-    if (schema_dictionary is None and schema_json_file is None) or (schema_dictionary is not None and schema_json_file is not None):
-        raise ValueError("'schema_dict' and 'schema_json_file', one and only one of them should be provided.")
+    if (schema_dictionary is None and schema_file is None) or (schema_dictionary is not None and schema_file is not None):
+        raise ValueError("'schema_dict' and 'schema_file', one and only one of them should be provided.")
 
     if schema_dictionary is not None and not isinstance(schema_dictionary, dict):
         raise TypeError("'schema_dict' must be of type dict but is {}").format(type(schema_dictionary))
 
-    if schema_json_file is not None and not isinstance(schema_json_file, (str, StringIO)):
-        raise TypeError("'schema_json_file' must be of type str or StringIO but is {}").format(type(schema_json_file))
+    if schema_file is not None and not isinstance(schema_file, (str, StringIO)):
+        raise TypeError("'schema_file' must be of type str or StringIO but is {}").format(type(schema_file))
 
     # get schema_dict
     if schema_dictionary is not None:
         schema_dict = schema_dictionary
     else:
         # schmea_json_file is not None
-        schemas = load_schema.load_schema(schema_json_file)
+        schemas = load_schema.load_schema(schema_file)
         if len(schemas) == 1:
             schema_dict = list(schemas.values())[0]
         elif len(schemas) > 1:
@@ -57,7 +61,7 @@ def read_csv(csv_file: str,
             else:
                 schema_dict = schemas[schema_key] 
         else:
-            raise ValueError("'schema_json_file' must not be empty.")
+            raise ValueError("'schema_file' must not be empty.")
 
     read_csv_with_schema_dict(csv_file, ddf, schema_dict, timestamp, include, exclude, chunk_row_size)
 
@@ -72,14 +76,17 @@ def read_csv_with_schema_dict(csv_file: str,
                               stop_after_rows = None
                               ):
     """
+    Read a comma-separated values (csv) file into HDF5DataFrame, with schema provided in dictionary formats.
 
-
-    :params csv_file:
-    :params ddf:
-    :params schema_dictionary:
-    :params chunk_row_size:
+    :params csv_file: string path for csv file.
+    :params ddf: destination dataframe.
+    :params schema_dictionary: provide schema in dictionary format.
+    :params timestamp: timestamp. 
+    :params include: a list of included field names. Default is None.
+    :params exclude: a list of excluded field names. Default in None.
+    :params chunk_row_size: read file chunk by chunk. Row sizes in each chunk is chunk_row_size. Default is 1 << 20.
+    :params stop_after_rows: stop after given rows. Default is None.
     """
-
     # get field_mapping
     field_mapping = {k.strip(): v for k, v in schema_dictionary.items()}
 

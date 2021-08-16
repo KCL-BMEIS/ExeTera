@@ -45,7 +45,7 @@ class TestReadCSV(TestCase):
         with self.assertRaises(Exception) as context:
             parsers.read_csv(self.csv_file_name, df)
         
-        self.assertEqual(str(context.exception), "'schema_dict' and 'schema_json_file', one and only one of them should be provided.")
+        self.assertEqual(str(context.exception), "'schema_dict' and 'schema_file', one and only one of them should be provided.")
 
 
     def test_read_csv_with_non_emtpy_schema_dict_and_file(self):
@@ -57,7 +57,7 @@ class TestReadCSV(TestCase):
         with self.assertRaises(Exception) as context:
             parsers.read_csv(self.csv_file_name, df, self.schema_dict, self.schema_file)
         
-        self.assertEqual(str(context.exception), "'schema_dict' and 'schema_json_file', one and only one of them should be provided.")
+        self.assertEqual(str(context.exception), "'schema_dict' and 'schema_file', one and only one of them should be provided.")
 
 
     def tearDown(self):
@@ -209,7 +209,7 @@ class TestSchemaJsonFileReadCSV(TestReadCSV):
 
             print('csv_file_name', self.csv_file_name)
 
-            parsers.read_csv(self.csv_file_name, df, schema_json_file=self.schema_file)
+            parsers.read_csv(self.csv_file_name, df, schema_file=self.schema_file)
 
             expected_postcode_value_list = [1, 3, 2, 0, 4]
             self.assertListEqual(df['postcode'].data[:].tolist(), expected_postcode_value_list)

@@ -4,14 +4,6 @@ exetera.core package
 Submodules
 ----------
 
-exetera.core.data\_schema module
---------------------------------
-
-.. automodule:: exetera.core.data_schema
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 exetera.core.data\_writer module
 --------------------------------
 
