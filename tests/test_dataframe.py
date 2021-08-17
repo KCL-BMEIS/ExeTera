@@ -1,3 +1,4 @@
+from exetera.core.operations import INVALID_INDEX
 import unittest
 from io import BytesIO
 import numpy as np
@@ -481,7 +482,7 @@ class TestDataFrameMerge(unittest.TestCase):
             self.assertEqual(expected, ddf['l_vals'].data[:])
             self.assertEqual(expected, ddf['r_vals'].data[:])
             self.assertEqual(ddf['l_id_1'].data[:].tolist(), ddf['r_id_1'].data[:].tolist())
-            self.assertEqual(ddf['r_id_2'].data[:].tolist(), ddf['r_id_2'].data[:].tolist())
+            self.assertEqual(ddf['l_id_2'].data[:].tolist(), ddf['r_id_2'].data[:].tolist())
 
 
 class TestDataFrameSort(unittest.TestCase):

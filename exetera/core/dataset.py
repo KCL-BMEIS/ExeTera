@@ -102,6 +102,17 @@ class HDF5Dataset(Dataset):
         self._dataframes[name] = _dataframe
         return _dataframe
 
+    def require_dataframe(self, name):
+        """
+        Get a dataframe, creating it if it doesn’t exist.
+
+        :param name: name of the dataframe
+        """
+        if self.__contains__(name):
+            return self._dataframes[name]
+        else:
+            return self.create_dataframe(name)
+
     def close(self):
         """Close the HDF5 file operations."""
         self._file.close()
@@ -173,7 +184,7 @@ class HDF5Dataset(Dataset):
         :param name: The name of the dataframe.
         :return: The dataframe or throw Error if the name is not existed in this dataset.
         """
-        self.__getitem__(name)
+        return self.__getitem__(name)
 
     def __setitem__(self, name: str, dataframe: DataFrame):
         """

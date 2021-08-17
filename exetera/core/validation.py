@@ -315,3 +315,9 @@ def validate_sort_and_groupby_keys(by, all):
                 return by
     else:
         raise ValueError('by should either be string or list of string')
+
+
+def validate_require_key(context, key, dictionary):
+    if key not in dictionary:
+        msg = "'{}': '{}' missing from fields".format(context, key)
+        raise ValueError(msg)

@@ -1255,25 +1255,6 @@ class TestGetSpans(unittest.TestCase):
 
 class TestFieldImporter(unittest.TestCase):
 
-    def _one_dim_data_to_indexed(self, data, field_size):
-        data = [str(s) for s in data]
-        count_row = len(data)
-        chunk_row_size = count_row
-
-        indices = np.zeros((1, count_row + 1), dtype = np.int64)
-        offsets = np.array([0, field_size], dtype=np.int64) * chunk_row_size
-        values = np.zeros(offsets[-1], dtype = np.uint8)
-
-        accumulated = 0
-        for i, s in enumerate(data):
-            indices[0, i + 1] = indices[0, i] + len(s)
-            for j, c in enumerate(s):
-                values[accumulated] = np.frombuffer(c.encode(), dtype =np.uint8)[0]
-                accumulated += 1
-
-        return indices, values, offsets, count_row
-
-
     def test_get_byte_map(self):
         byte_map_keys, byte_map_key_indices, byte_map_value = ops.get_byte_map({'a':1, 'bb':2, 'ccc':3, 'dddd':4})
 

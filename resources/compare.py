@@ -18,9 +18,9 @@ import numpy as np
 # new_source = 'resources/new_mental_health.hdf5'
 # schema_key = 'mental_health'
 
-# old_source = 'resources/old_patients.hdf5'
-# new_source = 'resources/new_patients.hdf5'
-# schema_key = 'patients'
+old_source = 'resources/old_patients.hdf5'
+new_source = 'resources/new_patients.hdf5'
+schema_key = 'patients'
 
 # old_source = 'resources/old_diet.hdf5'
 # new_source = 'resources/new_diet.hdf5'
@@ -30,9 +30,9 @@ import numpy as np
 # new_source = 'resources/new_tests.hdf5'
 # schema_key = 'tests'
 
-old_source = 'resources/old_assessments.hdf5'
-new_source = 'resources/new_assessments.hdf5'
-schema_key = 'assessments'
+# old_source = 'resources/old_assessments.hdf5'
+# new_source = 'resources/new_assessments.hdf5'
+# schema_key = 'assessments'
 
 
 with Session() as s:
@@ -42,8 +42,14 @@ with Session() as s:
     newdf = new[schema_key]
 
     keys = olddf.keys()
-    # keys = ['diabetes_oral_other_medication','outward_postcode_region', 'vs_other']
+    keys = ['diabetes_oral_other_medication', 'vs_other']
     # keys = ['supplements_other']
+
+    if len(olddf.keys()) != len(newdf.keys()):
+        print('olddf keys length', len(olddf.keys()))
+        print('newdf keys length', len(newdf.keys()))
+        print('missing in new df',  set(olddf.keys()).difference(set(newdf.keys())))
+        print('missing in old df',  set(newdf.keys()).difference(set(olddf.keys())))
 
 
     for k in keys:
@@ -64,9 +70,9 @@ with Session() as s:
                 print('*******')
                 print('new: ', new_[i])
 
-                for j in range(len(old_[i])):
-                    if old_[i][j] != new_[i][j]:
-                        print(j, old_[i][j], new_[i][j])
+        #         for j in range(len(old_[i])):
+        #             if old_[i][j] != new_[i][j]:
+        #                 print(j, old_[i][j], new_[i][j])
 
 
         # if olddf[k].indexed:
@@ -122,6 +128,3 @@ with Session() as s:
         #     if x[i] != y[i]:
         #         print(i, x[i], y[i])
         
-
-
-                
