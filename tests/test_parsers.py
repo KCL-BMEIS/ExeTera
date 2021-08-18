@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from exetera.core.field_importers import Categorical, Numeric, String, DateTime, Date
 from exetera.core import utils, session, operations as ops
-from exetera.io import csv_parser
+from exetera.io import parsers
 from .test_importer import TEST_SCHEMA, TEST_CSV_CONTENTS
 
 
@@ -43,7 +43,7 @@ class TestReadCSV(TestCase):
             df = dst.create_dataframe('df')
 
         with self.assertRaises(Exception) as context:
-            csv_parser.read_csv(self.csv_file_name, df)
+            parsers.read_csv(self.csv_file_name, df)
         
         self.assertEqual(str(context.exception), "'schema_dict' and 'schema_file', one and only one of them should be provided.")
 
@@ -55,7 +55,7 @@ class TestReadCSV(TestCase):
             df = dst.create_dataframe('df')
 
         with self.assertRaises(Exception) as context:
-            csv_parser.read_csv(self.csv_file_name, df, self.schema_dict, self.schema_file)
+            parsers.read_csv(self.csv_file_name, df, self.schema_dict, self.schema_file)
         
         self.assertEqual(str(context.exception), "'schema_dict' and 'schema_file', one and only one of them should be provided.")
 
@@ -72,7 +72,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             dst = s.open_dataset(bio, 'w', 'dst')
             df = dst.create_dataframe('df')
 
-            csv_parser.read_csv(self.csv_file_name, df, schema_dictionary = self.schema_dict, include=['postcode'])
+            parsers.read_csv(self.csv_file_name, df, schema_dictionary = self.schema_dict, include=['postcode'])
 
             expected_postcode_value_list = [1, 3, 2, 0, 4]
             self.assertListEqual(df['postcode'].data[:].tolist(), expected_postcode_value_list)
@@ -86,7 +86,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             dst = s.open_dataset(bio, 'w', 'dst')
             df = dst.create_dataframe('df')
 
-            csv_parser.read_csv(self.csv_file_name, df, self.schema_dict, include=['degree'])
+            parsers.read_csv(self.csv_file_name, df, self.schema_dict, include=['degree'])
 
             expected_degree_value_list = [1, 2, 0, -1, 3]
             expected_degree_freetext_index_list = [0, 0, 0, 0, 4, 4]
@@ -102,7 +102,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             dst = s.open_dataset(bio, 'w', 'dst')
             df = dst.create_dataframe('df')
 
-            csv_parser.read_csv(self.csv_file_name, df, self.schema_dict, include=['id', 'age'])
+            parsers.read_csv(self.csv_file_name, df, self.schema_dict, include=['id', 'age'])
 
             self.assertListEqual(df['id'].data[:].tolist(), [1,2,3,4,5])
             self.assertTrue('id_valid' not in df)
@@ -117,7 +117,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             dst = s.open_dataset(bio, 'w', 'dst')
             df = dst.create_dataframe('df')
 
-            csv_parser.read_csv(self.csv_file_name, df, self.schema_dict, include=['height', 'weight_change', 'BMI'])
+            parsers.read_csv(self.csv_file_name, df, self.schema_dict, include=['height', 'weight_change', 'BMI'])
 
             expected_height_list = list(np.asarray([170.9, 180.2, 160.5, 160.5, 161.0], dtype=np.float32))
             expected_height_valid_list = [True, True, False, False, True]
@@ -140,7 +140,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             dst = s.open_dataset(bio, 'w', 'dst')
             df = dst.create_dataframe('df')
 
-            csv_parser.read_csv(self.csv_file_name, df, self.schema_dict, include=['weight_change', 'height', 'BMI'])
+            parsers.read_csv(self.csv_file_name, df, self.schema_dict, include=['weight_change', 'height', 'BMI'])
 
             expected_height_list = list(np.asarray([170.9, 180.2, 160.5, 160.5, 161.0], dtype=np.float32))
             expected_height_valid_list = [True, True, False, False, True]
@@ -163,7 +163,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             dst = s.open_dataset(bio, 'w', 'dst')
             df = dst.create_dataframe('df')
 
-            csv_parser.read_csv(self.csv_file_name, df, self.schema_dict, include=['name'])
+            parsers.read_csv(self.csv_file_name, df, self.schema_dict, include=['name'])
             self.assertListEqual(df['name'].indices[:].tolist(), [0, 1, 3, 6, 10, 15])
             self.assertListEqual(df['name'].values[:].tolist(), [97, 98, 98, 99, 99, 99, 100, 100, 100, 100, 101, 101, 101, 101, 101])
             self.assertListEqual(df['name'].data[:], ['a', 'bb', 'ccc', 'dddd', 'eeeee'])
@@ -175,7 +175,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             dst = s.open_dataset(bio, 'w', 'dst')
             df = dst.create_dataframe('df')
 
-            csv_parser.read_csv(self.csv_file_name, df, self.schema_dict, include=['patient_id'])
+            parsers.read_csv(self.csv_file_name, df, self.schema_dict, include=['patient_id'])
 
             expected_patient_id_value_list = [b'E1', b'E123', b'E234', b'', b'E456']
             self.assertListEqual(df['patient_id'].data[:].tolist(), expected_patient_id_value_list)
@@ -187,7 +187,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             dst = s.open_dataset(bio, 'w', 'dst')
             df = dst.create_dataframe('df')
 
-            csv_parser.read_csv(self.csv_file_name, df, self.schema_dict, include=['updated_at'])    
+            parsers.read_csv(self.csv_file_name, df, self.schema_dict, include=['updated_at'])    
 
             expected_updated_at_list = ['2020-05-12 07:00:00', '2020-05-13 01:00:00', '2020-05-14 03:00:00', '2020-05-15 03:00:00', '2020-05-16 03:00:00']
             expected_updated_at_date_list = [b'2020-05-12', b'2020-05-13', b'2020-05-14',b'2020-05-15',b'2020-05-16']
@@ -201,7 +201,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             dst = s.open_dataset(bio, 'w', 'dst')
             df = dst.create_dataframe('df')
 
-            csv_parser.read_csv(self.csv_file_name, df, self.schema_dict, include=['birthday'])  
+            parsers.read_csv(self.csv_file_name, df, self.schema_dict, include=['birthday'])  
 
             expected_birthday_date = [b'1990-01-01', b'1980-03-04', b'1970-04-05', b'1960-04-05', b'1950-04-05']
             self.assertEqual(df['birthday'].data[:].tolist(), expected_birthday_date)
@@ -215,7 +215,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             dst = s.open_dataset(bio, 'w', 'dst')
             df = dst.create_dataframe('df')
 
-            csv_parser.read_csv(self.csv_file_name, df, self.schema_dict, timestamp=ts)  
+            parsers.read_csv(self.csv_file_name, df, self.schema_dict, timestamp=ts)  
 
             self.assertEqual(df['j_valid_from'].data[:].tolist(), [ts]*5)
             self.assertEqual(df['j_valid_to'].data[:].tolist(), [ops.MAX_DATETIME.timestamp()]*5)
@@ -228,7 +228,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             df = dst.create_dataframe('df')
 
             missing_schema_dict = {'name': String()}
-            csv_parser.read_csv(self.csv_file_name, df, missing_schema_dict)
+            parsers.read_csv(self.csv_file_name, df, missing_schema_dict)
             self.assertListEqual(df['id'].data[:], ['1','2','3','4','5']) 
             self.assertEqual(df['updated_at'].data[:],['2020-05-12 07:00:00', '2020-05-13 01:00:00', '2020-05-14 03:00:00', '2020-05-15 03:00:00', '2020-05-16 03:00:00'])
             self.assertEqual(df['birthday'].data[:], ['1990-01-01', '1980-03-04', '1970-04-05', '1960-04-05', '1950-04-05'])
@@ -245,7 +245,7 @@ class TestSchemaJsonFileReadCSV(TestReadCSV):
 
             print('csv_file_name', self.csv_file_name)
 
-            csv_parser.read_csv(self.csv_file_name, df, schema_file=self.schema_file)
+            parsers.read_csv(self.csv_file_name, df, schema_file=self.schema_file)
 
             expected_postcode_value_list = [1, 3, 2, 0, 4]
             self.assertListEqual(df['postcode'].data[:].tolist(), expected_postcode_value_list)
