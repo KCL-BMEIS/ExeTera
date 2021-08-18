@@ -7,6 +7,7 @@ from exetera.core.data_writer import DataWriter
 from exetera.core import utils
 from datetime import datetime, date
 
+INDEXED_STRING_FIELD_SIZE = 10 # guessing
 
 FIELD_MAPPING_TO_IMPORTER = {
     'categorical': lambda categories, value_type, allow_freetext:
@@ -80,7 +81,7 @@ class String(ImporterDefinition):
         if fixed_length:
             self._field_size = fixed_length
         else:
-            self._field_size = 10 # guessing
+            self._field_size = INDEXED_STRING_FIELD_SIZE # guessing
 
         self._importer = FIELD_MAPPING_TO_IMPORTER['string'](fixed_length)
 

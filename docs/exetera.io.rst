@@ -22,10 +22,10 @@ exetera.io.load_schema module
    :show-inheritance:
 
 
-exetera.io.parsers module
+exetera.io.csv_parser module
 ----------------------------
 
-.. automodule:: exetera.io.parsers
+.. automodule:: exetera.io.csv_parser
    :members:
    :undoc-members:
    :show-inheritance:

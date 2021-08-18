@@ -15,7 +15,7 @@ from itertools import accumulate
 from io import StringIO
 
 from exetera.core import persistence as per
-from exetera.io import load_schema, parsers
+from exetera.io import load_schema, csv_parser
 from exetera.core import utils
 
 
@@ -65,7 +65,7 @@ def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_
         ds = session.open_dataset(dest_file_name, mode, dataset_name)
         ddf = ds.require_dataframe(sk) 
 
-        parsers.read_csv_with_schema_dict(csv_file, ddf, schema_dict, ts, include_fields, exclude_fields, chunk_row_size=chunk_row_size)
+        csv_parser.read_csv_with_schema_dict(csv_file, ddf, schema_dict, ts, include_fields, exclude_fields, chunk_row_size=chunk_row_size)
 
 
 

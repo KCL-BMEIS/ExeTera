@@ -1,2 +1,2 @@
 
-from . import importer, parsers
+from . import importer, csv_parser
