@@ -5,7 +5,7 @@ import numpy as np
 from datetime import datetime, timezone
 
 from exetera.core.abstract_types import DataFrame
-from exetera.core.field_importers import ImporterDefinition, TimestampImporter
+from exetera.core.field_importers import ImporterDefinition, TimestampImporter, IndexedStringImporter, INDEXED_STRING_FIELD_SIZE
 from exetera.core.csv_reader_speedup import read_file_using_fast_csv_reader
 from exetera.io import load_schema
 from exetera.core import operations as ops
@@ -99,8 +99,8 @@ def read_csv_with_schema_dict(csv_file: str,
         # validate all field name is defined in schema_dictionary
         missing_names = set(csvf_fieldnames).difference(set(fields))
         if len(missing_names) > 0:
-            msg = "The following fields are present in file '{}' but not part of the 'schema_dictionary': {}"
-            raise ValueError(msg.format(csv_file, missing_names))    
+            msg = "Warning: The following fields are present in file '{}' but not part of the 'schema_dictionary': {}"
+            print(msg.format(csv_file, missing_names))    
 
         # check if included fields are in the file
         if include is not None and len(include) > 0:
@@ -127,14 +127,21 @@ def read_csv_with_schema_dict(csv_file: str,
 
         field_importer_list = list() # only for field_to_use     
         for field_name in fields_to_use:
-            importer_definition = field_mapping[field_name]
-            field_importer = importer_definition._importer(ddf.dataset.session, ddf, field_name, timestamp)
+            if field_name in missing_names:
+                field_importer = IndexedStringImporter(ddf.dataset.session, ddf, field_name, timestamp) 
+            else:
+                importer_definition = field_mapping[field_name]
+                field_importer = importer_definition._importer(ddf.dataset.session, ddf, field_name, timestamp)
             field_importer_list.append(field_importer)
 
         column_offsets = np.zeros(len(csvf_fieldnames) + 1, dtype=np.int64)
         for i, field_name in enumerate(csvf_fieldnames):
-            importer_definition = field_mapping[field_name]
-            column_offsets[i + 1] = column_offsets[i] + importer_definition._field_size * chunk_row_size
+            if field_name in missing_names:
+                field_size = INDEXED_STRING_FIELD_SIZE
+            else:  
+                importer_definition = field_mapping[field_name]
+                field_size = importer_definition._field_size
+            column_offsets[i + 1] = column_offsets[i] + field_size * chunk_row_size
     
     total_rows = read_file_using_fast_csv_reader(csv_file, chunk_row_size, column_offsets, index_map, field_importer_list, stop_after_rows)
 
