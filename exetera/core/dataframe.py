@@ -461,28 +461,35 @@ class HDF5DataFrame(DataFrame):
         fields_to_use = [self._columns[f] for f in field_name_to_use]
 
         with open(filepath, 'w') as f:
-            writer = csvlib.writer(f, delimiter=',',lineterminator='\n')
+            # writer = csvlib.writer(f, delimiter=',',lineterminator='\n')
 
             # write header names
-            writer.writerow(field_name_to_use)
+            f.write(','.join(field_name_to_use) + '\n')
 
             start_row = 0
             while True:
                 chunk_data = []
                 for field in fields_to_use:
                     if field.indexed:
+                        # print(field.name, field)
                         chunk_data.append(field.data[start_row: start_row+chunk_row_size])
                     else:
                         chunk_data.append(field.data[start_row: start_row+chunk_row_size].tolist())
 
+                chunk_content = []
                 for i, row in enumerate(zip(*chunk_data)):
-                    if filter_array is None or (i + start_row <len(filter_array) and filter_array[i + start_row] == True):
-                        writer.writerow(row)  
+                    if filter_array is None or (i + start_row <len(filter_array) and filter_array[i + start_row] == True):                       
+                        chunk_content.append(','.join(str(x) for x in row))
+                
+                if len(chunk_content) >= 1:
+                    f.write('\n'.join(chunk_content))
+                    f.write('\n')
 
                 if len(chunk_data[0]) < chunk_row_size:
                     break
                 else:
                     start_row += chunk_row_size
+
 
                     
     def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):
