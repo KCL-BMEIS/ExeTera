@@ -133,6 +133,29 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             self.assertEqual(list(df['BMI'].data[:]), expected_BMI_list)
             self.assertEqual(list(df['BMI_valid'].data[:]), expected_BMI_valid_list)
 
+
+    def test_read_csv_with_fields_out_of_order(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+
+            parsers.read_csv(self.csv_file_name, df, self.schema_dict, include=['weight_change', 'height', 'BMI'])
+
+            expected_height_list = list(np.asarray([170.9, 180.2, 160.5, 160.5, 161.0], dtype=np.float32))
+            expected_height_valid_list = [True, True, False, False, True]
+            self.assertEqual(list(df['height'].data[:]), expected_height_list)
+            self.assertEqual(list(df['height_valid_test'].data[:]), expected_height_valid_list)
+
+            expected_weight_change_list = list(np.asarray([21.2, utils.get_min_max('float32')[0], -17.5, -17.5, 2.5], dtype = np.float32))
+            self.assertEqual(list(df['weight_change'].data[:]), expected_weight_change_list)
+            self.assertTrue('weight_change_valid' not in df)
+
+            expected_BMI_list = list(np.asarray([20.5, 25.4, 27.2, 27.2, 20.2], dtype=np.float64))
+            expected_BMI_valid_list = [True, True, True, True, True]
+            self.assertEqual(list(df['BMI'].data[:]), expected_BMI_list)
+            self.assertEqual(list(df['BMI_valid'].data[:]), expected_BMI_valid_list)
+
     
     def test_read_csv_only_indexed_string_field(self):
         bio = BytesIO()
@@ -197,6 +220,18 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             self.assertEqual(df['j_valid_to'].data[:].tolist(), [ops.MAX_DATETIME.timestamp()]*5)
 
 
+    def test_read_csv_with_schema_missing_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+
+            missing_schema_dict = {'name': String()}
+            parsers.read_csv(self.csv_file_name, df, missing_schema_dict)
+            self.assertListEqual(df['id'].data[:], ['1','2','3','4','5']) 
+            self.assertEqual(df['updated_at'].data[:],['2020-05-12 07:00:00', '2020-05-13 01:00:00', '2020-05-14 03:00:00', '2020-05-15 03:00:00', '2020-05-16 03:00:00'])
+            self.assertEqual(df['birthday'].data[:], ['1990-01-01', '1980-03-04', '1970-04-05', '1960-04-05', '1950-04-05'])
+            self.assertEqual(df['postcode'].data[:], ['NW1', 'SW1P', 'E1', '', 'NW3'])
         
 
 class TestSchemaJsonFileReadCSV(TestReadCSV):
