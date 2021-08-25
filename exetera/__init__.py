@@ -1,5 +1,5 @@
 
-from . import core, processing
+from . import core, processing, io
 
 from ._version import __version__
 
