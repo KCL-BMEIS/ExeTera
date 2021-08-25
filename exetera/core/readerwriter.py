@@ -330,7 +330,7 @@ class IndexedStringWriter(Writer):
         self.write_part_raw(index, values)
         self.flush()
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         # broadcast accumulated size to current index array
         index = column_inds[col_idx, :written_row_count + 1] + self.chunk_accumulated
         self.chunk_accumulated += column_inds[col_idx, written_row_count]
@@ -384,7 +384,7 @@ class LeakyCategoricalImporter:
         self.write_part(values)
         self.flush()
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         cat_keys, cat_index, cat_values = self.byte_map
         chunk = np.zeros(written_row_count, dtype=np.int8) # use np.int8 instead of np.uint8, as we set -1 for leaky key
         freetext_indices_chunk = np.zeros(written_row_count + 1, dtype = np.int64)
@@ -435,7 +435,7 @@ class CategoricalImporter:
         self.writer.write_part(results)
         self.flush()
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         chunk = np.zeros(written_row_count, dtype=np.uint8)
         cat_keys, cat_index, cat_values = self.byte_map
                 
@@ -535,7 +535,7 @@ class NumericImporter:
             self.flag_writer.write_part(validity)
 
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         # elements = np.zeros(written_row_count, dtype=self.data_writer.nformat)
         # validity = np.ones(written_row_count, dtype=bool)
 
@@ -553,13 +553,13 @@ class NumericImporter:
         elif self.data_writer.nformat in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64') :
 
             exception_message, exception_args = 0, []
-            elements, validity = ops.transform_int_2(
+            elements, validity = ops.transform_int(
                 column_inds, column_vals, column_offsets, col_idx,
                 written_row_count, self.invalid_value, self.validation_mode,
                 value_dtype, self.field_name)
         else:
             exception_message, exception_args = 0, []
-            elements, validity = ops.transform_float_2(
+            elements, validity = ops.transform_float(
                 column_inds, column_vals, column_offsets, col_idx,
                 written_row_count, self.invalid_value, self.validation_mode,
                 value_dtype, self.field_name)
@@ -641,7 +641,7 @@ class FixedStringWriter(Writer):
     def write_part(self, values):
         DataWriter.write(self.field, 'values', values, len(values))
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets,  col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets,  col_idx, written_row_count):
         values = np.zeros(written_row_count, dtype='S{}'.format(self.strlen))
         ops.fixed_string_transform(column_inds, column_vals, column_offsets, col_idx,
                                      written_row_count, self.strlen, values.data.cast('b'))
@@ -715,7 +715,7 @@ class DateTimeImporter:
         self.write_part(values)
         self.flush()
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         data = ops.transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count)
         data = [x.tobytes().strip() for x in data]
         self.write_part(data)
@@ -886,7 +886,7 @@ class OptionalDateImporter:
             flags[i] = values[i] != b''
         return flags
 
-    def transform_and_write_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         data = ops.transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count)
         data = [x.tobytes().strip() for x in data]
         self.write_part(data)

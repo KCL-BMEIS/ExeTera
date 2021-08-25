@@ -314,6 +314,7 @@ def validate_selected_keys(by, all):
             else:
                 return by
     else:
+<<<<<<< HEAD
         raise ValueError('Selected field names should either be string or list of string')
 
 
@@ -324,3 +325,12 @@ def validate_boolean_row_filter(name, field):
     return array_from_field_or_lower(name, field), isinstance(field, Field)
     
         
+=======
+        raise ValueError('by should either be string or list of string')
+
+
+def validate_require_key(context, key, dictionary):
+    if key not in dictionary:
+        msg = "'{}': '{}' missing from fields".format(context, key)
+        raise ValueError(msg)
+>>>>>>> 122fa07b7aada7235830f5d58b1a7349a78d9fd3

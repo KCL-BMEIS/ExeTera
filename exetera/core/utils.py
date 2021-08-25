@@ -17,6 +17,7 @@ from io import StringIO
 
 import numpy as np
 from numba import njit
+from ctypes import sizeof, c_float, c_double, c_int8, c_uint8, c_int16, c_uint16, c_int32, c_uint32, c_int64
 
 
 SECONDS_PER_DAY = 86400
@@ -359,3 +360,37 @@ class Timer:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         print(self.end_msg + f' {time.time() - self.t0} seconds')
+
+
+def get_min_max(value_type):
+    mapping = {'float32': c_float, 'float64': c_double, 'int8': c_int8, 'uint8': c_uint8, 
+                                    'int16': c_int16, 'uint16': c_uint16, 'int32': c_int32, 'uint32': c_uint32, 'int64': c_int64}
+    c_type = mapping[value_type]
+
+    signed = c_type(-1).value < c_type(0).value
+    bit_size = sizeof(c_type) * 8
+    signed_limit = 2 ** (bit_size - 1)
+    return (-signed_limit, signed_limit - 1) if signed else (0, 2 * signed_limit - 1)
+
+
+def one_dim_data_to_indexed_for_test(data, field_size):
+    data = [str(s) for s in data]
+    count_row = len(data)
+    chunk_row_size = count_row
+
+    indices = np.zeros((1, count_row + 1), dtype = np.int64)
+    offsets = np.array([0, field_size], dtype=np.int64) * chunk_row_size
+    values = np.zeros(offsets[-1], dtype = np.uint8)
+
+    accumulated = 0
+    for i, s in enumerate(data):
+        length = 0
+        for j, c in enumerate(s):
+            encoded_c = np.frombuffer(c.encode(), dtype =np.uint8)
+            for e in encoded_c:
+                values[accumulated] = e
+                accumulated += 1
+                length += 1
+        indices[0, i + 1] = indices[0, i] + length
+         
+    return indices, values, offsets, count_row

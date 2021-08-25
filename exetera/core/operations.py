@@ -2718,62 +2718,19 @@ def numeric_bool_transform(elements, validity, column_inds, column_vals, column_
                     break
     return exception_message, exception_args      
 
-           
-@njit
-def calculate_value(length, decimal_index, num_before_decimal, num_after_decimcal, sign):
-    # Adjust for adding too many zeroes before we knew we had a decimal
-    divided = 10 ** (length - decimal_index)
-    num_before_decimal = num_before_decimal // divided  # actual integral part
 
-    # Adjust number after decimal based on length
-    if decimal_index != length:
-        divided = 10 ** (length - decimal_index - 1)
-        num_after_decimcal = num_after_decimcal / divided   # actual fractional part
+def raiseNumericException(exception_message, exception_args):
+    exceptions = {
+        1: "Numeric value in the field '{0}' can not be empty in strict mode",
+        2: "The following numeric value in the field '{0}' can not be parsed: {1}"
+    }
 
-    # Calculate and set final number
-    val = sign * (num_before_decimal + num_after_decimcal)
-    return val
+    raise Exception(exceptions[exception_message].format(
+        *[x.tobytes().decode('utf-8').strip() for x in exception_args]
+    ))
 
 
-def transform_int(elements, validity, column_inds, column_vals, column_offsets, col_idx,
-                  written_row_count, invalid_value, validation_mode, field_name):
-
-    col_offset = column_offsets[col_idx]
-    exception_message, exception_args = 0, [field_name]
-
-    for i in range(written_row_count):
-        start = column_inds[col_idx, i]
-        end = column_inds[col_idx, i + 1]
-        val = column_vals[col_offset + start : col_offset + end].tobytes()
-        empty = val.strip() == b''
-
-        try:
-            value, valid = int(val), True
-        except:
-            value, valid = invalid_value, False
-
-        elements[i] = value
-        validity[i] = valid
-
-        if not valid:
-            if validation_mode == 'strict':
-                if empty:
-                    exception_message = 1
-                    exception_args = [field_name]
-                    break
-                else:
-                    exception_message = 2
-                    exception_args = [field_name, val]
-                    break
-            if validation_mode == 'allow_empty':
-                if not empty:
-                    exception_message = 2
-                    exception_args = [field_name, val]
-                    break
-    return exception_message, exception_args
-
-
-def transform_int_2(column_inds, column_vals, column_offsets, col_idx,
+def transform_int(column_inds, column_vals, column_offsets, col_idx,
                     written_row_count, invalid_value, validation_mode, data_type, field_name):
 
     widths = column_inds[col_idx, 1:written_row_count + 1] - column_inds[col_idx, :written_row_count]
@@ -2786,7 +2743,7 @@ def transform_int_2(column_inds, column_vals, column_offsets, col_idx,
         try:
           results = elements.astype(data_type)
         except ValueError as e:
-            msg = ("field '{}' contains values that cannot "
+            msg = ("Field '{}' contains values that cannot "
                    "be converted to float in '{}' mode").format(field_name, validation_mode)
             raise ValueError(msg) from e
         valids = None
@@ -2816,7 +2773,7 @@ def transform_int_2(column_inds, column_vals, column_offsets, col_idx,
     return results, valids
 
 
-def transform_float_2(column_inds, column_vals, column_offsets, col_idx,
+def transform_float(column_inds, column_vals, column_offsets, col_idx,
                       written_row_count, invalid_value, validation_mode, data_type, field_name):
 
     widths = column_inds[col_idx, 1:written_row_count + 1] - column_inds[col_idx, :written_row_count]
@@ -2857,55 +2814,6 @@ def transform_float_2(column_inds, column_vals, column_offsets, col_idx,
         raise ValueError("'{}' is not a valid value for 'validation_mode'")
 
     return results, valids
-
-
-def transform_float(elements, validity, column_inds, column_vals, column_offsets, col_idx,
-                    written_row_count, invalid_value, validation_mode, field_name):
-
-    col_offset = column_offsets[col_idx]
-    exception_message, exception_args = 0, [field_name]
-
-    for i in range(written_row_count):
-        start = column_inds[col_idx, i]
-        end = column_inds[col_idx, i + 1]
-        val = column_vals[col_offset + start : col_offset + end].tobytes()
-        empty = val.strip() == b''
-
-        try:
-            value, valid = float(val), True
-        except:
-            value, valid = invalid_value, False
-
-        elements[i] = value
-        validity[i] = valid
-
-        if not valid:
-            if validation_mode == 'strict':
-                if empty:
-                    exception_message = 1
-                    exception_args = [field_name]
-                    break
-                else:
-                    exception_message = 2
-                    exception_args = [field_name, val]
-                    break
-            if validation_mode == 'allow_empty':
-                if not empty:
-                    exception_message = 2
-                    exception_args = [field_name, val]
-                    break
-    return exception_message, exception_args  
-
-
-def raiseNumericException(exception_message, exception_args):
-    exceptions = {
-        1: "Numeric value in the field '{0}' can not be empty in strict mode",
-        2: "The following numeric value in the field '{0}' can not be parsed: {1}"
-    }
-
-    raise Exception(exceptions[exception_message].format(
-        *[x.tobytes().decode('utf-8').strip() for x in exception_args]
-    ))
 
 
 @njit
