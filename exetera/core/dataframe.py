@@ -439,6 +439,58 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, in_place=True)
             return self
 
+    # def to_csv(self, filepath:str, row_filter:Union[np.ndarray, fld.Field]=None, column_filter:Union[str, List[str]]=None, chunk_row_size:int=1000):
+    #     """
+    #     Write object to a comma-separated values (csv) file.
+
+    #     :param filepath: File path.
+    #     :param row_filter: A boolean array / field. Only select rows when filter value is True
+    #     :param column_filter: A sequence of string names for the fields.
+    #     :chunk_row_size: Write rows for every chunk which has maximum chunk_row_size rows. The default is 1000. (???)
+    #     """
+        # field_name_to_use = list(self.keys())
+        # if column_filter is not None:
+        #     field_name_to_use = val.validate_selected_keys(column_filter, self.keys())  
+
+        # filter_array = None
+        # if row_filter is not None:
+        #     filter_array, is_field = val.validate_boolean_row_filter('row_filter', row_filter)
+        #     if is_field and row_filter.name in field_name_to_use:
+        #         field_name_to_use.remove(row_filter.name)
+
+        # fields_to_use = [self._columns[f] for f in field_name_to_use]
+
+        # with open(filepath, 'w') as f:
+        #     # writer = csvlib.writer(f, delimiter=',',lineterminator='\n')
+
+        #     # write header names
+        #     f.write(','.join(field_name_to_use) + '\n')
+
+        #     start_row = 0
+        #     while True:
+        #         chunk_data = []
+        #         for field in fields_to_use:
+        #             if field.indexed:
+        #                 # print(field.name, field)
+        #                 chunk_data.append(field.data[start_row: start_row+chunk_row_size])
+        #             else:
+        #                 chunk_data.append(field.data[start_row: start_row+chunk_row_size].tolist())
+
+        #         chunk_content = []
+        #         for i, row in enumerate(zip(*chunk_data)):
+        #             if filter_array is None or (i + start_row <len(filter_array) and filter_array[i + start_row] == True):                       
+        #                 chunk_content.append(','.join(str(x) for x in row))
+                
+        #         if len(chunk_content) >= 1:
+        #             f.write('\n'.join(chunk_content))
+        #             f.write('\n')
+
+        #         if len(chunk_data[0]) < chunk_row_size:
+        #             break
+        #         else:
+        #             start_row += chunk_row_size
+
+
     def to_csv(self, filepath:str, row_filter:Union[np.ndarray, fld.Field]=None, column_filter:Union[str, List[str]]=None, chunk_row_size:int=1000):
         """
         Write object to a comma-separated values (csv) file.
@@ -455,41 +507,93 @@ class HDF5DataFrame(DataFrame):
         filter_array = None
         if row_filter is not None:
             filter_array, is_field = val.validate_boolean_row_filter('row_filter', row_filter)
-            if is_field and row_filter.name in field_name_to_use:
-                field_name_to_use.remove(row_filter.name)
+            # if is_field and row_filter.name in field_name_to_use:
+            #     field_name_to_use.remove(row_filter.name)
 
         fields_to_use = [self._columns[f] for f in field_name_to_use]
 
-        with open(filepath, 'w') as f:
-            # writer = csvlib.writer(f, delimiter=',',lineterminator='\n')
+        if len(field_name_to_use) == 0:
+            raise ValueError('there no field to write')
 
-            # write header names
-            f.write(','.join(field_name_to_use) + '\n')
+        total_length = len(self[field_name_to_use[0]])
+
+        with open(filepath, 'wb') as f:
 
             start_row = 0
-            while True:
-                chunk_data = []
-                for field in fields_to_use:
-                    if field.indexed:
-                        # print(field.name, field)
-                        chunk_data.append(field.data[start_row: start_row+chunk_row_size])
-                    else:
-                        chunk_data.append(field.data[start_row: start_row+chunk_row_size].tolist())
 
-                chunk_content = []
-                for i, row in enumerate(zip(*chunk_data)):
-                    if filter_array is None or (i + start_row <len(filter_array) and filter_array[i + start_row] == True):                       
-                        chunk_content.append(','.join(str(x) for x in row))
-                
-                if len(chunk_content) >= 1:
-                    f.write('\n'.join(chunk_content))
-                    f.write('\n')
+            while start_row < total_length:
+                chunk_byte_size = chunk_row_size * 10
 
-                if len(chunk_data[0]) < chunk_row_size:
-                    break
-                else:
-                    start_row += chunk_row_size
+                total_indices = np.zeros(chunk_row_size + 1, dtype=np.int64)
 
+                # TODO: make indices_list, and values_list ndarray, instead of list
+                indices_list = []
+                values_list = []
+
+                for i, field in enumerate(fields_to_use):
+                    if isinstance(field, fld.NumericField):
+                        print(field.name, field._nformat)
+                        x = field.data[start_row: start_row+chunk_row_size]
+                        values = np.zeros(chunk_byte_size, dtype='S1')
+                        indices = np.zeros(len(x) + 1, dtype=np.int64)
+                        written_row_count, _ = ops.convert_ints_to_bytes(x, indices, values.data.cast('b'), chunk_byte_size)
+
+                        # print('values', values)
+                        # print('indices', indices)
+                        # print('written_row_count', written_row_count)
+                        
+                        if written_row_count < chunk_row_size:
+                            chunk_row_size = written_row_count
+                            indices = indices[:written_row_count + 1]
+                            total_indices = total_indices[:written_row_count + 1]
+
+                        total_indices += indices
+                        indices_list.append(indices.copy())
+                        values_list.append(values.copy())
+
+                        # add delimiter or newline
+                        delimiter_or_newline = np.arange(len(indices), dtype=np.int64) 
+                        delimiter_or_newline[0] = 0
+                        total_indices += delimiter_or_newline 
+
+                        indices_list.append(delimiter_or_newline.copy())
+                        
+                        if i == len(fields_to_use) - 1:
+                            values_list.append(np.array(['\n']*len(indices)))
+                        else:
+                            values_list.append(np.array([',']*len(indices)))
+
+
+                total_bytes = total_indices[-1]
+
+                # print('total_indices', total_indices)
+                # print('total_bytes', total_bytes)
+                chunk_bytes_array = np.zeros(total_bytes, dtype='S1')
+
+                assert(len(indices_list)== len(fields_to_use)*2)
+
+
+                for row in range(len(indices) - 1):
+                    byte_start_idx = total_indices[row]
+
+                    for col in range(len(fields_to_use) * 2):
+                        # print('byte_start_idx', byte_start_idx)
+
+                        value_start_idx = indices_list[col][row] 
+                        value_end_idx = indices_list[col][row + 1]
+                        
+                        byte_end_idx = byte_start_idx + value_end_idx - value_start_idx
+                        # print('byte_end_idx', byte_end_idx)
+                        chunk_bytes_array[byte_start_idx: byte_end_idx] = values_list[col][value_start_idx: value_end_idx]  
+                        # print('chunk_bytes_array', chunk_bytes_array)
+                        byte_start_idx = byte_end_idx
+                        # print('byte_start_idx', byte_start_idx)
+                    
+
+                f.write(chunk_bytes_array)
+
+                start_row += chunk_row_size
+                print('start_row', start_row)
 
                     
     def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):

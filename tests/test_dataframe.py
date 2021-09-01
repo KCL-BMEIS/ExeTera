@@ -608,6 +608,26 @@ class TestDataFrameToCSV(unittest.TestCase):
       
         os.close(fd_csv)
 
+    
+    def test_to_csv_with_multi_numeric_field(self):
+        val1 = np.asarray([0, 1, -2, 13], dtype='int32')
+        val2 = np.asarray([13, 124, -234, 15089], dtype='int32')
+        bio = BytesIO()
+        
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('val1', 'int32').data.write(val1)
+            df.create_numeric('val2', 'int32').data.write(val2)
+            df.to_csv(csv_file_name)
+
+        with open(csv_file_name, 'r') as f:
+            self.assertEqual(f.readlines(), ['0,13\n', '1,124\n', '-2,-234\n', '13,15089\n'])    
+
+        os.close(fd_csv)
+
 
 class TestDataFrameSort(unittest.TestCase):
 

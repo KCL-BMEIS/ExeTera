@@ -2841,3 +2841,50 @@ def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, wr
         for c in range(start_idx, end_idx):
             memory[a] = column_vals[c]
             a += 1
+
+
+@njit
+def convert_ints_to_bytes(input, indices, memory, chunk_byte_size):
+    b = np.uint8(0)
+    for i in range(len(input)):
+        v = input[i]
+        # special case: v = 0
+        if v == 0:
+            memory[b] = 48
+            indices[i + 1] = b + 1
+            b += 1
+            continue
+
+        # when v is negative 
+        if v < 0:
+            memory[b] = 45
+            indices[i + 1] = b + 1
+            b += 1
+            v = -v
+
+        # calculate the length of number
+        vv = v
+        l = 0
+        while vv != 0:
+            l += 1
+            vv //= 10
+
+        # if value exceeds memory size, then return written row count (i - 1 + 1 = i)
+        if b + l >= chunk_byte_size:
+            return i, b
+        
+        # assign the index
+        indices[i + 1] = b + l
+
+        # get each digit of number (from low digit to high digit)
+        for j in range(l - 1, -1, -1):
+            memory[b + j] = (v % 10) + 48
+            v //= 10
+
+        # update b
+        b += l
+
+    return len(input), b
+
+
+        
