@@ -526,9 +526,8 @@ class HDF5DataFrame(DataFrame):
 
                 total_indices = np.zeros(chunk_row_size + 1, dtype=np.int64)
 
-                # TODO: make indices_list, and values_list ndarray, instead of list
-                indices_list = []
-                values_list = []
+                fields_indices = np.zeros((chunk_row_size + 1, len(fields_to_use)*2), dtype=np.int64)
+                fields_values = np.zeros((chunk_byte_size, len(fields_to_use)*2), dtype='S1')
 
                 for i, field in enumerate(fields_to_use):
                     if isinstance(field, fld.NumericField):
@@ -546,31 +545,29 @@ class HDF5DataFrame(DataFrame):
                             chunk_row_size = written_row_count
                             indices = indices[:written_row_count + 1]
                             total_indices = total_indices[:written_row_count + 1]
+                            fields_indices = fields_indices[:written_row_count + 1, :]
 
                         total_indices += indices
-                        indices_list.append(indices.copy())
-                        values_list.append(values.copy())
+                        fields_indices[:, 2*i] = indices.copy()
+                        fields_values[:, 2*i] = values.copy()
 
                         # add delimiter or newline
                         delimiter_or_newline = np.arange(len(indices), dtype=np.int64) 
                         delimiter_or_newline[0] = 0
                         total_indices += delimiter_or_newline 
 
-                        indices_list.append(delimiter_or_newline.copy())
+                        fields_indices[:, 2*i+1] = delimiter_or_newline.copy()
                         
                         if i == len(fields_to_use) - 1:
-                            values_list.append(np.array(['\n']*len(indices)))
+                            fields_values[:, 2*i+1] = np.array(['\n']*len(values))
                         else:
-                            values_list.append(np.array([',']*len(indices)))
-
+                            fields_values[:, 2*i+1] = np.array([',']*len(values))
 
                 total_bytes = total_indices[-1]
 
                 # print('total_indices', total_indices)
                 # print('total_bytes', total_bytes)
                 chunk_bytes_array = np.zeros(total_bytes, dtype='S1')
-
-                assert(len(indices_list)== len(fields_to_use)*2)
 
 
                 for row in range(len(indices) - 1):
@@ -579,12 +576,12 @@ class HDF5DataFrame(DataFrame):
                     for col in range(len(fields_to_use) * 2):
                         # print('byte_start_idx', byte_start_idx)
 
-                        value_start_idx = indices_list[col][row] 
-                        value_end_idx = indices_list[col][row + 1]
+                        value_start_idx = fields_indices[row, col] 
+                        value_end_idx = fields_indices[row + 1, col]
                         
                         byte_end_idx = byte_start_idx + value_end_idx - value_start_idx
                         # print('byte_end_idx', byte_end_idx)
-                        chunk_bytes_array[byte_start_idx: byte_end_idx] = values_list[col][value_start_idx: value_end_idx]  
+                        chunk_bytes_array[byte_start_idx: byte_end_idx] = fields_values[value_start_idx: value_end_idx, col] 
                         # print('chunk_bytes_array', chunk_bytes_array)
                         byte_start_idx = byte_end_idx
                         # print('byte_start_idx', byte_start_idx)
