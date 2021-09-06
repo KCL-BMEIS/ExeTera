@@ -466,9 +466,11 @@ class HDF5DataFrame(DataFrame):
         sorted_index = self._dataset.session.dataset_sort_index(
             readers, np.arange(len(readers[0].data), dtype=np.uint32))
 
+        print('sorted_index', sorted_index)
+
         return self.apply_index(sorted_index, ddf)
 
-            
+
     def distinct(self, by: Union[str, List[str]], 
                        ddf: DataFrame = None):
         """
@@ -506,6 +508,19 @@ class HDF5DataFrame(DataFrame):
             newfld.data.write(results[i])
 
         return ddf
+
+            
+    def drop_duplicate(self, by: Union[str, List[str]], 
+                       ddf: DataFrame = None,
+                       hint_keys_is_sorted=False):
+        """
+        Distinct values of a field or a list of field, return a dataframe with distinct values.
+        
+        :param by: Name (str) or list of names (str) to distinct.
+        :param ddf: optional - the destination dataframe
+        :returns: DataFrame with distinct values.
+        """
+        return self.groupby(by, hint_keys_is_sorted).distinct(ddf)
 
         
     def groupby(self, by: Union[str, List[str]], hint_keys_is_sorted=False):         
@@ -589,6 +604,10 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
         return ddf
 
+    def distinct(self, ddf: DataFrame, write_keys=True) -> DataFrame:
+        self._write_groupby_keys(ddf, write_keys)
+        return ddf
+        
 
     def max(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
         """
