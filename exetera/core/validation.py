@@ -337,3 +337,8 @@ def validate_groupby_target(target, by, all):
         raise ValueError('target = {} should not overlap groupby keys'.format(overlap_2))
     else:
         return result
+
+def validate_require_key(context, key, dictionary):
+    if key not in dictionary:
+        msg = "'{}': '{}' missing from fields".format(context, key)
+        raise ValueError(msg)

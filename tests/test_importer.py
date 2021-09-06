@@ -4,8 +4,8 @@ import tempfile
 import os
 import h5py
 from datetime import datetime, timezone
-from exetera.core import importer
-from exetera.core.load_schema import NewDataSchema
+from exetera.io import importer
+from exetera.core import utils, session
 import numpy as np
 from io import BytesIO, StringIO
 
@@ -105,6 +105,8 @@ TEST_CSV_CONTENTS = '\n'.join((
 class TestImporter(unittest.TestCase):
     def setUp(self):
         self.ts = str(datetime.now(timezone.utc))
+        self.ds_name = 'test_ds'
+        self.chunk_row_size = 100
 
         # csv file
         self.fd_csv, self.csv_file_name = tempfile.mkstemp(suffix='.csv')
@@ -114,18 +116,25 @@ class TestImporter(unittest.TestCase):
 
         # schema can use StringIO to replace csv file
         self.schema = StringIO(TEST_SCHEMA)
-        self.chunk_row_size = 100
 
 
     def test_importer_with_arg_include(self):
         include, exclude = {'schema_key': ['id', 'name']}, {}
 
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, include, exclude, chunk_row_size=self.chunk_row_size)
+        with session.Session() as s:
+            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, include, exclude, chunk_row_size=self.chunk_row_size)
+
+            ds = s.get_dataset(self.ds_name)
+            df = ds.get_dataframe('schema_key')
+            self.assertEqual(df['id'].data[:].tolist(), [1,2,3,4,5])
+            self.assertEqual(df['name'].data[:], ['a','bb','ccc','dddd','eeeee'])
+
         with h5py.File(bio, 'r') as hf:
             self.assertListEqual(list(hf.keys()), ['schema_key'])
             self.assertTrue(set(hf['schema_key'].keys()) >= set(['id', 'name']))
-            self.assertEqual(hf['schema_key']['id']['values'].shape[0], 5)
+            self.assertEqual(hf['schema_key']['id']['values'][:].tolist(), [1,2,3,4,5])
+            self.assertEqual(hf['schema_key']['name']['index'][:].tolist(), [0,1,3,6,10,15])
 
 
     def test_importer_with_wrong_arg_include(self):
@@ -133,7 +142,7 @@ class TestImporter(unittest.TestCase):
         include, exclude = {'schema_wrong_key': ['id', 'name']}, {}
 
         with self.assertRaises(Exception) as context:
-            importer.import_with_schema(self.ts, bio, self.schema, self.files, False, include, exclude, chunk_row_size=self.chunk_row_size)
+            importer.import_with_schema(None, self.ts, self.ds_name, bio, self.schema, self.files, False, include, exclude, chunk_row_size=self.chunk_row_size)
         
         self.assertEqual(str(context.exception), "-n/--include: the following include table(s) are not part of any input files: {'schema_wrong_key'}")
                     
@@ -142,49 +151,69 @@ class TestImporter(unittest.TestCase):
         bio = BytesIO()
         include, exclude = {}, {'schema_key':['updated_at']}
 
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, include, exclude, chunk_row_size=self.chunk_row_size)
+        with session.Session() as s:
+            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, include, exclude, chunk_row_size=self.chunk_row_size)
+            ds = s.get_dataset(self.ds_name)
+            df = ds.get_dataframe('schema_key')
+            self.assertTrue('updated_at' not in df)
+
         with h5py.File(bio, 'r') as hf:
-            self.assertListEqual(list(hf.keys()), ['schema_key'])
             self.assertTrue('updated_at' not in set(hf['schema_key'].keys()))
-            self.assertEqual(hf['schema_key']['id']['values'].shape[0], 5)
 
 
-    def test_date_importer_without_create_day_field(self):     
+    def test_importer_date(self):
+        expected_birthday_date = [b'1990-01-01', b'1980-03-04', b'1970-04-05', b'1960-04-05', b'1950-04-05']
+
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+        with session.Session() as s:
+            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+            ds = s.get_dataset(self.ds_name)
+            df = ds.get_dataframe('schema_key')
+            self.assertEqual(df['birthday'].data[:].tolist(), expected_birthday_date)
+
         with h5py.File(bio, 'r') as hf:
-            self.assertTrue('birthday' in set(hf['schema_key'].keys()))  
-            self.assertEqual(datetime.fromtimestamp(hf['schema_key']['birthday']['values'][1]).strftime("%Y-%m-%d"), '1980-03-04')
-            
-            self.assertTrue('birthday_day' not in set(hf['schema_key'].keys()))       
+            self.assertEqual(hf['schema_key']['birthday']['values'][:].tolist(), expected_birthday_date)
 
 
-    def test_datetime_importer_with_create_day_field_True(self):
+    def test_importer_datetime_with_create_day_field(self):
+        expected_updated_at_list = ['2020-05-12 07:00:00', '2020-05-13 01:00:00', '2020-05-14 03:00:00', '2020-05-15 03:00:00', '2020-05-16 03:00:00']
+        expected_updated_at_date_list = [b'2020-05-12', b'2020-05-13', b'2020-05-14',b'2020-05-15',b'2020-05-16']
+
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
-        with h5py.File(bio, 'r') as hf:
-            self.assertTrue('updated_at' in set(hf['schema_key'].keys()))                
-            self.assertEqual(datetime.fromtimestamp(hf['schema_key']['updated_at']['values'][1]).strftime("%Y-%m-%d %H:%M:%S"), '2020-05-13 01:00:00')  
+        with session.Session() as s:
+            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+            ds = s.get_dataset(self.ds_name)
+            df = ds.get_dataframe('schema_key')
+            self.assertEqual(df['updated_at'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d %H:%M:%S").timestamp() for x in expected_updated_at_list])
+            self.assertEqual(df['updated_at_day'].data[:].tolist(), expected_updated_at_date_list )
 
-            self.assertTrue('updated_at_day' in set(hf['schema_key'].keys()))         
-            self.assertEqual(hf['schema_key']['updated_at_day']['values'][1], b'2020-05-13')
+        with h5py.File(bio, 'r') as hf:
+            print(hf['schema_key']['updated_at']['values'][:])              
+            self.assertAlmostEqual(hf['schema_key']['updated_at']['values'][:].tolist(), [datetime.strptime(x, "%Y-%m-%d %H:%M:%S").timestamp() for x in expected_updated_at_list])  
+            self.assertEqual(hf['schema_key']['updated_at_day']['values'][:].tolist(), expected_updated_at_date_list)
 
 
     def test_numeric_field_importer_with_small_chunk_size(self):
-        bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
-
         # numeric int field
         expected_age_list = list(np.array([30,40,50,60,70], dtype = np.int32 ))
         # numeric float field with default value
         expected_height_list = list(np.array([170.9,180.2,160.5,160.5,161.0], dtype = np.float32))
         # numeric float field with min_default_value
-        expected_weight_change_list = list(np.array([21.2, NewDataSchema._get_min_max('float32')[0], -17.5, -17.5, 2.5], dtype = np.float32))
+        expected_weight_change_list = list(np.array([21.2, utils.get_min_max('float32')[0], -17.5, -17.5, 2.5], dtype = np.float32))
+
+        bio = BytesIO()
+        with session.Session() as s:
+            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+            ds = s.get_dataset(self.ds_name)
+            df = ds.get_dataframe('schema_key')
+            self.assertEqual(df['age'].data[:].tolist(), expected_age_list)
+            self.assertEqual(df['height'].data[:].tolist(), expected_height_list)
+            self.assertEqual(df['weight_change'].data[:].tolist(), expected_weight_change_list)
 
         with h5py.File(bio, 'r') as hf:
-            self.assertListEqual(list(hf['schema_key']['age']['values'][:]), expected_age_list)
-            self.assertListEqual(list(hf['schema_key']['height']['values'][:]), expected_height_list)
-            self.assertListEqual(list(hf['schema_key']['weight_change']['values'][:]), expected_weight_change_list)
+            self.assertListEqual(hf['schema_key']['age']['values'][:].tolist(), expected_age_list)
+            self.assertListEqual(hf['schema_key']['height']['values'][:].tolist(), expected_height_list)
+            self.assertListEqual(hf['schema_key']['weight_change']['values'][:].tolist(), expected_weight_change_list)
 
 
     def test_numeric_importer_with_empty_value_in_strict_mode(self):
@@ -201,11 +230,11 @@ class TestImporter(unittest.TestCase):
         files = {'schema_key': csv_file_name}
         
         bio = BytesIO()
-        expected = ("Field 'id' contains values that cannot "
-                    "be converted to float in 'strict' mode")
         with self.assertRaises(ValueError) as context:
-            importer.import_with_schema(self.ts, bio, self.schema, files, False, {}, {},
-                                        chunk_row_size=self.chunk_row_size)
+            with session.Session() as s:
+                importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+
+        self.assertEqual(str(context.exception), "Field 'id' contains values that cannot be converted to float in 'strict' mode")
         
         os.close(fd_csv)
 
@@ -224,90 +253,132 @@ class TestImporter(unittest.TestCase):
         files = {'schema_key': csv_file_name}
         
         bio = BytesIO()
-        expected = ("Field 'id' contains values that cannot "
-                    "be converted to float in 'strict' mode")
-        with self.assertRaises(ValueError, msg=expected):
-            importer.import_with_schema(self.ts, bio, self.schema, files, False, {}, {},
-                                        chunk_row_size=self.chunk_row_size)
+        with self.assertRaises(ValueError) as context:
+            with session.Session() as s:
+                importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+
+        self.assertEqual(str(context.exception), "Field 'id' contains values that cannot be converted to float in 'strict' mode")
 
         os.close(fd_csv)
 
 
     def test_numeric_importer_with_non_empty_valid_value_in_strict_mode(self):
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {},
-                                    chunk_row_size=self.chunk_row_size)
+        with session.Session() as s:
+            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+            ds = s.get_dataset(self.ds_name)
+            df = ds.get_dataframe('schema_key')
+            self.assertEqual(df['id'].data[:].tolist(), [1,2,3,4,5])
+            self.assertTrue('id_valid' not in df)
+
         with h5py.File(bio, 'r') as hf:
-            self.assertTrue('id' in set(hf['schema_key'].keys()))  
+            self.assertEqual(hf['schema_key']['id']['values'][:].tolist(), [1,2,3,4,5])  
             self.assertTrue('id_valid' not in set(hf['schema_key'].keys()))
 
 
     def test_numeric_importer_in_allow_empty_mode(self):
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {})
+        with session.Session() as s:
+            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+            ds = s.get_dataset(self.ds_name)
+            df = ds.get_dataframe('schema_key')
+            self.assertEqual(df['age_valid'].data[:].tolist(),  [True, True, True, True, True])
+            self.assertTrue('weight_change_valid' not in df)
+
         with h5py.File(bio, 'r') as hf:
-            self.assertTrue('age' in set(hf['schema_key'].keys()))
-            self.assertTrue('age_valid' in set(hf['schema_key'].keys()))
-            self.assertTrue('weight_change' in set(hf['schema_key'].keys()))
+            self.assertTrue(hf['schema_key']['age']['values'][:].tolist(), [30,40,50,60,70])
+            self.assertTrue(hf['schema_key']['age_valid']['values'][:].tolist(), [True, True, True, True, True])
             self.assertTrue('weight_change_valid' not in set(hf['schema_key'].keys()))            
 
 
     def test_numeric_importer_in_relaxed_mode(self):
+        expected_height_list = list(np.asarray([170.9, 180.2, 160.5, 160.5, 161.0], dtype=np.float32))
+
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+        with session.Session() as s:
+            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, None, None, chunk_row_size=self.chunk_row_size)
+            ds = s.get_dataset(self.ds_name)
+            df = ds.get_dataframe('schema_key')
+            self.assertEqual(df['height'].data[:].tolist(), expected_height_list)
+            self.assertTrue('height_valid' not in df)
+            self.assertEqual(df['height_valid_test'].data[:].tolist(), [True, True, False, False, True])
+            self.assertEqual(df['BMI_valid'].data[:].tolist(), [True, True, True, True, True])
+
         with h5py.File(bio, 'r') as hf:
-            self.assertTrue('height' in set(hf['schema_key'].keys()))
+            self.assertEqual(hf['schema_key']['height']['values'][:].tolist(), expected_height_list)
             self.assertTrue('height_valid' not in set(hf['schema_key'].keys()))
-            self.assertTrue('height_valid_test' in set(hf['schema_key'].keys()))
-            self.assertTrue('BMI' in set(hf['schema_key'].keys()))
-            self.assertTrue('BMI_valid' in set(hf['schema_key'].keys()))
+            self.assertTrue(hf['schema_key']['height_valid_test']['values'][:].tolist(), [True, True, False, False, True])
+            self.assertTrue(hf['schema_key']['BMI']['values'][:].tolist(), [20.5, 25.4, 27.2, 27.2, 20.2])
+            self.assertTrue(hf['schema_key']['BMI_valid']['values'][:].tolist(), [True, True, True, True, True])
 
 
     def test_indexed_string_importer_with_small_chunk_size(self):
         chunk_row_size = 20 # chunk_row_size * column_count < total_bytes
 
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=chunk_row_size)
+        with session.Session() as s:
+            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, None, None, chunk_row_size=chunk_row_size)
+            ds = s.get_dataset(self.ds_name)
+            df = ds.get_dataframe('schema_key')
+            self.assertEqual(df['name'].data[:], ['a','bb','ccc','dddd','eeeee'])
+
         with h5py.File(bio, 'r') as hf:
             indices = hf['schema_key']['name']['index'][:]
             values = hf['schema_key']['name']['values'][:]
 
-        self.assertListEqual(list(indices), [0,1,3,6,10,15])
-        self.assertEqual(values[indices[0]:indices[1]].tobytes(), b'a')
-        self.assertEqual(values[indices[3]:indices[4]].tobytes(), b'dddd')
+            self.assertListEqual(list(indices), [0,1,3,6,10,15])
+            self.assertEqual(values[indices[0]:indices[1]].tobytes(), b'a')
+            self.assertEqual(values[indices[3]:indices[4]].tobytes(), b'dddd')
 
 
     def test_categorical_field_importer_with_small_chunk_size(self):
         chunk_row_size = 20 # chunk_row_size * column_count < total_bytes
+
+        expected_postcode_value_list = [1, 3, 2, 0, 4]
+        expected_key_names = [b'', b'NW1', b'E1', b'SW1P', b'NW3']
+        expected_key_values = [0,1,2,3,4]
         
         bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=chunk_row_size)
-        with h5py.File(bio, 'r') as hf:
-            expected_postcode_value_list = [1, 3, 2, 0, 4]
-            expected_key_names = [b'', b'NW1', b'E1', b'SW1P', b'NW3']
-            expected_key_values = [0,1,2,3,4]
+        with session.Session() as s:
+            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, None, None, chunk_row_size=chunk_row_size)
+            ds = s.get_dataset(self.ds_name)
+            df = ds.get_dataframe('schema_key')
+            self.assertEqual(df['postcode'].data[:].tolist(), expected_postcode_value_list)
 
-            self.assertEqual(list(hf['schema_key']['postcode']['values'][:]), expected_postcode_value_list)
-            self.assertEqual(list(hf['schema_key']['postcode']['key_names'][:]), expected_key_names)
-            self.assertEqual(list(hf['schema_key']['postcode']['key_values'][:]), expected_key_values)
+        with h5py.File(bio, 'r') as hf:
+            self.assertEqual(hf['schema_key']['postcode']['values'][:].tolist(), expected_postcode_value_list)
+            self.assertEqual(hf['schema_key']['postcode']['key_names'][:].tolist(), expected_key_names)
+            self.assertEqual(hf['schema_key']['postcode']['key_values'][:].tolist(), expected_key_values)
 
 
     def test_fixed_string_field_importer(self):
-        bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
-
         expected_patient_id_value_list = [b'E1', b'E123', b'E234', b'', b'E456']
+
+        bio = BytesIO()
+        with session.Session() as s:
+            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, None, None, chunk_row_size=self.chunk_row_size)
+            ds = s.get_dataset(self.ds_name)
+            df = ds.get_dataframe('schema_key')
+            self.assertEqual(df['patient_id'].data[:].tolist(), expected_patient_id_value_list)            
+
         with h5py.File(bio, 'r') as hf:
-            self.assertEqual(list(hf['schema_key']['patient_id']['values'][:]), expected_patient_id_value_list)
+            self.assertEqual(hf['schema_key']['patient_id']['values'][:].tolist(), expected_patient_id_value_list)
 
 
     def test_leaky_categorical_field_importer(self):
-        bio = BytesIO()
-        importer.import_with_schema(self.ts, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
-
         expected_degree_value_list = [1, 2, 0, -1, 3]
         expected_degree_freetext_index_list = [0, 0, 0, 0, 4, 4]
         expected_degree_freetext_value_list = list(np.frombuffer(b'prof', dtype = np.uint8))
+
+        bio = BytesIO()
+        with session.Session() as s:
+            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, None, None, chunk_row_size=self.chunk_row_size)
+            ds = s.get_dataset(self.ds_name)
+            df = ds.get_dataframe('schema_key')
+            self.assertEqual(df['degree'].data[:].tolist(), expected_degree_value_list)
+            self.assertEqual(df['degree_freetext'].indices[:].tolist(), expected_degree_freetext_index_list)
+            self.assertEqual(df['degree_freetext'].values[:].tolist(), expected_degree_freetext_value_list)
+
         with h5py.File(bio, 'r') as hf:
             self.assertEqual(list(hf['schema_key']['degree']['values'][:]), expected_degree_value_list)
             self.assertEqual(list(hf['schema_key']['degree_freetext']['index'][:]), expected_degree_freetext_index_list)

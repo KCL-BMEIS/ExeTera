@@ -93,6 +93,10 @@ class Dataset(ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def require_dataframe(self, name: str):
+        raise NotImplementedError()
+
+    @abstractmethod
     def close(self):
         raise NotImplementedError()
 

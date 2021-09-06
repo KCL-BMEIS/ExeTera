@@ -1,5 +1,4 @@
 import time
-from exetera.core.load_schema import load_schema
 from exetera.core.session import Session
 from exetera.core.journal import journal_test_harness
 

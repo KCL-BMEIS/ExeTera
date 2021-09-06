@@ -1,3 +1,4 @@
+from exetera.core.operations import INVALID_INDEX
 import unittest
 from io import BytesIO
 import numpy as np

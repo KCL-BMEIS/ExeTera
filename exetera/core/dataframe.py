@@ -475,7 +475,7 @@ class HDF5DataFrame(DataFrame):
         Distinct values of a field or a list of field, return a dataframe with distinct values.
         
         :param by: Name (str) or list of names (str) to distinct.
-        :param ddf: optional - the destination data frame
+        :param ddf: optional - the destination dataframe
         :returns: DataFrame with distinct values.
         """
         keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())

@@ -9,6 +9,7 @@ Subpackages
    
    exetera.core
    exetera.processing
+   exetera.io
 
 Module contents
 ---------------
