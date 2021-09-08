@@ -471,7 +471,7 @@ class HDF5DataFrame(DataFrame):
         return self.apply_index(sorted_index, ddf)
 
             
-    def drop_duplicate(self, by: Union[str, List[str]], 
+    def drop_duplicates(self, by: Union[str, List[str]], 
                        ddf: DataFrame = None,
                        hint_keys_is_sorted=False):
         """

@@ -500,7 +500,7 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             ddf = dst.create_dataframe('ddf')
 
-            df.drop_duplicate(by = 'val', ddf = ddf)
+            df.drop_duplicates(by = 'val', ddf = ddf)
 
             self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())        
         
@@ -517,7 +517,7 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             ddf = dst.create_dataframe('ddf')
 
-            df.drop_duplicate(by = ['val', 'val2'], ddf = ddf)
+            df.drop_duplicates(by = ['val', 'val2'], ddf = ddf)
 
             self.assertListEqual([0, 1, 2, 2, 3, 3], ddf['val'].data[:].tolist())        
             self.assertListEqual([b'b', b'a', b'b', b'c', b'c', b'd'], ddf['val2'].data[:].tolist())        
