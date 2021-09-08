@@ -470,45 +470,6 @@ class HDF5DataFrame(DataFrame):
 
         return self.apply_index(sorted_index, ddf)
 
-
-    def distinct(self, by: Union[str, List[str]], 
-                       ddf: DataFrame = None):
-        """
-        Distinct values of a field or a list of field, return a dataframe with distinct values.
-        
-        :param by: Name (str) or list of names (str) to distinct.
-        :param ddf: optional - the destination dataframe
-        :returns: DataFrame with distinct values.
-        """
-        keys = val.validate_sort_and_groupby_keys(by, self._columns.keys())
-
-        if ddf is not None and not isinstance(ddf, DataFrame):
-            raise TypeError("The destination object must be an instance of DataFrame.")
-    
-        fields = tuple(self._columns[k] for k in keys)
-        results = []
-
-        if len(keys) == 1:
-            results = [np.unique(fields[0].data)]
-
-        elif len(keys) > 1:
-            entries = [(f'{i}', f.data.dtype) for i, f in enumerate(fields)]
-            unified = np.empty_like(fields[0].data, dtype=np.dtype(entries))
-            for i, f in enumerate(fields):
-                unified[f'{i}'] = f.data
-
-            uniques = np.unique(unified)
-            results = [uniques[f'{i}'] for i in range(len(fields))]
-
-        if ddf is None:
-            ddf = self._dataset.create_dataframe('ddf')
-
-        for i, field in enumerate(fields):
-            newfld = field.create_like(ddf, field.name)
-            newfld.data.write(results[i])
-
-        return ddf
-
             
     def drop_duplicate(self, by: Union[str, List[str]], 
                        ddf: DataFrame = None,
@@ -555,7 +516,7 @@ class HDF5DataFrame(DataFrame):
             sorted_by_fields_data = np.asarray([self._columns[k].data[:] for k in by])
 
         spans = ops._get_spans_for_multi_fields(sorted_by_fields_data)
-
+        
         return HDF5DataFrameGroupBy(self._columns, by, sorted_index, spans)
 
 
@@ -579,10 +540,11 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
             for field in by_fields:
                 newfld = field.create_like(ddf, field.name)
                 
-                if self._sorted_index is not None: 
-                    field.apply_index(self._sorted_index, target=newfld)
-
-                newfld.apply_filter(self._spans[:-1], in_place=True)
+                if self._sorted_index is not None:                    
+                    field.apply_index(self._sorted_index, target=newfld)                  
+                    newfld.apply_filter(self._spans[:-1], in_place=True)
+                else:
+                    field.apply_filter(self._spans[:-1], target=newfld)
 
     
     def count(self, ddf: DataFrame, write_keys=True) -> DataFrame:
@@ -631,8 +593,10 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
             if self._sorted_index is not None:
                 field.apply_index(self._sorted_index, target=newfld)
 
-            # apply spans to target fields
-            newfld.apply_spans_max(self._spans, in_place=True)
+                # apply spans to target fields
+                newfld.apply_spans_max(self._spans, in_place=True)
+            else:
+                field.apply_spans_max(self._spans, target=newfld)
 
         return ddf
 
@@ -659,8 +623,10 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
             if self._sorted_index is not None:
                 field.apply_index(self._sorted_index, target=newfld)
 
-            # apply spans to target fields
-            newfld.apply_spans_min(self._spans, in_place=True)
+                # apply spans to target fields
+                newfld.apply_spans_min(self._spans, in_place=True)
+            else:
+                field.apply_spans_min(self._spans, target=newfld)
 
         return ddf
 
@@ -686,9 +652,10 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
             # sort first if needed
             if self._sorted_index is not None:
                 field.apply_index(self._sorted_index, target=newfld)
-
-            # apply spans to target fields
-            newfld.apply_spans_first(self._spans, in_place=True)
+                # apply spans to target fields
+                newfld.apply_spans_first(self._spans, in_place=True)
+            else:
+                field.apply_spans_first(self._spans, target=newfld)
 
         return ddf
 
@@ -714,9 +681,10 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
             # sort first if needed
             if self._sorted_index is not None:
                 field.apply_index(self._sorted_index, target=newfld)
-
-            # apply spans to target fields
-            newfld.apply_spans_last(self._spans, in_place=True)
+                # apply spans to target fields
+                newfld.apply_spans_last(self._spans, in_place=True)
+            else:
+                field.apply_spans_last(self._spans, target=newfld)
             
         return ddf
 

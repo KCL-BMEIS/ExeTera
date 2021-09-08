@@ -485,6 +485,7 @@ class TestDataFrameMerge(unittest.TestCase):
             self.assertEqual(ddf['l_id_2'].data[:].tolist(), ddf['r_id_2'].data[:].tolist())
 
 
+
 class TestDataFrameGroupBy(unittest.TestCase):
 
     def test_distinct_single_field(self):
@@ -499,7 +500,7 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             ddf = dst.create_dataframe('ddf')
 
-            df.distinct(by = 'val', ddf = ddf)
+            df.drop_duplicate(by = 'val', ddf = ddf)
 
             self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())        
         
@@ -516,7 +517,7 @@ class TestDataFrameGroupBy(unittest.TestCase):
 
             ddf = dst.create_dataframe('ddf')
 
-            df.distinct(by = ['val', 'val2'], ddf = ddf)
+            df.drop_duplicate(by = ['val', 'val2'], ddf = ddf)
 
             self.assertListEqual([0, 1, 2, 2, 3, 3], ddf['val'].data[:].tolist())        
             self.assertListEqual([b'b', b'a', b'b', b'c', b'c', b'd'], ddf['val2'].data[:].tolist())        
@@ -676,7 +677,24 @@ class TestDataFrameGroupBy(unittest.TestCase):
             df.groupby(by = 'val').last(target ='val2', ddf = ddf)
             
             self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
-            self.assertListEqual([0, 2, 5, 1], ddf['val2_last'].data[:].tolist())    
+            self.assertListEqual([0, 2, 5, 1], ddf['val2_last'].data[:].tolist()) 
+
+
+    def test_groupby_sorted_field(self):
+        val = np.asarray([0,0,0,1,1,1,3], dtype=np.int32)
+        val2 = np.asarray(['a','b','b','c','d','d','f'], dtype='S1')   
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_fixed_string("val2", 1).data.write(val2)
+            ddf = dst.create_dataframe('ddf')
+
+            df.groupby(by = 'val').min(target ='val2', ddf = ddf)
+
+            self.assertListEqual([0, 1, 3], ddf['val'].data[:].tolist())
+            self.assertListEqual([b'a', b'c', b'f'], ddf['val2_min'].data[:].tolist())
 
 
 class TestDataFrameSort(unittest.TestCase):
