@@ -477,6 +477,8 @@ class HDF5DataFrame(DataFrame):
         :param column_filter: A sequence of string names for the fields.
         :chunk_row_size: Write rows for every chunk which has maximum chunk_row_size rows. The default is 1<<15.
         """
+        val.validate_chunk_size('chunk_row_size', chunk_row_size)
+
         column_names = self.keys()
         column_fields = self.values()
         field_name_to_use = list(self.keys())

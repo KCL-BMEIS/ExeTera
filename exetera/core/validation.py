@@ -328,3 +328,8 @@ def validate_boolean_row_filter(name, field):
         raise ValueError("'{}' must be boolean field, but is {}".format(name, field._nformat))
 
     return array_from_field_or_lower(name, field), isinstance(field, Field)
+
+
+def validate_chunk_size(chunk_size_name, chunk_size):
+    if chunk_size <= 0:
+        raise ValueError("'{}' must be larger than 0.".format(chunk_size_name))
