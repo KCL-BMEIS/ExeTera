@@ -2,6 +2,8 @@ from exetera.core.operations import INVALID_INDEX
 import unittest
 from io import BytesIO
 import numpy as np
+import tempfile
+import os
 
 from exetera.core import session
 from exetera.core import fields
@@ -762,3 +764,108 @@ class TestDataFrameSort(unittest.TestCase):
                 df.sort_values(by = 'idx')
 
             self.assertEqual(str(context.exception), "There are consistent lengths in dataframe 'ds'. The following length were observed: {4, 5}") 
+
+
+class TestDataFrameToCSV(unittest.TestCase):
+
+    def test_to_csv_file(self):
+        val1 = np.asarray([0, 1, 2, 3], dtype='int32')
+        val2 = ['zero', 'one', 'two', 'three']
+        bio = BytesIO()
+
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('val1', 'int32').data.write(val1)
+            df.create_indexed_string('val2').data.write(val2)
+            df.to_csv(csv_file_name)
+
+        with open(csv_file_name, 'r') as f:
+            self.assertEqual(f.readlines(), ['val1,val2\n', '0,zero\n', '1,one\n', '2,two\n', '3,three\n'])
+
+        os.close(fd_csv)
+
+
+    def test_to_csv_small_chunk_row_size(self):
+        val1 = np.asarray([0, 1, 2, 3], dtype='int32')
+        val2 = ['zero', 'one', 'two', 'three']
+        bio = BytesIO()
+
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('val1', 'int32').data.write(val1)
+            df.create_indexed_string('val2').data.write(val2)
+            df.to_csv(csv_file_name, chunk_row_size=2)
+
+        with open(csv_file_name, 'r') as f:
+            self.assertEqual(f.readlines(), ['val1,val2\n', '0,zero\n', '1,one\n', '2,two\n', '3,three\n'])
+
+        os.close(fd_csv) 
+
+
+    def test_to_csv_with_column_filter(self):
+        val1 = np.asarray([0, 1, 2, 3], dtype='int32')
+        val2 = ['zero', 'one', 'two', 'three']
+        bio = BytesIO()
+
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('val1', 'int32').data.write(val1)
+            df.create_indexed_string('val2').data.write(val2)
+            df.to_csv(csv_file_name, column_filter=['val1'])
+
+        with open(csv_file_name, 'r') as f:
+            self.assertEqual(f.readlines(), ['val1\n', '0\n', '1\n', '2\n', '3\n'])
+
+        os.close(fd_csv)    
+
+
+    def test_to_csv_with_row_filter_field(self):
+        val1 = np.asarray([0, 1, 2, 3], dtype='int32')
+        val2 = [True, False, True, False]
+        bio = BytesIO()
+
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('val1', 'int32').data.write(val1)
+            df.create_numeric('val2', 'bool').data.write(val2)
+            df.to_csv(csv_file_name, row_filter=df['val2'])
+
+        with open(csv_file_name, 'r') as f:
+            self.assertEqual(f.readlines(), ['val1\n', '0\n', '2\n'])
+
+        os.close(fd_csv)      
+
+
+    def test_to_csv_with_row_filter_field(self):
+        val1 = np.asarray([0, 1, 2, 3], dtype='int32')
+        val2 = ['zero', 'one', 'two', 'three']
+        row_filter = np.array([True, False, True, False])
+        bio = BytesIO()
+
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('val1', 'int32').data.write(val1)
+            df.create_indexed_string('val2').data.write(val2)
+            df.to_csv(csv_file_name, row_filter=row_filter)
+
+        with open(csv_file_name, 'r') as f:
+            self.assertEqual(f.readlines(), ['val1,val2\n', '0,zero\n', '2,two\n'])
+
+        os.close(fd_csv)     
+
+        
