@@ -92,7 +92,7 @@ def to_csv_byte_array_benchmark():
 
 
 def distinct_benchmark():
-    hdf5_df_distinct()
+    # hdf5_df_distinct()
     pandas_drop_duplicate()
 
 
@@ -121,7 +121,7 @@ def hdf5_df_distinct():
 
         df = ds[schema_key] 
 
-        # print(df.keys())
+        print(df.keys())
 
         # # 1
         # print('@@@@  1  @@@@')
@@ -137,11 +137,15 @@ def hdf5_df_distinct():
 
         # # 2
         # print('@@@@  2  @@@@')
-        # ddf_2 = ds.require_dataframe(ddf_2_name) 
+        
 
         # time0 = time.time()
-        # df.groupby(by = 'country_code').distinct(ddf = ddf_2)
-        # print('group by first then distinct, used time', time.time() - time0)
+        # for i in range(1000):
+        #     ddf_2 = ds.require_dataframe(ddf_2_name) 
+        #     df.groupby(by = 'country_code').distinct(ddf = ddf_2)
+        #     ds.delete_dataframe(ddf_2)
+
+        # print('group by first then distinct, used time', (time.time() - time0)/1000)
 
         # print('destination dataframe keys', ddf_2.keys())
         # result = ddf_2['country_code'].data[:]
@@ -149,14 +153,19 @@ def hdf5_df_distinct():
 
         # 3
         print('@@@@  3  @@@@')
-        sorted_df = ds.require_dataframe('sorted_df') 
-        df.sort_values(by = 'country_code', ddf = sorted_df)
+        # sorted_df = ds.require_dataframe('sorted_df') 
+        # df.sort_values(by = 'country_code')
+        # print(df['country_code'].data[:10])
 
-        ddf_3 = ds.require_dataframe(ddf_3_name) 
+         
 
         time0 = time.time()
-        sorted_df.groupby(by = 'country_code').distinct(ddf = ddf_3)
-        print('sort first, then group by, then distinct, used time', time.time() - time0)
+        for i in range(1000):
+            ddf_3 = ds.require_dataframe(ddf_3_name)
+            df.drop_duplicate(by = 'country_code', hint_keys_is_sorted=False, ddf = ddf_3)
+            ds.delete_dataframe(ddf_3)
+        # df.drop_duplicate(by = 'country_code', hint_keys_is_sorted=False, ddf = ddf_3)
+        print('group by first then distinct, used time', (time.time() - time0)/1000)
 
         print('destination dataframe keys', ddf_3.keys())
         result = ddf_3['country_code'].data[:]
