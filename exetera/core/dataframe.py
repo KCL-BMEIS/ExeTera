@@ -471,6 +471,53 @@ class HDF5DataFrame(DataFrame):
 
         return self.apply_index(sorted_index, ddf)
 
+
+    def to_csv(self, filepath:str, row_filter:Union[np.ndarray, fld.Field]=None, column_filter:Union[str, List[str]]=None, chunk_row_size:int=1<<15):
+        """
+        Write object to a comma-separated values (csv) file.
+        :param filepath: File path.
+        :param row_filter: A boolean array / field. Only select rows when filter value is True
+        :param column_filter: A sequence of string names for the fields.
+        :chunk_row_size: Write rows for every chunk which has maximum chunk_row_size rows. The default is 1<<15.
+        """
+        val.validate_chunk_size('chunk_row_size', chunk_row_size)
+
+        field_name_to_use = list(self.keys())
+        if column_filter is not None:
+            field_name_to_use = val.validate_selected_keys(column_filter, self.keys())  
+
+        filter_array = None
+        if row_filter is not None:
+            filter_array, is_field = val.validate_boolean_row_filter('row_filter', row_filter)
+            if is_field and row_filter.name in field_name_to_use:
+                field_name_to_use.remove(row_filter.name)
+
+        fields_to_use = [self._columns[f] for f in field_name_to_use]
+
+        with open(filepath, 'w') as f:
+            writer = csvlib.writer(f, delimiter=',',lineterminator='\n')
+
+            # write header names
+            writer.writerow(field_name_to_use)
+
+            start_row = 0
+            while True:
+                chunk_data = []
+                for field in fields_to_use:
+                    if field.indexed:
+                        chunk_data.append(field.data[start_row: start_row+chunk_row_size])
+                    else:
+                        chunk_data.append(field.data[start_row: start_row+chunk_row_size].tolist())
+
+                for i, row in enumerate(zip(*chunk_data)):
+                    if filter_array is None or (i + start_row <len(filter_array) and filter_array[i + start_row] == True):
+                        writer.writerow(row)
+
+                if len(chunk_data[0]) < chunk_row_size:
+                    break
+                else:
+                    start_row += chunk_row_size
+
             
     def drop_duplicates(self, by: Union[str, List[str]], 
                        ddf: DataFrame = None,
@@ -496,7 +543,7 @@ class HDF5DataFrame(DataFrame):
         :returns: Returns a groupby object that contains information about the groups.
         """         
         # validate groupby keys
-        by = val.validate_sort_and_groupby_keys(by, self._columns.keys())
+        by = val.validate_selected_keys(by, self._columns.keys())
 
         # check if keys is sorted
         by_fields_data = np.asarray([self._columns[k].data[:] for k in by])
@@ -688,55 +735,6 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
                 field.apply_spans_last(self._spans, target=newfld)
             
         return ddf
-
-
-    def to_csv(self, filepath:str, row_filter:Union[np.ndarray, fld.Field]=None, column_filter:Union[str, List[str]]=None, chunk_row_size:int=1<<15):
-        """
-        Write object to a comma-separated values (csv) file.
-        :param filepath: File path.
-        :param row_filter: A boolean array / field. Only select rows when filter value is True
-        :param column_filter: A sequence of string names for the fields.
-        :chunk_row_size: Write rows for every chunk which has maximum chunk_row_size rows. The default is 1<<15.
-        """
-        val.validate_chunk_size('chunk_row_size', chunk_row_size)
-
-        column_names = self.keys()
-        column_fields = self.values()
-        field_name_to_use = list(self.keys())
-        if column_filter is not None:
-            field_name_to_use = val.validate_selected_keys(column_filter, self.keys())  
-
-        filter_array = None
-        if row_filter is not None:
-            filter_array, is_field = val.validate_boolean_row_filter('row_filter', row_filter)
-            if is_field and row_filter.name in field_name_to_use:
-                field_name_to_use.remove(row_filter.name)
-
-        fields_to_use = [self._columns[f] for f in field_name_to_use]
-
-        with open(filepath, 'w') as f:
-            writer = csvlib.writer(f, delimiter=',',lineterminator='\n')
-
-            # write header names
-            writer.writerow(field_name_to_use)
-
-            start_row = 0
-            while True:
-                chunk_data = []
-                for field in fields_to_use:
-                    if field.indexed:
-                        chunk_data.append(field.data[start_row: start_row+chunk_row_size])
-                    else:
-                        chunk_data.append(field.data[start_row: start_row+chunk_row_size].tolist())
-
-                for i, row in enumerate(zip(*chunk_data)):
-                    if filter_array is None or (i + start_row <len(filter_array) and filter_array[i + start_row] == True):
-                        writer.writerow(row)
-
-                if len(chunk_data[0]) < chunk_row_size:
-                    break
-                else:
-                    start_row += chunk_row_size
 
 
 

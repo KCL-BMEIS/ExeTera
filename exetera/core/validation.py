@@ -342,8 +342,6 @@ def validate_require_key(context, key, dictionary):
     if key not in dictionary:
         msg = "'{}': '{}' missing from fields".format(context, key)
         raise ValueError(msg)
-<<<<<<< HEAD
-=======
 
 
 def validate_boolean_row_filter(name, field):
@@ -356,4 +354,3 @@ def validate_boolean_row_filter(name, field):
 def validate_chunk_size(chunk_size_name, chunk_size):
     if chunk_size <= 0:
         raise ValueError("'{}' must be larger than 0.".format(chunk_size_name))
->>>>>>> 90a6961cdcf6c0e5a92bd7d0dbabca0b44226fea
