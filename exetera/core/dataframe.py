@@ -467,8 +467,6 @@ class HDF5DataFrame(DataFrame):
         sorted_index = self._dataset.session.dataset_sort_index(
             readers, np.arange(len(readers[0].data), dtype=np.uint32))
 
-        print('sorted_index', sorted_index)
-
         return self.apply_index(sorted_index, ddf)
 
 
@@ -710,7 +708,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
     def last(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
         """
-        Get min of group values.
+        Get last of group values.
 
         :param target: Name (str) or list of names (str) to get last value.
         :param ddf: the destination data frame
