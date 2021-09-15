@@ -316,6 +316,27 @@ def validate_selected_keys(by, all):
     else:
         raise ValueError('Selected field names should either be string or list of string')
 
+        
+def validate_groupby_target(target, by, all):
+    result = []
+    if isinstance(target, str):
+        result = [target]
+    elif isinstance(target, list):
+        if len(target) == 0:
+            raise ValueError('target should not be empty list')
+        else:
+            result = target
+    else:
+        raise ValueError('target should either be string or list of string')
+
+    overlap_1 = set(result) - set(all)
+    overlap_2 = set(result) & set(by)
+    if len(overlap_1) > 0:
+        raise ValueError('target = {} should be existing field(s)'.format(overlap_1))
+    elif len(overlap_2) > 0:
+        raise ValueError('target = {} should not overlap groupby keys'.format(overlap_2))
+    else:
+        return result
 
 def validate_require_key(context, key, dictionary):
     if key not in dictionary:

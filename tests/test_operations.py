@@ -1253,6 +1253,70 @@ class TestGetSpans(unittest.TestCase):
         self.assertTrue(list(spans), list(spans3))
 
 
+class TestCheckIfSorted(unittest.TestCase):
+
+    def test_check_if_sorted_for_single_index_string_fields(self):
+        val1 = np.asarray(['abc', 'ac', 'bc', 'ab'])
+        val2 = np.asarray(['ab', 'abc', 'ac', 'bc'])
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_indexed_string("val1").data.write(val1)
+            df.create_indexed_string("val2").data.write(val2)
+
+            unsorted_field_data = np.asarray([df[k].data[:] for k in ['val1']])
+            sorted_field_data = np.asarray([df[k].data[:] for k in ['val2']])
+
+            self.assertEqual(ops.check_if_sorted_for_multi_fields(unsorted_field_data), False)
+            self.assertEqual(ops.check_if_sorted_for_multi_fields(sorted_field_data), True)
+
+
+    def test_check_if_sorted_for_multi_index_string_fields(self):
+        val1 = np.asarray(['a', 'c', 'b', 'a'])
+        val2 = np.asarray(['abc', 'ac', 'bc', 'ab'])
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_indexed_string("val1").data.write(val1)
+            df.create_indexed_string("val2").data.write(val2)
+
+            field_data = np.asarray([df[k].data[:] for k in ['val1','val2']])
+
+            self.assertEqual(ops.check_if_sorted_for_multi_fields(field_data), False)
+
+
+    def test_check_if_sorted_for_multi_mixed_fields(self):
+        val1 = np.asarray([1, 3, 2, 1])
+        val2 = np.asarray(['abc', 'a', 'da', 'efg'])
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val1", 'int8').data.write(val1)
+            df.create_indexed_string("val2").data.write(val2)
+
+            field_data = np.asarray([df[k].data[:] for k in ['val1','val2']])
+
+            self.assertEqual(ops.check_if_sorted_for_multi_fields(field_data), False) 
+
+
+    def test_check_if_sorted_for_multi_numeric_fields(self):
+        val1 = np.asarray([1, 1, 2, 3])
+        val2 = np.asarray([2, 3, 9.0, 5.0])
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val1", 'int8').data.write(val1)
+            df.create_numeric("val2", 'float32').data.write(val2)
+
+            field_data = np.asarray([df[k].data[:] for k in ['val1','val2']])
+
+            self.assertEqual(ops.check_if_sorted_for_multi_fields(field_data), True) 
+
+
 class TestFieldImporter(unittest.TestCase):
 
     def test_get_byte_map(self):

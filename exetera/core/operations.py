@@ -680,7 +680,61 @@ def _get_spans_for_2_fields(ndarray0, ndarray1):
     spans[count+1] = len(ndarray0)
     return spans[:count+2]
 
+    
+@njit
+def _get_spans_for_multi_fields(fields_data):
+    count = 0
+    length = len(fields_data[0])
+    spans = np.zeros(length + 1, dtype = np.uint32)
+    spans[0] = 0
 
+    for i in np.arange(1, length):
+        not_equal = False
+        for f_d in fields_data:
+            if f_d[i] != f_d[i - 1]:
+                not_equal = True
+                break
+        
+        if not_equal:
+            count += 1
+            spans[count] = i
+        
+    spans[count + 1] = length
+    return spans[:count + 2]
+
+
+@njit
+def check_if_sorted_for_multi_fields(fields_data):
+    """
+    Check if input fields data is sorted. Note that fields_data should be treat as a group key
+
+    pre_row[j] < cur_row[j], means these two rows are sorted, move to next row => i + 1
+    pre_row[j] = cur_row[j], means we need to check if next element is sorted => j + 1
+    pre_row[j] > cur_row[j], means input data is not sorted
+    """
+    field_count = len(fields_data)
+
+    total_row = len(fields_data[0])
+    if total_row == 0:
+        return True
+
+    pre_row = fields_data[:, 0]
+    for i in range(1, total_row):
+        cur_row = fields_data[:, i]
+
+        for j in range(field_count):
+            if pre_row[j] > cur_row[j]:
+                return False
+            elif pre_row[j] < cur_row[j]:
+                break
+
+        pre_row = cur_row
+
+    return True
+
+    
+
+@njit
 def _get_spans_for_index_string_field(indices,values):
     result = []
     result.append(0)

@@ -13,7 +13,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from exetera.core.abstract_types import Dataset, DataFrame
+from exetera.core.abstract_types import Dataset, DataFrame, DataFrameGroupBy, Field
 from exetera.core import fields as fld
 from exetera.core import operations as ops
 from exetera.core import validation as val
@@ -440,6 +440,7 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, in_place=True)
             return self
 
+
     def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):
         """
         Sort by the values of a field or a list of fields
@@ -479,8 +480,6 @@ class HDF5DataFrame(DataFrame):
         """
         val.validate_chunk_size('chunk_row_size', chunk_row_size)
 
-        column_names = self.keys()
-        column_fields = self.values()
         field_name_to_use = list(self.keys())
         if column_filter is not None:
             field_name_to_use = val.validate_selected_keys(column_filter, self.keys())  
@@ -516,6 +515,224 @@ class HDF5DataFrame(DataFrame):
                     break
                 else:
                     start_row += chunk_row_size
+
+            
+    def drop_duplicates(self, by: Union[str, List[str]], 
+                       ddf: DataFrame = None,
+                       hint_keys_is_sorted=False):
+        """
+        Distinct values of a field or a list of field, return a dataframe with distinct values.
+        
+        :param by: Name (str) or list of names (str) to distinct.
+        :param ddf: optional - the destination dataframe
+        :returns: DataFrame with distinct values.
+        """
+        return self.groupby(by, hint_keys_is_sorted).distinct(ddf)
+
+        
+    def groupby(self, by: Union[str, List[str]], hint_keys_is_sorted=False):         
+        """
+        Group DataFrame using a field or a list of field, return a groupby object.
+
+        :param by: Name (str) or list of names (str) to group by.
+        :param hint_keys_is_sorted: an optional flag that users could set to skip the sorted check. \
+                                    Note that it runs faster and uses less memory when the dataframe is sorted, that is, hint_key_is_sorted=True. 
+
+        :returns: Returns a groupby object that contains information about the groups.
+        """         
+        # validate groupby keys
+        by = val.validate_selected_keys(by, self._columns.keys())
+
+        # check if keys is sorted
+        by_fields_data = np.asarray([self._columns[k].data[:] for k in by])
+
+        if not hint_keys_is_sorted:
+            is_sorted = ops.check_if_sorted_for_multi_fields(by_fields_data)
+        else:
+            is_sorted = True
+
+        sorted_index = None
+        if not is_sorted:
+            # sort first if needed
+            readers = tuple(self._columns[k] for k in by)
+            sorted_index = self._dataset.session.dataset_sort_index(readers, np.arange(len(readers[0].data), dtype=np.uint32))
+
+            sorted_by_fields_data = np.asarray([self._columns[k].data[:][sorted_index] for k in by])
+        else:
+            sorted_by_fields_data = np.asarray([self._columns[k].data[:] for k in by])
+
+        spans = ops._get_spans_for_multi_fields(sorted_by_fields_data)
+        
+        return HDF5DataFrameGroupBy(self._columns, by, sorted_index, spans)
+
+
+
+class HDF5DataFrameGroupBy(DataFrameGroupBy):
+
+    def __init__(self, columns, by, sorted_index, spans):
+        self._by = by
+        self._columns = columns
+        self._all = columns.keys()
+        self._sorted_index = sorted_index
+        self._spans = spans
+
+
+    def _write_groupby_keys(self, ddf: DataFrame, write_keys=True):    
+        """
+        Write groupby keys to ddf only if write_key = True
+        """
+        if write_keys: 
+            by_fields = np.asarray([self._columns[k] for k in self._by]) 
+            for field in by_fields:
+                newfld = field.create_like(ddf, field.name)
+                
+                if self._sorted_index is not None:                    
+                    field.apply_index(self._sorted_index, target=newfld)                  
+                    newfld.apply_filter(self._spans[:-1], in_place=True)
+                else:
+                    field.apply_filter(self._spans[:-1], target=newfld)
+
+    
+    def count(self, ddf: DataFrame, write_keys=True) -> DataFrame:
+        """
+        Compute max of group values.
+
+        :param target: Name (str) or list of names (str) to compute count.
+        :param ddf: the destination data frame
+        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+        
+        :return: dataframe with count of group values
+        """        
+        self._write_groupby_keys(ddf, write_keys)
+
+        counts = np.zeros(len(self._spans)-1, dtype='int64')
+        ops.apply_spans_count(self._spans, counts)
+
+        ddf.create_numeric(name = 'count', nformat='int64').data.write(counts)
+
+        return ddf
+
+    def distinct(self, ddf: DataFrame, write_keys=True) -> DataFrame:
+        self._write_groupby_keys(ddf, write_keys)
+        return ddf
+        
+
+    def max(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
+        """
+        Compute max of group values.
+
+        :param target: Name (str) or list of names (str) to compute max.
+        :param ddf: the destination data frame
+        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+        
+        :return: dataframe with max of group values
+        """
+        targets = val.validate_groupby_target(target, self._by, self._all)
+
+        self._write_groupby_keys(ddf, write_keys)
+        
+        target_fields = tuple(self._columns[k] for k in targets)
+        for field in target_fields:       
+            newfld = field.create_like(ddf, field.name + '_max')
+
+            # sort first if needed
+            if self._sorted_index is not None:
+                field.apply_index(self._sorted_index, target=newfld)
+
+                # apply spans to target fields
+                newfld.apply_spans_max(self._spans, in_place=True)
+            else:
+                field.apply_spans_max(self._spans, target=newfld)
+
+        return ddf
+
+
+    def min(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
+        """
+        Compute min of group values.
+
+        :param target: Name (str) or list of names (str) to compute min.
+        :param ddf: the destination data frame
+        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+        
+        :return: dataframe with min of group values
+        """
+        targets = val.validate_groupby_target(target, self._by, self._all)
+
+        self._write_groupby_keys(ddf, write_keys)
+
+        target_fields = tuple(self._columns[k] for k in targets)
+        for field in target_fields:       
+            newfld = field.create_like(ddf, field.name + '_min')
+
+            # sort first if needed
+            if self._sorted_index is not None:
+                field.apply_index(self._sorted_index, target=newfld)
+
+                # apply spans to target fields
+                newfld.apply_spans_min(self._spans, in_place=True)
+            else:
+                field.apply_spans_min(self._spans, target=newfld)
+
+        return ddf
+
+
+    def first(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
+        """
+        Get first of group values.
+
+        :param target: Name (str) or list of names (str) to get first value.
+        :param ddf: the destination data frame
+        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+        
+        :return: dataframe with first of group values
+        """
+        targets = val.validate_groupby_target(target, self._by, self._all)
+
+        self._write_groupby_keys(ddf, write_keys)
+
+        target_fields = tuple(self._columns[k] for k in targets)
+        for field in target_fields:       
+            newfld = field.create_like(ddf, field.name + '_first')
+
+            # sort first if needed
+            if self._sorted_index is not None:
+                field.apply_index(self._sorted_index, target=newfld)
+                # apply spans to target fields
+                newfld.apply_spans_first(self._spans, in_place=True)
+            else:
+                field.apply_spans_first(self._spans, target=newfld)
+
+        return ddf
+
+
+    def last(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
+        """
+        Get last of group values.
+
+        :param target: Name (str) or list of names (str) to get last value.
+        :param ddf: the destination data frame
+        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+        
+        :return: dataframe with last of group values
+        """
+        targets = val.validate_groupby_target(target, self._by, self._all)
+
+        self._write_groupby_keys(ddf, write_keys)
+
+        target_fields = tuple(self._columns[k] for k in targets)
+        for field in target_fields:       
+            newfld = field.create_like(ddf, field.name + '_last')
+
+            # sort first if needed
+            if self._sorted_index is not None:
+                field.apply_index(self._sorted_index, target=newfld)
+                # apply spans to target fields
+                newfld.apply_spans_last(self._spans, in_place=True)
+            else:
+                field.apply_spans_last(self._spans, target=newfld)
+            
+        return ddf
 
 
 
