@@ -694,9 +694,30 @@ class TestDataFrameGroupBy(unittest.TestCase):
             ddf = dst.create_dataframe('ddf')
 
             df.groupby(by = 'val').min(target ='val2', ddf = ddf)
+            df.groupby(by = 'val').first(target ='val2', ddf = ddf, write_keys=False)
 
             self.assertListEqual([0, 1, 3], ddf['val'].data[:].tolist())
             self.assertListEqual([b'a', b'c', b'f'], ddf['val2_min'].data[:].tolist())
+            self.assertListEqual([b'a', b'c', b'f'], ddf['val2_first'].data[:].tolist())
+
+
+    def test_groupby_with_hint_keys_is_sorted(self):
+        val = np.asarray([0,0,0,1,1,1,3], dtype=np.int32)
+        val2 = np.asarray(['a','b','b','c','d','d','f'], dtype='S1')   
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_fixed_string("val2", 1).data.write(val2)
+            ddf = dst.create_dataframe('ddf')
+
+            df.groupby(by = 'val', hint_keys_is_sorted=True).max(target ='val2', ddf = ddf)
+            df.groupby(by = 'val', hint_keys_is_sorted=True).last(target ='val2', ddf = ddf, write_keys=False)
+
+            self.assertListEqual([0, 1, 3], ddf['val'].data[:].tolist())
+            self.assertListEqual([b'b', b'd', b'f'], ddf['val2_max'].data[:].tolist())
+            self.assertListEqual([b'b', b'd', b'f'], ddf['val2_last'].data[:].tolist())
 
 
 class TestDataFrameSort(unittest.TestCase):
@@ -764,6 +785,30 @@ class TestDataFrameSort(unittest.TestCase):
                 df.sort_values(by = 'idx')
 
             self.assertEqual(str(context.exception), "There are consistent lengths in dataframe 'ds'. The following length were observed: {4, 5}") 
+
+
+    def test_sort_values_on_invalid_input(self):
+        idx = np.asarray([b'a', b'e', b'b', b'd', b'c'], dtype='S1')
+        bio = BytesIO()
+        with session.Session(10) as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_fixed_string("idx", 1).data.write(idx)
+        
+            with self.assertRaises(ValueError) as context:
+                df.sort_values(by = 'idx', axis=1)
+            
+            self.assertEqual(str(context.exception), "Currently sort_values() only supports axis = 0") 
+
+            with self.assertRaises(ValueError) as context:
+                df.sort_values(by = 'idx', ascending=False)
+            
+            self.assertEqual(str(context.exception), "Currently sort_values() only supports ascending = True")     
+        
+            with self.assertRaises(ValueError) as context:
+                df.sort_values(by = 'idx', kind='quicksort')
+            
+            self.assertEqual(str(context.exception), "Currently sort_values() only supports kind='stable'")  
 
 
 class TestDataFrameToCSV(unittest.TestCase):
@@ -846,26 +891,4 @@ class TestDataFrameToCSV(unittest.TestCase):
             self.assertEqual(f.readlines(), ['val1\n', '0\n', '2\n'])
 
         os.close(fd_csv)      
-
-
-    def test_to_csv_with_row_filter_field(self):
-        val1 = np.asarray([0, 1, 2, 3], dtype='int32')
-        val2 = ['zero', 'one', 'two', 'three']
-        row_filter = np.array([True, False, True, False])
-        bio = BytesIO()
-
-        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
-
-        with session.Session() as s:
-            dst = s.open_dataset(bio, 'w', 'dst')
-            df = dst.create_dataframe('df')
-            df.create_numeric('val1', 'int32').data.write(val1)
-            df.create_indexed_string('val2').data.write(val2)
-            df.to_csv(csv_file_name, row_filter=row_filter)
-
-        with open(csv_file_name, 'r') as f:
-            self.assertEqual(f.readlines(), ['val1,val2\n', '0,zero\n', '2,two\n'])
-
-        os.close(fd_csv)     
-
         
