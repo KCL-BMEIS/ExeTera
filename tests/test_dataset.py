@@ -117,6 +117,7 @@ class TestDataSet(unittest.TestCase):
             df1.create_timestamp('t_foo').data.write(tcontents1)
 
             df2 = ds.create_dataframe('df2', dataframe=df1)
+
             self.assertListEqual(iscontents1, df1['is_foo'].data[:])
             self.assertListEqual(iscontents1, df2['is_foo'].data[:])
             df2['is_foo'].data.clear()
@@ -149,3 +150,6 @@ class TestDataSet(unittest.TestCase):
             df2['t_foo'].data[:] = np.array(tcontents2, dtype=np.float64)
             self.assertListEqual(tcontents1.tolist(), df1['t_foo'].data[:].tolist())
             self.assertListEqual(tcontents2.tolist(), df2['t_foo'].data[:].tolist())
+
+    def test_dataset_ops(self):
+        pass

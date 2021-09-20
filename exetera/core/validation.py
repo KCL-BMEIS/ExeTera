@@ -14,7 +14,7 @@ import numpy as np
 
 import h5py
 
-from exetera.core.abstract_types import Field
+from exetera.core.abstract_types import DataFrame, Field
 from exetera.core import readerwriter as rw
 from exetera.core import fields as flds
 
@@ -217,7 +217,16 @@ def validate_and_get_key_fields(side, df, key):
         if field.indexed:
             raise ValueError("'{}': field is indexed; indexed fields cannot be "
                              "used as keys".format(side))
-        return field
+        return (field,)
+
+
+def validate_all_field_length_in_df(df:DataFrame):
+    lens = set()
+    for name, field in df._columns.items():
+        lens.add(len(field.data))
+        if len(lens) > 1:
+            raise ValueError("There are consistent lengths in dataframe '{}'. "
+                             "The following length were observed: {}".format(df.name, lens))
 
 
 def validate_key_lengths(side, df, key):
@@ -287,3 +296,61 @@ def validate_and_normalize_categorical_key(param_name, key):
             return {k: v.encode() for k, v, in key}
         else:
             return key
+
+
+def validate_selected_keys(by, all):
+    if isinstance(by, str):
+        if by in all:
+            return [by]
+        else: 
+            raise ValueError('{} is not an existing field'.format(by))
+    elif isinstance(by, list):
+        if len(by) == 0:
+            raise ValueError('Selected field names should not be empty list')
+        else:
+            extra = set(by) - set(all)
+            if len(extra) > 0:
+                raise ValueError('{} is/are not exising field(s)'.format(extra))
+            else:
+                return by
+    else:
+        raise ValueError('Selected field names should either be string or list of string')
+
+        
+def validate_groupby_target(target, by, all):
+    result = []
+    if isinstance(target, str):
+        result = [target]
+    elif isinstance(target, list):
+        if len(target) == 0:
+            raise ValueError('target should not be empty list')
+        else:
+            result = target
+    else:
+        raise ValueError('target should either be string or list of string')
+
+    overlap_1 = set(result) - set(all)
+    overlap_2 = set(result) & set(by)
+    if len(overlap_1) > 0:
+        raise ValueError('target = {} should be existing field(s)'.format(overlap_1))
+    elif len(overlap_2) > 0:
+        raise ValueError('target = {} should not overlap groupby keys'.format(overlap_2))
+    else:
+        return result
+
+def validate_require_key(context, key, dictionary):
+    if key not in dictionary:
+        msg = "'{}': '{}' missing from fields".format(context, key)
+        raise ValueError(msg)
+
+
+def validate_boolean_row_filter(name, field):
+    if isinstance(field, Field) and field._nformat != 'bool':
+        raise ValueError("'{}' must be boolean field, but is {}".format(name, field._nformat))
+
+    return array_from_field_or_lower(name, field), isinstance(field, Field)
+
+
+def validate_chunk_size(chunk_size_name, chunk_size):
+    if chunk_size <= 0:
+        raise ValueError("'{}' must be larger than 0.".format(chunk_size_name))

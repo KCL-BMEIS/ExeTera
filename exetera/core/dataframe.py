@@ -8,16 +8,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Mapping, Optional, Sequence, Tuple, Union
+from typing import Mapping, Optional, Sequence, Tuple, Union, List
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from exetera.core.abstract_types import Dataset, DataFrame
+from exetera.core.abstract_types import Dataset, DataFrame, DataFrameGroupBy, Field
 from exetera.core import fields as fld
 from exetera.core import operations as ops
 from exetera.core import validation as val
 import h5py
+import csv as csvlib
 
 
 class HDF5DataFrame(DataFrame):
@@ -36,7 +37,7 @@ class HDF5DataFrame(DataFrame):
     For a detailed explanation of DataFrame along with examples of its use, please refer to the
     wiki documentation at
     https://github.com/KCL-BMEIS/ExeTera/wiki/DataFrame-API
-    
+
     :param name: name of the dataframe.
     :param dataset: a dataset object, where this dataframe belongs to.
     :param h5group: the h5group object to store the fields. If the h5group is not empty, acquire data from h5group
@@ -45,6 +46,7 @@ class HDF5DataFrame(DataFrame):
         Dataframe<-Field-Field.data automatically.
     :param dataframe: optional - replicate data from another dictionary of (name:str, field: Field).
     """
+
     def __init__(self,
                  dataset: Dataset,
                  name: str,
@@ -91,7 +93,7 @@ class HDF5DataFrame(DataFrame):
 
         :param field: field to add to this dataframe, copy the underlying dataset
         """
-        dname = field.name[field.name.index('/', 1)+1:]
+        dname = field.name[field.name.index('/', 1) + 1:]
         nfield = field.create_like(self, dname)
         if field.indexed:
             nfield.indices.write(field.indices[:])
@@ -310,16 +312,16 @@ class HDF5DataFrame(DataFrame):
         renamed.
 
         Example::
-        
+
             # rename a single field
             df.rename('a', 'b')
-    
+
             # rename multiple fields
             df.rename({'a': 'b', 'b': 'c', 'c': 'a'})
 
         Field renaming can fail if the resulting set of renamed fields would have name clashes. If
         this is the case, none of the rename operations go ahead and the dataframe remains unmodified.
-        
+
         :param field: Either a string or a dictionary of name pairs, each of which is the existing
             field name and the destination field name
         :param field_to: Optional parameter containing a string, if `field` is a string. If 'field'
@@ -394,7 +396,6 @@ class HDF5DataFrame(DataFrame):
 
         self._columns = final_columns
 
-
     def apply_filter(self, filter_to_apply, ddf=None):
         """
         Apply the filter to all the fields in this dataframe, return a dataframe with filtered fields.
@@ -424,6 +425,8 @@ class HDF5DataFrame(DataFrame):
         :returns: a dataframe contains all the fields re-indexed, self if ddf is not set
         """
         if ddf is not None:
+            val.validate_all_field_length_in_df(ddf)
+
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self._columns.items():
@@ -431,9 +434,297 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, target=newfld)
             return ddf
         else:
+            val.validate_all_field_length_in_df(self)
+
             for field in self._columns.values():
                 field.apply_index(index_to_apply, in_place=True)
             return self
+
+    def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):
+        """
+        Sort by the values of a field or a list of fields
+
+        :param by: Name (str) or list of names (str) to sort by.
+        :param ddf: optional - the destination data frame
+        :param axis: Axis to be sorted. Currently only supports 0
+        :param ascending: Sort ascending vs. descending. Currently only supports ascending=True.
+        :param kind: Choice of sorting algorithm. Currently only supports "stable"
+
+        :returns: DataFrame with sorted values or None if ddf=None.
+        """
+        if axis != 0:
+            raise ValueError("Currently sort_values() only supports axis = 0")
+        elif ascending != True:
+            raise ValueError("Currently sort_values() only supports ascending = True")
+        elif kind != 'stable':
+            raise ValueError("Currently sort_values() only supports kind='stable'")
+
+        keys = val.validate_selected_keys(by, self._columns.keys())
+
+        readers = tuple(self._columns[k] for k in keys)
+
+        sorted_index = self._dataset.session.dataset_sort_index(
+            readers, np.arange(len(readers[0].data), dtype=np.uint32))
+
+        return self.apply_index(sorted_index, ddf)
+
+    def to_csv(self, filepath: str, row_filter: Union[np.ndarray, fld.Field] = None,
+               column_filter: Union[str, List[str]] = None, chunk_row_size: int = 1 << 15):
+        """
+        Write object to a comma-separated values (csv) file.
+        :param filepath: File path.
+        :param row_filter: A boolean array / field. Only select rows when filter value is True
+        :param column_filter: A sequence of string names for the fields.
+        :chunk_row_size: Write rows for every chunk which has maximum chunk_row_size rows. The default is 1<<15.
+        """
+        val.validate_chunk_size('chunk_row_size', chunk_row_size)
+
+        field_name_to_use = list(self.keys())
+        if column_filter is not None:
+            field_name_to_use = val.validate_selected_keys(column_filter, self.keys())
+
+        filter_array = None
+        if row_filter is not None:
+            filter_array, is_field = val.validate_boolean_row_filter('row_filter', row_filter)
+            if is_field and row_filter.name in field_name_to_use:
+                field_name_to_use.remove(row_filter.name)
+
+        fields_to_use = [self._columns[f] for f in field_name_to_use]
+
+        with open(filepath, 'w') as f:
+            writer = csvlib.writer(f, delimiter=',', lineterminator='\n')
+
+            # write header names
+            writer.writerow(field_name_to_use)
+
+            start_row = 0
+            while True:
+                chunk_data = []
+                for field in fields_to_use:
+                    if field.indexed:
+                        chunk_data.append(field.data[start_row: start_row + chunk_row_size])
+                    else:
+                        chunk_data.append(field.data[start_row: start_row + chunk_row_size].tolist())
+
+                for i, row in enumerate(zip(*chunk_data)):
+                    if filter_array is None or (
+                            i + start_row < len(filter_array) and filter_array[i + start_row] == True):
+                        writer.writerow(row)
+
+                if len(chunk_data[0]) < chunk_row_size:
+                    break
+                else:
+                    start_row += chunk_row_size
+
+    def drop_duplicates(self, by: Union[str, List[str]],
+                        ddf: DataFrame = None,
+                        hint_keys_is_sorted=False):
+        """
+        Distinct values of a field or a list of field, return a dataframe with distinct values.
+
+        :param by: Name (str) or list of names (str) to distinct.
+        :param ddf: optional - the destination dataframe
+        :returns: DataFrame with distinct values.
+        """
+        return self.groupby(by, hint_keys_is_sorted).distinct(ddf)
+
+    def groupby(self, by: Union[str, List[str]], hint_keys_is_sorted=False):
+        """
+        Group DataFrame using a field or a list of field, return a groupby object.
+
+        :param by: Name (str) or list of names (str) to group by.
+        :param hint_keys_is_sorted: an optional flag that users could set to skip the sorted check. \
+                                    Note that it runs faster and uses less memory when the dataframe is sorted, that is, hint_key_is_sorted=True.
+
+        :returns: Returns a groupby object that contains information about the groups.
+        """
+        # validate groupby keys
+        by = val.validate_selected_keys(by, self._columns.keys())
+
+        # check if keys is sorted
+        by_fields_data = np.asarray([self._columns[k].data[:] for k in by])
+
+        if not hint_keys_is_sorted:
+            is_sorted = ops.check_if_sorted_for_multi_fields(by_fields_data)
+        else:
+            is_sorted = True
+
+        sorted_index = None
+        if not is_sorted:
+            # sort first if needed
+            readers = tuple(self._columns[k] for k in by)
+            sorted_index = self._dataset.session.dataset_sort_index(readers,
+                                                                    np.arange(len(readers[0].data), dtype=np.uint32))
+
+            sorted_by_fields_data = np.asarray([self._columns[k].data[:][sorted_index] for k in by])
+        else:
+            sorted_by_fields_data = np.asarray([self._columns[k].data[:] for k in by])
+
+        spans = ops._get_spans_for_multi_fields(sorted_by_fields_data)
+
+        return HDF5DataFrameGroupBy(self._columns, by, sorted_index, spans)
+
+
+class HDF5DataFrameGroupBy(DataFrameGroupBy):
+
+    def __init__(self, columns, by, sorted_index, spans):
+        self._by = by
+        self._columns = columns
+        self._all = columns.keys()
+        self._sorted_index = sorted_index
+        self._spans = spans
+
+    def _write_groupby_keys(self, ddf: DataFrame, write_keys=True):
+        """
+        Write groupby keys to ddf only if write_key = True
+        """
+        if write_keys:
+            by_fields = np.asarray([self._columns[k] for k in self._by])
+            for field in by_fields:
+                newfld = field.create_like(ddf, field.name)
+
+                if self._sorted_index is not None:
+                    field.apply_index(self._sorted_index, target=newfld)
+                    newfld.apply_filter(self._spans[:-1], in_place=True)
+                else:
+                    field.apply_filter(self._spans[:-1], target=newfld)
+
+    def count(self, ddf: DataFrame, write_keys=True) -> DataFrame:
+        """
+        Compute max of group values.
+
+        :param target: Name (str) or list of names (str) to compute count.
+        :param ddf: the destination data frame
+        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+
+        :return: dataframe with count of group values
+        """
+        self._write_groupby_keys(ddf, write_keys)
+
+        counts = np.zeros(len(self._spans) - 1, dtype='int64')
+        ops.apply_spans_count(self._spans, counts)
+
+        ddf.create_numeric(name='count', nformat='int64').data.write(counts)
+
+        return ddf
+
+    def distinct(self, ddf: DataFrame, write_keys=True) -> DataFrame:
+        self._write_groupby_keys(ddf, write_keys)
+        return ddf
+
+    def max(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
+        """
+        Compute max of group values.
+
+        :param target: Name (str) or list of names (str) to compute max.
+        :param ddf: the destination data frame
+        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+
+        :return: dataframe with max of group values
+        """
+        targets = val.validate_groupby_target(target, self._by, self._all)
+
+        self._write_groupby_keys(ddf, write_keys)
+
+        target_fields = tuple(self._columns[k] for k in targets)
+        for field in target_fields:
+            newfld = field.create_like(ddf, field.name + '_max')
+
+            # sort first if needed
+            if self._sorted_index is not None:
+                field.apply_index(self._sorted_index, target=newfld)
+
+                # apply spans to target fields
+                newfld.apply_spans_max(self._spans, in_place=True)
+            else:
+                field.apply_spans_max(self._spans, target=newfld)
+
+        return ddf
+
+    def min(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
+        """
+        Compute min of group values.
+
+        :param target: Name (str) or list of names (str) to compute min.
+        :param ddf: the destination data frame
+        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+
+        :return: dataframe with min of group values
+        """
+        targets = val.validate_groupby_target(target, self._by, self._all)
+
+        self._write_groupby_keys(ddf, write_keys)
+
+        target_fields = tuple(self._columns[k] for k in targets)
+        for field in target_fields:
+            newfld = field.create_like(ddf, field.name + '_min')
+
+            # sort first if needed
+            if self._sorted_index is not None:
+                field.apply_index(self._sorted_index, target=newfld)
+
+                # apply spans to target fields
+                newfld.apply_spans_min(self._spans, in_place=True)
+            else:
+                field.apply_spans_min(self._spans, target=newfld)
+
+        return ddf
+
+    def first(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
+        """
+        Get first of group values.
+
+        :param target: Name (str) or list of names (str) to get first value.
+        :param ddf: the destination data frame
+        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+
+        :return: dataframe with first of group values
+        """
+        targets = val.validate_groupby_target(target, self._by, self._all)
+
+        self._write_groupby_keys(ddf, write_keys)
+
+        target_fields = tuple(self._columns[k] for k in targets)
+        for field in target_fields:
+            newfld = field.create_like(ddf, field.name + '_first')
+
+            # sort first if needed
+            if self._sorted_index is not None:
+                field.apply_index(self._sorted_index, target=newfld)
+                # apply spans to target fields
+                newfld.apply_spans_first(self._spans, in_place=True)
+            else:
+                field.apply_spans_first(self._spans, target=newfld)
+
+        return ddf
+
+    def last(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
+        """
+        Get last of group values.
+
+        :param target: Name (str) or list of names (str) to get last value.
+        :param ddf: the destination data frame
+        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+
+        :return: dataframe with last of group values
+        """
+        targets = val.validate_groupby_target(target, self._by, self._all)
+
+        self._write_groupby_keys(ddf, write_keys)
+
+        target_fields = tuple(self._columns[k] for k in targets)
+        for field in target_fields:
+            newfld = field.create_like(ddf, field.name + '_last')
+
+            # sort first if needed
+            if self._sorted_index is not None:
+                field.apply_index(self._sorted_index, target=newfld)
+                # apply spans to target fields
+                newfld.apply_spans_last(self._spans, in_place=True)
+            else:
+                field.apply_spans_last(self._spans, target=newfld)
+
+        return ddf
 
 
 def copy(field: fld.Field, dataframe: DataFrame, name: str):
@@ -482,7 +773,12 @@ def merge(left: DataFrame,
           right_fields: Optional[Sequence[str]] = None,
           left_suffix: str = '_l',
           right_suffix: str = '_r',
-          how='left'):
+          how='left',
+          hint_left_keys_ordered: Optional[bool] = None,
+          hint_left_keys_unique: Optional[bool] = None,
+          hint_right_keys_ordered: Optional[bool] = None,
+          hint_right_keys_unique: Optional[bool] = None,
+          chunk_size=1 << 20):
     """
     Merge 'left' and 'right' DataFrames into a destination dataset. The merge is a database-style
     join operation, in any of the following modes ("left", "right", "inner", "outer"). This
@@ -513,9 +809,9 @@ def merge(left: DataFrame,
         this is not set, all fields from the left table are joined
     :param right_fields: Optional parameter listing which fields are to be joined from the right table.
         If this is not set, all fields from the right table are joined
-    :param left_suffix: A string to be appended to fields from the left table if they clash with fields from the 
+    :param left_suffix: A string to be appended to fields from the left table if they clash with fields from the
         right table.
-    :param right_suffix: A string to be appended to fields from the right table if they clash with fields from the 
+    :param right_suffix: A string to be appended to fields from the right table if they clash with fields from the
         left table.
     :param how: Optional parameter specifying the merge mode. It must be one of ('left', 'right',
         'inner', 'outer' or 'cross). If not set, the 'left' join is performed.
@@ -550,11 +846,76 @@ def merge(left: DataFrame,
     left_len = list(left_lens)[0]
     right_len = list(right_lens)[0]
 
+    # TODO: tweak this to be consistent with the streaming code
     if left_len < (2 << 30) and right_len < (2 << 30):
         index_dtype = np.int32
     else:
         index_dtype = np.int64
 
+    left_fields_to_map = left.keys() if left_fields is None else left_fields
+    right_fields_to_map = right.keys() if right_fields is None else right_fields
+
+    # TODO: check for ordering for multi-key-fields (is_ordered doesn't support it yet)
+    if hint_left_keys_ordered is None:
+        left_keys_ordered = False
+    else:
+        left_keys_ordered = hint_left_keys_ordered
+
+    if hint_right_keys_ordered is None:
+        right_keys_ordered = False
+    else:
+        right_keys_ordered = hint_right_keys_ordered
+
+    if hint_left_keys_unique is None:
+        left_keys_unique = False
+    else:
+        left_keys_unique = hint_left_keys_unique
+
+    if hint_right_keys_unique is None:
+        right_keys_unique = False
+    else:
+        right_keys_unique = hint_right_keys_unique
+
+    ordered = False
+    if left_keys_ordered and right_keys_ordered and \
+            len(left_on_fields) == 1 and len(right_on_fields) == 1 and \
+            how in ('left', 'right', 'inner'):
+        ordered = True
+
+    if ordered:
+        _ordered_merge(left, right, dest,
+                       left_on_fields, right_on_fields,
+                       left_fields_to_map, right_fields_to_map,
+                       left_len, right_len,
+                       index_dtype,
+                       left_suffix, right_suffix,
+                       how,
+                       left_keys_unique,
+                       right_keys_unique,
+                       chunk_size)
+    else:
+        _unordered_merge(left, right, dest,
+                         left_on_fields, right_on_fields,
+                         left_fields_to_map, right_fields_to_map,
+                         left_len, right_len,
+                         index_dtype,
+                         left_suffix, right_suffix,
+                         how)
+
+
+def _unordered_merge(left: DataFrame,
+                     right: DataFrame,
+                     dest: DataFrame,
+                     left_on_fields,
+                     right_on_fields,
+                     left_fields_to_map,
+                     right_fields_to_map,
+                     left_len,
+                     right_len,
+                     index_dtype,
+                     left_suffix,
+                     right_suffix,
+                     how):
     left_df_dict = {}
     right_df_dict = {}
     left_on_keys = []
@@ -582,6 +943,7 @@ def merge(left: DataFrame,
     l_df = pd.DataFrame(left_df_dict)
     r_df = pd.DataFrame(right_df_dict)
 
+    # TODO: more efficient unordered merges using dict and numba
     df = pd.merge(left=l_df, right=r_df, left_on=l_key, right_on=r_key, how=how)
 
     l_to_d_map = df['l_i'].to_numpy(dtype=np.int32)
@@ -590,12 +952,10 @@ def merge(left: DataFrame,
     r_to_d_filt = np.logical_not(df['r_i'].isnull()).to_numpy()
 
     # perform the mapping
-    left_fields_ = left.keys() if left_fields is None else left_fields
-    right_fields_ = right.keys() if right_fields is None else right_fields
 
-    for f in left_fields_:
+    for f in left_fields_to_map:
         dest_f = f
-        if f in right_fields_:
+        if f in right_fields_to_map:
             dest_f += left_suffix
         l = left[f]
         d = l.create_like(dest, dest_f)
@@ -606,13 +966,14 @@ def merge(left: DataFrame,
         else:
             v = ops.safe_map_values(l.data[:], l_to_d_map, l_to_d_filt)
             d.data.write(v)
-    if np.all(l_to_d_filt) == False:
-        d = dest.create_numeric('valid'+left_suffix, 'bool')
+
+    if not np.all(l_to_d_filt):
+        d = dest.create_numeric('valid' + left_suffix, 'bool')
         d.data.write(l_to_d_filt)
 
-    for f in right_fields_:
+    for f in right_fields_to_map:
         dest_f = f
-        if f in left_fields_:
+        if f in left_fields_to_map:
             dest_f += right_suffix
         r = right[f]
         d = r.create_like(dest, dest_f)
@@ -623,6 +984,130 @@ def merge(left: DataFrame,
         else:
             v = ops.safe_map_values(r.data[:], r_to_d_map, r_to_d_filt)
             d.data.write(v)
-    if np.all(r_to_d_filt) == False:
-        d = dest.create_numeric('valid'+right_suffix, 'bool')
+
+    if not np.all(r_to_d_filt):
+        d = dest.create_numeric('valid' + right_suffix, 'bool')
         d.data.write(r_to_d_filt)
+
+
+def _ordered_merge(left: DataFrame,
+                   right: DataFrame,
+                   dest: DataFrame,
+                   left_on_fields,
+                   right_on_fields,
+                   left_fields_to_map,
+                   right_fields_to_map,
+                   left_len,
+                   right_len,
+                   index_dtype,
+                   left_suffix,
+                   right_suffix,
+                   how,
+                   left_keys_unique,
+                   right_keys_unique,
+                   chunk_size=1 << 20):
+    supported = ('left', 'right', 'inner')
+    if how not in supported:
+        raise ValueError("Unsupported mode for 'how'; must be one of "
+                         "{} but is {}".format(supported, how))
+
+    if left_keys_unique or right_keys_unique:
+        npdtype = ops.get_map_datatype_based_on_lengths(left_len, right_len)
+        strdtype = 'int32' if npdtype == np.int32 else np.int64
+        invalid = ops.INVALID_INDEX_32 if npdtype == np.int32 else ops.INVALID_INDEX_64
+    else:
+        npdtype = np.int64
+        strdtype = 'int64'
+        invalid = ops.INVALID_INDEX_64
+
+    # chunksize = 1 << 25
+    if how in ('left', 'right'):
+        if how == 'left':
+            a_on, b_on = left_on_fields, right_on_fields
+            a_unique, b_unique = left_keys_unique, right_keys_unique
+        else:
+            a_on, b_on = right_on_fields, left_on_fields
+            a_unique, b_unique = right_keys_unique, left_keys_unique
+
+        if a_unique:
+            if b_unique:
+                b_result = dest.create_numeric('_b_map', strdtype)
+                ops.generate_ordered_map_to_left_both_unique_streamed(
+                    a_on[0], b_on[0], b_result, invalid, rdtype=npdtype)
+            else:
+                a_result = dest.create_numeric('_a_map', strdtype)
+                b_result = dest.create_numeric('_b_map', strdtype)
+                ops.generate_ordered_map_to_left_left_unique_streamed(
+                    a_on[0], b_on[0], a_result, b_result, invalid, rdtype=npdtype)
+        else:
+            if right_keys_unique:
+                b_result = dest.create_numeric('_b_map', strdtype)
+                ops.generate_ordered_map_to_left_right_unique_streamed(
+                    a_on[0], b_on[0], b_result, invalid, rdtype=npdtype)
+            else:
+                a_result = dest.create_numeric('_a_map', strdtype)
+                b_result = dest.create_numeric('_b_map', strdtype)
+                ops.generate_ordered_map_to_left_streamed(
+                    a_on[0], b_on[0], a_result, b_result, invalid, rdtype=npdtype)
+
+        if how == 'right':
+            dest.rename('_a_map', '_right_map')
+            dest.rename('_b_map', '_left_map')
+        else:
+            dest.rename('_a_map', '_left_map')
+            dest.rename('_b_map', '_right_map')
+    else:
+        left_result = dest.create_numeric('_left_map', strdtype)
+        right_result = dest.create_numeric('_right_map', strdtype)
+        if left_keys_unique:
+            if right_keys_unique:
+                ops.generate_ordered_map_to_inner_both_unique_streamed(
+                    left_on_fields[0], right_on_fields[0], left_result, right_result,
+                    rdtype=npdtype)
+            else:
+                ops.generate_ordered_map_to_inner_right_unique_streamed(
+                    left_on_fields[0], right_on_fields[0], left_result, right_result,
+                    rdtype=npdtype)
+        else:
+            if right_keys_unique:
+                ops.generate_ordered_map_to_inner_left_unique_streamed(
+                    left_on_fields[0], right_on_fields[0], left_result, right_result,
+                    rdtype=npdtype)
+            else:
+                ops.generate_ordered_map_to_inner_streamed(
+                    left_on_fields[0], right_on_fields[0], left_result, right_result,
+                    rdtype=npdtype)
+
+    # perform the mappings
+    # ====================
+
+    left_map = dest['_left_map'] if '_left_map' in dest else None
+    right_map = dest['_right_map']
+
+    if left_map is None:
+        for k in left_fields_to_map:
+            dest_k = k
+            if k in dest:
+                dest_k += left_suffix
+            dest_f = left[k].create_like(dest, dest_k)
+            ops.chunked_copy(left[k], dest_f, chunk_size)
+    else:
+        for k in left_fields_to_map:
+            dest_k = k
+            if k in dest:
+                dest_k += left_suffix
+            dest_f = left[k].create_like(dest, dest_k)
+            if left[k].indexed:
+                ops.ordered_map_valid_indexed_stream(left[k], left_map, dest_f)
+            else:
+                ops.ordered_map_valid_stream(left[k], left_map, dest_f)
+
+    for k in right_fields_to_map:
+        dest_k = k
+        if k in dest:
+            dest_k += right_suffix
+        dest_f = right[k].create_like(dest, dest_k)
+        if right[k].indexed:
+            ops.ordered_map_valid_indexed_stream(right[k], right_map, dest_f, invalid)
+        else:
+            ops.ordered_map_valid_stream(right[k], right_map, dest_f, invalid)

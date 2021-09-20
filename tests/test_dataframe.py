@@ -1,6 +1,9 @@
+from exetera.core.operations import INVALID_INDEX
 import unittest
 from io import BytesIO
 import numpy as np
+import tempfile
+import os
 
 from exetera.core import session
 from exetera.core import fields
@@ -64,7 +67,7 @@ class TestDataFrameCreateFields(unittest.TestCase):
             values = np.random.randint(low=0, high=1000000, size=100000000)
             dst = s.open_dataset(bio, 'r+', 'dst')
             df = dst.create_dataframe('dst')
-            a = df.create_numeric('a','int32')
+            a = df.create_numeric('a', 'int32')
             a.data.write(values)
 
             total = np.sum(a.data[:])
@@ -82,7 +85,7 @@ class TestDataFrameCreateFields(unittest.TestCase):
             dst = s.open_dataset(bio, 'r+', 'dst')
             hf = dst.create_dataframe('dst')
             a = hf.create_categorical('a', 'int8',
-                                                 {'foo': 0, 'bar': 1, 'boo': 2})
+                                      {'foo': 0, 'bar': 1, 'boo': 2})
             a.data.write(values)
 
             total = np.sum(a.data[:])
@@ -106,7 +109,6 @@ class TestDataFrameCreateFields(unittest.TestCase):
             self.assertListEqual(
                 [b'xxxy', b'xxy', b'xxxy', b'y', b'xy', b'y', b'xxxy', b'xxxy', b'xy', b'y'],
                 a.data[:10].tolist())
-
 
     def test_dataframe_create_indexed_string(self):
         bio = BytesIO()
@@ -136,7 +138,6 @@ class TestDataFrameCreateFields(unittest.TestCase):
             self.assertListEqual(
                 ['xxxy', 'xxy', 'xxxy', 'y', 'xy', 'y', 'xxxy', 'xxxy', 'xy', 'y'], a.data[:10])
 
-
     def test_dataframe_create_mem_numeric(self):
         bio = BytesIO()
         with session.Session() as s:
@@ -165,16 +166,15 @@ class TestDataFrameCreateFields(unittest.TestCase):
             df['num10'] = df['num'] % df['num2']
             self.assertEqual([0, 0, 0, 0], df['num10'].data[:].tolist())
 
-
     def test_dataframe_create_mem_categorical(self):
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio, 'r+', 'dst')
             df = dst.create_dataframe('dst')
-            cat1 = df.create_categorical('cat1','uint8',{'foo': 0, 'bar': 1, 'boo': 2})
+            cat1 = df.create_categorical('cat1', 'uint8', {'foo': 0, 'bar': 1, 'boo': 2})
             cat1.data.write([0, 1, 2, 0, 1, 2])
 
-            cat2 = df.create_categorical('cat2','uint8',{'foo': 0, 'bar': 1, 'boo': 2})
+            cat2 = df.create_categorical('cat2', 'uint8', {'foo': 0, 'bar': 1, 'boo': 2})
             cat2.data.write([1, 2, 0, 1, 2, 0])
 
             df['r1'] = cat1 < cat2
@@ -199,7 +199,7 @@ class TestDataFrameCreateFields(unittest.TestCase):
             numf.data.write([5, 4, 3, 2, 1])
 
             df2 = dst.create_dataframe('df2')
-            dataframe.copy(numf, df2,'numf')
+            dataframe.copy(numf, df2, 'numf')
             self.assertListEqual([5, 4, 3, 2, 1], df2['numf'].data[:].tolist())
             df.drop('numf')
             self.assertTrue('numf' not in df)
@@ -226,7 +226,7 @@ class TestDataFrameCreateFields(unittest.TestCase):
 
             filter_to_apply = np.array([True, True, False, False, True])
             ddf = dst.create_dataframe('dst3')
-            df.apply_filter(filter_to_apply, ddf=ddf)
+            df.apply_filter(filter_to_apply, ddf)
             self.assertEqual([5, 4, 1], ddf['numf'].data[:].tolist())
             self.assertEqual([b'e', b'd', b'a'], ddf['fst'].data[:].tolist())
 
@@ -234,7 +234,6 @@ class TestDataFrameCreateFields(unittest.TestCase):
 class TestDataFrameRename(unittest.TestCase):
 
     def test_rename_1(self):
-
         a = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
         b = np.array([8, 7, 6, 5, 4, 3, 2, 1], dtype='int32')
 
@@ -295,10 +294,10 @@ class TestDataFrameRename(unittest.TestCase):
             self.assertEqual('fb', df['fb'].name)
             self.assertEqual('fc', df['fc'].name)
 
+
 class TestDataFrameCopyMove(unittest.TestCase):
 
     def test_move_same_dataframe(self):
-
         sa = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
         sb = np.array([8, 7, 6, 5, 4, 3, 2, 1], dtype='int32')
 
@@ -310,12 +309,10 @@ class TestDataFrameCopyMove(unittest.TestCase):
             df1.create_numeric('fb', 'int32').data.write(sb)
             fa = df1['fa']
             fc = dataframe.move(df1['fa'], df1, 'fc')
-            print(fa.name, fa.data[:])
             self.assertEqual('fc', fc.name)
             self.assertEqual('fb', df1['fb'].name)
 
     def test_move_different_dataframe(self):
-
         sa = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
         sb = np.array([8, 7, 6, 5, 4, 3, 2, 1], dtype='int32')
 
@@ -362,7 +359,6 @@ class TestDataFrameApplyFilter(unittest.TestCase):
 class TestDataFrameMerge(unittest.TestCase):
 
     def tests_merge_left(self):
-
         l_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
         r_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
         r_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
@@ -384,7 +380,6 @@ class TestDataFrameMerge(unittest.TestCase):
             self.assertTrue(np.all(valid_if_equal))
 
     def tests_merge_right(self):
-
         r_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
         l_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
         l_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
@@ -406,7 +401,6 @@ class TestDataFrameMerge(unittest.TestCase):
             self.assertTrue(np.all(valid_if_equal))
 
     def tests_merge_inner(self):
-
         r_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
         l_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
         r_vals = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven']
@@ -429,7 +423,6 @@ class TestDataFrameMerge(unittest.TestCase):
             self.assertEqual(expected_right, ddf['r_vals'].data[:])
 
     def tests_merge_outer(self):
-
         r_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
         l_id = np.asarray([2, 3, 0, 4, 7, 6, 2, 0, 3], dtype='int32')
         r_vals = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven']
@@ -453,9 +446,7 @@ class TestDataFrameMerge(unittest.TestCase):
             self.assertEqual(expected_left, ddf['l_vals'].data[:])
             self.assertEqual(expected_right, ddf['r_vals'].data[:])
 
-
     def tests_merge_left_compound_key(self):
-
         l_id_1 = np.asarray([0, 0, 0, 0, 1, 1, 1, 1], dtype='int32')
         l_id_2 = np.asarray([0, 1, 2, 3, 0, 1, 2, 3], dtype='int32')
         r_id_1 = np.asarray([0, 1, 0, 1, 0, 1, 0, 1], dtype='int32')
@@ -480,5 +471,393 @@ class TestDataFrameMerge(unittest.TestCase):
             self.assertEqual(expected, ddf['l_vals'].data[:])
             self.assertEqual(expected, ddf['r_vals'].data[:])
             self.assertEqual(ddf['l_id_1'].data[:].tolist(), ddf['r_id_1'].data[:].tolist())
-            self.assertEqual(ddf['r_id_2'].data[:].tolist(), ddf['r_id_2'].data[:].tolist())
+            self.assertEqual(ddf['l_id_2'].data[:].tolist(), ddf['r_id_2'].data[:].tolist())
 
+
+class TestDataFrameGroupBy(unittest.TestCase):
+
+    def test_distinct_single_field(self):
+        val = np.asarray([1, 0, 1, 2, 3, 2, 2, 3, 3, 3], dtype=np.int32)
+        val2 = np.asarray(['a', 'b', 'a', 'b', 'c', 'b', 'c', 'c', 'd', 'd'], dtype='S1')
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_fixed_string("val2", 1).data.write(val2)
+
+            ddf = dst.create_dataframe('ddf')
+
+            df.drop_duplicates(by='val', ddf=ddf)
+
+            self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
+
+    def test_distinct_multi_fields(self):
+        val = np.asarray([1, 0, 1, 2, 3, 2, 2, 3, 3, 3], dtype=np.int32)
+        val2 = np.asarray(['a', 'b', 'a', 'b', 'c', 'b', 'c', 'c', 'd', 'd'], dtype='S1')
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_fixed_string("val2", 1).data.write(val2)
+
+            ddf = dst.create_dataframe('ddf')
+
+            df.drop_duplicates(by=['val', 'val2'], ddf=ddf)
+
+            self.assertListEqual([0, 1, 2, 2, 3, 3], ddf['val'].data[:].tolist())
+            self.assertListEqual([b'b', b'a', b'b', b'c', b'c', b'd'], ddf['val2'].data[:].tolist())
+
+    def test_groupby_count_single_field(self):
+        val = np.asarray([1, 0, 1, 2, 3, 2, 2, 3, 3, 3], dtype=np.int32)
+        val2 = np.asarray(['a', 'b', 'a', 'b', 'c', 'b', 'c', 'c', 'd', 'd'], dtype='S1')
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_fixed_string("val2", 1).data.write(val2)
+
+            ddf = dst.create_dataframe('ddf')
+
+            df.groupby(by='val').count(ddf=ddf)
+
+            self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
+            self.assertListEqual([1, 2, 3, 4], ddf['count'].data[:].tolist())
+
+    def test_groupby_count_multi_fields(self):
+        val = np.asarray([1, 0, 1, 2, 3, 2, 2, 3, 3, 3], dtype=np.int32)
+        val2 = np.asarray(['a', 'b', 'a', 'b', 'c', 'b', 'c', 'c', 'd', 'd'], dtype='S1')
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_fixed_string("val2", 1).data.write(val2)
+
+            ddf = dst.create_dataframe('ddf')
+
+            df.groupby(by=['val', 'val2']).count(ddf=ddf)
+
+            self.assertListEqual([0, 1, 2, 2, 3, 3], ddf['val'].data[:].tolist())
+            self.assertListEqual([b'b', b'a', b'b', b'c', b'c', b'd'], ddf['val2'].data[:].tolist())
+            self.assertListEqual([1, 2, 2, 1, 2, 2], ddf['count'].data[:].tolist())
+
+    def test_groupby_max_single_field(self):
+        val = np.asarray([3, 1, 1, 2, 2, 2, 3, 3, 3, 0], dtype=np.int32)
+        val2 = np.asarray([9, 8, 2, 6, 4, 5, 3, 7, 1, 0], dtype=np.int64)
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_numeric("val2", "int64").data.write(val2)
+
+            ddf = dst.create_dataframe('ddf')
+
+            df.groupby(by='val').max(target='val2', ddf=ddf)
+
+            self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
+            self.assertListEqual([0, 8, 6, 9], ddf['val2_max'].data[:].tolist())
+
+    def test_groupby_max_multi_fields(self):
+        val = np.asarray([1, 2, 1, 2], dtype=np.int32)
+        val2 = np.asarray(['a', 'c', 'a', 'b'], dtype='S1')
+        val3 = np.asarray([3, 4, 5, 6])
+        val4 = np.asarray(['aa', 'ab', 'cd', 'def'])
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_fixed_string("val2", 1).data.write(val2)
+            df.create_numeric("val3", "int32").data.write(val3)
+            df.create_indexed_string("val4").data.write(val4)
+
+            ddf = dst.create_dataframe('ddf')
+
+            df.groupby(by=['val', 'val2']).max(['val3', 'val4'], ddf=ddf)
+
+            self.assertListEqual([1, 2, 2], ddf['val'].data[:].tolist())
+            self.assertListEqual([b'a', b'b', b'c'], ddf['val2'].data[:].tolist())
+            self.assertListEqual([5, 6, 4], ddf['val3_max'].data[:].tolist())
+            self.assertListEqual(['cd', 'def', 'ab'], ddf['val4_max'].data[:])
+
+    def test_groupby_min_single_field(self):
+        val = np.asarray([3, 1, 1, 2, 2, 2, 3, 3, 3, 0], dtype=np.int32)
+        val2 = np.asarray([9, 8, 2, 6, 4, 5, 3, 7, 1, 0], dtype=np.int64)
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_numeric("val2", "int64").data.write(val2)
+
+            ddf = dst.create_dataframe('ddf')
+
+            df.groupby(by='val').min(target='val2', ddf=ddf)
+
+            self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
+            self.assertListEqual([0, 2, 4, 1], ddf['val2_min'].data[:].tolist())
+
+    def test_groupby_min_multi_fields(self):
+        val = np.asarray([1, 2, 1, 2], dtype=np.int32)
+        val2 = np.asarray(['a', 'c', 'a', 'b'], dtype='S1')
+        val3 = np.asarray([3, 4, 5, 6])
+        val4 = np.asarray(['aa', 'ab', 'cd', 'def'])
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_fixed_string("val2", 1).data.write(val2)
+            df.create_numeric("val3", "int32").data.write(val3)
+            df.create_indexed_string("val4").data.write(val4)
+
+            ddf = dst.create_dataframe('ddf')
+
+            df.groupby(by=['val', 'val2']).min(['val3', 'val4'], ddf=ddf)
+
+            self.assertListEqual([1, 2, 2], ddf['val'].data[:].tolist())
+            self.assertListEqual([b'a', b'b', b'c'], ddf['val2'].data[:].tolist())
+            self.assertListEqual([3, 6, 4], ddf['val3_min'].data[:].tolist())
+            self.assertListEqual(['aa', 'def', 'ab'], ddf['val4_min'].data[:])
+
+    def test_groupby_first_single_field(self):
+        val = np.asarray([3, 1, 1, 2, 2, 2, 3, 3, 3, 0], dtype=np.int32)
+        val2 = np.asarray([9, 8, 2, 6, 4, 5, 3, 7, 1, 0], dtype=np.int64)
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_numeric("val2", "int64").data.write(val2)
+
+            ddf = dst.create_dataframe('ddf')
+
+            df.groupby(by='val').first(target='val2', ddf=ddf)
+
+            self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
+            self.assertListEqual([0, 8, 6, 9], ddf['val2_first'].data[:].tolist())
+
+    def test_groupby_last_single_field(self):
+        val = np.asarray([3, 1, 1, 2, 2, 2, 3, 3, 3, 0], dtype=np.int32)
+        val2 = np.asarray([9, 8, 2, 6, 4, 5, 3, 7, 1, 0], dtype=np.int64)
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_numeric("val2", "int64").data.write(val2)
+
+            ddf = dst.create_dataframe('ddf')
+
+            df.groupby(by='val').last(target='val2', ddf=ddf)
+
+            self.assertListEqual([0, 1, 2, 3], ddf['val'].data[:].tolist())
+            self.assertListEqual([0, 2, 5, 1], ddf['val2_last'].data[:].tolist())
+
+    def test_groupby_sorted_field(self):
+        val = np.asarray([0, 0, 0, 1, 1, 1, 3], dtype=np.int32)
+        val2 = np.asarray(['a', 'b', 'b', 'c', 'd', 'd', 'f'], dtype='S1')
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_fixed_string("val2", 1).data.write(val2)
+            ddf = dst.create_dataframe('ddf')
+
+            df.groupby(by='val').min(target='val2', ddf=ddf)
+            df.groupby(by='val').first(target='val2', ddf=ddf, write_keys=False)
+
+            self.assertListEqual([0, 1, 3], ddf['val'].data[:].tolist())
+            self.assertListEqual([b'a', b'c', b'f'], ddf['val2_min'].data[:].tolist())
+            self.assertListEqual([b'a', b'c', b'f'], ddf['val2_first'].data[:].tolist())
+
+    def test_groupby_with_hint_keys_is_sorted(self):
+        val = np.asarray([0, 0, 0, 1, 1, 1, 3], dtype=np.int32)
+        val2 = np.asarray(['a', 'b', 'b', 'c', 'd', 'd', 'f'], dtype='S1')
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_fixed_string("val2", 1).data.write(val2)
+            ddf = dst.create_dataframe('ddf')
+
+            df.groupby(by='val', hint_keys_is_sorted=True).max(target='val2', ddf=ddf)
+            df.groupby(by='val', hint_keys_is_sorted=True).last(target='val2', ddf=ddf, write_keys=False)
+
+            self.assertListEqual([0, 1, 3], ddf['val'].data[:].tolist())
+            self.assertListEqual([b'b', b'd', b'f'], ddf['val2_max'].data[:].tolist())
+            self.assertListEqual([b'b', b'd', b'f'], ddf['val2_last'].data[:].tolist())
+
+
+class TestDataFrameSort(unittest.TestCase):
+
+    def test_sort_values_on_original_df(self):
+        idx = np.asarray([b'a', b'e', b'b', b'd', b'c'], dtype='S1')
+        val = np.asarray([10, 20, 30, 40, 50], dtype=np.int32)
+        val2 = ['a', 'ee', 'bbb', 'dddd', 'ccccc']
+
+        bio = BytesIO()
+        with session.Session(10) as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_fixed_string("idx", 1).data.write(idx)
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_indexed_string("val2").data.write(val2)
+
+            df.sort_values(by='idx')
+
+            self.assertListEqual([b'a', b'b', b'c', b'd', b'e'], df['idx'].data[:].tolist())
+            self.assertListEqual([10, 30, 50, 40, 20], df['val'].data[:].tolist())
+            self.assertListEqual(['a', 'bbb', 'ccccc', 'dddd', 'ee'], df['val2'].data[:])
+
+    def test_sort_values_on_other_df(self):
+        idx = np.asarray([b'a', b'e', b'b', b'd', b'c'], dtype='S1')
+        val = np.asarray([10, 20, 30, 40, 50], dtype=np.int32)
+        val2 = ['a', 'ee', 'bbb', 'dddd', 'ccccc']
+
+        bio = BytesIO()
+        with session.Session(10) as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_fixed_string("idx", 1).data.write(idx)
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_indexed_string("val2").data.write(val2)
+
+            ddf = dst.create_dataframe('ddf')
+
+            df.sort_values(by='idx', ddf=ddf)
+
+            self.assertListEqual(list(idx), df['idx'].data[:].tolist())
+            self.assertListEqual(list(val), df['val'].data[:].tolist())
+            self.assertListEqual(list(val2), df['val2'].data[:])
+
+            self.assertListEqual([b'a', b'b', b'c', b'd', b'e'], ddf['idx'].data[:].tolist())
+            self.assertListEqual([10, 30, 50, 40, 20], ddf['val'].data[:].tolist())
+            self.assertListEqual(['a', 'bbb', 'ccccc', 'dddd', 'ee'], ddf['val2'].data[:])
+
+    def test_sort_values_on_inconsistent_length_df(self):
+        idx = np.asarray([b'a', b'e', b'b', b'd', b'c'], dtype='S1')
+        val = np.asarray([10, 20, 30, 40], dtype=np.int32)
+        val2 = ['a', 'ee', 'bbb', 'dddd']
+
+        bio = BytesIO()
+        with session.Session(10) as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_fixed_string("idx", 1).data.write(idx)
+            df.create_numeric("val", "int32").data.write(val)
+            df.create_indexed_string("val2").data.write(val2)
+
+            with self.assertRaises(ValueError) as context:
+                df.sort_values(by='idx')
+
+            self.assertEqual(str(context.exception),
+                             "There are consistent lengths in dataframe 'ds'. The following length were observed: {4, 5}")
+
+    def test_sort_values_on_invalid_input(self):
+        idx = np.asarray([b'a', b'e', b'b', b'd', b'c'], dtype='S1')
+        bio = BytesIO()
+        with session.Session(10) as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('ds')
+            df.create_fixed_string("idx", 1).data.write(idx)
+
+            with self.assertRaises(ValueError) as context:
+                df.sort_values(by='idx', axis=1)
+
+            self.assertEqual(str(context.exception), "Currently sort_values() only supports axis = 0")
+
+            with self.assertRaises(ValueError) as context:
+                df.sort_values(by='idx', ascending=False)
+
+            self.assertEqual(str(context.exception), "Currently sort_values() only supports ascending = True")
+
+            with self.assertRaises(ValueError) as context:
+                df.sort_values(by='idx', kind='quicksort')
+
+            self.assertEqual(str(context.exception), "Currently sort_values() only supports kind='stable'")
+
+
+class TestDataFrameToCSV(unittest.TestCase):
+
+    def test_to_csv_file(self):
+        val1 = np.asarray([0, 1, 2, 3], dtype='int32')
+        val2 = ['zero', 'one', 'two', 'three']
+        bio = BytesIO()
+
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('val1', 'int32').data.write(val1)
+            df.create_indexed_string('val2').data.write(val2)
+            df.to_csv(csv_file_name)
+
+        with open(csv_file_name, 'r') as f:
+            self.assertEqual(f.readlines(), ['val1,val2\n', '0,zero\n', '1,one\n', '2,two\n', '3,three\n'])
+
+        os.close(fd_csv)
+
+    def test_to_csv_small_chunk_row_size(self):
+        val1 = np.asarray([0, 1, 2, 3], dtype='int32')
+        val2 = ['zero', 'one', 'two', 'three']
+        bio = BytesIO()
+
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('val1', 'int32').data.write(val1)
+            df.create_indexed_string('val2').data.write(val2)
+            df.to_csv(csv_file_name, chunk_row_size=2)
+
+        with open(csv_file_name, 'r') as f:
+            self.assertEqual(f.readlines(), ['val1,val2\n', '0,zero\n', '1,one\n', '2,two\n', '3,three\n'])
+
+        os.close(fd_csv)
+
+    def test_to_csv_with_column_filter(self):
+        val1 = np.asarray([0, 1, 2, 3], dtype='int32')
+        val2 = ['zero', 'one', 'two', 'three']
+        bio = BytesIO()
+
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('val1', 'int32').data.write(val1)
+            df.create_indexed_string('val2').data.write(val2)
+            df.to_csv(csv_file_name, column_filter=['val1'])
+
+        with open(csv_file_name, 'r') as f:
+            self.assertEqual(f.readlines(), ['val1\n', '0\n', '1\n', '2\n', '3\n'])
+
+        os.close(fd_csv)
+
+    def test_to_csv_with_row_filter_field(self):
+        val1 = np.asarray([0, 1, 2, 3], dtype='int32')
+        val2 = [True, False, True, False]
+        bio = BytesIO()
+
+        fd_csv, csv_file_name = tempfile.mkstemp(suffix='.csv')
+
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('val1', 'int32').data.write(val1)
+            df.create_numeric('val2', 'bool').data.write(val2)
+            df.to_csv(csv_file_name, row_filter=df['val2'])
+
+        with open(csv_file_name, 'r') as f:
+            self.assertEqual(f.readlines(), ['val1\n', '0\n', '2\n'])
+
+        os.close(fd_csv)

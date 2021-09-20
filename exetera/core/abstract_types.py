@@ -93,6 +93,10 @@ class Dataset(ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def require_dataframe(self, name: str):
+        raise NotImplementedError()
+
+    @abstractmethod
     def close(self):
         raise NotImplementedError()
 
@@ -255,6 +259,27 @@ class DataFrame(ABC):
 
     @abstractmethod
     def apply_index(self, index_to_apply, ddf=None):
+        raise NotImplementedError()
+
+
+class DataFrameGroupBy(ABC):
+    """
+    DataFrameGroupBy is an object returned after group by on dataframe
+    """
+    @abstractmethod
+    def max(self, field):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def min(self, field):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def first(self, field):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def last(self, field):
         raise NotImplementedError()
 
 

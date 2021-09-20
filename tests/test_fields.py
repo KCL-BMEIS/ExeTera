@@ -8,6 +8,8 @@ import h5py
 from exetera.core import session
 from exetera.core import fields
 from exetera.core import persistence as per
+from exetera.core import field_importers as fi
+from exetera.core import utils
 
 
 class TestFieldExistence(unittest.TestCase):
@@ -159,38 +161,50 @@ class TestIsSorted(unittest.TestCase):
 
 class TestIndexedStringFields(unittest.TestCase):
 
+    def test_create_indexed_string(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'src')
+            df = ds.create_dataframe('src')
+            f = df.create_indexed_string('f')
+            d = f.data[:]
+            print(d)
+
+
     def test_filter_indexed_string(self):
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio, "w", "src")
             hf = dst.create_dataframe('src')
-            strings = ['a', 'bb', 'ccc', 'dddd']
-            f = fields.IndexedStringImporter(s, hf, 'foo')
-            f.write(strings)
-            f = s.get(hf['foo'])
-            self.assertListEqual([0, 1, 3, 6, 10], f.indices[:].tolist())
+            data = ['a', 'bb', 'ccc', 'dddd']
+            indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)               
+            foo = fi.IndexedStringImporter(s, hf, 'foo')
+            foo.import_part(indices, values, offsets, 0, written_row_count)
+
+            self.assertListEqual([0, 1, 3, 6, 10], hf['foo'].indices[:].tolist())
 
             f2 = s.create_indexed_string(hf, 'bar')
-            s.apply_filter(np.asarray([False, True, True, False]), f, f2)
+            s.apply_filter(np.asarray([False, True, True, False]), hf['foo'], f2)
             self.assertListEqual([0, 2, 5], f2.indices[:].tolist())
             self.assertListEqual([98, 98, 99, 99, 99], f2.values[:].tolist())
             self.assertListEqual(['bb', 'ccc'], f2.data[:])
             self.assertEqual('bb', f2.data[0])
             self.assertEqual('ccc', f2.data[1])
 
+
     def test_reindex_indexed_string(self):
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio, "w", "src")
             hf = dst.create_dataframe('src')
-            strings = ['a', 'bb', 'ccc', 'dddd']
-            f = fields.IndexedStringImporter(s, hf, 'foo')
-            f.write(strings)
-            f = s.get(hf['foo'])
-            self.assertListEqual([0, 1, 3, 6, 10], f.indices[:].tolist())
+            data = ['a', 'bb', 'ccc', 'dddd']
+            indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)               
+            foo = fi.IndexedStringImporter(s, hf, 'foo')
+            foo.import_part(indices, values, offsets, 0, written_row_count)
+            self.assertListEqual([0, 1, 3, 6, 10], hf['foo'].indices[:].tolist())
 
             f2 = s.create_indexed_string(hf, 'bar')
-            s.apply_index(np.asarray([3, 0, 2, 1], dtype=np.int64), f, f2)
+            s.apply_index(np.asarray([3, 0, 2, 1], dtype=np.int64), hf['foo'], f2)
             self.assertListEqual([0, 4, 5, 8, 10], f2.indices[:].tolist())
             self.assertListEqual([100, 100, 100, 100, 97, 99, 99, 99, 98, 98],
                                  f2.values[:].tolist())
@@ -198,16 +212,16 @@ class TestIndexedStringFields(unittest.TestCase):
 
 
     def test_update_legacy_indexed_string_that_has_uint_values(self):
-
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio, "w", "src")
             hf = dst.create_dataframe('src')
-            strings = ['a', 'bb', 'ccc', 'dddd']
-            f = fields.IndexedStringImporter(s, hf, 'foo')
-            f.write(strings)
-            values = hf['foo'].values[:]
-            self.assertListEqual([97, 98, 98, 99, 99, 99, 100, 100, 100, 100], values.tolist())
+            data = ['a', 'bb', 'ccc', 'dddd']
+            indices, values, offsets, written_row_count = utils.one_dim_data_to_indexed_for_test(data, 10)               
+            foo = fi.IndexedStringImporter(s, hf, 'foo')
+            foo.import_part(indices, values, offsets, 0, written_row_count)
+            self.assertListEqual([97, 98, 98, 99, 99, 99, 100, 100, 100, 100], hf['foo'].values[:].tolist())
+
 
     def test_index_string_field_get_span(self):
         bio = BytesIO()
@@ -217,10 +231,6 @@ class TestIndexedStringFields(unittest.TestCase):
             idx = s.create_indexed_string(ds, 'idx')
             idx.data.write(['aa', 'bb', 'bb', 'c', 'c', 'c', 'ddd', 'ddd', 'e', 'f', 'f', 'f'])
             self.assertListEqual([0, 1, 3, 6, 8, 9, 12], s.get_spans(idx))
-
-
-
-
 
 
 class TestFieldArray(unittest.TestCase):
