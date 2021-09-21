@@ -162,22 +162,22 @@ class TestImporter(unittest.TestCase):
 
 
     def test_importer_date(self):
-        expected_birthday_date = [b'1990-01-01', b'1980-03-04', b'1970-04-05', b'1960-04-05', b'1950-04-05']
+        expected_birthday_date = ['1990-01-01', '1980-03-04', '1970-04-05', '1960-04-05', '1950-04-05']
 
         bio = BytesIO()
         with session.Session() as s:
             importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
-            self.assertEqual(df['birthday'].data[:].tolist(), expected_birthday_date)
+            self.assertEqual(df['birthday'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d").timestamp() for x in expected_birthday_date])
 
         with h5py.File(bio, 'r') as hf:
-            self.assertEqual(hf['schema_key']['birthday']['values'][:].tolist(), expected_birthday_date)
+            self.assertEqual(hf['schema_key']['birthday']['values'][:].tolist(), [datetime.strptime(x, "%Y-%m-%d").timestamp() for x in expected_birthday_date])
 
 
     def test_importer_datetime_with_create_day_field(self):
         expected_updated_at_list = ['2020-05-12 07:00:00', '2020-05-13 01:00:00', '2020-05-14 03:00:00', '2020-05-15 03:00:00', '2020-05-16 03:00:00']
-        expected_updated_at_date_list = [b'2020-05-12', b'2020-05-13', b'2020-05-14',b'2020-05-15',b'2020-05-16']
+        expected_updated_at_date_list = [b'2020-05-12', b'2020-05-13', b'2020-05-14', b'2020-05-15', b'2020-05-16']
 
         bio = BytesIO()
         with session.Session() as s:

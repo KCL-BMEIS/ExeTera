@@ -27,7 +27,7 @@ class TestReadCSV(TestCase):
                         'weight_change': Numeric('float32', invalid_value= 'min', create_flag_field= False),
                         'BMI': Numeric('float64', validation_mode='relaxed'),
                         'updated_at': DateTime(create_day_field= True),
-                        'birthday': Date(),
+                        'birthday': Date(create_day_field=True),
                         'postcode': Categorical(categories={"": 0, "NW1":1, "E1":2, "SW1P":3, "NW3":4}),
                         'patient_id': String(fixed_length=4),
                         'degree': Categorical(categories={"":0, "bachelor":1, "master":2, "doctor":3}, allow_freetext=True)
@@ -204,7 +204,9 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             parsers.read_csv(self.csv_file_name, df, self.schema_dict, include=['birthday'])  
 
             expected_birthday_date = [b'1990-01-01', b'1980-03-04', b'1970-04-05', b'1960-04-05', b'1950-04-05']
-            self.assertEqual(df['birthday'].data[:].tolist(), expected_birthday_date)
+            self.assertEqual(df['birthday'].data[:].tolist(), [datetime.strptime(x.decode(), "%Y-%m-%d").timestamp() for x in expected_birthday_date])
+            self.assertEqual(df['birthday_day'].data[:].tolist(), expected_birthday_date)
+
 
     def test_read_csv_check_j_valid_from_to(self):
         bio = BytesIO()
