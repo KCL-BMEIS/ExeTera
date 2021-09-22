@@ -102,6 +102,7 @@ class Date(ImporterDefinition):
     """
     Date is an importer definition for Date fields. It's the means that you define Date field in the schema dictionary.
 
+    :param create_day_field: create extra field which contains the date information.
     :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
     """
     def __init__(self, create_day_field=False, create_flag_field=False):
