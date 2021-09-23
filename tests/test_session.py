@@ -1170,5 +1170,5 @@ class TestSessionImporters(unittest.TestCase):
             foo = fi.DateImporter(s, hf, 'foo')
             foo.import_part(indices, values, offsets, 0, written_row_count)
 
-            expected_date_list = [b'2020-05-10', b'2020-05-12', b'2020-05-12', b'2020-05-15']
-            self.assertListEqual(expected_date_list, hf['foo'].data[:].tolist())
+            expected_date_list = ['2020-05-10', '2020-05-12', '2020-05-12', '2020-05-15']
+            self.assertListEqual(hf['foo'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d").timestamp() for x in expected_date_list])

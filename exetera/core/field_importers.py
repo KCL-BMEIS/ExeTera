@@ -18,8 +18,8 @@ FIELD_MAPPING_TO_IMPORTER = {
               lambda s, df, name, ts: IndexedStringImporter(s, df, name, ts) if fixed_length is None else FixedStringImporter(s, df, name, fixed_length, ts),
     'datetime': lambda create_day_field, create_flag_field:
                 lambda s, df, name, ts: DateTimeImporter(s, df, name, create_day_field, create_flag_field, ts),
-    'date': lambda create_flag_field:
-            lambda s, df, name, ts: DateImporter(s, df, name, create_flag_field, ts),
+    'date': lambda create_day_field, create_flag_field:
+            lambda s, df, name, ts: DateImporter(s, df, name, create_day_field, create_flag_field, ts),
 }
 
 #========= ImporterDefinition, include Categorical, Numeric, , , Datetime =========
@@ -102,11 +102,12 @@ class Date(ImporterDefinition):
     """
     Date is an importer definition for Date fields. It's the means that you define Date field in the schema dictionary.
 
+    :param create_day_field: create extra field which contains the date information.
     :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
     """
-    def __init__(self, create_flag_field=False):
+    def __init__(self, create_day_field=False, create_flag_field=False):
         self._field_size = 10
-        self._importer = FIELD_MAPPING_TO_IMPORTER['date'](create_flag_field)
+        self._importer = FIELD_MAPPING_TO_IMPORTER['date'](create_day_field, create_flag_field)
 
 
 #============= Field Importers ============
@@ -339,18 +340,34 @@ class DateTimeImporter:
 
 
 class DateImporter:
-    def __init__(self, session, df, name, create_flag_field=False, timestamp=None, chunksize=None):
-        self.field = df.create_fixed_string(name, 10, timestamp, None)
+    def __init__(self, session, df, name, create_day_field=False, create_flag_field=False, timestamp=None, chunksize=None):
+        self.field = df.create_timestamp(name, timestamp, None)   
+        self.day_field = None
+        print('create_day_field' , create_day_field)
+        if create_day_field:
+            self.day_field = df.create_fixed_string(f"{name}_day", 10, timestamp, None) 
+
         self.flag_field = None
         if create_flag_field:
             self.flag_field = df.create_numeric(f"{name}_set", 'bool', timestamp, None)
     
     def write_part(self, values):
-        self.field.data.write_part(values)    
-        if self.flag_field:
-            flags = np.ones(len(values), dtype='bool')
-            valid = np.char.not_equal(values, b'')
-            flags = np.where(valid, flags, False)
+        date_ts = np.zeros(len(values), dtype=np.float64)
+        flags = np.ones(len(values), dtype='bool')
+
+        for i in range(len(values)):
+            value = values[i].strip()
+            if value == b'':
+                date_ts[i] = 0
+                flags[i] = False
+            else:
+                ts = datetime.strptime(value.decode(), '%Y-%m-%d')
+                date_ts[i] = ts.timestamp()
+
+        self.field.data.write_part(date_ts)
+        if self.day_field is not None:
+            self.day_field.data.write_part(values)    
+        if self.flag_field is not None:
             self.flag_field.data.write_part(flags)
 
     def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
@@ -360,7 +377,10 @@ class DateImporter:
 
     def complete(self):
         self.field.data.complete()
-
+        if self.day_field is not None:
+            self.day_field.data.complete()
+        if self.flag_field is not None:
+            self.flag_field.data.complete()
 
 class TimestampImporter:
     def __init__(self, session, df, name, timestamp=None, chunksize=None):
