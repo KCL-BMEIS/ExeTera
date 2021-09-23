@@ -1239,33 +1239,6 @@ class TestJournalling(unittest.TestCase):
         arr = np.asarray([1, 1, 1, 1, 1])
         self.assertTrue(ops.is_ordered(arr))
 
-    def test_count(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            dst = s.open_dataset(bio, 'w', 'dst')
-            df = dst.create_dataframe('df')
-            fld = df.create_numeric('num', 'int32')
-            fld.data.write([1, 1, 2, 3, 4, 5, 6, 3, 4, 1, 1, 2, 4, 2, 3, 4])
-            dict = ops.count(fld)
-            self.assertEqual([1, 2, 3, 4, 5, 6], list(dict.keys()))
-            self.assertEqual([4, 3, 3, 4, 1, 1], list(dict.values()))
-            fld = df.create_fixed_string('fst', 1)
-            fld.data.write([b'a', b'c', b'd', b'b', b'a', b'a', b'd', b'c', b'a'])
-            dict = ops.count(fld)
-            self.assertEqual([b'a', b'b', b'c', b'd'], list(dict.keys()))
-            self.assertEqual([4, 1, 2, 2], list(dict.values()))
-            fld = df.create_indexed_string('ids')
-            fld.data.write(['cc', 'aa', 'bb', 'cc', 'cc', 'ddd', 'dd', 'ddd'])
-            dict = ops.count(fld)
-            self.assertEqual(['aa', 'bb', 'cc', 'dd', 'ddd'], list(dict.keys()))
-            self.assertEqual([1, 1, 3, 1, 2], list(dict.values()))
-            fld = df.create_categorical('cat', 'int8', {'a': 1, 'b': 2})
-            fld.data.write([1, 1, 2, 2, 1, 1, 2, 2, 1, 2, 1, 2, 1])
-            dict = ops.count(fld)
-            self.assertEqual(list(fld.keys.keys()), list(dict.keys()))
-            self.assertEqual([7, 6], list(dict.values()))
-
-
 class TestGetSpans(unittest.TestCase):
 
     def test_get_spans_two_field(self):

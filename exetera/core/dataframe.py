@@ -37,7 +37,7 @@ class HDF5DataFrame(DataFrame):
     For a detailed explanation of DataFrame along with examples of its use, please refer to the
     wiki documentation at
     https://github.com/KCL-BMEIS/ExeTera/wiki/DataFrame-API
-
+    
     :param name: name of the dataframe.
     :param dataset: a dataset object, where this dataframe belongs to.
     :param h5group: the h5group object to store the fields. If the h5group is not empty, acquire data from h5group
@@ -46,7 +46,6 @@ class HDF5DataFrame(DataFrame):
         Dataframe<-Field-Field.data automatically.
     :param dataframe: optional - replicate data from another dictionary of (name:str, field: Field).
     """
-
     def __init__(self,
                  dataset: Dataset,
                  name: str,
@@ -93,7 +92,7 @@ class HDF5DataFrame(DataFrame):
 
         :param field: field to add to this dataframe, copy the underlying dataset
         """
-        dname = field.name[field.name.index('/', 1) + 1:]
+        dname = field.name[field.name.index('/', 1)+1:]
         nfield = field.create_like(self, dname)
         if field.indexed:
             nfield.indices.write(field.indices[:])
@@ -312,16 +311,16 @@ class HDF5DataFrame(DataFrame):
         renamed.
 
         Example::
-
+        
             # rename a single field
             df.rename('a', 'b')
-
+    
             # rename multiple fields
             df.rename({'a': 'b', 'b': 'c', 'c': 'a'})
 
         Field renaming can fail if the resulting set of renamed fields would have name clashes. If
         this is the case, none of the rename operations go ahead and the dataframe remains unmodified.
-
+        
         :param field: Either a string or a dictionary of name pairs, each of which is the existing
             field name and the destination field name
         :param field_to: Optional parameter containing a string, if `field` is a string. If 'field'
@@ -396,6 +395,7 @@ class HDF5DataFrame(DataFrame):
 
         self._columns = final_columns
 
+
     def apply_filter(self, filter_to_apply, ddf=None):
         """
         Apply the filter to all the fields in this dataframe, return a dataframe with filtered fields.
@@ -434,16 +434,17 @@ class HDF5DataFrame(DataFrame):
                 field.apply_index(index_to_apply, target=newfld)
             return ddf
         else:
-            val.validate_all_field_length_in_df(self)
+            val.validate_all_field_length_in_df(self) 
 
             for field in self._columns.values():
                 field.apply_index(index_to_apply, in_place=True)
             return self
 
+
     def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):
         """
         Sort by the values of a field or a list of fields
-
+        
         :param by: Name (str) or list of names (str) to sort by.
         :param ddf: optional - the destination data frame
         :param axis: Axis to be sorted. Currently only supports 0
@@ -468,8 +469,8 @@ class HDF5DataFrame(DataFrame):
 
         return self.apply_index(sorted_index, ddf)
 
-    def to_csv(self, filepath: str, row_filter: Union[np.ndarray, fld.Field] = None,
-               column_filter: Union[str, List[str]] = None, chunk_row_size: int = 1 << 15):
+
+    def to_csv(self, filepath:str, row_filter:Union[np.ndarray, fld.Field]=None, column_filter:Union[str, List[str]]=None, chunk_row_size:int=1<<15):
         """
         Write object to a comma-separated values (csv) file.
         :param filepath: File path.
@@ -481,7 +482,7 @@ class HDF5DataFrame(DataFrame):
 
         field_name_to_use = list(self.keys())
         if column_filter is not None:
-            field_name_to_use = val.validate_selected_keys(column_filter, self.keys())
+            field_name_to_use = val.validate_selected_keys(column_filter, self.keys())  
 
         filter_array = None
         if row_filter is not None:
@@ -492,7 +493,7 @@ class HDF5DataFrame(DataFrame):
         fields_to_use = [self._columns[f] for f in field_name_to_use]
 
         with open(filepath, 'w') as f:
-            writer = csvlib.writer(f, delimiter=',', lineterminator='\n')
+            writer = csvlib.writer(f, delimiter=',',lineterminator='\n')
 
             # write header names
             writer.writerow(field_name_to_use)
@@ -502,13 +503,12 @@ class HDF5DataFrame(DataFrame):
                 chunk_data = []
                 for field in fields_to_use:
                     if field.indexed:
-                        chunk_data.append(field.data[start_row: start_row + chunk_row_size])
+                        chunk_data.append(field.data[start_row: start_row+chunk_row_size])
                     else:
-                        chunk_data.append(field.data[start_row: start_row + chunk_row_size].tolist())
+                        chunk_data.append(field.data[start_row: start_row+chunk_row_size].tolist())
 
                 for i, row in enumerate(zip(*chunk_data)):
-                    if filter_array is None or (
-                            i + start_row < len(filter_array) and filter_array[i + start_row] == True):
+                    if filter_array is None or (i + start_row <len(filter_array) and filter_array[i + start_row] == True):
                         writer.writerow(row)
 
                 if len(chunk_data[0]) < chunk_row_size:
@@ -516,28 +516,30 @@ class HDF5DataFrame(DataFrame):
                 else:
                     start_row += chunk_row_size
 
-    def drop_duplicates(self, by: Union[str, List[str]],
-                        ddf: DataFrame = None,
-                        hint_keys_is_sorted=False):
+            
+    def drop_duplicates(self, by: Union[str, List[str]], 
+                       ddf: DataFrame = None,
+                       hint_keys_is_sorted=False):
         """
         Distinct values of a field or a list of field, return a dataframe with distinct values.
-
+        
         :param by: Name (str) or list of names (str) to distinct.
         :param ddf: optional - the destination dataframe
         :returns: DataFrame with distinct values.
         """
         return self.groupby(by, hint_keys_is_sorted).distinct(ddf)
 
-    def groupby(self, by: Union[str, List[str]], hint_keys_is_sorted=False):
+        
+    def groupby(self, by: Union[str, List[str]], hint_keys_is_sorted=False):         
         """
         Group DataFrame using a field or a list of field, return a groupby object.
 
         :param by: Name (str) or list of names (str) to group by.
         :param hint_keys_is_sorted: an optional flag that users could set to skip the sorted check. \
-                                    Note that it runs faster and uses less memory when the dataframe is sorted, that is, hint_key_is_sorted=True.
+                                    Note that it runs faster and uses less memory when the dataframe is sorted, that is, hint_key_is_sorted=True. 
 
         :returns: Returns a groupby object that contains information about the groups.
-        """
+        """         
         # validate groupby keys
         by = val.validate_selected_keys(by, self._columns.keys())
 
@@ -553,177 +555,16 @@ class HDF5DataFrame(DataFrame):
         if not is_sorted:
             # sort first if needed
             readers = tuple(self._columns[k] for k in by)
-            sorted_index = self._dataset.session.dataset_sort_index(readers,
-                                                                    np.arange(len(readers[0].data), dtype=np.uint32))
+            sorted_index = self._dataset.session.dataset_sort_index(readers, np.arange(len(readers[0].data), dtype=np.uint32))
 
             sorted_by_fields_data = np.asarray([self._columns[k].data[:][sorted_index] for k in by])
         else:
             sorted_by_fields_data = np.asarray([self._columns[k].data[:] for k in by])
 
         spans = ops._get_spans_for_multi_fields(sorted_by_fields_data)
-
+        
         return HDF5DataFrameGroupBy(self._columns, by, sorted_index, spans)
 
-    def describe(self, include=None, exclude=None):
-        """
-        Show the basic statistics of the data in each field.
-
-        :param include: The field name or data type or simply 'all' to indicate the fields included in the calculation.
-        :param exclude: The filed name or data type to exclude in the calculation.
-        :return: A dataframe contains the statistic results.
-
-        """
-        # check include and exclude conflicts
-        if include is not None and exclude is not None:
-            if isinstance(include, str):
-                raise ValueError('Please do not use exclude parameter when include is set as a single field.')
-            elif isinstance(include, type):
-                if isinstance(exclude, type) or (isinstance(exclude, list) and isinstance(exclude[0], type)):
-                    raise ValueError('Please do not use set exclude as a type when include is set as a single data type.')
-            elif isinstance(include, list):
-                if isinstance(include[0], str) and isinstance(exclude, str):
-                    raise ValueError('Please do not use exclude as the same type as the include parameter.')
-                elif isinstance(include[0], str) and isinstance(exclude, list) and isinstance(exclude[0], str):
-                    raise ValueError('Please do not use exclude as the same type as the include parameter.')
-                elif isinstance(include[0], type) and isinstance(exclude, type):
-                    raise ValueError('Please do not use exclude as the same type as the include parameter.')
-                elif isinstance(include[0], type) and isinstance(exclude, list) and isinstance(exclude[0], type):
-                    raise ValueError('Please do not use exclude as the same type as the include parameter.')
-
-        fields_to_calculate = []
-        if include is not None:
-            if isinstance(include, str):  # a single str
-                if include == 'all':
-                    fields_to_calculate = list(self.columns.keys())
-                elif include in self.columns.keys():
-                    fields_to_calculate = [include]
-                else:
-                    raise ValueError('The field to include in not in the dataframe.')
-            elif isinstance(include, type):  # a single type
-                for f in self.columns:
-                    if not self[f].indexed and np.issubdtype(self[f].data.dtype, include):
-                        fields_to_calculate.append(f)
-                if len(fields_to_calculate) == 0:
-                    raise ValueError('No such type appeared in the dataframe.')
-            elif isinstance(include, list) and isinstance(include[0], str):  # a list of str
-                for f in include:
-                    if f in self.columns.keys():
-                        fields_to_calculate.append(f)
-                if len(fields_to_calculate) == 0:
-                    raise ValueError('The fields to include in not in the dataframe.')
-
-            elif isinstance(include, list) and isinstance(include[0], type):  # a list of type
-                for t in include:
-                    for f in self.columns:
-                        if not self[f].indexed and np.issubdtype(self[f].data.dtype, t):
-                            fields_to_calculate.append(f)
-                if len(fields_to_calculate) == 0:
-                    raise ValueError('No such type appeared in the dataframe.')
-
-            else:
-                raise ValueError('The include parameter can only be str, dtype, or list of either.')
-
-        else:  # include is None, numeric & timestamp fields only (no indexed strings) TODO confirm the type
-            for f in self.columns:
-                if isinstance(self[f], fld.NumericField) or isinstance(self[f], fld.TimestampField):
-                    fields_to_calculate.append(f)
-
-        if len(fields_to_calculate) == 0:
-            raise ValueError('No fields included to describe.')
-
-        if exclude is not None:
-            if isinstance(exclude, str):
-                if exclude in fields_to_calculate:  # exclude
-                    fields_to_calculate.remove(exclude)  # remove from list
-            elif isinstance(exclude, type):  # a type
-                for f in fields_to_calculate:
-                    if np.issubdtype(self[f].data.dtype, exclude):
-                        fields_to_calculate.remove(f)
-            elif isinstance(exclude, list) and isinstance(exclude[0], str):  # a list of str
-                for f in exclude:
-                    fields_to_calculate.remove(f)
-
-            elif isinstance(exclude, list) and isinstance(exclude[0], type):  # a list of type
-                for t in exclude:
-                    for f in fields_to_calculate:
-                        if np.issubdtype(self[f].data.dtype, t):
-                            fields_to_calculate.remove(f)  # remove will raise valueerror if dtype not presented
-
-            else:
-                raise ValueError('The exclude parameter can only be str, dtype, or list of either.')
-
-        if len(fields_to_calculate) == 0:
-            raise ValueError('All fields are excluded, no field left to describe.')
-        # if flexible (str) fields
-        des_idxstr = False
-        for f in fields_to_calculate:
-            if isinstance(self[f], fld.CategoricalField) or isinstance(self[f], fld.FixedStringField) or isinstance(
-                    self[f], fld.IndexedStringField):
-                des_idxstr = True
-        # calculation
-        result = {'fields': [], 'count': [], 'mean': [], 'std': [], 'min': [], '25%': [], '50%': [], '75%': [],
-                  'max': []}
-
-        # count
-        if des_idxstr:
-            result['unique'], result['top'], result['freq'] = [], [], []
-
-        for f in fields_to_calculate:
-            result['fields'].append(f)
-            result['count'].append(len(self[f].data))
-
-            if des_idxstr and (isinstance(self[f], fld.NumericField) or isinstance(self[f],
-                                                                                   fld.TimestampField)):  # numberic, timestamp
-                result['unique'].append('NaN')
-                result['top'].append('NaN')
-                result['freq'].append('NaN')
-
-                result['mean'].append("{:.2f}".format(np.mean(self[f].data[:])))
-                result['std'].append("{:.2f}".format(np.std(self[f].data[:])))
-                result['min'].append("{:.2f}".format(np.min(self[f].data[:])))
-                result['25%'].append("{:.2f}".format(np.percentile(self[f].data[:], 0.25)))
-                result['50%'].append("{:.2f}".format(np.percentile(self[f].data[:], 0.5)))
-                result['75%'].append("{:.2f}".format(np.percentile(self[f].data[:], 0.75)))
-                result['max'].append("{:.2f}".format(np.max(self[f].data[:])))
-
-            elif des_idxstr and (isinstance(self[f], fld.CategoricalField) or isinstance(self[f],
-                                                                                         fld.IndexedStringField) or isinstance(
-                    self[f], fld.FixedStringField)):  # categorical & indexed string & fixed string
-                a, b = np.unique(self[f].data[:], return_counts=True)
-                result['unique'].append(len(a))
-                result['top'].append(a[np.argmax(b)])
-                result['freq'].append(b[np.argmax(b)])
-
-                result['mean'].append('NaN')
-                result['std'].append('NaN')
-                result['min'].append('NaN')
-                result['25%'].append('NaN')
-                result['50%'].append('NaN')
-                result['75%'].append('NaN')
-                result['max'].append('NaN')
-
-            elif not des_idxstr:
-                result['mean'].append("{:.2f}".format(np.mean(self[f].data[:])))
-                result['std'].append("{:.2f}".format(np.std(self[f].data[:])))
-                result['min'].append("{:.2f}".format(np.min(self[f].data[:])))
-                result['25%'].append("{:.2f}".format(np.percentile(self[f].data[:], 0.25)))
-                result['50%'].append("{:.2f}".format(np.percentile(self[f].data[:], 0.5)))
-                result['75%'].append("{:.2f}".format(np.percentile(self[f].data[:], 0.75)))
-                result['max'].append("{:.2f}".format(np.max(self[f].data[:])))
-
-        # display
-        columns_to_show = ['fields', 'count', 'unique', 'top', 'freq', 'mean', 'std', 'min', '25%', '50%', '75%', 'max']
-        # 5 fields each time for display
-        for col in range(0, len(result['fields']), 5):  # 5 column each time
-            for i in columns_to_show:
-                if i in result:
-                    print(i, end='\t')
-                    for f in result[i][col:col + 5 if col + 5 < len(result[i]) - 1 else len(result[i])]:
-                        print('{:>15}'.format(f), end='\t')
-                    print('')
-            print('\n')
-
-        return result
 
 
 class HDF5DataFrameGroupBy(DataFrameGroupBy):
@@ -735,21 +576,23 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         self._sorted_index = sorted_index
         self._spans = spans
 
-    def _write_groupby_keys(self, ddf: DataFrame, write_keys=True):
+
+    def _write_groupby_keys(self, ddf: DataFrame, write_keys=True):    
         """
         Write groupby keys to ddf only if write_key = True
         """
-        if write_keys:
-            by_fields = np.asarray([self._columns[k] for k in self._by])
+        if write_keys: 
+            by_fields = np.asarray([self._columns[k] for k in self._by]) 
             for field in by_fields:
                 newfld = field.create_like(ddf, field.name)
-
-                if self._sorted_index is not None:
-                    field.apply_index(self._sorted_index, target=newfld)
+                
+                if self._sorted_index is not None:                    
+                    field.apply_index(self._sorted_index, target=newfld)                  
                     newfld.apply_filter(self._spans[:-1], in_place=True)
                 else:
                     field.apply_filter(self._spans[:-1], target=newfld)
 
+    
     def count(self, ddf: DataFrame, write_keys=True) -> DataFrame:
         """
         Compute max of group values.
@@ -757,21 +600,22 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         :param target: Name (str) or list of names (str) to compute count.
         :param ddf: the destination data frame
         :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
-
+        
         :return: dataframe with count of group values
-        """
+        """        
         self._write_groupby_keys(ddf, write_keys)
 
-        counts = np.zeros(len(self._spans) - 1, dtype='int64')
+        counts = np.zeros(len(self._spans)-1, dtype='int64')
         ops.apply_spans_count(self._spans, counts)
 
-        ddf.create_numeric(name='count', nformat='int64').data.write(counts)
+        ddf.create_numeric(name = 'count', nformat='int64').data.write(counts)
 
         return ddf
 
     def distinct(self, ddf: DataFrame, write_keys=True) -> DataFrame:
         self._write_groupby_keys(ddf, write_keys)
         return ddf
+        
 
     def max(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
         """
@@ -780,15 +624,15 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         :param target: Name (str) or list of names (str) to compute max.
         :param ddf: the destination data frame
         :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
-
+        
         :return: dataframe with max of group values
         """
         targets = val.validate_groupby_target(target, self._by, self._all)
 
         self._write_groupby_keys(ddf, write_keys)
-
+        
         target_fields = tuple(self._columns[k] for k in targets)
-        for field in target_fields:
+        for field in target_fields:       
             newfld = field.create_like(ddf, field.name + '_max')
 
             # sort first if needed
@@ -802,6 +646,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
         return ddf
 
+
     def min(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
         """
         Compute min of group values.
@@ -809,7 +654,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         :param target: Name (str) or list of names (str) to compute min.
         :param ddf: the destination data frame
         :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
-
+        
         :return: dataframe with min of group values
         """
         targets = val.validate_groupby_target(target, self._by, self._all)
@@ -817,7 +662,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         self._write_groupby_keys(ddf, write_keys)
 
         target_fields = tuple(self._columns[k] for k in targets)
-        for field in target_fields:
+        for field in target_fields:       
             newfld = field.create_like(ddf, field.name + '_min')
 
             # sort first if needed
@@ -831,6 +676,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
         return ddf
 
+
     def first(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
         """
         Get first of group values.
@@ -838,7 +684,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         :param target: Name (str) or list of names (str) to get first value.
         :param ddf: the destination data frame
         :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
-
+        
         :return: dataframe with first of group values
         """
         targets = val.validate_groupby_target(target, self._by, self._all)
@@ -846,7 +692,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         self._write_groupby_keys(ddf, write_keys)
 
         target_fields = tuple(self._columns[k] for k in targets)
-        for field in target_fields:
+        for field in target_fields:       
             newfld = field.create_like(ddf, field.name + '_first')
 
             # sort first if needed
@@ -859,6 +705,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
         return ddf
 
+
     def last(self, target: Union[str, List[str]], ddf: DataFrame, write_keys=True) -> DataFrame:
         """
         Get last of group values.
@@ -866,7 +713,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         :param target: Name (str) or list of names (str) to get last value.
         :param ddf: the destination data frame
         :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
-
+        
         :return: dataframe with last of group values
         """
         targets = val.validate_groupby_target(target, self._by, self._all)
@@ -874,7 +721,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         self._write_groupby_keys(ddf, write_keys)
 
         target_fields = tuple(self._columns[k] for k in targets)
-        for field in target_fields:
+        for field in target_fields:       
             newfld = field.create_like(ddf, field.name + '_last')
 
             # sort first if needed
@@ -884,8 +731,9 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
                 newfld.apply_spans_last(self._spans, in_place=True)
             else:
                 field.apply_spans_last(self._spans, target=newfld)
-
+            
         return ddf
+
 
 
 def copy(field: fld.Field, dataframe: DataFrame, name: str):
@@ -970,9 +818,9 @@ def merge(left: DataFrame,
         this is not set, all fields from the left table are joined
     :param right_fields: Optional parameter listing which fields are to be joined from the right table.
         If this is not set, all fields from the right table are joined
-    :param left_suffix: A string to be appended to fields from the left table if they clash with fields from the
+    :param left_suffix: A string to be appended to fields from the left table if they clash with fields from the 
         right table.
-    :param right_suffix: A string to be appended to fields from the right table if they clash with fields from the
+    :param right_suffix: A string to be appended to fields from the right table if they clash with fields from the 
         left table.
     :param how: Optional parameter specifying the merge mode. It must be one of ('left', 'right',
         'inner', 'outer' or 'cross). If not set, the 'left' join is performed.
@@ -1039,8 +887,8 @@ def merge(left: DataFrame,
 
     ordered = False
     if left_keys_ordered and right_keys_ordered and \
-            len(left_on_fields) == 1 and len(right_on_fields) == 1 and \
-            how in ('left', 'right', 'inner'):
+        len(left_on_fields) == 1 and len(right_on_fields) == 1 and \
+        how in ('left', 'right', 'inner'):
         ordered = True
 
     if ordered:
@@ -1129,7 +977,7 @@ def _unordered_merge(left: DataFrame,
             d.data.write(v)
 
     if not np.all(l_to_d_filt):
-        d = dest.create_numeric('valid' + left_suffix, 'bool')
+        d = dest.create_numeric('valid'+left_suffix, 'bool')
         d.data.write(l_to_d_filt)
 
     for f in right_fields_to_map:
@@ -1147,7 +995,7 @@ def _unordered_merge(left: DataFrame,
             d.data.write(v)
 
     if not np.all(r_to_d_filt):
-        d = dest.create_numeric('valid' + right_suffix, 'bool')
+        d = dest.create_numeric('valid'+right_suffix, 'bool')
         d.data.write(r_to_d_filt)
 
 

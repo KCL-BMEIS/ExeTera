@@ -23,15 +23,6 @@ from exetera.core import validation as val
 
 class HDF5Field(Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
-        """
-        Constructor for Fields based on HDF5 data store. This initializer should only be called by Field types that are
-        subclasses of HDF5Field, and never directly by users of ExeTera.
-
-        :param session: The session instance.
-        :param group: The HDF5 Group object.
-        :param dataframe: The dataframe this field belongs to.
-        :param write_enabled: A read-only/read-write switch.
-        """
         super().__init__()
 
         # if name is None:
@@ -125,12 +116,6 @@ class HDF5Field(Field):
 class MemoryField(Field):
 
     def __init__(self, session):
-        """
-        Constructor for memory-based Fields. This initializer should only be called by Field types that are subclasses
-        of MemoryField, and never directly by users of ExeTera.
-
-        :param session: The session instance.
-        """
         super().__init__()
         self._session = session
         self._write_enabled = True
@@ -177,20 +162,8 @@ class MemoryField(Field):
         raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
 
 
-# Field arrays
-# ============
-
-
 class ReadOnlyFieldArray:
     def __init__(self, field, dataset_name):
-        """
-        Construct a ReadOnlyFieldArray instance. This class is an implementation detail, used to access data in
-        non-indexed fields deriving from HDF5Field. As such, instances of ReadOnlyFieldArray should only be created by
-        the fields themselves, and not by users of ExeTera.
-
-        :param field: The HDF5 group object used as storage.
-        :param dataset_name: The name of the dataset object in HDF5, normally use 'values'
-        """
         self._field = field
         self._name = dataset_name
         self._dataset = field[dataset_name]
@@ -226,16 +199,11 @@ class ReadOnlyFieldArray:
                               "for a writeable copy of the field")
 
 
+# Field arrays
+# ============
+
 class WriteableFieldArray:
     def __init__(self, field, dataset_name):
-        """
-        Construct a WriteableFieldArray instance. This class is an implementation detail, used to access data in
-        non-indexed fields deriving from HDF5Field. As such, instances of WriteableFieldArray should only be created by
-        the Fields themselves, and not by users of ExeTera.
-
-        :param field: The HDF5 group object used as storage.
-        :param dataset_name: The name of the dataset object in HDF5, normally use 'values'
-        """
         self._field = field
         self._name = dataset_name
         self._dataset = field[dataset_name]
@@ -273,14 +241,8 @@ class WriteableFieldArray:
 
 
 class MemoryFieldArray:
-    def __init__(self, dtype):
-        """
-        Construct a MemoryFieldArray instance. This class is an implementation detail, used to access data in
-        non-indexed fields deriving from MemoryField. As such, instances of MemoryFieldArray should only be created by
-        the Fields themselves, and not by users of ExeTera.
 
-        :param dtype: The data type for construct the numpy array.
-        """
+    def __init__(self, dtype):
         self._dtype = dtype
         self._dataset = None
 
@@ -327,15 +289,6 @@ class MemoryFieldArray:
 
 class ReadOnlyIndexedFieldArray:
     def __init__(self, field, indices, values):
-        """
-        Construct a ReadOnlyIndexedFieldArray instance. This class is an implementation detail, used to access data in
-        indexed fields. As such, instances of ReadOnlyIndexedFieldArray should only be created by the Fields themselves,
-        and not by users of ExeTera.
-
-        :param field: The HDF5 group from which the data is read.
-        :param indices: The indices of the IndexedStringField.
-        :param values: The values of the IndexedStringField.
-        """
         self._field = field
         self._indices = indices
         self._values = values
@@ -683,6 +636,7 @@ class NumericMemField(MemoryField):
         super().__init__(session)
         self._nformat = nformat
 
+
     def writeable(self):
         return self
 
@@ -801,9 +755,6 @@ class NumericMemField(MemoryField):
 
     def __xor__(self, second):
         return FieldDataOps.numeric_xor(self._session, self, second)
-
-    def __invert__(self):
-        return FieldDataOps.invert(self._session, self)
 
     def __rxor__(self, first):
         return FieldDataOps.numeric_xor(self._session, first, self)
@@ -1436,16 +1387,6 @@ class NumericField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
-    def astype(self, type):
-        if isinstance(type, str) and type not in ['int8', 'int16', 'int32', 'int64', 'uint8', 'uint16','uint32',
-                                                  'uint64', 'float16', 'float32', 'float64', 'float128', 'bool_']:
-            raise ValueError("The type to convert is not supported, please use numeric type such as int or float.")
-        elif isinstance(type, np.dtype) and type not in [np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16,
-                                                         np.uint32, np.uint64, np.float16, np.float32, np.float64,
-                                                         np.float128, np.bool_]:
-            raise ValueError("The type to convert is not supported, please use numeric type such as int or float.")
-        self.data._dataset = self.data[:].astype(type)
-
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
         self._ensure_valid()
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
@@ -1541,14 +1482,6 @@ class NumericField(HDF5Field):
     def __ror__(self, first):
         self._ensure_valid()
         return FieldDataOps.numeric_or(self._session, first, self)
-
-    def __invert__(self):
-        self._ensure_valid()
-        return FieldDataOps.invert(self._session, self)
-
-    def logical_not(self):
-        self._ensure_valid()
-        return FieldDataOps.logical_not(self._session, self)
 
     def __lt__(self, value):
         self._ensure_valid()
@@ -1959,18 +1892,6 @@ class FieldDataOps:
         f.data.write(r)
         return f
 
-    @staticmethod
-    def _unary_op(session, first, function):
-        if isinstance(first, Field):
-            first_data = first.data[:]
-        else:
-            first_data = first
-
-        r = function(first_data)
-        f = NumericMemField(session, dtype_to_str(r.dtype))
-        f.data.write(r)
-        return f
-
     @classmethod
     def numeric_add(cls, session, first, second):
         def function_add(first, second):
@@ -2052,20 +1973,6 @@ class FieldDataOps:
             return first | second
 
         return cls._binary_op(session, first, second, function_or)
-
-    @classmethod
-    def invert(cls, session, first):
-        def function_invert(first):
-            return ~first
-
-        return cls._unary_op(session, first, function_invert)
-
-    @classmethod
-    def logical_not(cls, session, first):
-        def function_logical_not(first):
-            return np.logical_not(first)
-
-        return cls._unary_op(session, first, function_logical_not)
 
     @classmethod
     def less_than(cls, session, first, second):

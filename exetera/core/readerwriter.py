@@ -9,7 +9,6 @@ from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
 from exetera.core.utils import Timer
 
-
 class Reader:
     def __init__(self, field):
         self.field = field
@@ -27,6 +26,7 @@ class IndexedStringReader(Reader):
             raise ValueError(error.format(field, fieldtype))
         self.chunksize = field.attrs['chunksize']
         self.datastore = datastore
+        
 
     def __getitem__(self, item):
         try:
@@ -35,15 +35,15 @@ class IndexedStringReader(Reader):
                 start = item.start if item.start is not None else 0
                 stop = item.stop if item.stop is not None else len(self.field['index']) - 1
                 step = item.step
-                # TODO: validate slice
-                index = self.field['index'][start:stop + 1]
+                #TODO: validate slice
+                index = self.field['index'][start:stop+1]
                 bytestr = self.field['values'][index[0]:index[-1]]
-                results = [None] * (len(index) - 1)
+                results = [None] * (len(index)-1)
                 startindex = start
                 for ir in range(len(results)):
-                    results[ir] = \
-                        bytestr[index[ir] - np.int64(startindex):
-                                index[ir + 1] - np.int64(startindex)].tobytes().decode()
+                    results[ir] =\
+                        bytestr[index[ir]-np.int64(startindex):
+                                index[ir+1]-np.int64(startindex)].tobytes().decode()
                 return results
         except Exception as e:
             print("{}: unexpected exception {}".format(self.field.name, e))
@@ -62,7 +62,7 @@ class IndexedStringReader(Reader):
     def sort(self, index, writer):
         field_index = self.field['index'][:]
         field_values = self.field['values'][:]
-        r_field_index, r_field_values = \
+        r_field_index, r_field_values =\
             pers._apply_sort_to_index_values(index, field_index, field_values)
         writer.write_raw(r_field_index, r_field_values)
 
@@ -300,6 +300,7 @@ class IndexedStringWriter(Writer):
         if char_index > 0:
             DataWriter.write(self.field, 'values', chars, char_index)
 
+
     def flush(self):
         # if self.value_index != 0 or 'values' not in self.field:
         #     DataWriter.write(self.field, 'values', self.values, self.value_index)
@@ -322,7 +323,7 @@ class IndexedStringWriter(Writer):
             raise ValueError(f"'index' must be an ndarray of '{np.int64}'")
         if values.dtype not in (np.uint8, 'S1'):
             raise ValueError(f"'values' must be an ndarray of '{np.uint8}' or 'S1'")
-        DataWriter.write(self.field, 'index', index[1:], len(index) - 1)
+        DataWriter.write(self.field, 'index', index[1:], len(index)-1)
         DataWriter.write(self.field, 'values', values, len(values))
 
     def write_raw(self, index, values):
@@ -385,17 +386,15 @@ class LeakyCategoricalImporter:
 
     def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         cat_keys, cat_index, cat_values = self.byte_map
-        chunk = np.zeros(written_row_count,
-                         dtype=np.int8)  # use np.int8 instead of np.uint8, as we set -1 for leaky key
-        freetext_indices_chunk = np.zeros(written_row_count + 1, dtype=np.int64)
+        chunk = np.zeros(written_row_count, dtype=np.int8) # use np.int8 instead of np.uint8, as we set -1 for leaky key
+        freetext_indices_chunk = np.zeros(written_row_count + 1, dtype = np.int64)
 
         col_count = column_offsets[col_idx + 1] - column_offsets[col_idx]
-        freetext_values_chunk = np.zeros(np.int64(col_count), dtype=np.uint8)
+        freetext_values_chunk = np.zeros(np.int64(col_count), dtype = np.uint8)
 
-        ops.leaky_categorical_transform(chunk, freetext_indices_chunk, freetext_values_chunk, col_idx, column_inds,
-                                        column_vals, column_offsets, cat_keys, cat_index, cat_values)
+        ops.leaky_categorical_transform(chunk, freetext_indices_chunk, freetext_values_chunk, col_idx, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values)
 
-        freetext_indices = freetext_indices_chunk + self.freetext_index_accumulated  # broadcast
+        freetext_indices = freetext_indices_chunk + self.freetext_index_accumulated # broadcast
         self.freetext_index_accumulated += freetext_indices_chunk[written_row_count]
         freetext_values = freetext_values_chunk[:freetext_indices_chunk[written_row_count]]
         self.writer.write_part(chunk)
@@ -439,9 +438,8 @@ class CategoricalImporter:
     def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         chunk = np.zeros(written_row_count, dtype=np.uint8)
         cat_keys, cat_index, cat_values = self.byte_map
-
-        ops.categorical_transform(chunk, col_idx, column_inds, column_vals, column_offsets, cat_keys, cat_index,
-                                  cat_values)
+                
+        ops.categorical_transform(chunk, col_idx, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values)
         self.writer.write_part(chunk)
 
 
@@ -499,7 +497,7 @@ class NumericImporter:
         self.flag_writer = None
         if create_flag_field:
             self.flag_writer = NumericWriter(datastore, group, f"{name}{flag_field_suffix}",
-                                             'bool', timestamp, write_mode)
+                                                            'bool', timestamp, write_mode)
         self.field_name = name
         self.parser = parser
         self.invalid_value = invalid_value
@@ -513,7 +511,7 @@ class NumericImporter:
         Given a list of strings, parse the strings and write the parsed values. Values that
         cannot be parsed are written out as zero for the values, and zero for the flags to
         indicate that that entry is not valid.
-
+        
         :param values: a list of strings to be parsed
         """
         elements = np.zeros(len(values), dtype=self.data_writer.nformat)
@@ -522,21 +520,20 @@ class NumericImporter:
             valid, value = self.parser(values[i], self.invalid_value)
             elements[i] = value
             validity[i] = valid
-
-            if self.validation_mode == 'strict' and not valid:
+            
+            if self.validation_mode == 'strict' and not valid: 
                 if self._is_blank(values[i]):
-                    raise ValueError(f"Numeric value in the field '{self.field_name}' can not be empty in strict mode")
-                else:
-                    raise ValueError(
-                        f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
+                    raise ValueError(f"Numeric value in the field '{self.field_name}' can not be empty in strict mode")  
+                else:        
+                    raise ValueError(f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i].strip()}")
 
             if self.validation_mode == 'allow_empty' and not self._is_blank(values[i]) and not valid:
-                raise ValueError(
-                    f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i]}")
+                raise ValueError(f"The following numeric value in the field '{self.field_name}' can not be parsed:{values[i]}")
 
         self.data_writer.write_part(elements)
         if self.flag_writer is not None:
             self.flag_writer.write_part(validity)
+
 
     def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
         # elements = np.zeros(written_row_count, dtype=self.data_writer.nformat)
@@ -553,7 +550,7 @@ class NumericImporter:
                 written_row_count, self.invalid_value,
                 self.validation_mode, np.frombuffer(bytes(self.field_name, "utf-8"), dtype=np.uint8)
             )
-        elif self.data_writer.nformat in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64'):
+        elif self.data_writer.nformat in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64') :
 
             exception_message, exception_args = 0, []
             elements, validity = ops.transform_int(
@@ -573,6 +570,7 @@ class NumericImporter:
         self.data_writer.write_part(elements)
         if self.flag_writer is not None:
             self.flag_writer.write_part(validity)
+
 
     def _is_blank(self, value):
         return (isinstance(value, str) and value.strip() == '') or value == b''
@@ -643,10 +641,10 @@ class FixedStringWriter(Writer):
     def write_part(self, values):
         DataWriter.write(self.field, 'values', values, len(values))
 
-    def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+    def import_part(self, column_inds, column_vals, column_offsets,  col_idx, written_row_count):
         values = np.zeros(written_row_count, dtype='S{}'.format(self.strlen))
         ops.fixed_string_transform(column_inds, column_vals, column_offsets, col_idx,
-                                   written_row_count, self.strlen, values.data.cast('b'))
+                                     written_row_count, self.strlen, values.data.cast('b'))
         self.write_part(values)
 
     def flush(self):
@@ -673,7 +671,7 @@ class DateTimeImporter:
         self.create_day_field = create_day_field
         if create_day_field:
             self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
-                                             '10', timestamp, write_mode)
+                                            '10', timestamp, write_mode)
         self.datetimeset = None
         if optional:
             self.datetimeset = NumericWriter(datastore, group, f"{name}_set",
@@ -687,11 +685,11 @@ class DateTimeImporter:
         self.datetime.write_part(values)
 
         if self.create_day_field:
-            days = self._get_days(values)
+            days=self._get_days(values)
             self.datestr.write_part(days)
 
         if self.datetimeset is not None:
-            flags = self._get_flags(values)
+            flags=self._get_flags(values)
             self.datetimeset.write_part(flags)
 
     def _get_days(self, values):
@@ -857,10 +855,10 @@ class OptionalDateImporter:
         self.create_day_field = create_day_field
         if create_day_field:
             self.datestr = FixedStringWriter(datastore, group, f"{name}_day",
-                                             '10', timestamp, write_mode)
+                                            '10', timestamp, write_mode)
         self.dateset = None
         if optional:
-            self.dateset = \
+            self.dateset =\
                 NumericWriter(datastore, group, f"{name}_set", 'bool', timestamp, write_mode)
 
     def chunk_factory(self, length):
@@ -906,3 +904,4 @@ class OptionalDateImporter:
 
 
 
+    

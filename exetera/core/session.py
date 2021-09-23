@@ -14,9 +14,10 @@ import os
 import uuid
 from datetime import datetime, timezone
 import time
-
+import warnings
 import numpy as np
 import pandas as pd
+
 import h5py
 
 from exetera.core.abstract_types import Field, AbstractSession
@@ -379,7 +380,16 @@ class Session(AbstractSession):
 
         :return: The resulting set of spans as a numpy array
         """
+        fields = []
         result = None
+        if len(kwargs) > 0:
+            for k in kwargs.keys():
+                if k == 'field':
+                    field = kwargs[k]
+                elif k == 'fields':
+                    fields = kwargs[k]
+                elif k == 'dest':
+                    dest = kwargs[k]
         if dest is not None and not isinstance(dest, Field):
             raise TypeError(f"'dest' must be one of 'Field' but is {type(dest)}")
 

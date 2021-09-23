@@ -343,7 +343,7 @@ class AbstractSession(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def get_spans(self, field=None, fields=None, dest=None):
+    def get_spans(self, field=None, fields=None):
         raise NotImplementedError()
 
     @abstractmethod

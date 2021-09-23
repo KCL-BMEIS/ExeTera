@@ -99,9 +99,9 @@ def count_back(array):
         [10, 20, 30, 30, 30] -> 2 ([10, 20])
         [10, 20, 20, 20, 20] -> 1 ([10])
     """
-    v = len(array) - 1
+    v = len(array)-1
     while v > 0:
-        if array[v - 1] != array[v]:
+        if array[v-1] != array[v]:
             return v
         v -= 1
     return 0
@@ -229,7 +229,7 @@ def safe_map_indexed_values(data_indices, data_values, map_field, map_filter, em
     value_length = 0
     for i in range(len(map_field)):
         if map_filter[i]:
-            value_length += data_indices[map_field[i] + 1] - data_indices[map_field[i]]
+            value_length += data_indices[map_field[i]+1] - data_indices[map_field[i]]
         else:
             value_length += empty_value_len
 
@@ -241,17 +241,17 @@ def safe_map_indexed_values(data_indices, data_values, map_field, map_filter, em
     for i in range(len(map_field)):
         if map_filter[i]:
             sst = data_indices[map_field[i]]
-            sse = data_indices[map_field[i] + 1]
+            sse = data_indices[map_field[i]+1]
             dst = offset
             delta = sse - sst
             dse = offset + delta
-            i_result[i + 1] = dse
+            i_result[i+1] = dse
             v_result[dst:dse] = data_values[sst:sse]
             offset += delta
         else:
             dst = offset
             dse = offset + empty_value_len
-            i_result[i + 1] = dse
+            i_result[i+1] = dse
             if empty_value is not None:
                 v_result[dst:dse] = empty_value
             offset += dse - dst
@@ -282,7 +282,7 @@ def map_valid(data_field, map_field, result=None, invalid=-1):
 
 
 def ordered_map_valid_stream_old(data_field, map_field, result_field,
-                                 invalid=-1, chunksize=DEFAULT_CHUNKSIZE):
+                             invalid=-1, chunksize=DEFAULT_CHUNKSIZE):
     df_it = iter(chunks(len(data_field.data), chunksize=chunksize))
     mf_it = iter(chunks(len(map_field.data), chunksize=chunksize))
     df_range = next(df_it)
@@ -334,6 +334,7 @@ def ordered_map_valid_partial_old(d, data_field, map_field, result, invalid):
 
 @njit
 def next_map_subchunk(map_, sm, invalid, chunksize):
+
     start = -1
     while sm < len(map_) and map_[sm] == invalid:
         sm += 1
@@ -382,9 +383,10 @@ def ordered_map_valid_stream(data_field, map_field, result_field,
                 # no unfiltered values in this chunk so just assign empty entries to the result field
                 result_data.fill(0)
             else:
-                values = data_field.data[d_limits[0]:d_limits[1] + 1]
+                values = data_field.data[d_limits[0]:d_limits[1]+1]
                 _ = ordered_map_valid_partial(values, map_, sm_start, sm_end, d_limits[0],
-                                              result_data, invalid, empty_value)
+                                               result_data, invalid, empty_value)
+
 
         result_field.data.write(result_data[:m_max])
         m_chunk, map_, m_max, m_off, m = next_untrimmed_chunk(map_field, m_chunk, chunksize)
@@ -461,9 +463,9 @@ def ordered_map_valid_indexed_stream(data_field, map_field, result_field,
                 # m += sm_end - sm_start
             else:
                 # TODO: can potentially optimise here by checking if upper limit has increased
-                indices_ = data_field.indices[i_limits[0]:i_limits[1] + 2]
+                indices_ = data_field.indices[i_limits[0]:i_limits[1]+2]
                 sub_chunks = list()
-                calculate_chunk_decomposition(0, i_limits[1] - i_limits[0] + 1, indices_,
+                calculate_chunk_decomposition(0, i_limits[1] - i_limits[0]+1, indices_,
                                               chunksize * value_factor, sub_chunks)
 
                 s = 0
@@ -524,11 +526,12 @@ def ordered_map_valid_indexed_partial(sm_values,
                                       ri,
                                       rv,
                                       ri_accum):
+
     need_values = False
     # this is the offset that must be subtracted from the value index before it is looked up
     v_offset = indices[i_start]
 
-    while sm < sm_end:  # and ri < len(result_indices):
+    while sm < sm_end: # and ri < len(result_indices):
         if sm_values[sm] == invalid:
             result_indices[ri] = ri_accum
         else:
@@ -537,7 +540,7 @@ def ordered_map_valid_indexed_partial(sm_values,
                 need_values = True
                 break
             v_start = indices[i] - v_offset
-            v_end = indices[i + 1] - v_offset
+            v_end = indices[i+1] - v_offset
             if rv + v_end - v_start > len(result_values):
                 break
             for v in range(v_start, v_end):
@@ -592,7 +595,7 @@ def apply_filter_to_index_values(index_filter, indices, values):
         if index_filter[i] == True:
             count += 1
             total += next_[i] - cur_[i]
-    dest_indices = np.zeros(count + 1, indices.dtype)
+    dest_indices = np.zeros(count+1, indices.dtype)
     dest_values = np.zeros(total, values.dtype)
     dest_indices[0] = 0
     count = 1
@@ -619,7 +622,7 @@ def apply_indices_to_index_values(indices_to_apply, indices, values):
     for i in indices_to_apply:
         count += 1
         total += next_[i] - cur_[i]
-    dest_indices = np.zeros(count + 1, indices.dtype)
+    dest_indices = np.zeros(count+1, indices.dtype)
     dest_values = np.zeros(total, values.dtype)
     dest_indices[0] = 0
     count = 1
@@ -651,16 +654,16 @@ def get_spans_for_field(ndarray):
 @njit
 def _get_spans_for_2_fields_by_spans(span0, span1):
     spans = []
-    j = 0
+    j=0
     for i in range(len(span0)):
-        if j < len(span1):
+        if j<len(span1):
             while span1[j] < span0[i]:
                 spans.append(span1[j])
                 j += 1
             if span1[j] == span0[i]:
                 j += 1
         spans.append(span0[i])
-    if j < len(span1):  # if two ndarray are not equally sized
+    if j<len(span1): #if two ndarray are not equally sized
         spans.extend(span1[j:])
     return spans
 
@@ -668,21 +671,21 @@ def _get_spans_for_2_fields_by_spans(span0, span1):
 @njit
 def _get_spans_for_2_fields(ndarray0, ndarray1):
     count = 0
-    spans = np.zeros(len(ndarray0) + 1, dtype=np.uint32)
+    spans = np.zeros(len(ndarray0)+1, dtype=np.uint32)
     spans[0] = 0
     for i in np.arange(1, len(ndarray0)):
-        if ndarray0[i] != ndarray0[i - 1] or ndarray1[i] != ndarray1[i - 1]:
+        if ndarray0[i] != ndarray0[i-1] or ndarray1[i] != ndarray1[i-1]:
             count += 1
             spans[count] = i
-    spans[count + 1] = len(ndarray0)
-    return spans[:count + 2]
+    spans[count+1] = len(ndarray0)
+    return spans[:count+2]
 
-
+    
 @njit
 def _get_spans_for_multi_fields(fields_data):
     count = 0
     length = len(fields_data[0])
-    spans = np.zeros(length + 1, dtype=np.uint32)
+    spans = np.zeros(length + 1, dtype = np.uint32)
     spans[0] = 0
 
     for i in np.arange(1, length):
@@ -691,11 +694,11 @@ def _get_spans_for_multi_fields(fields_data):
             if f_d[i] != f_d[i - 1]:
                 not_equal = True
                 break
-
+        
         if not_equal:
             count += 1
             spans[count] = i
-
+        
     spans[count + 1] = length
     return spans[:count + 2]
 
@@ -729,9 +732,10 @@ def check_if_sorted_for_multi_fields(fields_data):
 
     return True
 
+    
 
 @njit
-def _get_spans_for_index_string_field(indices, values):
+def _get_spans_for_index_string_field(indices,values):
     result = []
     result.append(0)
     for i in range(1, len(indices) - 1):
@@ -749,9 +753,9 @@ def _get_spans_for_index_string_field(indices, values):
 
 @njit
 def apply_spans_index_of_min(spans, src_array, dest_array):
-    for i in range(len(spans) - 1):
+    for i in range(len(spans)-1):
         cur = spans[i]
-        next = spans[i + 1]
+        next = spans[i+1]
 
         if next - cur == 1:
             dest_array[i] = cur
@@ -763,31 +767,31 @@ def apply_spans_index_of_min(spans, src_array, dest_array):
 
 @njit
 def apply_spans_index_of_min_indexed(spans, src_indices, src_values, dest_array):
-    for i in range(len(spans) - 1):
+    for i in range(len(spans)-1):
         cur = spans[i]
-        next = spans[i + 1]
+        next = spans[i+1]
 
         if next - cur == 1:
             dest_array[i] = cur
         else:
             minind = cur
             minstart = src_indices[cur]
-            minend = src_indices[cur + 1]
+            minend = src_indices[cur+1]
             minlen = minend - minstart
-            for j in range(cur + 1, next):
+            for j in range(cur+1, next):
                 curstart = src_indices[j]
-                curend = src_indices[j + 1]
+                curend = src_indices[j+1]
                 curlen = curend - curstart
                 shortlen = min(curlen, minlen)
                 found = False
                 for k in range(shortlen):
-                    if src_values[curstart + k] < src_values[minstart + k]:
+                    if src_values[curstart+k] < src_values[minstart+k]:
                         minind = j
                         minstart = curstart
                         minend = curend
                         found = True
                         break
-                    elif src_values[curstart + k] > src_values[minstart + k]:
+                    elif src_values[curstart+k] > src_values[minstart+k]:
                         found = True
                         break
                 if not found and curlen < minlen:
@@ -802,31 +806,31 @@ def apply_spans_index_of_min_indexed(spans, src_indices, src_values, dest_array)
 
 @njit
 def apply_spans_index_of_max_indexed(spans, src_indices, src_values, dest_array):
-    for i in range(len(spans) - 1):
+    for i in range(len(spans)-1):
         cur = spans[i]
-        next = spans[i + 1]
+        next = spans[i+1]
 
         if next - cur == 1:
             dest_array[i] = cur
         else:
             minind = cur
             minstart = src_indices[cur]
-            minend = src_indices[cur + 1]
+            minend = src_indices[cur+1]
             minlen = minend - minstart
-            for j in range(cur + 1, next):
+            for j in range(cur+1, next):
                 curstart = src_indices[j]
-                curend = src_indices[j + 1]
+                curend = src_indices[j+1]
                 curlen = curend - curstart
                 shortlen = min(curlen, minlen)
                 found = False
                 for k in range(shortlen):
-                    if src_values[curstart + k] > src_values[minstart + k]:
+                    if src_values[curstart+k] > src_values[minstart+k]:
                         minind = j
                         minstart = curstart
                         minlen = curend - curstart
                         found = True
                         break
-                    elif src_values[curstart + k] < src_values[minstart + k]:
+                    elif src_values[curstart+k] < src_values[minstart+k]:
                         found = True
                         break
                 if not found and curlen > minlen:
@@ -841,9 +845,9 @@ def apply_spans_index_of_max_indexed(spans, src_indices, src_values, dest_array)
 
 @njit
 def apply_spans_index_of_max(spans, src_array, dest_array):
-    for i in range(len(spans) - 1):
+    for i in range(len(spans)-1):
         cur = spans[i]
-        next = spans[i + 1]
+        next = spans[i+1]
 
         if next - cur == 1:
             dest_array[i] = cur
@@ -920,15 +924,15 @@ def apply_spans_index_of_last_filter(spans, dest_array, filter_array):
             filter_array[i] = False
         else:
             filter_array[i] = True
-            dest_array[i] = spans[i + 1] - 1
+            dest_array[i] = spans[i+1]-1
 
     return dest_array, filter_array
 
 
 @njit
 def apply_spans_count(spans, dest_array):
-    for i in range(len(spans) - 1):
-        dest_array[i] = np.int64(spans[i + 1] - spans[i])
+    for i in range(len(spans)-1):
+        dest_array[i] = np.int64(spans[i+1] - spans[i])
 
 
 @njit
@@ -938,15 +942,16 @@ def apply_spans_first(spans, src_array, dest_array):
 
 @njit
 def apply_spans_last(spans, src_array, dest_array):
-    spans = spans[1:] - 1
+    spans = spans[1:]-1
     dest_array[:] = src_array[spans]
 
 
 @njit
 def apply_spans_max(spans, src_array, dest_array):
-    for i in range(len(spans) - 1):
+
+    for i in range(len(spans)-1):
         cur = spans[i]
-        next = spans[i + 1]
+        next = spans[i+1]
         if next - cur == 1:
             dest_array[i] = src_array[cur]
         else:
@@ -955,9 +960,10 @@ def apply_spans_max(spans, src_array, dest_array):
 
 @njit
 def apply_spans_min(spans, src_array, dest_array):
-    for i in range(len(spans) - 1):
+
+    for i in range(len(spans)-1):
         cur = spans[i]
-        next = spans[i + 1]
+        next = spans[i+1]
         if next - cur == 1:
             dest_array[i] = src_array[cur]
         else:
@@ -995,10 +1001,10 @@ def apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
         index_i = np.uint32(0)
         index_v = np.int64(0)
 
-    s_end = len(spans) - 1
+    s_end = len(spans)-1
     for s in range(s_start, s_end):
         cur = spans[s]
-        next = spans[s + 1]
+        next = spans[s+1]
         cur_src_i = src_index[cur]
         next_src_i = src_index[next]
 
@@ -1016,8 +1022,8 @@ def apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
                 # separate them by commas
                 non_empties = 0
                 for e in range(cur, next):
-                    if src_index[e] < src_index[e + 1]:
-                        non_empties += 1
+                   if src_index[e] < src_index[e+1]:
+                       non_empties += 1
                 if non_empties == 1:
                     # only one non-empty entry to be copied, so commas not required
                     next_index_v = next_src_i - cur_src_i + np.int64(index_v)
@@ -1028,7 +1034,7 @@ def apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
                     # so there must be multiple non-empty entries and commas are required
                     for e in range(cur, next):
                         src_start = src_index[e]
-                        src_end = src_index[e + 1]
+                        src_end = src_index[e+1]
                         comma = False
                         quotes = False
                         for i_c in range(src_start, src_end):
@@ -1058,7 +1064,7 @@ def apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
         # if either the index or values are past the threshold, write them
         if index_i >= max_index_i or index_v >= max_value_i:
             break
-    return s + 1, index_i, index_v
+    return s+1, index_i, index_v
 
 
 # ordered map to left functionality: streaming
@@ -1376,13 +1382,13 @@ def generate_ordered_map_to_left_partial(left,
                 # freeze i for the duration of the loop; i_ tracks
                 i_ = i
                 cur_i_count = 1
-                while i_ + 1 < i_max and left[i_ + 1] == left[i_]:
+                while i_ + 1 < i_max and left[i_+1] == left[i_]:
                     cur_i_count += 1
                     i_ += 1
 
                 j_ = j
                 cur_j_count = 1
-                while j_ + 1 < j_max and right[j_ + 1] == right[j_]:
+                while j_ + 1 < j_max and right[j_+1] == right[j_]:
                     cur_j_count += 1
                     j_ += 1
 
@@ -1436,7 +1442,7 @@ def generate_ordered_map_to_left_left_unique_partial(left,
             l_result[r] = i + i_off
             r_result[r] = j + j_off
             r += 1
-            if j + 1 >= j_max or right[j + 1] != right[j]:
+            if j+1 >= j_max or right[j+1] != right[j]:
                 i += 1
             j += 1
     return i, j, r
@@ -1462,7 +1468,7 @@ def generate_ordered_map_to_left_right_unique_partial(left,
         else:
             r_result[r] = j + j_off
             r += 1
-            if i + 1 >= i_max or left[i + 1] != left[i]:
+            if i+1 >= i_max or left[i+1] != left[i]:
                 j += 1
             i += 1
     return i, j, r
@@ -1575,7 +1581,7 @@ def generate_ordered_map_to_left_right_unique_partial_old(d_j, left, right, left
             j += 1
         else:
             left_to_right[i] = j + d_j
-            if i + 1 >= len(left) or left[i + 1] != left[i]:
+            if i+1 >= len(left) or left[i+1] != left[i]:
                 j += 1
             i += 1
             # if j+1 < len(right) and right[j+1] != right[j]:
@@ -1836,13 +1842,13 @@ def generate_ordered_map_to_inner_partial(left,
                 # freeze i for the duration of the loop; i_ tracks
                 i_ = i
                 cur_i_count = 1
-                while i_ + 1 < i_max and left[i_ + 1] == left[i_]:
+                while i_ + 1 < i_max and left[i_+1] == left[i_]:
                     cur_i_count += 1
                     i_ += 1
 
                 j_ = j
                 cur_j_count = 1
-                while j_ + 1 < j_max and right[j_ + 1] == right[j_]:
+                while j_ + 1 < j_max and right[j_+1] == right[j_]:
                     cur_j_count += 1
                     j_ += 1
 
@@ -1893,7 +1899,7 @@ def generate_ordered_map_to_inner_left_unique_partial(left,
             l_result[r] = i + i_off
             r_result[r] = j + j_off
             r += 1
-            if j + 1 >= j_max or right[j + 1] != right[j]:
+            if j+1 >= j_max or right[j+1] != right[j]:
                 i += 1
             j += 1
     return i, j, r
@@ -1920,7 +1926,7 @@ def generate_ordered_map_to_inner_right_unique_partial(left,
             l_result[r] = i + i_off
             r_result[r] = j + j_off
             r += 1
-            if i + 1 >= i_max or left[i + 1] != left[i]:
+            if i+1 >= i_max or left[i+1] != left[i]:
                 j += 1
             i += 1
     return i, j, r
@@ -1973,7 +1979,7 @@ def generate_ordered_map_to_left_right_unique(first, second, result, invalid):
             j += 1
         else:
             result[i] = j
-            if i + 1 >= len(first) or first[i + 1] != first[i]:
+            if i+1 >= len(first) or first[i+1] != first[i]:
                 j += 1
             i += 1
 
@@ -2170,7 +2176,7 @@ def ordered_inner_map_left_unique_partial(d_i, d_j, left, right,
             left_to_inner[m] = i + d_i
             right_to_inner[m] = j + d_j
             m += 1
-            if j + 1 >= len(right) or right[j + 1] != right[j]:
+            if j+1 >= len(right) or right[j+1] != right[j]:
                 i += 1
             j += 1
     return i, j, m
@@ -2190,7 +2196,7 @@ def ordered_inner_map_left_unique(left, right, left_to_inner, right_to_inner):
             cur_j = j
             while cur_j + 1 < len(right) and right[cur_j + 1] == right[cur_j]:
                 cur_j += 1
-            for jj in range(j, cur_j + 1):
+            for jj in range(j, cur_j+1):
                 left_to_inner[cur_m] = i
                 right_to_inner[cur_m] = jj
                 cur_m += 1
@@ -2215,8 +2221,8 @@ def ordered_inner_map(left, right, left_to_inner, right_to_inner):
             cur_j = j
             while cur_j + 1 < len(right) and right[cur_j + 1] == right[cur_j]:
                 cur_j += 1
-            for ii in range(i, cur_i + 1):
-                for jj in range(j, cur_j + 1):
+            for ii in range(i, cur_i+1):
+                for jj in range(j, cur_j+1):
                     left_to_inner[cur_m] = ii
                     right_to_inner[cur_m] = jj
                     cur_m += 1
@@ -2227,8 +2233,8 @@ def ordered_inner_map(left, right, left_to_inner, right_to_inner):
 @njit
 def ordered_get_last_as_filter(field):
     result = np.zeros(len(field), dtype=numba.types.boolean)
-    for i in range(len(field) - 1):
-        result[i] = field[i] != field[i + 1]
+    for i in range(len(field)-1):
+        result[i] = field[i] != field[i+1]
     result[-1] = True
     return result
 
@@ -2240,7 +2246,7 @@ def ordered_generate_journalling_indices(old, new):
     total = 0
     while i < len(old) and j < len(new):
         if old[i] < new[j]:
-            while i + 1 < len(old) and old[i + 1] == old[i]:
+            while i+1 < len(old) and old[i+1] == old[i]:
                 i += 1
             i += 1
             total += 1
@@ -2248,13 +2254,13 @@ def ordered_generate_journalling_indices(old, new):
             j += 1
             total += 1
         else:
-            while i + 1 < len(old) and old[i + 1] == old[i]:
+            while i+1 < len(old) and old[i+1] == old[i]:
                 i += 1
             i += 1
             j += 1
             total += 1
     while i < len(old):
-        while i + 1 < len(old) and old[i + 1] == old[i]:
+        while i+1 < len(old) and old[i+1] == old[i]:
             i += 1
         i += 1
         total += 1
@@ -2270,7 +2276,7 @@ def ordered_generate_journalling_indices(old, new):
     joint = 0
     while i < len(old) and j < len(new):
         if old[i] < new[j]:
-            while i + 1 < len(old) and old[i + 1] == old[i]:
+            while i+1 < len(old) and old[i+1] == old[i]:
                 i += 1
             old_inds[joint] = i
             new_inds[joint] = -1
@@ -2282,7 +2288,7 @@ def ordered_generate_journalling_indices(old, new):
             j += 1
             joint += 1
         else:
-            while i + 1 < len(old) and old[i + 1] == old[i]:
+            while i+1 < len(old) and old[i+1] == old[i]:
                 i += 1
             old_inds[joint] = i
             new_inds[joint] = j
@@ -2291,7 +2297,7 @@ def ordered_generate_journalling_indices(old, new):
             joint += 1
 
     while i < len(old):
-        while i + 1 < len(old) and old[i + 1] == old[i]:
+        while i+1 < len(old) and old[i+1] == old[i]:
             i += 1
         old_inds[joint] = i
         new_inds[joint] = -1
@@ -2336,8 +2342,8 @@ def compare_indexed_rows_for_journalling(old_map, new_map,
                 # row has been removed so don't count as kept
                 to_keep[i] = False
             else:
-                old_value = old_values[old_indices[old_map[i]]:old_indices[old_map[i] + 1]]
-                new_value = new_values[new_indices[new_map[i]]:new_indices[new_map[i] + 1]]
+                old_value = old_values[old_indices[old_map[i]]:old_indices[old_map[i]+1]]
+                new_value = new_values[new_indices[new_map[i]]:new_indices[new_map[i]+1]]
                 to_keep[i] = not np.array_equal(old_value, new_value)
 
 
@@ -2356,7 +2362,6 @@ def merge_journalled_entries(old_map, new_map, to_keep, old_src, new_src, dest):
             dest[cur_dest] = new_src[new_map[i]]
             cur_dest += 1
 
-
 # def merge_journalled_entries(old_map, new_map, to_keep, old_src, new_src, dest):
 #     for om, im, tk in zip(old_map, new_map, to_keep):
 #         for omi in old_map:
@@ -2371,20 +2376,20 @@ def merge_indexed_journalled_entries_count(old_map, new_map, to_keep, old_src_in
     acc_val = 0
     for i in range(len(old_map)):
         while cur_old <= old_map[i]:
-            ind_delta = old_src_inds[cur_old + 1] - old_src_inds[cur_old]
+            ind_delta = old_src_inds[cur_old+1] - old_src_inds[cur_old]
             acc_val += ind_delta
             cur_old += 1
         if to_keep[i] == True:
-            ind_delta = new_src_inds[new_map[i] + 1] - new_src_inds[new_map[i]]
+            ind_delta = new_src_inds[new_map[i]+1] - new_src_inds[new_map[i]]
             acc_val += ind_delta
     return acc_val
 
 
 @njit
 def merge_indexed_journalled_entries(old_map, new_map, to_keep,
-                                     old_src_inds, old_src_vals,
-                                     new_src_inds, new_src_vals,
-                                     dest_inds, dest_vals):
+                                    old_src_inds, old_src_vals,
+                                    new_src_inds, new_src_vals,
+                                    dest_inds, dest_vals):
     cur_old = 0
     cur_dest = 1
     ind_acc = 0
@@ -2396,7 +2401,7 @@ def merge_indexed_journalled_entries(old_map, new_map, to_keep,
             ind_acc += ind_delta
             dest_inds[cur_dest] = ind_acc
             if ind_delta > 0:
-                dest_vals[ind_acc - ind_delta:ind_acc] = \
+                dest_vals[ind_acc-ind_delta:ind_acc] = \
                     old_src_vals[old_src_inds[cur_old]:old_src_inds[cur_old + 1]]
             cur_old += 1
             cur_dest += 1
@@ -2406,7 +2411,7 @@ def merge_indexed_journalled_entries(old_map, new_map, to_keep,
             ind_acc += ind_delta
             dest_inds[cur_dest] = ind_acc
             if ind_delta > 0:
-                dest_vals[ind_acc - ind_delta:ind_acc] = \
+                dest_vals[ind_acc-ind_delta:ind_acc] = \
                     new_src_vals[new_src_inds[new_map[i]]:new_src_inds[new_map[i] + 1]]
             cur_dest += 1
 
@@ -2444,6 +2449,7 @@ def merge_entries_segment(i_start, cur_old_start,
 
 def streaming_sort_merge(src_index_f, src_value_f, tgt_index_f, tgt_value_f,
                          segment_length, chunk_length):
+
     # get the number of segments
     segment_count = len(src_index_f.data) // segment_length
     if len(src_index_f.data) % segment_length != 0:
@@ -2473,8 +2479,8 @@ def streaming_sort_merge(src_index_f, src_value_f, tgt_index_f, tgt_value_f,
     # get the first chunk for each segment
     for i in range(segment_count):
         index_start = segment_starts[i] + chunk_indices[i] * chunk_length
-        src_value_chunks.append(src_value_f.data[index_start:index_start + chunk_length])
-        src_index_chunks.append(src_index_f.data[index_start:index_start + chunk_length])
+        src_value_chunks.append(src_value_f.data[index_start:index_start+chunk_length])
+        src_index_chunks.append(src_index_f.data[index_start:index_start+chunk_length])
         in_chunk_lengths[i] = len(src_value_chunks[i])
 
     dest_indices = np.zeros(segment_count * chunk_length, dtype=src_index_f.data.dtype)
@@ -2497,8 +2503,8 @@ def streaming_sort_merge(src_index_f, src_value_f, tgt_index_f, tgt_value_f,
                 remaining = segment_starts[i] + segment_lengths[i] - index_start
                 remaining = min(remaining, chunk_length)
                 if remaining > 0:
-                    src_value_chunks[i] = src_value_f.data[index_start:index_start + remaining]
-                    src_index_chunks[i] = src_index_f.data[index_start:index_start + remaining]
+                    src_value_chunks[i] = src_value_f.data[index_start:index_start+remaining]
+                    src_index_chunks[i] = src_index_f.data[index_start:index_start+remaining]
                     in_chunk_lengths[i] = len(src_value_chunks[i])
                     in_chunk_indices[i] = 0
                 else:
@@ -2529,7 +2535,7 @@ def streaming_sort_partial(in_chunk_indices, in_chunk_lengths,
                            src_value_chunks, src_index_chunks, dest_value_chunk, dest_index_chunk):
     dest_index = 0
     max_possible = in_chunk_lengths.sum()
-    while (dest_index < max_possible):
+    while(dest_index < max_possible):
         if in_chunk_indices[0] == in_chunk_lengths[0]:
             return dest_index
         min_value = src_value_chunks[0][in_chunk_indices[0]]
@@ -2562,7 +2568,7 @@ def is_ordered(field):
     return not np.any(fn(field[:-1], field[1:]))
 
 
-# ======== method for transform functions that called in readerwriter.py ==========#
+#======== method for transform functions that called in readerwriter.py ==========#
 
 def get_byte_map(string_map):
     """
@@ -2572,36 +2578,36 @@ def get_byte_map(string_map):
     sorted_string_map = {k: v for k, v in sorted(string_map.items(), key=lambda item: item[0])}
     sorted_string_key = [(len(k), np.frombuffer(k.encode(), dtype=np.uint8), v) for k, v in sorted_string_map.items()]
     sorted_string_values = list(sorted_string_map.values())
-
+    
     # assign byte_map_key_lengths, byte_map_value
     total_bytes_keys = 0
     byte_map_value = np.zeros(len(sorted_string_map), dtype=np.uint8)
 
-    for i, (length, _, v) in enumerate(sorted_string_key):
+    for i, (length, _, v)  in enumerate(sorted_string_key):
         total_bytes_keys += length
         byte_map_value[i] = v
 
     # assign byte_map_keys, byte_map_key_indices
     byte_map_keys = np.zeros(total_bytes_keys, dtype=np.uint8)
-    byte_map_key_indices = np.zeros(len(sorted_string_map) + 1, dtype=np.uint8)
-
+    byte_map_key_indices = np.zeros(len(sorted_string_map)+1, dtype=np.uint8)
+    
     idx_pointer = 0
-    for i, (_, b_key, _) in enumerate(sorted_string_key):
+    for i, (_, b_key, _) in enumerate(sorted_string_key):   
         for b in b_key:
             byte_map_keys[idx_pointer] = b
             idx_pointer += 1
 
-        byte_map_key_indices[i + 1] = idx_pointer
+        byte_map_key_indices[i + 1] = idx_pointer  
 
     byte_map = [byte_map_keys, byte_map_key_indices, byte_map_value]
     return byte_map
 
 
-@njit
+@njit           
 def categorical_transform(chunk, i_c, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values):
     """
     Tranform method for categorical importer in readerwriter.py
-    """
+    """   
     col_offset = column_offsets[i_c]
 
     for row_idx in range(len(column_inds[i_c]) - 1):
@@ -2626,18 +2632,17 @@ def categorical_transform(chunk, i_c, column_inds, column_vals, column_offsets, 
 
             if index != -1:
                 chunk[row_idx] = cat_values[index]
+                
 
-
-@njit
-def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, column_inds, column_vals, column_offsets,
-                                cat_keys, cat_index, cat_values):
+@njit           
+def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values):
     """
     Tranform method for categorical importer in readerwriter.py
-    """
-    col_offset = column_offsets[i_c]
+    """   
+    col_offset = column_offsets[i_c] 
 
     for row_idx in range(len(column_inds[i_c]) - 1):
-        if row_idx >= chunk.shape[0]:  # reach the end of chunk
+        if row_idx >= chunk.shape[0]:   # reach the end of chunk
             break
 
         key_start = column_inds[i_c, row_idx]
@@ -2663,10 +2668,9 @@ def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, c
                 freetext_indices[row_idx + 1] = freetext_indices[row_idx]
 
         if not is_found:
-            chunk[row_idx] = -1
+            chunk[row_idx] = -1 
             freetext_indices[row_idx + 1] = freetext_indices[row_idx] + key_len
-            freetext_values[freetext_indices[row_idx]: freetext_indices[row_idx + 1]] = column_vals[
-                                                                                        col_offset + key_start: col_offset + key_end]
+            freetext_values[freetext_indices[row_idx]: freetext_indices[row_idx + 1]] = column_vals[col_offset + key_start: col_offset + key_end]
 
 
 @njit
@@ -2674,15 +2678,15 @@ def numeric_bool_transform(elements, validity, column_inds, column_vals, column_
                            invalid_value, validation_mode, field_name):
     """
     Transform method for numeric importer (bool) in readerwriter.py
-    """
-    col_offset = column_offsets[col_idx]
-    exception_message, exception_args = 0, [field_name]
+    """  
+    col_offset = column_offsets[col_idx]  
+    exception_message, exception_args = 0, [field_name]     
 
     for row_idx in range(written_row_count):
-
-        empty = False
-        valid_input = True  # Start by assuming number is valid
-        value = -1  # start by assuming value is -1, the valid result will be 1 or 0 for bool
+        
+        empty = False  
+        valid_input = True # Start by assuming number is valid
+        value = -1 # start by assuming value is -1, the valid result will be 1 or 0 for bool
 
         row_start_idx = column_inds[col_idx, row_idx]
         row_end_idx = column_inds[col_idx, row_idx + 1]
@@ -2693,10 +2697,10 @@ def numeric_bool_transform(elements, validity, column_inds, column_vals, column_
         # ignore heading whitespace
         while byte_start_idx < length and column_vals[col_offset + row_start_idx + byte_start_idx] == 32:
             byte_start_idx += 1
-        # ignore tailing whitespace
+        # ignore tailing whitespace 
         while byte_end_idx >= 0 and column_vals[col_offset + row_start_idx + byte_end_idx] == 32:
             byte_end_idx -= 1
-
+        
         # actual length after removing heading and trailing whitespace
         actual_length = byte_end_idx - byte_start_idx + 1
 
@@ -2704,49 +2708,46 @@ def numeric_bool_transform(elements, validity, column_inds, column_vals, column_
             empty = True
             valid_input = False
         else:
-
-            val = column_vals[
-                  col_offset + row_start_idx + byte_start_idx: col_offset + row_start_idx + byte_start_idx + actual_length]
+        
+            val = column_vals[col_offset + row_start_idx + byte_start_idx: col_offset + row_start_idx + byte_start_idx + actual_length]
             if actual_length == 1:
-                if val in (49, 89, 121, 84, 116):  # '1', 'Y', 'y', 'T', 't'
+                if val in (49, 89, 121, 84, 116): # '1', 'Y', 'y', 'T', 't'
                     value = 1
-                elif val in (48, 78, 110, 70, 102):  # '0', 'N', 'n', 'F', 'f'
+                elif val in (48, 78, 110, 70, 102):   # '0', 'N', 'n', 'F', 'f'
                     value = 0
                 else:
                     valid_input = False
 
             elif actual_length == 2:
-                if val[0] in (79, 111) and val[1] in (
-                78, 110):  # val.lower() == 'on': val[0] in ('O', 'o'), val[1] in ('N', 'n')
+                if val[0] in (79, 111) and val[1] in (78, 110): # val.lower() == 'on': val[0] in ('O', 'o'), val[1] in ('N', 'n')
                     value = 1
-                elif val[0] in (78, 110) and val[1] in (79, 111):  # val.lower() == 'no'
+                elif val[0] in (78, 110) and val[1] in (79, 111): # val.lower() == 'no'
                     value = 0
                 else:
                     valid_input = False
 
             elif actual_length == 3:
-                if val[0] in (89, 121) and val[1] in (69, 101) and val[2] in (83, 115):  # 'yes'
+                if val[0] in (89, 121) and val[1] in (69, 101) and val[2] in (83, 115): # 'yes'
                     value = 1
-                elif val[0] in (79, 111) and val[1] in (70, 102) and val[2] in (70, 102):  # 'off'
+                elif val[0] in (79, 111) and val[1] in (70, 102) and val[2] in (70, 102): # 'off'
                     value = 0
                 else:
                     valid_input = False
 
-            elif actual_length == 4:
-                if val[0] in (84, 116) and val[1] in (82, 114) and val[2] in (85, 117) and val[3] in (
-                69, 101):  # 'true'
+            elif actual_length == 4: 
+                if val[0] in (84, 116) and val[1] in (82, 114) and val[2] in (85, 117) and val[3] in (69, 101): # 'true'
                     value = 1
                 else:
                     valid_input = False
 
             elif actual_length == 5:
-                if val[0] in (70, 102) and val[1] in (65, 97) and val[2] in (76, 108) and val[3] in (83, 115) and val[
-                    4] in (69, 101):  # 'false'
+                if val[0] in (70, 102) and val[1] in (65, 97) and val[2] in (76, 108) and val[3] in (83, 115) and val[4] in (69, 101): # 'false'
                     value = 0
                 else:
                     valid_input = False
             else:
                 valid_input = False
+
 
         elements[row_idx] = value if valid_input else invalid_value
         validity[row_idx] = valid_input
@@ -2760,16 +2761,16 @@ def numeric_bool_transform(elements, validity, column_inds, column_vals, column_
                     break
                 else:
                     exception_message = 2
-                    non_parsable = column_vals[col_offset + row_start_idx: col_offset + row_end_idx]
+                    non_parsable = column_vals[col_offset + row_start_idx : col_offset + row_end_idx]
                     exception_args = [field_name, non_parsable]
                     break
             if validation_mode == 'allow_empty':
                 if not empty:
                     exception_message = 2
-                    non_parsable = column_vals[col_offset + row_start_idx: col_offset + row_end_idx]
+                    non_parsable = column_vals[col_offset + row_start_idx : col_offset + row_end_idx]
                     exception_args = [field_name, non_parsable]
                     break
-    return exception_message, exception_args
+    return exception_message, exception_args      
 
 
 def raiseNumericException(exception_message, exception_args):
@@ -2784,7 +2785,8 @@ def raiseNumericException(exception_message, exception_args):
 
 
 def transform_int(column_inds, column_vals, column_offsets, col_idx,
-                  written_row_count, invalid_value, validation_mode, data_type, field_name):
+                    written_row_count, invalid_value, validation_mode, data_type, field_name):
+
     widths = column_inds[col_idx, 1:written_row_count + 1] - column_inds[col_idx, :written_row_count]
     width = widths.max()
     elements = np.zeros(written_row_count, 'S{}'.format(width))
@@ -2793,7 +2795,7 @@ def transform_int(column_inds, column_vals, column_offsets, col_idx,
 
     if validation_mode == 'strict':
         try:
-            results = elements.astype(data_type)
+          results = elements.astype(data_type)
         except ValueError as e:
             msg = ("Field '{}' contains values that cannot "
                    "be converted to float in '{}' mode").format(field_name, validation_mode)
@@ -2826,7 +2828,8 @@ def transform_int(column_inds, column_vals, column_offsets, col_idx,
 
 
 def transform_float(column_inds, column_vals, column_offsets, col_idx,
-                    written_row_count, invalid_value, validation_mode, data_type, field_name):
+                      written_row_count, invalid_value, validation_mode, data_type, field_name):
+
     widths = column_inds[col_idx, 1:written_row_count + 1] - column_inds[col_idx, :written_row_count]
     width = widths.max()
     elements = np.zeros(written_row_count, 'S{}'.format(width))
@@ -2835,7 +2838,7 @@ def transform_float(column_inds, column_vals, column_offsets, col_idx,
 
     if validation_mode == 'strict':
         try:
-            results = elements.astype(data_type)
+          results = elements.astype(data_type)
         except ValueError as e:
             msg = ("Field '{}' contains values that cannot "
                    "be converted to float in '{}' mode").format(field_name, validation_mode)
@@ -2880,6 +2883,7 @@ def transform_to_values(column_inds, column_vals, column_offsets, col_idx, writt
     return data
 
 
+
 @njit
 def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, written_row_count,
                            strlen, memory):
@@ -2887,7 +2891,7 @@ def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, wr
     for i in range(written_row_count):
         a = i * strlen
         start_idx = column_inds[col_idx, i] + col_offset
-        end_idx = min(column_inds[col_idx, i + 1] + col_offset, start_idx + strlen)
+        end_idx = min(column_inds[col_idx, i+1] + col_offset, start_idx + strlen)
         for c in range(start_idx, end_idx):
             memory[a] = column_vals[c]
             a += 1
