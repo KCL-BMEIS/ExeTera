@@ -565,6 +565,180 @@ class HDF5DataFrame(DataFrame):
         
         return HDF5DataFrameGroupBy(self._columns, by, sorted_index, spans)
 
+    def describe(self, include=None, exclude=None):
+        """
+        Show the basic statistics of the data in each field.
+
+        :param include: The field name or data type or simply 'all' to indicate the fields included in the calculation.
+        Example::
+
+            df.describe(include='all')  # display all fields
+            df.describe(include='num1')  # display the field named 'num1'
+            df.describe(include=np.number)  # display the field with numeric datatype (numeric, categorical, timestamp)
+                                                or str for indexed string or np.bytes_ for fixed string.
+            df.describe(include=['num1', 'num2'])  # display multiple fields selected by name
+            df.describe(include=[np.number, str])  # display multiple fields selected by date type
+
+        :param exclude: The filed name or data type to exclude in the calculation.
+        :return: A dataframe contains the statistic results.
+
+        """
+        # check include and exclude conflicts
+        if include is not None and exclude is not None:
+            if isinstance(include, str):
+                raise ValueError('Please do not use exclude parameter when include is set as a single field.')
+            elif isinstance(include, type):
+                if isinstance(exclude, type) or (isinstance(exclude, list) and isinstance(exclude[0], type)):
+                    raise ValueError(
+                        'Please do not use set exclude as a type when include is set as a single data type.')
+            elif isinstance(include, list):
+                if isinstance(include[0], str) and isinstance(exclude, str):
+                    raise ValueError('Please do not use exclude as the same type as the include parameter.')
+                elif isinstance(include[0], str) and isinstance(exclude, list) and isinstance(exclude[0], str):
+                    raise ValueError('Please do not use exclude as the same type as the include parameter.')
+                elif isinstance(include[0], type) and isinstance(exclude, type):
+                    raise ValueError('Please do not use exclude as the same type as the include parameter.')
+                elif isinstance(include[0], type) and isinstance(exclude, list) and isinstance(exclude[0], type):
+                    raise ValueError('Please do not use exclude as the same type as the include parameter.')
+
+        fields_to_calculate = []
+        if include is not None:
+            if isinstance(include, str):  # a single str
+                if include == 'all':
+                    fields_to_calculate = list(self.columns.keys())
+                elif include in self.columns.keys():
+                    fields_to_calculate = [include]
+                else:
+                    raise ValueError('The field to include in not in the dataframe.')
+            elif isinstance(include, type):  # a single type
+                for f in self.columns:
+                    if self[f].indexed and include == str:  # str
+                        fields_to_calculate.append(f)
+                    elif not self[f].indexed and np.issubdtype(self[f].data.dtype, include):  # number
+                        fields_to_calculate.append(f)
+                if len(fields_to_calculate) == 0:
+                    raise ValueError('No such type appeared in the dataframe.')
+            elif isinstance(include, list) and isinstance(include[0], str):  # a list of str
+                for f in include:
+                    if f in self.columns.keys():
+                        fields_to_calculate.append(f)
+                if len(fields_to_calculate) == 0:
+                    raise ValueError('The fields to include in not in the dataframe.')
+
+            elif isinstance(include, list) and isinstance(include[0], type):  # a list of type
+                for t in include:
+                    for f in self.columns:
+                        if self[f].indexed and t == str:  # str
+                            fields_to_calculate.append(f)
+                        elif not self[f].indexed and np.issubdtype(self[f].data.dtype, t):  # number
+                            fields_to_calculate.append(f)
+                if len(fields_to_calculate) == 0:
+                    raise ValueError('No such type appeared in the dataframe.')
+
+            else:
+                raise ValueError('The include parameter can only be str, dtype, or list of either.')
+
+        else:  # include is None, numeric & timestamp fields only (no indexed strings) TODO confirm the type
+            for f in self.columns:
+                if isinstance(self[f], fld.NumericField) or isinstance(self[f], fld.TimestampField):
+                    fields_to_calculate.append(f)
+
+        if len(fields_to_calculate) == 0:
+            raise ValueError('No fields included to describe.')
+
+        if exclude is not None:
+            if isinstance(exclude, str):
+                if exclude in fields_to_calculate:  # exclude
+                    fields_to_calculate.remove(exclude)  # remove from list
+            elif isinstance(exclude, type):  # a type
+                for f in fields_to_calculate:
+                    if np.issubdtype(self[f].data.dtype, exclude):
+                        fields_to_calculate.remove(f)
+            elif isinstance(exclude, list) and isinstance(exclude[0], str):  # a list of str
+                for f in exclude:
+                    fields_to_calculate.remove(f)
+
+            elif isinstance(exclude, list) and isinstance(exclude[0], type):  # a list of type
+                for t in exclude:
+                    for f in fields_to_calculate:
+                        if np.issubdtype(self[f].data.dtype, t):
+                            fields_to_calculate.remove(f)  # remove will raise valueerror if dtype not presented
+
+            else:
+                raise ValueError('The exclude parameter can only be str, dtype, or list of either.')
+
+        if len(fields_to_calculate) == 0:
+            raise ValueError('All fields are excluded, no field left to describe.')
+        # if flexible (str) fields
+        des_idxstr = False
+        for f in fields_to_calculate:
+            if isinstance(self[f], fld.CategoricalField) or isinstance(self[f], fld.FixedStringField) or isinstance(
+                    self[f], fld.IndexedStringField):
+                des_idxstr = True
+        # calculation
+        result = {'fields': [], 'count': [], 'mean': [], 'std': [], 'min': [], '25%': [], '50%': [], '75%': [],
+                  'max': []}
+
+        # count
+        if des_idxstr:
+            result['unique'], result['top'], result['freq'] = [], [], []
+
+        for f in fields_to_calculate:
+            result['fields'].append(f)
+            result['count'].append(len(self[f].data))
+
+            if des_idxstr and (isinstance(self[f], fld.NumericField) or isinstance(self[f],
+                                                                                   fld.TimestampField)):  # numberic, timestamp
+                result['unique'].append('NaN')
+                result['top'].append('NaN')
+                result['freq'].append('NaN')
+
+                result['mean'].append("{:.2f}".format(np.mean(self[f].data[:])))
+                result['std'].append("{:.2f}".format(np.std(self[f].data[:])))
+                result['min'].append("{:.2f}".format(np.min(self[f].data[:])))
+                result['25%'].append("{:.2f}".format(np.percentile(self[f].data[:], 0.25)))
+                result['50%'].append("{:.2f}".format(np.percentile(self[f].data[:], 0.5)))
+                result['75%'].append("{:.2f}".format(np.percentile(self[f].data[:], 0.75)))
+                result['max'].append("{:.2f}".format(np.max(self[f].data[:])))
+
+            elif des_idxstr and (isinstance(self[f], fld.CategoricalField) or isinstance(self[f],
+                                                                                         fld.IndexedStringField) or isinstance(
+                self[f], fld.FixedStringField)):  # categorical & indexed string & fixed string
+                a, b = np.unique(self[f].data[:], return_counts=True)
+                result['unique'].append(len(a))
+                result['top'].append(a[np.argmax(b)])
+                result['freq'].append(b[np.argmax(b)])
+
+                result['mean'].append('NaN')
+                result['std'].append('NaN')
+                result['min'].append('NaN')
+                result['25%'].append('NaN')
+                result['50%'].append('NaN')
+                result['75%'].append('NaN')
+                result['max'].append('NaN')
+
+            elif not des_idxstr:
+                result['mean'].append("{:.2f}".format(np.mean(self[f].data[:])))
+                result['std'].append("{:.2f}".format(np.std(self[f].data[:])))
+                result['min'].append("{:.2f}".format(np.min(self[f].data[:])))
+                result['25%'].append("{:.2f}".format(np.percentile(self[f].data[:], 0.25)))
+                result['50%'].append("{:.2f}".format(np.percentile(self[f].data[:], 0.5)))
+                result['75%'].append("{:.2f}".format(np.percentile(self[f].data[:], 0.75)))
+                result['max'].append("{:.2f}".format(np.max(self[f].data[:])))
+
+        # display
+        columns_to_show = ['fields', 'count', 'unique', 'top', 'freq', 'mean', 'std', 'min', '25%', '50%', '75%', 'max']
+        # 5 fields each time for display
+        for col in range(0, len(result['fields']), 5):  # 5 column each time
+            for i in columns_to_show:
+                if i in result:
+                    print(i, end='\t')
+                    for f in result[i][col:col + 5 if col + 5 < len(result[i]) - 1 else len(result[i])]:
+                        print('{:>15}'.format(f), end='\t')
+                    print('')
+            print('\n')
+
+        return result
 
 
 class HDF5DataFrameGroupBy(DataFrameGroupBy):
