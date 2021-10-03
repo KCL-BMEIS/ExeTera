@@ -368,7 +368,14 @@ def ordered_map_valid_stream(data_field, map_field, result_field,
     """
     result_data = np.zeros(chunksize, dtype=result_field.data.dtype)
 
-    empty_value = 0 if np.issubdtype(result_field.data.dtype, np.number) else b''
+    empty_value = None
+    if np.issubdtype(result_field.data.dtype, bool):
+        empty_value = False
+    elif np.issubdtype(result_field.data.dtype, np.number):
+        empty_value = 0
+    else:
+        empty_value = b''
+    # empty_value = 0 if np.issubdtype(result_field.data.dtype, np.number) else b''
 
     m_chunk, map_, m_max, m_off, m = first_untrimmed_chunk(map_field, chunksize)
 

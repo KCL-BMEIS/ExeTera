@@ -905,6 +905,20 @@ class TestOrderedMap(unittest.TestCase):
         # print(dest_data.data[:])
 
 
+    def test_ordered_map_valid_stream_bool(self):
+        s = session.Session()
+        map_data = fields.NumericMemField(s, 'int32')
+        map_data.data.write(np.asarray([0, 1, 2, -1, 4, 4, 4, 5, 5], dtype=np.int32))
+        src_data = fields.NumericMemField(s, 'bool')
+        src_data.data.write(np.asarray([False, True, False, True, False, True], dtype=bool))
+        dest_data = fields.NumericMemField(s, 'bool')
+        ops.ordered_map_valid_stream(src_data, map_data, dest_data, -1, 4)
+        expected = [10, 30, 30, 0, 50, 50, 50, 60, 60]
+        expected = [False, True, False, False, False, False, False, True, True]
+        self.assertListEqual(dest_data.data[:].tolist(), expected)
+        # print(dest_data.data[:])
+
+
     def test_ordered_map_valid_stream(self):
         s = session.Session()
         map_data = fields.NumericMemField(s, 'int32')
