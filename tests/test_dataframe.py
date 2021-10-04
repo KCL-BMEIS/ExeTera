@@ -949,6 +949,11 @@ class TestDataFrameDescribe(unittest.TestCase):
                         'max': ['9.00', 'NaN'], 'unique': ['NaN', 1], 'top': ['NaN', 1], 'freq': ['NaN', 20]}
             self.assertEqual(result, expected)
 
+            result = df.describe(include=str)
+            expected = {'fields': ['is1'], 'count': [20], 'mean': ['NaN'], 'std': ['NaN'], 'min': ['NaN'], '25%': ['NaN'],
+                        '50%': ['NaN'], '75%': ['NaN'], 'max': ['NaN'], 'unique': [1], 'top': ['abc'], 'freq': [20]}
+            self.assertEqual(result, expected)
+
             result = df.describe(include=[np.int32, np.bytes_])
             expected = {'fields': ['num', 'c1', 'fs1'], 'count': [10, 20, 20], 'mean': ['4.50', 'NaN', 'NaN'],
                         'std': ['2.87', 'NaN', 'NaN'], 'min': ['0.00', 'NaN', 'NaN'], '25%': ['0.02', 'NaN', 'NaN'],
