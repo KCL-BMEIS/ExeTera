@@ -394,3 +394,28 @@ def one_dim_data_to_indexed_for_test(data, field_size):
         indices[0, i + 1] = indices[0, i] + length
          
     return indices, values, offsets, count_row
+
+
+def get_timestamp(date):
+    """
+    This is an alternative of datetime.timestamp() as such function will raise an OSError on windoes if year is less
+    than 1970 or greater than 3002.
+
+    :param date: The datetime instance to convert.
+
+    :return: The timestamp of the date.
+    """
+    if not isinstance(date, datetime):
+        raise TypeError("Please use a datetime variable as argument.")
+    try:
+        ts = date.timestamp()
+        return ts
+    except OSError:
+        import pytz
+        anchor = pytz.timezone('UTC').localize(datetime(1970, 1, 2))  # timestamp 86400
+        ts = (pytz.timezone('Europe/London').localize(date) - anchor).total_seconds() + 86400
+        if date.year >= 2038 and 4 <= date.month <= 10:
+            ts -= 3600
+        return ts
+    #else:
+
