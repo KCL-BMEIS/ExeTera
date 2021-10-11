@@ -411,11 +411,11 @@ class HDF5DataFrame(DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self._columns.items():
                 newfld = field.create_like(ddf, name)
-                field.apply_filter(filter_to_apply_, target=newfld, validate_filter=False)
+                field.apply_filter(filter_to_apply_, target=newfld)
             return ddf
         else:
             for field in self._columns.values():
-                field.apply_filter(filter_to_apply_, in_place=True, validate_filter=False)
+                field.apply_filter(filter_to_apply_, in_place=True)
             return self
 
     def apply_index(self, index_to_apply, ddf=None):
