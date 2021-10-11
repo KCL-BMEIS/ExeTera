@@ -76,7 +76,7 @@ class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
         from datetime import datetime as D
         bio = BytesIO()
         contents = [D(2021, 2, 6), D(2020, 11, 5), D(2974, 8, 1), D(1873, 12, 28)]
-        contents = [c.timestamp() for c in contents]
+        contents = [utils.to_timestamp(c) for c in contents]
 
         with session.Session() as s:
             with h5py.File(bio, 'w') as src:
