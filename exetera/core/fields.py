@@ -102,7 +102,7 @@ class HDF5Field(Field):
     def get_spans(self):
         raise NotImplementedError("Please use get_spans() on specific fields, not the field base class.")
 
-    def apply_filter(self, filter_to_apply, dstfld=None):
+    def apply_filter(self, filter_to_apply, dstfld=None, validate_filter=True):
         raise NotImplementedError("Please use apply_filter() on specific fields, not the field base class.")
 
     def apply_index(self, index_to_apply, dstfld=None):
@@ -155,7 +155,7 @@ class MemoryField(Field):
     def get_spans(self):
         raise NotImplementedError("Please use get_spans() on specific fields, not the field base class.")
 
-    def apply_filter(self, filter_to_apply, dstfld=None):
+    def apply_filter(self, filter_to_apply, dstfld=None, validate_filter=True):
         raise NotImplementedError("Please use apply_filter() on specific fields, not the field base class.")
 
     def apply_index(self, index_to_apply, dstfld=None):
@@ -508,7 +508,7 @@ class IndexedStringMemField(MemoryField):
     def get_spans(self):
         return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
 
-    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+    def apply_filter(self, filter_to_apply, target=None, in_place=False, validate_filter=True):
         """
         Apply a boolean filter to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
@@ -522,7 +522,7 @@ class IndexedStringMemField(MemoryField):
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
             case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
-        return FieldDataOps.apply_filter_to_indexed_field(self, filter_to_apply, target, in_place)
+        return FieldDataOps.apply_filter_to_indexed_field(self, filter_to_apply, target, in_place, validate_filter)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
         """
@@ -586,7 +586,7 @@ class FixedStringMemField(MemoryField):
     def get_spans(self):
         return ops.get_spans_for_field(self.data[:])
 
-    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+    def apply_filter(self, filter_to_apply, target=None, in_place=False, validate_filter=True):
         """
         Apply a boolean filter to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
@@ -600,7 +600,7 @@ class FixedStringMemField(MemoryField):
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
             case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
-        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place, validate_filter)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
         """
@@ -661,7 +661,7 @@ class NumericMemField(MemoryField):
     def get_spans(self):
         return ops.get_spans_for_field(self.data[:])
 
-    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+    def apply_filter(self, filter_to_apply, target=None, in_place=False, validate_filter=True):
         """
         Apply a boolean filter to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
@@ -675,7 +675,7 @@ class NumericMemField(MemoryField):
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
             case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
-        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place, validate_filter)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
         """
@@ -831,7 +831,7 @@ class CategoricalMemField(MemoryField):
         result.data.write(values)
         return result
 
-    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+    def apply_filter(self, filter_to_apply, target=None, in_place=False, validate_filter=True):
         """
         Apply a boolean filter to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
@@ -845,7 +845,7 @@ class CategoricalMemField(MemoryField):
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
             case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
-        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place, validate_filter)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
         """
@@ -922,7 +922,7 @@ class TimestampMemField(MemoryField):
     def get_spans(self):
         return ops.get_spans_for_field(self.data[:])
 
-    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+    def apply_filter(self, filter_to_apply, target=None, in_place=False, validate_filter=True):
         """
         Apply a boolean filter to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
@@ -936,7 +936,7 @@ class TimestampMemField(MemoryField):
         :return: The filtered field. This is a new field instance unless 'target' is set, in which
             case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
-        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place, validate_filter)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
         """
@@ -1170,7 +1170,7 @@ class IndexedStringField(HDF5Field):
         self._ensure_valid()
         return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
 
-    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+    def apply_filter(self, filter_to_apply, target=None, in_place=False, validate_filter=True):
         """
         Apply a boolean filter to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
@@ -1185,7 +1185,7 @@ class IndexedStringField(HDF5Field):
             case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
-        return FieldDataOps.apply_filter_to_indexed_field(self, filter_to_apply, target, in_place)
+        return FieldDataOps.apply_filter_to_indexed_field(self, filter_to_apply, target, in_place, validate_filter)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
         """
@@ -1264,7 +1264,7 @@ class FixedStringField(HDF5Field):
         self._ensure_valid()
         return ops.get_spans_for_field(self.data[:])
 
-    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+    def apply_filter(self, filter_to_apply, target=None, in_place=False, validate_filter=True):
         """
         Apply a boolean filter to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
@@ -1279,7 +1279,7 @@ class FixedStringField(HDF5Field):
             case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
-        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place, validate_filter)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
         """
@@ -1353,7 +1353,7 @@ class NumericField(HDF5Field):
         self._ensure_valid()
         return ops.get_spans_for_field(self.data[:])
 
-    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+    def apply_filter(self, filter_to_apply, target=None, in_place=False, validate_filter=True):
         """
         Apply a boolean filter to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
@@ -1368,7 +1368,7 @@ class NumericField(HDF5Field):
             case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
-        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place, validate_filter)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
         """
@@ -1571,7 +1571,7 @@ class CategoricalField(HDF5Field):
         result.data.write(values)
         return result
 
-    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+    def apply_filter(self, filter_to_apply, target=None, in_place=False, validate_filter=True):
         """
         Apply a boolean filter to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
@@ -1586,7 +1586,7 @@ class CategoricalField(HDF5Field):
             case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
-        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place, validate_filter)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
         """
@@ -1684,7 +1684,7 @@ class TimestampField(HDF5Field):
         self._ensure_valid()
         return ops.get_spans_for_field(self.data[:])
 
-    def apply_filter(self, filter_to_apply, target=None, in_place=False):
+    def apply_filter(self, filter_to_apply, target=None, in_place=False, validate_filter=True):
         """
         Apply a boolean filter to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
@@ -1699,7 +1699,7 @@ class TimestampField(HDF5Field):
             case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
         self._ensure_valid()
-        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place)
+        return FieldDataOps.apply_filter_to_field(self, filter_to_apply, target, in_place, validate_filter)
 
     def apply_index(self, index_to_apply, target=None, in_place=False):
         """
@@ -2017,14 +2017,16 @@ class FieldDataOps:
         return cls._binary_op(session, first, second, function_greater_than_equal)
 
     @staticmethod
-    def apply_filter_to_indexed_field(source, filter_to_apply, target=None, in_place=False):
+    def apply_filter_to_indexed_field(source, filter_to_apply, target=None, in_place=False, validate_filter=True):
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
+        
+        if validate_filter:
+            filter_to_apply = val.validate_filter(filter_to_apply)
 
-        filter_to_apply_ = val.array_from_field_or_lower('filter_to_apply', filter_to_apply)
 
         dest_indices, dest_values = \
-            ops.apply_filter_to_index_values(filter_to_apply_,
+            ops.apply_filter_to_index_values(filter_to_apply,
                                              source.indices[:], source.values[:])
 
         if in_place:
@@ -2096,14 +2098,15 @@ class FieldDataOps:
 
 
     @staticmethod
-    def apply_filter_to_field(source, filter_to_apply, target=None, in_place=False):
+    def apply_filter_to_field(source, filter_to_apply, target=None, in_place=False, validate_filter=True):
 
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
-        filter_to_apply_ = val.array_from_field_or_lower('filter_to_apply', filter_to_apply)
+        if validate_filter:
+            filter_to_apply = val.validate_filter(filter_to_apply)
 
-        dest_data = source.data[:][filter_to_apply_]
+        dest_data = source.data[:][filter_to_apply]
 
         if in_place:
             if not source._write_enabled:

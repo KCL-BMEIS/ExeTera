@@ -481,7 +481,7 @@ class TestFieldApplyFilter(unittest.TestCase):
     def test_indexed_string_apply_filter(self):
 
         data = ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
-        filt = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0], dtype=bool)
+        filt = np.array([0, 2, 0, 1, 0, 1, 0, 1, 0])
 
         expected_indices = [0, 1, 3, 6, 10, 10, 14, 17, 19, 20]
         expected_values = [97, 98, 98, 99, 99, 99, 100, 100, 100, 100,
@@ -550,7 +550,7 @@ class TestFieldApplyFilter(unittest.TestCase):
 
     def test_fixed_string_apply_filter(self):
         data = np.array([b'a', b'bb', b'ccc', b'dddd', b'eeee', b'fff', b'gg', b'h'], dtype='S4')
-        filt = np.array([0, 1, 0, 1, 0, 1, 0, 1], dtype=bool)
+        filt = np.array([0, 1, 0, 1, 0, 1, 0, 1])
         expected = [b'bb', b'dddd', b'fff', b'h']
 
         bio = BytesIO()

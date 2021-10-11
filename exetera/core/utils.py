@@ -21,6 +21,7 @@ from ctypes import sizeof, c_float, c_double, c_int8, c_uint8, c_int16, c_uint16
 
 
 SECONDS_PER_DAY = 86400
+PERMITTED_NUMERIC_TYPES = ('float32', 'float64', 'bool', 'int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64')
 
 
 def validate_file_exists(file_name):

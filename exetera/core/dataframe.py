@@ -404,16 +404,18 @@ class HDF5DataFrame(DataFrame):
         :param ddf: optional- the destination data frame
         :returns: a dataframe contains all the fields filterd, self if ddf is not set
         """
+        filter_to_apply_ = val.validate_filter(filter_to_apply)
+
         if ddf is not None:
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self._columns.items():
                 newfld = field.create_like(ddf, name)
-                field.apply_filter(filter_to_apply, target=newfld)
+                field.apply_filter(filter_to_apply_, target=newfld, validate_filter=False)
             return ddf
         else:
             for field in self._columns.values():
-                field.apply_filter(filter_to_apply, in_place=True)
+                field.apply_filter(filter_to_apply_, in_place=True, validate_filter=False)
             return self
 
     def apply_index(self, index_to_apply, ddf=None):
@@ -588,9 +590,9 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
                 
                 if self._sorted_index is not None:                    
                     field.apply_index(self._sorted_index, target=newfld)                  
-                    newfld.apply_filter(self._spans[:-1], in_place=True)
+                    newfld.apply_index(self._spans[:-1], in_place=True)
                 else:
-                    field.apply_filter(self._spans[:-1], target=newfld)
+                    field.apply_index(self._spans[:-1], target=newfld)
 
     
     def count(self, ddf: DataFrame, write_keys=True) -> DataFrame:

@@ -8,7 +8,8 @@ from numba.typed import List
 
 from exetera.core import validation as val
 from exetera.core.abstract_types import Field
-from exetera.core import fields, utils
+from exetera.core import fields
+from exetera.core import utils
 
 DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62
@@ -614,7 +615,7 @@ def apply_filter_to_index_values(index_filter, indices, values):
 
 @njit
 def apply_indices_to_index_values(indices_to_apply, indices, values):
-    # pass 1 - determine the destination lengths
+    # pass 1 - determine the destination lengths 
     cur_ = indices[:-1]
     next_ = indices[1:]
     count = 0
