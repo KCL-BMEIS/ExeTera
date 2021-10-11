@@ -913,7 +913,6 @@ class TestOrderedMap(unittest.TestCase):
         src_data.data.write(np.asarray([False, True, False, True, False, True], dtype=bool))
         dest_data = fields.NumericMemField(s, 'bool')
         ops.ordered_map_valid_stream(src_data, map_data, dest_data, -1, 4)
-        expected = [10, 30, 30, 0, 50, 50, 50, 60, 60]
         expected = [False, True, False, False, False, False, False, True, True]
         self.assertListEqual(dest_data.data[:].tolist(), expected)
         # print(dest_data.data[:])
