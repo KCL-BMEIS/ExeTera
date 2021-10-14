@@ -74,9 +74,10 @@ class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
 
     def test_create_then_load_timestamp(self):
         from datetime import datetime as D
+        from datetime import timezone
         bio = BytesIO()
-        contents = [D(2021, 2, 6), D(2020, 11, 5), D(2974, 8, 1), D(1873, 12, 28)]
-        contents = [utils.to_timestamp(c) for c in contents]
+        contents = [D(2021, 2, 6, tzinfo=timezone.utc), D(2020, 11, 5, tzinfo=timezone.utc), D(2974, 8, 1, tzinfo=timezone.utc), D(1873, 12, 28, tzinfo=timezone.utc)]
+        contents = [c.timestamp() for c in contents]
 
         with session.Session() as s:
             with h5py.File(bio, 'w') as src:

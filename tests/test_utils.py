@@ -102,23 +102,3 @@ class TestUtils(unittest.TestCase):
             self.assertEqual(min_value, expected_min_max_values[value_type][0])
             self.assertEqual(max_value, expected_min_max_values[value_type][1])
 
-    def test_to_timestamp(self):
-        from datetime import datetime
-        dts = [datetime(1874, 7, 27), datetime(1974, 1, 1), datetime(2020, 1, 1), datetime(2021, 6, 1),
-               datetime(2030, 5, 5), datetime(3030, 6, 6)]
-        dt_ts = [to_timestamp(d) for d in dts]
-        expected = [-3011558400.0, 126230400.0, 1577836800.0, 1622505600.0, 1904169600.0, 33463843200.0]
-        self.assertListEqual(dt_ts, expected)
-
-    def test_to_datetime(self):
-        from datetime import datetime, timezone
-        dt_ts = [-3011558400.0, 126230400.0, 1577836800.0, 1622505600.0, 1904169600.0, 33463843200.0]
-        dts = [to_datetime(d) for d in dt_ts]
-        expected = [datetime(1874, 7, 27, tzinfo=timezone.utc), datetime(1974, 1, 1, tzinfo=timezone.utc), datetime(2020, 1, 1, tzinfo=timezone.utc), datetime(2021, 6, 1, tzinfo=timezone.utc),
-               datetime(2030, 5, 5, tzinfo=timezone.utc), datetime(3030, 6, 6, tzinfo=timezone.utc)]
-        self.assertListEqual(dts, expected)
-
-        import pytz
-        dts = [to_datetime(d, tz=pytz.timezone('Europe/London')) for d in dt_ts]
-        for d in dts:
-            self.assertEqual(d.tzinfo, pytz.timezone('Europe/London'))

@@ -395,35 +395,3 @@ def one_dim_data_to_indexed_for_test(data, field_size):
          
     return indices, values, offsets, count_row
 
-
-def to_timestamp(dt):
-    """
-    This is an alternative of datetime.timestamp() as such function will raise an OSError on windoes if year is less
-    than 1970 or greater than 3002.
-
-    :param dt: The datetime instance to convert.
-
-    :return: The timestamp of the date.
-    """
-    if not isinstance(dt, datetime):
-        raise TypeError("Please use a datetime variable as argument.")
-    DATE_TIME_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
-    return (dt - DATE_TIME_EPOCH.replace(tzinfo=dt.tzinfo)).total_seconds()
-
-
-def to_datetime(ts, tz=None):
-    """
-    Convert an int/float timestamp to a datetime instance.
-
-    :param ts: The timestamp to convert
-    :param tz: The timezone info to set, default is in UTC.
-
-    :return: The datetime instance.
-    """
-    if not isinstance(ts, float) and not isinstance(ts, int):
-        raise TypeError("Please use a int/float timestamp as argument.")
-    DATE_TIME_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
-    if tz is not None:
-        return (DATE_TIME_EPOCH + timedelta(seconds=ts)).replace(tzinfo=tz)
-    else:
-        return DATE_TIME_EPOCH + timedelta(seconds=ts)

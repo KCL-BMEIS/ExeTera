@@ -169,10 +169,10 @@ class TestImporter(unittest.TestCase):
             importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
-            self.assertEqual(df['birthday'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d").timestamp() for x in expected_birthday_date])
+            self.assertEqual(df['birthday'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() for x in expected_birthday_date])
 
         with h5py.File(bio, 'r') as hf:
-            self.assertEqual(hf['schema_key']['birthday']['values'][:].tolist(), [datetime.strptime(x, "%Y-%m-%d").timestamp() for x in expected_birthday_date])
+            self.assertEqual(hf['schema_key']['birthday']['values'][:].tolist(), [datetime.strptime(x, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() for x in expected_birthday_date])
 
 
     def test_importer_datetime_with_create_day_field(self):
@@ -184,12 +184,12 @@ class TestImporter(unittest.TestCase):
             importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
-            self.assertEqual(df['updated_at'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d %H:%M:%S").timestamp() for x in expected_updated_at_list])
+            self.assertEqual(df['updated_at'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp() for x in expected_updated_at_list])
             self.assertEqual(df['updated_at_day'].data[:].tolist(), expected_updated_at_date_list )
 
         with h5py.File(bio, 'r') as hf:
             print(hf['schema_key']['updated_at']['values'][:])              
-            self.assertAlmostEqual(hf['schema_key']['updated_at']['values'][:].tolist(), [datetime.strptime(x, "%Y-%m-%d %H:%M:%S").timestamp() for x in expected_updated_at_list])  
+            self.assertAlmostEqual(hf['schema_key']['updated_at']['values'][:].tolist(), [datetime.strptime(x, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp() for x in expected_updated_at_list])
             self.assertEqual(hf['schema_key']['updated_at_day']['values'][:].tolist(), expected_updated_at_date_list)
 
 
