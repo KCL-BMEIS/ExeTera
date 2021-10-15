@@ -891,4 +891,232 @@ class TestDataFrameToCSV(unittest.TestCase):
             self.assertEqual(f.readlines(), ['val1\n', '0\n', '2\n'])
 
         os.close(fd_csv)      
-        
+
+class TestDataFrameDescribe(unittest.TestCase):
+
+    def test_describe_default(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('num', 'int32').data.write([i for i in range(10)])
+            df.create_fixed_string('fs1', 1).data.write([b'a' for i in range(20)])
+            df.create_timestamp('ts1').data.write([1632234128 + i for i in range(20)])
+            df.create_categorical('c1', 'int32', {'a': 1, 'b': 2}).data.write([1 for i in range(20)])
+            df.create_indexed_string('is1').data.write(['abc' for i in range(20)])
+            result = df.describe()
+            expected = {'fields': ['num', 'ts1'], 'count': [10, 20], 'mean': ['4.50', '1632234137.50'],
+                        'std': ['2.87', '5.77'], 'min': ['0.00', '1632234128.00'], '25%': ['0.02', '1632234128.05'],
+                        '50%': ['0.04', '1632234128.10'], '75%': ['0.07', '1632234128.14'],
+                        'max': ['9.00', '1632234147.00']}
+            self.assertEqual(result, expected)
+
+    def test_describe_include(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            df = dst.create_dataframe('df')
+            df.create_numeric('num', 'int32').data.write([i for i in range(10)])
+            df.create_fixed_string('fs1', 1).data.write([b'a' for i in range(20)])
+            df.create_timestamp('ts1').data.write([1632234128 + i for i in range(20)])
+            df.create_categorical('c1', 'int32', {'a': 1, 'b': 2}).data.write([1 for i in range(20)])
+            df.create_indexed_string('is1').data.write(['abc' for i in range(20)])
+
+            result = df.describe(include='all')
+            expected = {'fields': ['num', 'fs1', 'ts1', 'c1', 'is1'], 'count': [10, 20, 20, 20, 20],
+                        'mean': ['4.50', 'NaN', '1632234137.50', 'NaN', 'NaN'], 'std': ['2.87', 'NaN', '5.77', 'NaN', 'NaN'],
+                        'min': ['0.00', 'NaN', '1632234128.00', 'NaN', 'NaN'], '25%': ['0.02', 'NaN', '1632234128.05', 'NaN', 'NaN'],
+                        '50%': ['0.04', 'NaN', '1632234128.10', 'NaN', 'NaN'], '75%': ['0.07', 'NaN', '1632234128.14', 'NaN', 'NaN'],
+                        'max': ['9.00', 'NaN', '1632234147.00', 'NaN', 'NaN'], 'unique': ['NaN', 1, 'NaN', 1, 1],
+                        'top': ['NaN', b'a', 'NaN', 1, 'abc'], 'freq': ['NaN', 20, 'NaN', 20, 20]}
+            self.assertEqual(result, expected)
+
+            result = df.describe(include='num')
+            expected = {'fields': ['num'], 'count': [10], 'mean': ['4.50'], 'std': ['2.87'], 'min': ['0.00'],
+                        '25%': ['0.02'], '50%': ['0.04'], '75%': ['0.07'], 'max': ['9.00']}
+            self.assertEqual(result, expected)
+
+            result = df.describe(include=['num', 'fs1'])
+            expected = {'fields': ['num', 'fs1'], 'count': [10, 20], 'mean': ['4.50', 'NaN'], 'std': ['2.87', 'NaN'],
+                        'min': ['0.00', 'NaN'], '25%': ['0.02', 'NaN'], '50%': ['0.04', 'NaN'], '75%': ['0.07', 'NaN'],
+                        'max': ['9.00', 'NaN'], 'unique': ['NaN', 1], 'top': ['NaN', b'a'], 'freq': ['NaN', 20]}
+            self.assertEqual(result, expected)
+
+            result = df.describe(include=np.int32)
+            expected = {'fields': ['num', 'c1'], 'count': [10, 20], 'mean': ['4.50', 'NaN'], 'std': ['2.87', 'NaN'],
+                        'min': ['0.00', 'NaN'], '25%': ['0.02', 'NaN'], '50%': ['0.04', 'NaN'], '75%': ['0.07', 'NaN'],
+                        'max': ['9.00', 'NaN'], 'unique': ['NaN', 1], 'top': ['NaN', 1], 'freq': ['NaN', 20]}
+            self.assertEqual(result, expected)
+
+            result = df.describe(include=[np.int32, np.bytes_])
+            expected = {'fields': ['num', 'c1', 'fs1'], 'count': [10, 20, 20], 'mean': ['4.50', 'NaN', 'NaN'],
+                        'std': ['2.87', 'NaN', 'NaN'], 'min': ['0.00', 'NaN', 'NaN'], '25%': ['0.02', 'NaN', 'NaN'],
+                        '50%': ['0.04', 'NaN', 'NaN'], '75%': ['0.07', 'NaN', 'NaN'], 'max': ['9.00', 'NaN', 'NaN'],
+                        'unique': ['NaN', 1, 1], 'top': ['NaN', 1, b'a'], 'freq': ['NaN', 20, 20]}
+            self.assertEqual(result, expected)
+
+
+    def test_describe_exclude(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_numeric('num', 'int32').data.write([i for i in range(10)])
+            df.create_numeric('num2', 'int64').data.write([i for i in range(10)])
+            df.create_fixed_string('fs1', 1).data.write([b'a' for i in range(20)])
+            df.create_timestamp('ts1').data.write([1632234128 + i for i in range(20)])
+            df.create_categorical('c1', 'int32', {'a': 1, 'b': 2}).data.write([1 for i in range(20)])
+            df.create_indexed_string('is1').data.write(['abc' for i in range(20)])
+
+            result = df.describe(exclude='num')
+            expected = {'fields': ['num2', 'ts1'], 'count': [10, 20], 'mean': ['4.50', '1632234137.50'],
+                        'std': ['2.87', '5.77'], 'min': ['0.00', '1632234128.00'], '25%': ['0.02', '1632234128.05'],
+                        '50%': ['0.04', '1632234128.10'], '75%': ['0.07', '1632234128.14'],
+                        'max': ['9.00', '1632234147.00']}
+            self.assertEqual(result, expected)
+
+            result = df.describe(exclude=['num', 'num2'])
+            expected = {'fields': ['ts1'], 'count': [20], 'mean': ['1632234137.50'], 'std': ['5.77'],
+                        'min': ['1632234128.00'], '25%': ['1632234128.05'], '50%': ['1632234128.10'],
+                        '75%': ['1632234128.14'], 'max': ['1632234147.00']}
+            self.assertEqual(result, expected)
+
+            result = df.describe(exclude=np.int32)
+            expected = {'fields': ['num2', 'ts1'], 'count': [10, 20], 'mean': ['4.50', '1632234137.50'],
+                        'std': ['2.87', '5.77'], 'min': ['0.00', '1632234128.00'], '25%': ['0.02', '1632234128.05'],
+                        '50%': ['0.04', '1632234128.10'], '75%': ['0.07', '1632234128.14'],
+                        'max': ['9.00', '1632234147.00']}
+            self.assertEqual(result, expected)
+
+            result = df.describe(exclude=[np.int32, np.float64])
+            expected = {'fields': ['num2'], 'count': [10], 'mean': ['4.50'], 'std': ['2.87'], 'min': ['0.00'],
+                        '25%': ['0.02'], '50%': ['0.04'], '75%': ['0.07'], 'max': ['9.00']}
+            self.assertEqual(result, expected)
+
+    def test_describe_include_and_exclude(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_numeric('num', 'int32').data.write([i for i in range(10)])
+            df.create_numeric('num2', 'int64').data.write([i for i in range(10)])
+            df.create_fixed_string('fs1', 1).data.write([b'a' for i in range(20)])
+            df.create_timestamp('ts1').data.write([1632234128 + i for i in range(20)])
+            df.create_categorical('c1', 'int32', {'a': 1, 'b': 2}).data.write([1 for i in range(20)])
+            df.create_indexed_string('is1').data.write(['abc' for i in range(20)])
+
+            #str *
+            with self.assertRaises(Exception) as context:
+                df.describe(include='num', exclude='num')
+            self.assertTrue(isinstance(context.exception, ValueError))
+
+            # list of str , str
+            with self.assertRaises(Exception) as context:
+                df.describe(include=['num', 'num2'], exclude='num')
+            self.assertTrue(isinstance(context.exception, ValueError))
+            # list of str , type
+            result = df.describe(include=['num', 'num2'], exclude=np.int32)
+            expected = {'fields': ['num2'], 'count': [10], 'mean': ['4.50'], 'std': ['2.87'], 'min': ['0.00'],
+                        '25%': ['0.02'], '50%': ['0.04'], '75%': ['0.07'], 'max': ['9.00']}
+            self.assertEqual(result, expected)
+            # list of str , list of str
+            with self.assertRaises(Exception) as context:
+                df.describe(include=['num', 'num2'], exclude=['num', 'num2'])
+            self.assertTrue(isinstance(context.exception, ValueError))
+            # list of str , list of type
+            result = df.describe(include=['num', 'num2', 'ts1'], exclude=[np.int32, np.int64])
+            expected = {'fields': ['ts1'], 'count': [20], 'mean': ['1632234137.50'], 'std': ['5.77'],
+                        'min': ['1632234128.00'], '25%': ['1632234128.05'], '50%': ['1632234128.10'],
+                        '75%': ['1632234128.14'], 'max': ['1632234147.00']}
+            self.assertEqual(result, expected)
+
+            # type, str
+            result = df.describe(include=np.number, exclude='num2')
+            expected = {'fields': ['num', 'ts1', 'c1'], 'count': [10, 20, 20], 'mean': ['4.50', '1632234137.50', 'NaN'],
+                       'std': ['2.87', '5.77', 'NaN'], 'min': ['0.00', '1632234128.00', 'NaN'],
+                       '25%': ['0.02', '1632234128.05', 'NaN'], '50%': ['0.04', '1632234128.10', 'NaN'],
+                       '75%': ['0.07', '1632234128.14', 'NaN'], 'max': ['9.00', '1632234147.00', 'NaN'],
+                       'unique': ['NaN', 'NaN', 1], 'top': ['NaN', 'NaN', 1], 'freq': ['NaN', 'NaN', 20]}
+            self.assertEqual(result, expected)
+            # type, type
+            with self.assertRaises(Exception) as context:
+                df.describe(include=np.int32, exclude=np.int64)
+            self.assertTrue(isinstance(context.exception, ValueError))
+            # type, list of str
+            result = df.describe(include=np.number, exclude=['num', 'num2'])
+            expected = {'fields': ['ts1', 'c1'], 'count': [20, 20], 'mean': ['1632234137.50', 'NaN'],
+                        'std': ['5.77', 'NaN'], 'min': ['1632234128.00', 'NaN'], '25%': ['1632234128.05', 'NaN'],
+                        '50%': ['1632234128.10', 'NaN'], '75%': ['1632234128.14', 'NaN'], 'max': ['1632234147.00', 'NaN'],
+                        'unique': ['NaN', 1], 'top': ['NaN', 1], 'freq': ['NaN', 20]}
+            self.assertEqual(result, expected)
+            # type, list of type
+            with self.assertRaises(Exception) as context:
+                df.describe(include=np.int32, exclude=[np.int64, np.float64])
+            self.assertTrue(isinstance(context.exception, ValueError))
+
+            # list of type, str
+            result = df.describe(include=[np.int32, np.int64], exclude='num')
+            expected = {'fields': ['c1', 'num2'], 'count': [20, 10], 'mean': ['NaN', '4.50'], 'std': ['NaN', '2.87'],
+                        'min': ['NaN', '0.00'], '25%': ['NaN', '0.02'], '50%': ['NaN', '0.04'], '75%': ['NaN', '0.07'],
+                        'max': ['NaN', '9.00'], 'unique': [1, 'NaN'], 'top': [1, 'NaN'], 'freq': [20, 'NaN']}
+            self.assertEqual(result, expected)
+            # list of type, type
+            with self.assertRaises(Exception) as context:
+                df.describe(include=[np.int32, np.int64], exclude=np.int64)
+            self.assertTrue(isinstance(context.exception, ValueError))
+            # list of type, list of str
+            result = df.describe(include=[np.int32, np.int64], exclude=['num', 'num2'])
+            expected = {'fields': ['c1'], 'count': [20], 'mean': ['NaN'], 'std': ['NaN'], 'min': ['NaN'],
+                        '25%': ['NaN'], '50%': ['NaN'], '75%': ['NaN'], 'max': ['NaN'], 'unique': [1], 'top': [1],
+                        'freq': [20]}
+            self.assertEqual(result, expected)
+            # list of type, list of type
+            with self.assertRaises(Exception) as context:
+                df.describe(include=[np.int32, np.int64], exclude=[np.int32, np.int64])
+            self.assertTrue(isinstance(context.exception, ValueError))
+
+    def test_raise_errors(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+
+            df.create_fixed_string('fs1', 1).data.write([b'a' for i in range(20)])
+            df.create_categorical('c1', 'int32', {'a': 1, 'b': 2}).data.write([1 for i in range(20)])
+            df.create_indexed_string('is1').data.write(['abc' for i in range(20)])
+
+            with self.assertRaises(Exception) as context:
+                df.describe(include='num3')
+            self.assertTrue(isinstance(context.exception, ValueError))
+
+            with self.assertRaises(Exception) as context:
+                df.describe(include=np.int8)
+            self.assertTrue(isinstance(context.exception, ValueError))
+
+            with self.assertRaises(Exception) as context:
+                df.describe(include=['num3', 'num4'])
+            self.assertTrue(isinstance(context.exception, ValueError))
+
+            with self.assertRaises(Exception) as context:
+                df.describe(include=[np.int8, np.uint])
+            self.assertTrue(isinstance(context.exception, ValueError))
+
+            with self.assertRaises(Exception) as context:
+                df.describe(include=float('3.14159'))
+            self.assertTrue(isinstance(context.exception, ValueError))
+
+            with self.assertRaises(Exception) as context:
+                df.describe()
+            self.assertTrue(isinstance(context.exception, ValueError))
+
+            df.create_numeric('num', 'int32').data.write([i for i in range(10)])
+            df.create_numeric('num2', 'int64').data.write([i for i in range(10)])
+            df.create_timestamp('ts1').data.write([1632234128 + i for i in range(20)])
+
+            with self.assertRaises(Exception) as context:
+                df.describe(exclude=float('3.14159'))
+            self.assertTrue(isinstance(context.exception, ValueError))
+
+            with self.assertRaises(Exception) as context:
+                df.describe(exclude=['num', 'num2', 'ts1'])
+            self.assertTrue(isinstance(context.exception, ValueError))
