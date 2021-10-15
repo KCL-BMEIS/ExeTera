@@ -70,11 +70,11 @@ class TestDataFrameCreateFields(unittest.TestCase):
             a = df.create_numeric('a','int32')
             a.data.write(values)
 
-            total = np.sum(a.data[:])
+            total = np.sum(a.data[:], dtype=np.int64)
             self.assertEqual(49997540637149, total)
 
             a.data[:] = a.data[:] * 2
-            total = np.sum(a.data[:])
+            total = np.sum(a.data[:], dtype=np.int64)
             self.assertEqual(99995081274298, total)
 
     def test_dataframe_create_categorical(self):

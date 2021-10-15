@@ -344,13 +344,11 @@ class TestImporter(unittest.TestCase):
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
             self.assertEqual(df['postcode'].data[:].tolist(), expected_postcode_value_list)
+            self.assertEqual(list(df['postcode'].keys.values()), expected_key_names)
 
         with h5py.File(bio, 'r') as hf:
             self.assertEqual(hf['schema_key']['postcode']['values'][:].tolist(), expected_postcode_value_list)
-            if isinstance(hf['schema_key']['postcode']['key_names'][0], str):
-                self.assertEqual([bytearray(i, 'utf-8') for i in hf['schema_key']['postcode']['key_names'][:].tolist()], expected_key_names)
-            else:
-                self.assertEqual(hf['schema_key']['postcode']['key_names'][:].tolist(), expected_key_names)
+            #self.assertEqual(hf['schema_key']['postcode']['key_names'][:].tolist(), expected_key_names)
             self.assertEqual(hf['schema_key']['postcode']['key_values'][:].tolist(), expected_key_values)
 
 
