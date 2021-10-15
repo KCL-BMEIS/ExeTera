@@ -231,7 +231,8 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             missing_schema_dict = {'name': String()}
             parsers.read_csv(self.csv_file_name, df, missing_schema_dict)
             self.assertListEqual(df['id'].data[:], ['1','2','3','4','5']) 
-            self.assertEqual(df['updated_at'].data[:],['2020-05-12 07:00:00', '2020-05-13 01:00:00', '2020-05-14 03:00:00', '2020-05-15 03:00:00', '2020-05-16 03:00:00'])
+            self.assertEqual([i.replace('\r', '') for i in df['updated_at'].data[:]],  # remove \r due to windows
+                             ['2020-05-12 07:00:00', '2020-05-13 01:00:00', '2020-05-14 03:00:00', '2020-05-15 03:00:00', '2020-05-16 03:00:00'])
             self.assertEqual(df['birthday'].data[:], ['1990-01-01', '1980-03-04', '1970-04-05', '1960-04-05', '1950-04-05'])
             self.assertEqual(df['postcode'].data[:], ['NW1', 'SW1P', 'E1', '', 'NW3'])
         

@@ -540,7 +540,7 @@ class TestPersistence(unittest.TestCase):
                       '', 'True', 'False', 'False', '', '', 'True', 'False', 'True', '',
                       '', 'True', 'False', 'False', '']
             value_map = {'': 0, 'False': 1, 'True': 2}
-            rw.CategoricalImporter(datastore, hf, 'foo', value_map, ts).write(values)
+            rw.CategoricalImporter(datastore, hf, 'foo', value_map, ts).write_strings(values)
 
             reader = datastore.get_reader(hf['foo'])
             writer = reader.get_writer(hf, 'foo2', ts)
