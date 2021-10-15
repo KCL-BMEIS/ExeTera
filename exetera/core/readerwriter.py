@@ -60,7 +60,7 @@ class IndexedStringReader(Reader):
         return self.field['index'].dtype, self.field['values'].dtype
 
     def sort(self, index, writer):
-        field_index = self.field['index'][:]
+        field_index = np.array(self.field['index'][:], dtype=np.int64)
         field_values = self.field['values'][:]
         r_field_index, r_field_values =\
             pers._apply_sort_to_index_values(index, field_index, field_values)

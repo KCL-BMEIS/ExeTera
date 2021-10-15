@@ -169,7 +169,7 @@ def _apply_sort_to_array(index, values):
 @njit
 def _apply_sort_to_index_values(index, indices, values):
 
-    s_indices = np.zeros_like(indices)
+    s_indices = np.zeros_like(indices, dtype=np.int64)
     s_values = np.zeros_like(values)
     accumulated = np.int64(0)
     s_indices[0] = 0
@@ -1029,7 +1029,7 @@ class DataStore:
 
         src_index = reader.field['index'][:]
         src_values = reader.field['values'][:]
-        dest_index = np.zeros(reader.chunksize, src_index.dtype)
+        dest_index = np.zeros(reader.chunksize, np.int64)
         dest_values = np.zeros(reader.chunksize * 16, src_values.dtype)
 
         max_index_i = reader.chunksize

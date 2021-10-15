@@ -191,7 +191,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
 
             expected_updated_at_list = ['2020-05-12 07:00:00', '2020-05-13 01:00:00', '2020-05-14 03:00:00', '2020-05-15 03:00:00', '2020-05-16 03:00:00']
             expected_updated_at_date_list = [b'2020-05-12', b'2020-05-13', b'2020-05-14',b'2020-05-15',b'2020-05-16']
-            self.assertEqual(df['updated_at'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d %H:%M:%S").timestamp() for x in expected_updated_at_list])
+            self.assertEqual(df['updated_at'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp() for x in expected_updated_at_list])
             self.assertEqual(df['updated_at_day'].data[:].tolist(),expected_updated_at_date_list )
 
 
@@ -204,7 +204,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
             parsers.read_csv(self.csv_file_name, df, self.schema_dict, include=['birthday'])  
 
             expected_birthday_date = [b'1990-01-01', b'1980-03-04', b'1970-04-05', b'1960-04-05', b'1950-04-05']
-            self.assertEqual(df['birthday'].data[:].tolist(), [datetime.strptime(x.decode(), "%Y-%m-%d").timestamp() for x in expected_birthday_date])
+            self.assertEqual(df['birthday'].data[:].tolist(), [datetime.strptime(x.decode(), "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() for x in expected_birthday_date])
             self.assertEqual(df['birthday_day'].data[:].tolist(), expected_birthday_date)
 
 

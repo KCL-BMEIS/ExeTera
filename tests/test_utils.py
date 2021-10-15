@@ -14,7 +14,6 @@ import unittest
 import numpy as np
 
 from exetera.core.utils import find_longest_sequence_of, to_escaped, bytearray_to_escaped, get_min_max
-from exetera.core.utils import to_timestamp, to_datetime
 
 class TestUtils(unittest.TestCase):
 

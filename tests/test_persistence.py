@@ -1042,7 +1042,7 @@ class TestPersistenceOperations(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             rw.IndexedStringWriter(datastore, hf, 'foo', ts).write(values)
 
-            raw_indices = hf['foo']['index'][:]
+            raw_indices = np.array(hf['foo']['index'][:], dtype=np.int64)
             raw_values = hf['foo']['values'][:]
 
             even_filter = np.zeros(len(values), bool)
@@ -1098,7 +1098,7 @@ class TestPersistenceOperations(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             rw.IndexedStringWriter(datastore, hf, 'foo', ts).write(values)
 
-            raw_indices = hf['foo']['index'][:]
+            raw_indices = np.array(hf['foo']['index'][:], dtype=np.int64)
             raw_values = hf['foo']['values'][:]
 
             even_indices = np.arange(0, len(values), 2)
@@ -1390,7 +1390,7 @@ class TestSorting(unittest.TestCase):
 
                 vals = rw.IndexedStringReader(datastore, hf['vals'])
                 wvals = vals.get_writer(hf, 'sorted_vals', ts)
-                vals.sort(np.asarray(si, dtype=np.uint32), wvals)
+                vals.sort(np.asarray(si, dtype=np.int32), wvals)
                 actual = rw.IndexedStringReader(datastore, hf['sorted_vals'])[:]
                 expected = [sv[i] for i in si]
                 self.assertListEqual(expected, actual)
