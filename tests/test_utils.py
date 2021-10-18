@@ -15,7 +15,6 @@ import numpy as np
 
 from exetera.core.utils import find_longest_sequence_of, to_escaped, bytearray_to_escaped, get_min_max
 
-
 class TestUtils(unittest.TestCase):
 
     def test_find_longest_sequence_of(self):
@@ -101,3 +100,4 @@ class TestUtils(unittest.TestCase):
             (min_value, max_value) = get_min_max(value_type)
             self.assertEqual(min_value, expected_min_max_values[value_type][0])
             self.assertEqual(max_value, expected_min_max_values[value_type][1])
+

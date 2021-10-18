@@ -74,8 +74,9 @@ class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
 
     def test_create_then_load_timestamp(self):
         from datetime import datetime as D
+        from datetime import timezone
         bio = BytesIO()
-        contents = [D(2021, 2, 6), D(2020, 11, 5), D(2974, 8, 1), D(1873, 12, 28)]
+        contents = [D(2021, 2, 6, tzinfo=timezone.utc), D(2020, 11, 5, tzinfo=timezone.utc), D(2974, 8, 1, tzinfo=timezone.utc), D(1873, 12, 28, tzinfo=timezone.utc)]
         contents = [c.timestamp() for c in contents]
 
         with session.Session() as s:
@@ -1010,11 +1011,11 @@ class TestSessionFields(unittest.TestCase):
             a = fields.NumericField(s, hf['a'], None, write_enabled=True)
             a.data.write(values)
 
-            total = np.sum(a.data[:])
+            total = np.sum(a.data[:], dtype=np.int64)
             self.assertEqual(49997540637149, total)
 
             a.data[:] = a.data[:] * 2
-            total = np.sum(a.data[:])
+            total = np.sum(a.data[:], dtype=np.int64)
             self.assertEqual(99995081274298, total)
 
     def test_write_then_read_categorical(self):
@@ -1160,7 +1161,7 @@ class TestSessionImporters(unittest.TestCase):
 
 
     def test_date_importer(self):
-        from datetime import datetime
+        from datetime import datetime, timezone
         bio = BytesIO()
         with session.Session() as s:
             dst = s.open_dataset(bio,'r+', 'dst')
@@ -1171,4 +1172,4 @@ class TestSessionImporters(unittest.TestCase):
             foo.import_part(indices, values, offsets, 0, written_row_count)
 
             expected_date_list = ['2020-05-10', '2020-05-12', '2020-05-12', '2020-05-15']
-            self.assertListEqual(hf['foo'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d").timestamp() for x in expected_date_list])
+            self.assertListEqual(hf['foo'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() for x in expected_date_list])

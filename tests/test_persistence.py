@@ -540,7 +540,7 @@ class TestPersistence(unittest.TestCase):
                       '', 'True', 'False', 'False', '', '', 'True', 'False', 'True', '',
                       '', 'True', 'False', 'False', '']
             value_map = {'': 0, 'False': 1, 'True': 2}
-            rw.CategoricalImporter(datastore, hf, 'foo', value_map, ts).write(values)
+            rw.CategoricalImporter(datastore, hf, 'foo', value_map, ts).write_strings(values)
 
             reader = datastore.get_reader(hf['foo'])
             writer = reader.get_writer(hf, 'foo2', ts)
@@ -1042,7 +1042,7 @@ class TestPersistenceOperations(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             rw.IndexedStringWriter(datastore, hf, 'foo', ts).write(values)
 
-            raw_indices = hf['foo']['index'][:]
+            raw_indices = np.array(hf['foo']['index'][:], dtype=np.int64)
             raw_values = hf['foo']['values'][:]
 
             even_filter = np.zeros(len(values), bool)
@@ -1098,7 +1098,7 @@ class TestPersistenceOperations(unittest.TestCase):
         with h5py.File(bio, 'w') as hf:
             rw.IndexedStringWriter(datastore, hf, 'foo', ts).write(values)
 
-            raw_indices = hf['foo']['index'][:]
+            raw_indices = np.array(hf['foo']['index'][:], dtype=np.int64)
             raw_values = hf['foo']['values'][:]
 
             even_indices = np.arange(0, len(values), 2)
