@@ -38,14 +38,14 @@ def main():
     parser_import.add_argument('-te', '--territories', default=None,
                                help=('The territory/territories to filter the dataset on '
                                     '(runs on all territories if not set)'))
-    parser_import.add_argument('-ds', '--dataset', required=True,
-                               help='Open a dataset, creating it if it doesn’t exist')
+    # parser_import.add_argument('-ds', '--dataset', required=False,
+    #                            help='Open a dataset, creating it if it doesn’t exist')
     parser_import.add_argument('-s', '--schema', required=True,
                                help='The location and name of the schema file')
     parser_import.add_argument('-i', '--inputs', required=True)
     parser_import.add_argument('-o', '--output_hdf5',
-                               help='The location and name of the output hdf5 file. If this is an existing file, it will'
-                                    ' be overwritten')
+                               help='The location and name of the output hdf5 file. If this is an existing file, it'
+                                    ' will be overwritten unless overwrite is set to False')
     parser_import.add_argument('-w', '--overwrite', action='store_true',
                                help="If set, overwrites an existing project rather than appending to it")
     parser_import.add_argument('-ts', '--timestamp', default=str(datetime.now(timezone.utc)),
@@ -110,7 +110,8 @@ def main():
             exit(-1)
 
         with session.Session() as s:
-            importer.import_with_schema(s, args.timestamp, args.dataset, args.output_hdf5, args.schema, tokens, args.overwrite, include, exclude)
+            importer.import_with_schema(s, args.timestamp, args.output_hdf5, args.schema, tokens,
+                                        args.overwrite, include, exclude)
         
 # elif args.command == 'process':
 #     timestamp = str(datetime.now(timezone.utc))

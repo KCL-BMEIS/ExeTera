@@ -19,7 +19,8 @@ from exetera.io import load_schema, parsers
 from exetera.core import utils
 
 
-def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_file, files, overwrite, include=None, exclude=None, chunk_row_size = 1 << 20):
+def import_with_schema(session, timestamp, dest_file_name, schema_file, files,
+                       overwrite, include=None, exclude=None, chunk_row_size=1 << 20):
  
     schema = load_schema.load_schema(schema_file)
 
@@ -48,7 +49,9 @@ def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_
 
     reserved_column_names = ('j_valid_from', 'j_valid_to')
     ts = utils.string_to_datetime(timestamp).timestamp()
-        
+
+    ds = session.open_dataset(dest_file_name, mode, dest_file_name)
+
     for sk in files.keys():
         schema_dict = schema[sk]
         
@@ -62,11 +65,7 @@ def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_
         include_fields = include.get(sk, None) if include is not None else None
         exclude_fields = exclude.get(sk, None) if exclude is not None else None
 
-        ds = session.open_dataset(dest_file_name, mode, dataset_name)
-        ddf = ds.require_dataframe(sk) 
+        ddf = ds.require_dataframe(sk)
 
-        parsers.read_csv_with_schema_dict(csv_file, ddf, schema_dict, ts, include_fields, exclude_fields, chunk_row_size=chunk_row_size)
-
-
-
- 
+        parsers.read_csv_with_schema_dict(csv_file, ddf, schema_dict, ts, include_fields, exclude_fields,
+                                          chunk_row_size=chunk_row_size)
