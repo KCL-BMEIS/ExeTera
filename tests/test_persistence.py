@@ -1390,7 +1390,7 @@ class TestSorting(unittest.TestCase):
 
                 vals = rw.IndexedStringReader(datastore, hf['vals'])
                 wvals = vals.get_writer(hf, 'sorted_vals', ts)
-                vals.sort(np.asarray(si, dtype=np.int32), wvals)
+                vals.sort(np.asarray(si, dtype=np.uint32), wvals)
                 actual = rw.IndexedStringReader(datastore, hf['sorted_vals'])[:]
                 expected = [sv[i] for i in si]
                 self.assertListEqual(expected, actual)
