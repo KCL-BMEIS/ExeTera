@@ -1557,8 +1557,14 @@ class CategoricalField(HDF5Field):
     @property
     def keys(self):
         self._ensure_valid()
-        kv = self._field['key_values']
-        kn = self._field['key_names']
+        if isinstance(self._field['key_values'][0], str):  # convert into bytearray to keep up with linux
+            kv = [bytes(i, 'utf-8') for i in self._field['key_values']]
+        else:
+            kv = self._field['key_values']
+        if isinstance(self._field['key_names'][0], str):
+            kn = [bytes(i, 'utf-8') for i in self._field['key_names']]
+        else:
+            kn = self._field['key_names']
         keys = dict(zip(kv, kn))
         return keys
 
