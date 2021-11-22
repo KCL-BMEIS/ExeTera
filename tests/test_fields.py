@@ -1281,3 +1281,43 @@ class TestFieldCreateLikeWithGroups(unittest.TestCase):
                 g = f.create_like(df, "g")
                 self.assertIsInstance(g, fields.TimestampField)
                 self.assertEqual(0, len(g.data))
+
+
+class TestFieldWhereFunc(unittest.TestCase):
+
+    def test_where_numeric_filter(self):
+        data = np.asarray([1,2,3,4], dtype=np.int32)
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('df')
+            f = df.create_numeric('foo', 'int32')
+            f.data.write(data)
+
+            r = f.where(lambda x: x > 2, 1,0)
+            self.assertEqual([0,0,1,1], r.tolist())
+
+    def test_where_numeric_field_data(self):
+        data = np.asarray([10,20,30,40], dtype=np.int32)
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('df')
+            f = df.create_numeric('foo', 'int32')
+            f.data.write(data)
+                
+            r = f.where(lambda x: x > 25, f, 0)
+            self.assertEqual([0,0,30,40], r.tolist() )
+
+    def test_where_bool_condition(self):
+        data = np.asarray([1,2,3,4], dtype=np.int32)
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, "w", "src")
+            df = dst.create_dataframe('df')
+            f = df.create_numeric('foo', 'int32')
+            f.data.write(data)
+                
+            cond = np.array([False,False,True,True])
+            r = f.where(cond, 1,0)
+            self.assertEqual([0,0,1,1], r.tolist())

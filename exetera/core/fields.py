@@ -112,6 +112,32 @@ class HDF5Field(Field):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
 
+    def where(self, cond, a, b):
+        """
+        Supports condition as lambda function or bool array
+        
+            field.where(lambda x: x > 2, a_value, b_value)
+            field.where(lambda x: x > 2, a_field, b_value)
+            field.where(np.array([True,True,False]), a, b)
+
+        """
+
+        data = self.data[:]
+    
+        if callable(cond):
+            cond = cond(data)
+        elif isinstance(cond, np.ndarray) and cond.dtype == 'bool':
+            cond = cond
+        else:
+            raise Exception("'cond' parameter needs to be lambda function or boolean ndarray")
+
+        if isinstance(a, Field):
+            a = a.data[:]
+        if isinstance(b, Field):
+            b = b.data[:]
+            
+        return np.where(cond, a, b)
+
 
 class MemoryField(Field):
 
