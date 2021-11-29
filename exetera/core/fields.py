@@ -138,6 +138,15 @@ class HDF5Field(Field):
             
         return np.where(cond, a, b)
 
+    def where(self, cond, b, inplace=False):
+        if callable(cond):
+            cond = cond(self.data[:])
+        result = super().where(cond, self, b)
+        if inplace:
+            self.data.clear()
+            self.data.write(result)
+        return result
+
 
 class MemoryField(Field):
 

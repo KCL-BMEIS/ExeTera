@@ -11,7 +11,7 @@
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-
+import numpy as np
 
 class Field(ABC):
 
@@ -75,6 +75,13 @@ class Field(ABC):
     def get_spans(self):
         raise NotImplementedError()
 
+    @staticmethod
+    def where(cond, a, b):
+        if isinstance(a, Field):
+            a = a.data[:]
+        if isinstance(b, Field):
+            b = b.data[:]
+        return np.where(cond, a, b)
 
 class Dataset(ABC):
     """
@@ -259,6 +266,10 @@ class DataFrame(ABC):
 
     @abstractmethod
     def apply_index(self, index_to_apply, ddf=None):
+        raise NotImplementedError()
+
+    @staticmethod
+    def where(cond, a, b):
         raise NotImplementedError()
 
 
