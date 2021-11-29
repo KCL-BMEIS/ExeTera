@@ -783,6 +783,12 @@ class NumericMemField(MemoryField):
     def __ge__(self, value):
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
+    def __invert__(self):
+        return FieldDataOps.invert(self._session, self)
+
+    def logical_not(self):
+        return FieldDataOps.logical_not(self._session, self)
+
 
 class CategoricalMemField(MemoryField):
     def __init__(self, session, nformat, keys):
@@ -1353,13 +1359,14 @@ class NumericField(HDF5Field):
         """
         Convert the field data type to dtype parameter given.
 
-        :param dtype: The new datatype, given as a str object. The dtype must be a subtype of np.number.
+        :param dtype: The new datatype, given as a str object. The dtype must be a subtype of np.number, e.g. int, float, etc.
+        :param casting: Similar to the casting parameter in numpy ndarray.astype, can be 'no’, ‘equiv’, ‘safe’, ‘same_kind’, or ‘unsafe’.
         :return: The field with new datatype.
         """
         if not np.issubdtype(dtype, np.number):
             raise ValueError("The dtype to convert must be a subtype of np.number, but type {} given.".format(dtype))
         else:
-            content = np.array(self.data[:]).astype(dtype, casting)
+            content = np.array(self.data[:]).astype(dtype, casting=casting)
             name = self.name
             del self.dataframe[name]
             fld = self.dataframe.create_numeric(name, str(dtype))
@@ -1525,6 +1532,16 @@ class NumericField(HDF5Field):
     def __ge__(self, value):
         self._ensure_valid()
         return FieldDataOps.greater_than_equal(self._session, self, value)
+
+    def __invert__(self):
+        self._ensure_valid()
+        return FieldDataOps.invert(self._session, self)
+
+    def logical_not(self):
+        self._ensure_valid()
+        return FieldDataOps.logical_not(self._session, self)
+
+
 
 
 class CategoricalField(HDF5Field):
