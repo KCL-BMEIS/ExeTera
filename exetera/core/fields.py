@@ -1349,6 +1349,25 @@ class NumericField(HDF5Field):
         self._ensure_valid()
         return len(self.data)
 
+    def as_type(self, dtype:str, casting='unsafe'):
+        """
+        Convert the field data type to dtype parameter given.
+
+        :param dtype: The new datatype, given as a str object. The dtype must be a subtype of np.number.
+        :return: The field with new datatype.
+        """
+        if not np.issubdtype(dtype, np.number):
+            raise ValueError("The dtype to convert must be a subtype of np.number, but type {} given.".format(dtype))
+        else:
+            content = np.array(self.data[:]).astype(dtype, casting)
+            name = self.name
+            del self.dataframe[name]
+            fld = self.dataframe.create_numeric(name, str(dtype))
+            fld.data.write(content)
+            return fld
+
+
+
     def get_spans(self):
         self._ensure_valid()
         return ops.get_spans_for_field(self.data[:])
@@ -1898,6 +1917,18 @@ class FieldDataOps:
         f.data.write(r)
         return f
 
+    @staticmethod
+    def _unary_op(session, first, function):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        r = function(first_data)
+        f = NumericMemField(session, dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
     @classmethod
     def numeric_add(cls, session, first, second):
         def function_add(first, second):
@@ -1979,6 +2010,20 @@ class FieldDataOps:
             return first | second
 
         return cls._binary_op(session, first, second, function_or)
+
+    @classmethod
+    def invert(cls, session, first):
+        def function_invert(first):
+            return ~first
+
+        return cls._unary_op(session, first, function_invert)
+
+    @classmethod
+    def logical_not(cls, session, first):
+        def function_logical_not(first):
+            return np.logical_not(first)
+
+        return cls._unary_op(session, first, function_logical_not)
 
     @classmethod
     def less_than(cls, session, first, second):
