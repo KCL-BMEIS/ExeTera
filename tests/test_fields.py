@@ -1328,7 +1328,7 @@ class TestFieldCreateLikeWithGroups(unittest.TestCase):
 
 class TestNumericFieldAsType(unittest.TestCase):
 
-    def test_numeric_field_as_type(self):
+    def test_numeric_field_astype(self):
         bio = BytesIO()
         with session.Session() as s:
             src = s.open_dataset(bio, 'w', 'src')
@@ -1336,16 +1336,16 @@ class TestNumericFieldAsType(unittest.TestCase):
             num = df.create_numeric('num', 'int16')
             num.data.write([1, 2, 3, 4, 5])
 
-            num = num.as_type('int32')
+            num = num.astype('int32')
             self.assertEqual(num.data[:].dtype.type, np.int32)
-            num = num.as_type('int64')
+            num = num.astype('int64')
             self.assertEqual(num.data[:].dtype.type, np.int64)
-            num = num.as_type('float32')
+            num = num.astype('float32')
             self.assertEqual(num.data[:].dtype.type, np.float32)
-            num = num.as_type('float64')
+            num = num.astype('float64')
             self.assertEqual(num.data[:].dtype.type, np.float64)
             with self.assertRaises(Exception) as context:
-                num.as_type('int32', casting='safe')
+                num.astype('int32', casting='safe')
             self.assertTrue(isinstance(context.exception,TypeError))
 
 
