@@ -1328,7 +1328,7 @@ class TestFieldCreateLikeWithGroups(unittest.TestCase):
 
 class TestFieldWhereFunc(unittest.TestCase):
 
-    def test_static_where_numeric(self):
+    def test_module_where_numeric(self):
         input_data = [1,2,3,4]
         data = np.asarray(input_data, dtype=np.int32)
         bio = BytesIO()
