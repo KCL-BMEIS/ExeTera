@@ -615,7 +615,7 @@ def apply_filter_to_index_values(index_filter, indices, values):
 
 @njit
 def apply_indices_to_index_values(indices_to_apply, indices, values):
-    # pass 1 - determine the destination lengths 
+    # pass 1 - determine the destination lengths
     cur_ = indices[:-1]
     next_ = indices[1:]
     count = 0

@@ -85,7 +85,7 @@ class TestUtils(unittest.TestCase):
 
     def test_get_min_max_for_permitted_types(self):
         permitted_numeric_types_without_bool = ('float32', 'float64', 'int8', 'uint8', 'int16', 'uint16', 
-                                            'int32', 'uint32', 'int64')
+                                                'int32', 'uint32', 'int64')
         expected_min_max_values = {
             'float32': (-2147483648, 2147483647),
             'float64': (-9223372036854775808, 9223372036854775807),
