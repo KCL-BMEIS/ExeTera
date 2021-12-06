@@ -21,6 +21,22 @@ from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
 from exetera.core import validation as val
 
+
+def where(cond, a, b):
+    if isinstance(cond, np.ndarray) and cond.dtype == 'bool':
+        cond = cond
+    elif isinstance(cond, NumericMemField):
+        cond = cond.data[:]
+    else:
+        raise Exception("'cond' parameter needs to be either boolean ndarray, or NumericMemField")
+
+    if isinstance(a, Field):
+        a = a.data[:]
+    if isinstance(b, Field):
+        b = b.data[:]
+    return np.where(cond, a, b)
+
+
 class HDF5Field(Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
         super().__init__()
@@ -112,36 +128,20 @@ class HDF5Field(Field):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
 
-    def where(self, cond, a, b):
-        """
-        Supports condition as lambda function or bool array
-        
-            field.where(lambda x: x > 2, a_value, b_value)
-            field.where(lambda x: x > 2, a_field, b_value)
-            field.where(np.array([True,True,False]), a, b)
 
-        """
+    def where(self, cond, b, inplace=False):     
 
-        data = self.data[:]
-    
-        if callable(cond):
-            cond = cond(data)
-        elif isinstance(cond, np.ndarray) and cond.dtype == 'bool':
-            cond = cond
-        else:
-            raise Exception("'cond' parameter needs to be lambda function or boolean ndarray")
-
-        if isinstance(a, Field):
-            a = a.data[:]
-        if isinstance(b, Field):
-            b = b.data[:]
-            
-        return np.where(cond, a, b)
-
-    def where(self, cond, b, inplace=False):
         if callable(cond):
             cond = cond(self.data[:])
-        result = super().where(cond, self, b)
+        elif isinstance(cond, np.ndarray) and cond.dtype == 'bool':
+            cond = cond
+        elif isinstance(cond, NumericMemField):
+            cond = cond.data[:]
+        else:
+            raise Exception("'cond' parameter needs to be either callable lambda function, or boolean ndarray, or NumericMemField")
+
+        result = np.where(cond, self.data[:], b)
+
         if inplace:
             self.data.clear()
             self.data.write(result)

@@ -74,14 +74,7 @@ class Field(ABC):
     @abstractmethod
     def get_spans(self):
         raise NotImplementedError()
-
-    @staticmethod
-    def where(cond, a, b):
-        if isinstance(a, Field):
-            a = a.data[:]
-        if isinstance(b, Field):
-            b = b.data[:]
-        return np.where(cond, a, b)
+        
 
 class Dataset(ABC):
     """
