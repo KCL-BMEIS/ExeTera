@@ -11,7 +11,7 @@ Please take a moment to read this page, and also take a look at the [Wiki](https
 [![Documentation Status](https://readthedocs.org/projects/exetera/badge/?version=latest)](https://exetera.readthedocs.io/en/latest/?badge=latest)
 [![PyPI Version](https://img.shields.io/pypi/v/exetera?label=PyPI%20version&logo=python&logoColor=white)](https://pypi.org/project/exetera/)
 [![Testing](https://github.com/KCL-BMEIS/ExeTera/workflows/Unittests/badge.svg)](https://github.com/KCL-BMEIS/ExeTera/actions)
-
+[![codecov](https://codecov.io/gh/KCL-BMEIS/ExeTera/branch/master/graph/badge.svg)](https://codecov.io/gh/KCL-BMEIS/ExeTera)
 
 Requires python 3.7+
 

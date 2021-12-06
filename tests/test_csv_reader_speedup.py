@@ -266,7 +266,7 @@ class TestReadFile(TestCase):
             # print(result)
             # print(df[field])
             self.assertEqual(len(result), len(df[field]))
-            self.assertListEqual(result, list(df[field]))
+            self.assertListEqual([i.replace('\r', '') for i in result], list(df[field]))  # remove \r due to windoes
 
 
     @patch("numpy.fromfile")
