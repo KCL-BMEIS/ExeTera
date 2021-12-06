@@ -1350,5 +1350,32 @@ class TestNumericFieldAsType(unittest.TestCase):
 
 
 
+class TestFieldIsIn(unittest.TestCase):
+    def test_instance_field_isin(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = df.create_numeric('f', 'int16')
+            f.data.write([1, 2, 3, 4, 5])
+
+            r1 = f.isin([1,2,3]) # test_element is list
+            self.assertEqual(r1.tolist(), [True, True, True, False, False])
+
+            r2 = f.isin(3) # single test_element
+            self.assertEqual(r2.tolist(), [False, False, True, False, False])
 
 
+    def test_module_field_isin(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = df.create_numeric('f', 'int16')
+            f.data.write([1, 2, 3, 4, 5])
+
+            r1 = fields.isin(f, [1,2,3]) # test_element is list
+            self.assertEqual(r1.tolist(), [True, True, True, False, False])
+
+            r2 = fields.isin(f, 3) # single test_element
+            self.assertEqual(r2.tolist(), [False, False, True, False, False])       

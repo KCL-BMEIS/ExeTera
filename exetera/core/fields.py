@@ -22,6 +22,14 @@ from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
 from exetera.core import validation as val
 
+
+def isin(field, test_elements):
+    if not isinstance(field, Field):
+        raise Exception("'field' should be field type")
+
+    return np.isin(field.data[:], test_elements)
+
+
 class HDF5Field(Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
         super().__init__()
@@ -112,6 +120,10 @@ class HDF5Field(Field):
     def _ensure_valid(self):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
+
+
+    def isin(self, test_elements):
+        return np.isin(self.data[:], test_elements)
 
 
 class MemoryField(Field):
