@@ -1281,3 +1281,45 @@ class TestFieldCreateLikeWithGroups(unittest.TestCase):
                 g = f.create_like(df, "g")
                 self.assertIsInstance(g, fields.TimestampField)
                 self.assertEqual(0, len(g.data))
+
+
+class TestFieldUnique(unittest.TestCase):
+
+    def test_unique_numeric(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = df.create_numeric('f', 'int16')
+            f.data.write([1, 2, 3, 1, 2])
+
+            self.assertEqual(f.unique().tolist(), [1,2,3])
+
+    def test_unique_indexed_string(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = df.create_indexed_string('foo')
+            f.data.write(['a','bb','ccc','bb'])
+
+            self.assertEqual(f.unique(), ['a', 'bb', 'ccc'])
+
+    # can be deleted, for the purpose of comparing performance
+    # def test_unique_indexed_string_perf(self):
+    #     bio = BytesIO()
+    #     multiplier = 10000000
+    #     data = ['a','bb','dd','ccc'] * multiplier
+
+    #     from timeit import Timer
+    #     with session.Session() as s:
+    #         src = s.open_dataset(bio, 'w', 'src')
+    #         df = src.create_dataframe('df')
+    #         f = df.create_indexed_string('foo')
+    #         f.data.write(data)
+
+    #         t = Timer(lambda: fields.unique(f))
+    #         print("Using isin on data[:]:  ", t.timeit(number=1))
+
+    #         t = Timer(lambda: f.unique())
+    #         print("Using own implementation:", t.timeit(number=1))

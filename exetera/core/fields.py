@@ -15,11 +15,17 @@ from datetime import datetime, timezone
 import numpy as np
 import numba
 import h5py
+from numba import njit,jit
+from numba.typed import List
 
 from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
 from exetera.core import validation as val
+
+def unique(field):
+    return np.unique(field.data[:])
+
 
 class HDF5Field(Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
@@ -111,6 +117,9 @@ class HDF5Field(Field):
     def _ensure_valid(self):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
+
+    def unique(self, return_counts=False):
+        return np.unique(self.data[:], return_counts=return_counts)
 
 
 class MemoryField(Field):
@@ -1219,6 +1228,10 @@ class IndexedStringField(HDF5Field):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
+    def unique(self):
+        unique = ops.unique_indexed_string_speedup(self.indices[:], self.values[:])
+        return [x.tobytes().decode() for x in unique]
 
 
 class FixedStringField(HDF5Field):

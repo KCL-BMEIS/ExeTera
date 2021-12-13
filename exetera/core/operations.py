@@ -2902,3 +2902,31 @@ def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, wr
         for c in range(start_idx, end_idx):
             memory[a] = column_vals[c]
             a += 1
+
+
+@njit
+def unique_indexed_string_speedup(indices, values):
+    unique_result = List([values[indices[0] : indices[1]]])
+    lengths_seen = {indices[1] - indices[0]}
+
+    for i in range(1, len(indices)-1):
+        length = indices[i+1] - indices[i]
+        v = values[indices[i] : indices[i+1]]
+
+        # If we have not seen length of value, we can add it directly
+        if length not in lengths_seen:
+            lengths_seen.add(length)
+            unique_result.append(v)
+            continue
+
+        # If we have seen same length before, then compare to existing unique values
+        # Can probably be further optimized by only comparing to those with same length
+        is_unique = True
+        for unique_v in unique_result:
+            if np.array_equal(v, unique_v):
+                is_unique = False
+
+        if is_unique:
+            unique_result.append(v)
+
+    return unique_result
