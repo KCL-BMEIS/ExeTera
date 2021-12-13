@@ -2902,3 +2902,21 @@ def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, wr
         for c in range(start_idx, end_idx):
             memory[a] = column_vals[c]
             a += 1
+
+
+
+@njit
+def isin_indexed_string_speedup(test_elements, indices, values):
+    result = [False] * (len(indices) - 1)
+    for i in range(len(indices)-1):
+        v = values[indices[i] : indices[i+1]]
+        is_equal = False
+        for test_value in test_elements:
+            if len(v) != len(test_value):
+                continue
+            for idx, t_char in enumerate(test_value):
+                if t_char != v[idx]:
+                    break
+            is_equal = True
+        result[i] = is_equal
+    return result

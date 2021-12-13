@@ -14,8 +14,8 @@ from datetime import datetime, timezone
 import operator
 
 import numpy as np
-import numba
 import h5py
+from numba.typed import List
 
 from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
@@ -121,7 +121,6 @@ class HDF5Field(Field):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
 
-
     def isin(self, test_elements):
         return np.isin(self.data[:], test_elements)
 
@@ -173,6 +172,9 @@ class MemoryField(Field):
 
     def apply_index(self, index_to_apply, dstfld=None):
         raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
+
+    def isin(self, test_elements):
+        return np.isin(self.data[:], test_elements)
 
 
 class ReadOnlyFieldArray:
@@ -564,6 +566,10 @@ class IndexedStringMemField(MemoryField):
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
+    def isin(self, test_elements):
+        test_elements = List([np.frombuffer(x.encode(), dtype=np.uint8) for x in test_elements])
+        return ops.isin_indexed_string_speedup(test_elements, self.indices[:], self.values[:])
 
 
 class FixedStringMemField(MemoryField):
@@ -1238,6 +1244,10 @@ class IndexedStringField(HDF5Field):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
+    def isin(self, test_elements):
+        test_elements = List([np.frombuffer(x.encode(), dtype=np.uint8) for x in test_elements])
+        return ops.isin_indexed_string_speedup(test_elements, self.indices[:], self.values[:])
 
 
 class FixedStringField(HDF5Field):

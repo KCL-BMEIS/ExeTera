@@ -1379,3 +1379,55 @@ class TestFieldIsIn(unittest.TestCase):
 
             r2 = fields.isin(f, 3) # single test_element
             self.assertEqual(r2.tolist(), [False, False, True, False, False])       
+
+
+class TestFieldIsIn(unittest.TestCase):
+    def test_isin_on_numeric_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = df.create_numeric('f', 'int16')
+            f.data.write([1, 2, 3, 4, 5])
+
+            r1 = f.isin([1,2,3]) # test_element is list
+            self.assertEqual(r1.tolist(), [True, True, True, False, False])
+
+            r2 = f.isin(3) # single test_element
+            self.assertEqual(r2.tolist(), [False, False, True, False, False])
+
+
+    def test_isin_on_indexed_string(self):
+        bio = BytesIO()
+        data = ['a','bb','ccc']
+
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = df.create_indexed_string('foo')
+            f.data.write(data)
+
+            self.assertEqual(f.isin(['a']), [True, False, False])
+            self.assertEqual(f.isin(['a','bb']), [True, True, False])
+            self.assertEqual(f.isin(['a','ccc']), [True, False, True])
+            self.assertEqual(f.isin(['a','ccc','bb']), [True, True, True])
+
+
+    # # This can be deleted, just used to compare performance
+    # def test_isin_on_indexed_string_perf(self):
+    #     bio = BytesIO()
+    #     multiplier = 10000000
+    #     data = ['a','bb','ccc'] * multiplier
+
+    #     from timeit import Timer
+    #     with session.Session() as s:
+    #         src = s.open_dataset(bio, 'w', 'src')
+    #         df = src.create_dataframe('df')
+    #         f = df.create_indexed_string('foo')
+    #         f.data.write(data)
+
+    #         t = Timer(lambda: fields.isin(f, ['a']).tolist())
+    #         print("Using isin on data[:] directly", t.timeit(number=1))
+
+    #         t = Timer(lambda: f.isin(['a']))
+    #         print("Own implementaation", t.timeit(number=1))
