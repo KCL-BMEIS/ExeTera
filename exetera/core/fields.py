@@ -11,6 +11,7 @@
 
 from typing import Callable, Optional, Union
 from datetime import datetime, timezone
+import operator
 
 import numpy as np
 import numba
@@ -792,6 +793,12 @@ class NumericMemField(MemoryField):
     def __ge__(self, value):
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
+    def __invert__(self):
+        return FieldDataOps.invert(self._session, self)
+
+    def logical_not(self):
+        return FieldDataOps.logical_not(self._session, self)
+
 
 class CategoricalMemField(MemoryField):
     def __init__(self, session, nformat, keys):
@@ -1362,6 +1369,26 @@ class NumericField(HDF5Field):
         self._ensure_valid()
         return len(self.data)
 
+    def astype(self, dtype:str, casting='unsafe'):
+        """
+        Convert the field data type to dtype parameter given.
+
+        :param dtype: The new datatype, given as a str object. The dtype must be a subtype of np.number, e.g. int, float, etc.
+        :param casting: Similar to the casting parameter in numpy ndarray.astype, can be 'no’, ‘equiv’, ‘safe’, ‘same_kind’, or ‘unsafe’.
+        :return: The field with new datatype.
+        """
+        if not np.issubdtype(dtype, np.number):
+            raise ValueError("The dtype to convert must be a subtype of np.number, but type {} given.".format(dtype))
+        else:
+            content = np.array(self.data[:]).astype(dtype, casting=casting)
+            name = self.name
+            del self.dataframe[name]
+            fld = self.dataframe.create_numeric(name, str(dtype))
+            fld.data.write(content)
+            return fld
+
+
+
     def get_spans(self):
         self._ensure_valid()
         return ops.get_spans_for_field(self.data[:])
@@ -1519,6 +1546,16 @@ class NumericField(HDF5Field):
     def __ge__(self, value):
         self._ensure_valid()
         return FieldDataOps.greater_than_equal(self._session, self, value)
+
+    def __invert__(self):
+        self._ensure_valid()
+        return FieldDataOps.invert(self._session, self)
+
+    def logical_not(self):
+        self._ensure_valid()
+        return FieldDataOps.logical_not(self._session, self)
+
+
 
 
 class CategoricalField(HDF5Field):
@@ -1911,47 +1948,41 @@ class FieldDataOps:
         f.data.write(r)
         return f
 
+    @staticmethod
+    def _unary_op(session, first, function):
+        if isinstance(first, Field):
+            first_data = first.data[:]
+        else:
+            first_data = first
+
+        r = function(first_data)
+        f = NumericMemField(session, dtype_to_str(r.dtype))
+        f.data.write(r)
+        return f
+
     @classmethod
     def numeric_add(cls, session, first, second):
-        def function_add(first, second):
-            return first + second
-
-        return cls._binary_op(session, first, second, function_add)
+        return cls._binary_op(session, first, second, operator.add)
 
     @classmethod
     def numeric_sub(cls, session, first, second):
-        def function_sub(first, second):
-            return first - second
-
-        return cls._binary_op(session, first, second, function_sub)
+        return cls._binary_op(session, first, second, operator.sub)
 
     @classmethod
     def numeric_mul(cls, session, first, second):
-        def function_mul(first, second):
-            return first * second
-
-        return cls._binary_op(session, first, second, function_mul)
+        return cls._binary_op(session, first, second, operator.mul)
 
     @classmethod
     def numeric_truediv(cls, session, first, second):
-        def function_truediv(first, second):
-            return first / second
-
-        return cls._binary_op(session, first, second, function_truediv)
+        return cls._binary_op(session, first, second, operator.truediv)
 
     @classmethod
     def numeric_floordiv(cls, session, first, second):
-        def function_floordiv(first, second):
-            return first // second
-
-        return cls._binary_op(session, first, second, function_floordiv)
+        return cls._binary_op(session, first, second, operator.floordiv)
 
     @classmethod
     def numeric_mod(cls, session, first, second):
-        def function_mod(first, second):
-            return first % second
-
-        return cls._binary_op(session, first, second, function_mod)
+        return cls._binary_op(session, first, second, operator.mod)
 
     @classmethod
     def numeric_divmod(cls, session, first, second):
@@ -1974,66 +2005,50 @@ class FieldDataOps:
 
     @classmethod
     def numeric_and(cls, session, first, second):
-        def function_and(first, second):
-            return first & second
-
-        return cls._binary_op(session, first, second, function_and)
+        return cls._binary_op(session, first, second, operator.and_)
 
     @classmethod
     def numeric_xor(cls, session, first, second):
-        def function_xor(first, second):
-            return first ^ second
-
-        return cls._binary_op(session, first, second, function_xor)
+        return cls._binary_op(session, first, second, operator.xor)
 
     @classmethod
     def numeric_or(cls, session, first, second):
-        def function_or(first, second):
-            return first | second
+        return cls._binary_op(session, first, second, operator.or_)
 
-        return cls._binary_op(session, first, second, function_or)
+    @classmethod
+    def invert(cls, session, first):
+        return cls._unary_op(session, first, operator.invert)
+
+    @classmethod
+    def logical_not(cls, session, first):
+        def function_logical_not(first):
+            return np.logical_not(first)
+
+        return cls._unary_op(session, first, function_logical_not)
 
     @classmethod
     def less_than(cls, session, first, second):
-        def function_less_than(first, second):
-            return first < second
-
-        return cls._binary_op(session, first, second, function_less_than)
+        return cls._binary_op(session, first, second, operator.lt)
 
     @classmethod
     def less_than_equal(cls, session, first, second):
-        def function_less_than_equal(first, second):
-            return first <= second
-
-        return cls._binary_op(session, first, second, function_less_than_equal)
+        return cls._binary_op(session, first, second, operator.le)
 
     @classmethod
     def equal(cls, session, first, second):
-        def function_equal(first, second):
-            return first == second
-
-        return cls._binary_op(session, first, second, function_equal)
+        return cls._binary_op(session, first, second, operator.eq)
 
     @classmethod
     def not_equal(cls, session, first, second):
-        def function_not_equal(first, second):
-            return first != second
-
-        return cls._binary_op(session, first, second, function_not_equal)
+        return cls._binary_op(session, first, second, operator.ne)
 
     @classmethod
     def greater_than(cls, session, first, second):
-        def function_greater_than(first, second):
-            return first > second
-
-        return cls._binary_op(session, first, second, function_greater_than)
+        return cls._binary_op(session, first, second, operator.gt)
 
     @classmethod
     def greater_than_equal(cls, session, first, second):
-        def function_greater_than_equal(first, second):
-            return first >= second
-
-        return cls._binary_op(session, first, second, function_greater_than_equal)
+        return cls._binary_op(session, first, second, operator.ge)
 
     @staticmethod
     def apply_filter_to_indexed_field(source, filter_to_apply, target=None, in_place=False):

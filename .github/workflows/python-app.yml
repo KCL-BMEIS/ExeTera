@@ -15,8 +15,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest] 
-        
+        os: [macos-latest, windows-latest, ubuntu-latest]
+
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.7
@@ -36,7 +36,7 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with unittest
       run: |
-        coverage run -m unittest tests/*.py
+        coverage run -m unittest
         coverage xml
     - name: Upload coverage
       uses: codecov/codecov-action@v1
