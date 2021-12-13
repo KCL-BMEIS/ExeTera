@@ -16,7 +16,7 @@ import operator
 import numpy as np
 import numba
 import h5py
-from numba import njit,jit
+from numba import njit, jit
 from numba.typed import List
 
 from exetera.core.abstract_types import Field
@@ -24,8 +24,9 @@ from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
 from exetera.core import validation as val
 
-def unique(field):
-    return np.unique(field.data[:])
+
+def unique(self, return_index=False, return_inverse=False, return_counts=False):
+    return np.unique(field.data[:], return_index, return_inverse, return_counts)
 
 
 class HDF5Field(Field):
@@ -119,9 +120,6 @@ class HDF5Field(Field):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
 
-    def unique(self, return_counts=False):
-        return np.unique(self.data[:], return_counts=return_counts)
-
 
 class MemoryField(Field):
 
@@ -161,9 +159,6 @@ class MemoryField(Field):
         # rather than
         #   if f is not None:
         return True
-
-    def get_spans(self):
-        raise NotImplementedError("Please use get_spans() on specific fields, not the field base class.")
 
     def apply_filter(self, filter_to_apply, dstfld=None):
         raise NotImplementedError("Please use apply_filter() on specific fields, not the field base class.")
@@ -306,7 +301,7 @@ class ReadOnlyIndexedFieldArray:
     def __len__(self):
         # TODO: this occurs because of the initialized state of an indexed string. It would be better for the
         # index to be initialised as [0]
-        return max(len(self._indices)-1, 0)
+        return max(len(self._indices) - 1, 0)
 
     @property
     def dtype(self):
@@ -318,20 +313,20 @@ class ReadOnlyIndexedFieldArray:
                 start = item.start if item.start is not None else 0
                 stop = item.stop if item.stop is not None else len(self._indices) - 1
                 step = item.step
-                #TODO: validate slice
-                index = self._indices[start:stop+1]
+                # TODO: validate slice
+                index = self._indices[start:stop + 1]
                 bytestr = self._values[index[0]:index[-1]]
-                results = [None] * (len(index)-1)
+                results = [None] * (len(index) - 1)
                 startindex = self._indices[start]
                 for ir in range(len(results)):
-                    results[ir] =\
-                        bytestr[index[ir]-np.int64(startindex):
-                                index[ir+1]-np.int64(startindex)].tobytes().decode()
+                    results[ir] = \
+                        bytestr[index[ir] - np.int64(startindex):
+                                index[ir + 1] - np.int64(startindex)].tobytes().decode()
                 return results
             elif isinstance(item, int):
                 if item >= len(self._indices) - 1:
                     raise ValueError("index is out of range")
-                start, stop = self._indices[item:item+2]
+                start, stop = self._indices[item:item + 2]
                 if start == stop:
                     return ''
                 value = self._values[start:stop].tobytes().decode()
@@ -389,7 +384,7 @@ class WriteableIndexedFieldArray:
                 step = item.step
                 # TODO: validate slice
 
-                index = self._indices[start:stop+1]
+                index = self._indices[start:stop + 1]
                 if len(index) == 0:
                     return []
                 bytestr = self._values[index[0]:index[-1]]
@@ -398,14 +393,14 @@ class WriteableIndexedFieldArray:
                 rmax = min(len(results), stop - start)
                 for ir in range(rmax):
                     rbytes = bytestr[index[ir] - np.int64(startindex):
-                                index[ir + 1] - np.int64(startindex)].tobytes()
+                                     index[ir + 1] - np.int64(startindex)].tobytes()
                     rstr = rbytes.decode()
                     results[ir] = rstr
                 return results
             elif isinstance(item, int):
                 if item >= len(self._indices) - 1:
                     raise ValueError("index is out of range")
-                start, stop = self._indices[item:item+2]
+                start, stop = self._indices[item:item + 2]
                 if start == stop:
                     return ''
                 value = self._values[start:stop].tobytes().decode()
@@ -493,8 +488,8 @@ class IndexedStringMemField(MemoryField):
         indices = self.indices[:]
         values = self.values[:]
         last = values[indices[0]:indices[1]].tobytes()
-        for i in range(1, len(indices)-1):
-            cur = values[indices[i]:indices[i+1]].tobytes()
+        for i in range(1, len(indices) - 1):
+            cur = values[indices[i]:indices[i + 1]].tobytes()
             if last > cur:
                 return False
             last = cur
@@ -640,12 +635,15 @@ class FixedStringMemField(MemoryField):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+    def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        return np.unique(self.data[:], return_index=return_index, return_inverse=return_inverse,
+                         return_counts=return_counts)
+
 
 class NumericMemField(MemoryField):
     def __init__(self, session, nformat):
         super().__init__(session)
         self._nformat = nformat
-
 
     def writeable(self):
         return self
@@ -799,6 +797,10 @@ class NumericMemField(MemoryField):
     def logical_not(self):
         return FieldDataOps.logical_not(self._session, self)
 
+    def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        return np.unique(self.data[:], return_index=return_index, return_inverse=return_inverse,
+                         return_counts=return_counts)
+
 
 class CategoricalMemField(MemoryField):
     def __init__(self, session, nformat, keys):
@@ -908,6 +910,10 @@ class CategoricalMemField(MemoryField):
 
     def __ge__(self, value):
         return FieldDataOps.greater_than_equal(self._session, self, value)
+
+    def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        return np.unique(self.data[:], return_index=return_index, return_inverse=return_inverse,
+                         return_counts=return_counts)
 
 
 class TimestampMemField(MemoryField):
@@ -1042,6 +1048,10 @@ class TimestampMemField(MemoryField):
     def __ge__(self, value):
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
+    def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        return np.unique(self.data[:], return_index=return_index, return_inverse=return_inverse,
+                         return_counts=return_counts)
+
 
 # HDF5 field constructors
 # =======================
@@ -1065,7 +1075,7 @@ def base_field_contructor(session, group, name, timestamp=None, chunksize=None):
 def indexed_string_field_constructor(session, group, name, timestamp=None, chunksize=None):
     field = base_field_contructor(session, group, name, timestamp, chunksize)
     field.attrs['fieldtype'] = 'indexedstring'
-    DataWriter.write(field, 'index', [], 0, 'int64') 
+    DataWriter.write(field, 'index', [], 0, 'int64')
     DataWriter.write(field, 'values', [], 0, 'uint8')
 
 
@@ -1141,8 +1151,7 @@ class IndexedStringField(HDF5Field):
     def data(self):
         self._ensure_valid()
         if self._data_wrapper is None:
-
-            wrapper =\
+            wrapper = \
                 WriteableIndexedFieldArray if self._write_enabled else ReadOnlyIndexedFieldArray
             self._data_wrapper = wrapper(self.chunksize, self.indices, self.values)
         return self._data_wrapper
@@ -1155,8 +1164,8 @@ class IndexedStringField(HDF5Field):
         indices = self.indices[:]
         values = self.values[:]
         last = values[indices[0]:indices[1]].tobytes()
-        for i in range(1, len(indices)-1):
-            cur = values[indices[i]:indices[i+1]].tobytes()
+        for i in range(1, len(indices) - 1):
+            cur = values[indices[i]:indices[i + 1]].tobytes()
             if last > cur:
                 return False
             last = cur
@@ -1236,9 +1245,18 @@ class IndexedStringField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
-    def unique(self):
-        unique = ops.unique_indexed_string_speedup(self.indices[:], self.values[:])
-        return [x.tobytes().decode() for x in unique]
+    def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        if return_index:
+            raise ValueError("Argument `return_index` is not used currently")
+
+        if return_inverse:
+            raise ValueError("Argument `return_inverse` is not used currently")
+
+        if return_counts:
+            raise ValueError("Argument `return_counts` is not used currently")
+
+        result = ops.unique_indexed_string(self.indices[:], self.values[:])
+        return [x.tobytes().decode() for x in result]
 
 
 class FixedStringField(HDF5Field):
@@ -1334,6 +1352,10 @@ class FixedStringField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+    def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        return np.unique(self.data[:], return_index=return_index, return_inverse=return_inverse,
+                         return_counts=return_counts)
+
 
 class NumericField(HDF5Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
@@ -1369,7 +1391,7 @@ class NumericField(HDF5Field):
         self._ensure_valid()
         return len(self.data)
 
-    def astype(self, dtype:str, casting='unsafe'):
+    def astype(self, dtype: str, casting='unsafe'):
         """
         Convert the field data type to dtype parameter given.
 
@@ -1386,8 +1408,6 @@ class NumericField(HDF5Field):
             fld = self.dataframe.create_numeric(name, str(dtype))
             fld.data.write(content)
             return fld
-
-
 
     def get_spans(self):
         self._ensure_valid()
@@ -1555,7 +1575,9 @@ class NumericField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.logical_not(self._session, self)
 
-
+    def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        return np.unique(self.data[:], return_index=return_index, return_inverse=return_inverse,
+                         return_counts=return_counts)
 
 
 class CategoricalField(HDF5Field):
@@ -1700,6 +1722,10 @@ class CategoricalField(HDF5Field):
     def __ge__(self, value):
         self._ensure_valid()
         return FieldDataOps.greater_than_equal(self._session, self, value)
+
+    def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        return np.unique(self.data[:], return_index=return_index, return_inverse=return_inverse,
+                         return_counts=return_counts)
 
 
 class TimestampField(HDF5Field):
@@ -1870,6 +1896,10 @@ class TimestampField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
+    def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        return np.unique(self.data[:], return_index=return_index, return_inverse=return_inverse,
+                         return_counts=return_counts)
+
 
 # Operation implementations
 # =========================
@@ -1888,7 +1918,7 @@ def as_field(data, key=None):
 
 
 def argsort(field: Field,
-            dtype: str=None):
+            dtype: str = None):
     supported_dtypes = ('int32', 'int64', 'uint32')
     if dtype not in supported_dtypes:
         raise ValueError("If set, 'dtype' must be one of {}".format(supported_dtypes))
@@ -2128,7 +2158,6 @@ class FieldDataOps:
             mem_field.values.write(dest_values)
             return mem_field
 
-
     @staticmethod
     def apply_filter_to_field(source, filter_to_apply, target=None, in_place=False):
 
@@ -2200,7 +2229,7 @@ class FieldDataOps:
 
         spans_ = val.array_from_field_or_lower('spans', spans)
         result_inds = np.zeros(len(spans))
-        results = np.zeros(len(spans)-1, dtype=source.data.dtype)
+        results = np.zeros(len(spans) - 1, dtype=source.data.dtype)
         predicate(spans_, source.data[:], results)
 
         if in_place is True:
@@ -2234,7 +2263,7 @@ class FieldDataOps:
         spans_ = val.array_from_field_or_lower('spans', spans)
 
         # step 1: get the indices through the index predicate
-        results = np.zeros(len(spans)-1, dtype=np.int64)
+        results = np.zeros(len(spans) - 1, dtype=np.int64)
         predicate(spans_, source.indices[:], source.values[:], results)
 
         # step 2: run apply_index on the source
@@ -2253,7 +2282,7 @@ class FieldDataOps:
         spans_ = val.array_from_field_or_lower('spans', spans)
 
         # step 1: get the indices through the index predicate
-        results = np.zeros(len(spans)-1, dtype=np.int64)
+        results = np.zeros(len(spans) - 1, dtype=np.int64)
         predicate(spans_, results)
 
         # step 2: run apply_index on the source
@@ -2312,7 +2341,6 @@ class FieldDataOps:
         else:
             return FieldDataOps._apply_spans_src(source, ops.apply_spans_min, spans_,
                                                  target, in_place)
-
 
     @staticmethod
     def apply_spans_max(source: Field,
