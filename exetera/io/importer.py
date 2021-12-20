@@ -19,9 +19,15 @@ from exetera.io import load_schema, parsers
 from exetera.core import utils
 
 
-def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_file, files, overwrite, include=None, exclude=None, chunk_row_size = 1 << 20):
+def import_with_schema(session, timestamp, dataset_name, schema_file, files, overwrite, include=None, exclude=None, chunk_row_size = 1 << 20):
  
     schema = load_schema.load_schema(schema_file)
+
+    mode = 'w' if overwrite else 'r+'
+    if isinstance(dataset_name, str) and not os.path.exists(dataset_name):
+        mode = 'w'
+
+    ds = session.open_dataset(dataset_name, mode, 'dest')
 
     any_parts_present = False
     for sk in schema.keys():
@@ -42,10 +48,6 @@ def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_
         extra_tables = exclude_tables.difference(input_file_tables)
         raise ValueError("-x/--exclude: the following exclude table(s) are not part of any input files: {}".format(extra_tables))
 
-    mode = 'w' if overwrite else 'r+'
-    if isinstance(dest_file_name, str) and not os.path.exists(dest_file_name):
-        mode = 'w'
-
     reserved_column_names = ('j_valid_from', 'j_valid_to')
     ts = utils.string_to_datetime(timestamp).timestamp()
         
@@ -62,8 +64,7 @@ def import_with_schema(session, timestamp, dataset_name, dest_file_name, schema_
         include_fields = include.get(sk, None) if include is not None else None
         exclude_fields = exclude.get(sk, None) if exclude is not None else None
 
-        ds = session.open_dataset(dest_file_name, mode, dataset_name)
-        ddf = ds.require_dataframe(sk) 
+        ddf = ds.require_dataframe(sk)
 
         parsers.read_csv_with_schema_dict(csv_file, ddf, schema_dict, ts, include_fields, exclude_fields, chunk_row_size=chunk_row_size)
 
