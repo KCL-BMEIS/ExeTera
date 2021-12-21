@@ -557,6 +557,19 @@ class IndexedStringMemField(MemoryField):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+    def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        if return_index:
+            raise ValueError("Argument `return_index` is not used currently")
+
+        if return_inverse:
+            raise ValueError("Argument `return_inverse` is not used currently")
+
+        if return_counts:
+            raise ValueError("Argument `return_counts` is not used currently")
+
+        result = ops.unique_indexed_string(self.indices[:], self.values[:])
+        return [x.tobytes().decode() for x in result]
+
 
 class FixedStringMemField(MemoryField):
     def __init__(self, session, length):
