@@ -15,7 +15,6 @@ import operator
 
 import numpy as np
 import h5py
-from numba.typed import List
 
 from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
@@ -121,9 +120,6 @@ class HDF5Field(Field):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
 
-    def isin(self, test_elements):
-        return np.isin(self.data[:], test_elements)
-
 
 class MemoryField(Field):
 
@@ -172,9 +168,6 @@ class MemoryField(Field):
 
     def apply_index(self, index_to_apply, dstfld=None):
         raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
-
-    def isin(self, test_elements):
-        return np.isin(self.data[:], test_elements)
 
 
 class ReadOnlyFieldArray:
@@ -567,9 +560,8 @@ class IndexedStringMemField(MemoryField):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
-    def isin(self, test_elements):
-        test_elements = List([np.frombuffer(x.encode(), dtype=np.uint8) for x in test_elements])
-        return ops.isin_indexed_string_speedup(test_elements, self.indices[:], self.values[:])
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
 
 
 class FixedStringMemField(MemoryField):
@@ -648,6 +640,9 @@ class FixedStringMemField(MemoryField):
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
 
 
 class NumericMemField(MemoryField):
@@ -807,6 +802,9 @@ class NumericMemField(MemoryField):
 
     def logical_not(self):
         return FieldDataOps.logical_not(self._session, self)
+    
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
 
 
 class CategoricalMemField(MemoryField):
@@ -917,6 +915,9 @@ class CategoricalMemField(MemoryField):
 
     def __ge__(self, value):
         return FieldDataOps.greater_than_equal(self._session, self, value)
+
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
 
 
 class TimestampMemField(MemoryField):
@@ -1050,6 +1051,9 @@ class TimestampMemField(MemoryField):
 
     def __ge__(self, value):
         return FieldDataOps.greater_than_equal(self._session, self, value)
+
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
 
 
 # HDF5 field constructors
@@ -1245,9 +1249,8 @@ class IndexedStringField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
-    def isin(self, test_elements):
-        test_elements = List([np.frombuffer(x.encode(), dtype=np.uint8) for x in test_elements])
-        return ops.isin_indexed_string_speedup(test_elements, self.indices[:], self.values[:])
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
 
 
 class FixedStringField(HDF5Field):
@@ -1342,6 +1345,9 @@ class FixedStringField(HDF5Field):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
 
 
 class NumericField(HDF5Field):
@@ -1564,7 +1570,8 @@ class NumericField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.logical_not(self._session, self)
 
-
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
 
 
 class CategoricalField(HDF5Field):
@@ -1709,6 +1716,9 @@ class CategoricalField(HDF5Field):
     def __ge__(self, value):
         self._ensure_valid()
         return FieldDataOps.greater_than_equal(self._session, self, value)
+    
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
 
 
 class TimestampField(HDF5Field):
@@ -1879,6 +1889,8 @@ class TimestampField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
 
 # Operation implementations
 # =========================
@@ -2427,3 +2439,15 @@ class FieldDataOps:
             return TimestampField(source._session, group[name], None, write_enabled=True)
         else:
             return group.create_timestamp(name, ts)
+
+
+    @staticmethod
+    def apply_isin(source: Field, test_elements:Union[list, set, np.ndarray]):
+        if isinstance(test_elements, set):
+            test_elements = list(test_elements)
+
+        if source.indexed:
+            test_elements = list([np.frombuffer(x.encode(), dtype=np.uint8) for x in test_elements])
+            return ops.isin_indexed_string_speedup(test_elements, source.indices[:], source.values[:])
+        else: 
+            return np.isin(source.data[:], test_elements)

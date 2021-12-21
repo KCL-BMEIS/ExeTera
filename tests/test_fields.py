@@ -4,6 +4,7 @@ import numpy as np
 from io import BytesIO
 
 import h5py
+from datetime import datetime
 
 from exetera.core import session
 from exetera.core import fields
@@ -1351,21 +1352,6 @@ class TestNumericFieldAsType(unittest.TestCase):
 
 
 class TestFieldIsIn(unittest.TestCase):
-    def test_instance_field_isin(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            f = df.create_numeric('f', 'int16')
-            f.data.write([1, 2, 3, 4, 5])
-
-            r1 = f.isin([1,2,3]) # test_element is list
-            self.assertEqual(r1.tolist(), [True, True, True, False, False])
-
-            r2 = f.isin(3) # single test_element
-            self.assertEqual(r2.tolist(), [False, False, True, False, False])
-
-
     def test_module_field_isin(self):
         bio = BytesIO()
         with session.Session() as s:
@@ -1380,54 +1366,49 @@ class TestFieldIsIn(unittest.TestCase):
             r2 = fields.isin(f, 3) # single test_element
             self.assertEqual(r2.tolist(), [False, False, True, False, False])       
 
-
-class TestFieldIsIn(unittest.TestCase):
     def test_isin_on_numeric_field(self):
         bio = BytesIO()
         with session.Session() as s:
             src = s.open_dataset(bio, 'w', 'src')
             df = src.create_dataframe('df')
-            f = df.create_numeric('f', 'int16')
-            f.data.write([1, 2, 3, 4, 5])
+            df.create_numeric('f', 'int16').data.write([1, 2, 3, 4, 5])
 
-            r1 = f.isin([1,2,3]) # test_element is list
-            self.assertEqual(r1.tolist(), [True, True, True, False, False])
-
-            r2 = f.isin(3) # single test_element
-            self.assertEqual(r2.tolist(), [False, False, True, False, False])
+            # test_element is list
+            self.assertEqual(df['f'].isin([1,2,3]).tolist(), [True, True, True, False, False])
+            # single test_element
+            self.assertEqual(df['f'].isin(3).tolist(), [False, False, True, False, False])
 
 
-    def test_isin_on_indexed_string(self):
+    def test_isin_on_indexed_string_field(self):
         bio = BytesIO()
-        data = ['a','bb','ccc']
-
         with session.Session() as s:
             src = s.open_dataset(bio, 'w', 'src')
             df = src.create_dataframe('df')
-            f = df.create_indexed_string('foo')
-            f.data.write(data)
+            df.create_indexed_string('foo').data.write(['a','bb','ccc'])
 
-            self.assertEqual(f.isin(['a']), [True, False, False])
-            self.assertEqual(f.isin(['a','bb']), [True, True, False])
-            self.assertEqual(f.isin(['a','ccc']), [True, False, True])
-            self.assertEqual(f.isin(['a','ccc','bb']), [True, True, True])
+            self.assertEqual(df['foo'].isin(['a']), [True, False, False])
+            self.assertEqual(df['foo'].isin(['a','bb']), [True, True, False])
+            self.assertEqual(df['foo'].isin(['a','ccc']), [True, False, True])
+            self.assertEqual(df['foo'].isin(['a','ccc','bb']), [True, True, True])
 
+    def test_isin_on_fixed_string_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_fixed_string('foo', 2).data.write([b'aa', b'bb', b'cc'])
 
-    # # This can be deleted, just used to compare performance
-    # def test_isin_on_indexed_string_perf(self):
-    #     bio = BytesIO()
-    #     multiplier = 10000000
-    #     data = ['a','bb','ccc'] * multiplier
+            self.assertEqual(df['foo'].isin([b'aa', b'zz']).tolist(), [True, False, False])
 
-    #     from timeit import Timer
-    #     with session.Session() as s:
-    #         src = s.open_dataset(bio, 'w', 'src')
-    #         df = src.create_dataframe('df')
-    #         f = df.create_indexed_string('foo')
-    #         f.data.write(data)
+    def test_isin_on_timestamp_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
 
-    #         t = Timer(lambda: fields.isin(f, ['a']).tolist())
-    #         print("Using isin on data[:] directly", t.timeit(number=1))
+            ts1 = datetime(2021, 12, 1).timestamp()
+            ts2 = datetime(2022, 1, 1).timestamp()
+            ts3 = datetime(2022, 2, 1).timestamp()
+            df.create_timestamp('ts').data.write([ts2, ts3, ts1])
 
-    #         t = Timer(lambda: f.isin(['a']))
-    #         print("Own implementaation", t.timeit(number=1))
+            self.assertEqual(df['ts'].isin({ts1, ts2}).tolist(), [True, False, True])

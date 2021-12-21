@@ -3,8 +3,6 @@ from typing import Optional, Union
 
 import numpy as np
 from numba import jit, njit
-import numba
-from numba.typed import List
 
 from exetera.core import validation as val
 from exetera.core.abstract_types import Field
