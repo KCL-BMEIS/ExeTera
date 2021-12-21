@@ -1368,7 +1368,7 @@ class TestFieldUnique(unittest.TestCase):
             df = src.create_dataframe('df')
             df.create_indexed_string('foo').data.write(['ccc','bb','a','bb'])
 
-            self.assertEqual(df['foo'].unique(), ['a', 'bb', 'ccc'])
+            self.assertEqual(df['foo'].unique().tolist(), ['a', 'bb', 'ccc'])
 
     def test_unique_fixed_string(self):
         bio = BytesIO()

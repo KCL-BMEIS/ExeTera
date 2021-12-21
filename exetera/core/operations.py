@@ -2927,9 +2927,6 @@ def unique_indexed_string(indices, values):
                 is_unique = False
                 break
 
-        # works in numba?
-        # is_unique = any(np.array_equal(v, unique_v) for unique_v in unique_result)
-
         if is_unique:
             unique_result.append(v)
 
