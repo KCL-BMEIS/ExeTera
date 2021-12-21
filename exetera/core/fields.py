@@ -25,10 +25,6 @@ from exetera.core import operations as ops
 from exetera.core import validation as val
 
 
-def unique(self, return_index=False, return_inverse=False, return_counts=False):
-    return np.unique(field.data[:], return_index, return_inverse, return_counts)
-
-
 class HDF5Field(Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
         super().__init__()
@@ -568,7 +564,7 @@ class IndexedStringMemField(MemoryField):
             raise ValueError("Argument `return_counts` is not used currently")
 
         result = ops.unique_indexed_string(self.indices[:], self.values[:])
-        return [x.tobytes().decode() for x in result]
+        return sorted([x.tobytes().decode() for x in result])
 
 
 class FixedStringMemField(MemoryField):
@@ -1269,7 +1265,7 @@ class IndexedStringField(HDF5Field):
             raise ValueError("Argument `return_counts` is not used currently")
 
         result = ops.unique_indexed_string(self.indices[:], self.values[:])
-        return [x.tobytes().decode() for x in result]
+        return sorted([x.tobytes().decode() for x in result])
 
 
 class FixedStringField(HDF5Field):

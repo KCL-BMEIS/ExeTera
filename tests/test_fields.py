@@ -4,6 +4,7 @@ import numpy as np
 from io import BytesIO
 
 import h5py
+from datetime import datetime
 
 from exetera.core import session
 from exetera.core import fields
@@ -1356,42 +1357,48 @@ class TestFieldUnique(unittest.TestCase):
         with session.Session() as s:
             src = s.open_dataset(bio, 'w', 'src')
             df = src.create_dataframe('df')
-            f = df.create_numeric('f', 'int16')
-            f.data.write([1, 2, 3, 1, 2])
+            df.create_numeric('f', 'int16').data.write([1, 2, 3, 1, 2])
 
-            self.assertEqual(f.unique().tolist(), [1,2,3])
+            self.assertEqual(df['f'].unique().tolist(), [1,2,3])
 
     def test_unique_indexed_string(self):
         bio = BytesIO()
         with session.Session() as s:
             src = s.open_dataset(bio, 'w', 'src')
             df = src.create_dataframe('df')
-            f = df.create_indexed_string('foo')
-            f.data.write(['a','bb','ccc','bb'])
+            df.create_indexed_string('foo').data.write(['ccc','bb','a','bb'])
 
-            self.assertEqual(f.unique(), ['a', 'bb', 'ccc'])
+            self.assertEqual(df['foo'].unique(), ['a', 'bb', 'ccc'])
 
-    # can be deleted, for the purpose of comparing performance
-    # def test_unique_indexed_string_perf(self):
-    #     bio = BytesIO()
-    #     multiplier = 10000000
-    #     data = ['a','bb','dd','ccc'] * multiplier
+    def test_unique_fixed_string(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_fixed_string('foo', 2).data.write(['bb','aa','cc','aa'])
 
-    #     from timeit import Timer
-    #     with session.Session() as s:
-    #         src = s.open_dataset(bio, 'w', 'src')
-    #         df = src.create_dataframe('df')
-    #         f = df.create_indexed_string('foo')
-    #         f.data.write(data)
+            self.assertEqual(df['foo'].unique().tolist(), [b'aa', b'bb', b'cc'])
 
-    #         t = Timer(lambda: fields.unique(f))
-    #         print("Using isin on data[:]:  ", t.timeit(number=1))
+    def test_unique_categorical_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = df.create_categorical('f', 'int8', {'a': 0, 'c': 1, 'd': 2, 'b': 3})
+            f.data.write([0, 1, 3, 2, 3, 2, 0, 1])
+            self.assertEqual(df['f'].unique().tolist(), [0, 1, 2, 3])
+        
+    def test_unique_timestamp_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
 
-    #         t = Timer(lambda: f.unique())
-    #         print("Using own implementation:", t.timeit(number=1))
+            ts1 = datetime(2021, 12, 1).timestamp()
+            ts2 = datetime(2022, 1, 1).timestamp()
+            df.create_timestamp('ts').data.write([ts2, ts2, ts1])
 
-
-
+            self.assertEqual(df['ts'].unique().tolist(), [ts1, ts2])
 
 
 
