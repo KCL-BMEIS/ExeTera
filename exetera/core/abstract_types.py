@@ -11,6 +11,8 @@
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
+from typing import Union
+import numpy as np
 
 
 class Field(ABC):
@@ -73,6 +75,10 @@ class Field(ABC):
 
     @abstractmethod
     def get_spans(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
         raise NotImplementedError()
 
 
