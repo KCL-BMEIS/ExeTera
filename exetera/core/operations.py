@@ -5,6 +5,7 @@ import numpy as np
 from numba import jit, njit
 import numba
 import numba.typed as nt
+import numba.core.types as nct
 
 from exetera.core import validation as val
 from exetera.core.abstract_types import Field
@@ -2904,12 +2905,49 @@ def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, wr
             a += 1
 
 
-@njit
-def unique_indexed_string(indices, values):
-    unique_result = nt.List([values[indices[0]:indices[1]]])
-    lengths_seen = {indices[1] - indices[0]}
 
-    for i in range(1, len(indices)-1):
+def unique_for_indexed_string(indices, values, return_index, return_inverse, return_counts):
+    # type-expression is not supported in jit functions.
+    unique_result = nt.List.empty_list(item_type=nct.uint8[:])
+    unique_index, unique_inverse, unique_counts = None, None, None
+    if return_counts:
+        unique_counts = nt.List.empty_list(item_type=nct.int64)
+
+    if return_index or return_inverse:
+        unique_index = nt.List.empty_list(item_type=nct.int64)
+
+    if return_inverse:
+        unique_inverse = nt.List.empty_list(item_type=nct.int64)
+
+    indexed_string_unique(indices, values, unique_result, unique_index, unique_inverse, unique_counts)
+
+    sorted_unique_result = np.sort([x.tobytes().decode() for x in unique_result])
+
+    if np.any([return_index, return_inverse, return_counts]) == False:
+        return sorted_unique_result
+
+    combined_result = [sorted_unique_result]
+    indices_sort = np.argsort([x.tobytes().decode() for x in unique_result])
+    
+    if return_index:
+        combined_result.append(np.array(unique_index)[indices_sort])
+    if return_inverse:
+        unique_inverse = np.array(unique_inverse)
+        for i in range(0, len(unique_inverse)):
+            unique_inverse[i] = indices_sort[unique_inverse[i]]
+        combined_result.append(unique_inverse)
+    if return_counts:
+        combined_result.append(np.array(unique_counts)[indices_sort])
+
+    return combined_result
+     
+
+@njit
+def indexed_string_unique(indices, values, unique_result, unique_index, unique_inverse, unique_counts):
+
+    lengths_seen = {-1} # initiate length with type given (int)
+
+    for i in range(0, len(indices)-1):
         length = indices[i+1] - indices[i]
         v = values[indices[i]:indices[i+1]]
 
@@ -2917,17 +2955,40 @@ def unique_indexed_string(indices, values):
         if length not in lengths_seen:
             lengths_seen.add(length)
             unique_result.append(v)
+            if unique_index is not None:
+                unique_index.append(i)
+
+            if unique_inverse is not None:
+                unique_inverse.append(i)
+
+            if unique_counts is not None:
+                unique_counts.append(1)
+
             continue
 
         # If we have seen same length before, then compare to existing unique values
         # Can probably be further optimized by only comparing to those with same length
         is_unique = True
-        for unique_v in unique_result:
+        for j, unique_v in enumerate(unique_result):
             if np.array_equal(v, unique_v):
                 is_unique = False
+
+                if unique_inverse is not None:
+                    unique_inverse.append(j)
+
+                if unique_counts is not None:
+                    unique_counts[j] += 1
+                
                 break
 
         if is_unique:
             unique_result.append(v)
 
-    return unique_result
+            if unique_index is not None:
+                unique_index.append(i)
+
+            if unique_inverse is not None:
+                unique_inverse.append(i)
+
+            if unique_counts is not None:
+                unique_counts.append(1)
