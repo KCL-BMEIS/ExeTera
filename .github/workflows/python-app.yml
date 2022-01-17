@@ -36,13 +36,12 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with unittest
       run: |
-        python -m unittest
-#         coverage run -m unittest
-#         coverage xml
-#     - name: Upload coverage
-#       uses: codecov/codecov-action@v1
-#       with:
-#         file: ./coverage.xml
+        coverage run -m unittest
+        coverage xml
+    - name: Upload coverage
+      uses: codecov/codecov-action@v1
+      with:
+        file: ./coverage.xml
         
   install_test:
     runs-on: ${{ matrix.os }}
