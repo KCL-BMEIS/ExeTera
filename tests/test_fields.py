@@ -1370,8 +1370,7 @@ class TestFieldUnique(unittest.TestCase):
 
             self.assertEqual(df['foo'].unique().tolist(), ['a', 'bb', 'ccc'])
 
-<<<<<<< HEAD
-
+            
     def test_unique_indexed_string_return_index(self):
         bio = BytesIO()
         with session.Session() as s:
@@ -1408,8 +1407,6 @@ class TestFieldUnique(unittest.TestCase):
             self.assertEqual(counts.tolist(), [1,2,1])
 
 
-=======
->>>>>>> 49ae7a736d3d44be4d908c03e5a8f820a6a7951b
     def test_unique_fixed_string(self):
         bio = BytesIO()
         with session.Session() as s:
