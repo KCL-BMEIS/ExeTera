@@ -36,7 +36,6 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with unittest
       run: |
-        find . -name \*.pyc -delete
         coverage run -m unittest
         coverage xml
     - name: Upload coverage
@@ -45,6 +44,7 @@ jobs:
         file: ./coverage.xml
         
   install_test:
+    needs: build
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
