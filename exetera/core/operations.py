@@ -2942,7 +2942,7 @@ def unique_for_indexed_string(indices, values, return_index, return_inverse, ret
     return combined_result
      
 
-#@njit
+@njit
 def indexed_string_unique(indices, values, unique_result, unique_index, unique_inverse, unique_counts):
 
     lengths_seen = {-1} # initiate length with type given (int)
