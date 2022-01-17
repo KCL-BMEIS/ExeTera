@@ -1370,6 +1370,39 @@ class TestFieldUnique(unittest.TestCase):
 
             self.assertEqual(df['foo'].unique().tolist(), ['a', 'bb', 'ccc'])
 
+    def test_unique_indexed_string_return_index(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_indexed_string('foo').data.write(['ccc','bb','a','bb'])
+
+            val, indices = df['foo'].unique(return_index=True)
+            self.assertEqual(val.tolist(), ['a', 'bb', 'ccc'])
+            self.assertEqual(indices.tolist(), [2,1,0])
+
+    def test_unique_indexed_string_return_inverse(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_indexed_string('foo').data.write(['ccc','bb','a','bb','a'])
+
+            val, indices = df['foo'].unique(return_inverse=True)
+            self.assertEqual(val.tolist(), ['a', 'bb', 'ccc'])
+            self.assertEqual(indices.tolist(), [2,1,0,1,0])
+
+    def test_unique_indexed_string_return_counts(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_indexed_string('foo').data.write(['ccc','bb','a','bb'])
+
+            val, counts = df['foo'].unique(return_counts=True)
+            self.assertEqual(val.tolist(), ['a', 'bb', 'ccc'])
+            self.assertEqual(counts.tolist(), [1,2,1])
+
     def test_unique_fixed_string(self):
         bio = BytesIO()
         with session.Session() as s:

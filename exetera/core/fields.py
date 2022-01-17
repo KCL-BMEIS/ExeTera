@@ -2433,14 +2433,7 @@ class FieldDataOps:
 
     @staticmethod
     def apply_unique(src: Field, return_index=False, return_inverse=False, return_counts=False) -> np.ndarray:
-        if src.indexed:               
-            if return_index:
-                raise ValueError("Argument `return_index` is not used currently")
-            if return_inverse:
-                raise ValueError("Argument `return_inverse` is not used currently")
-            if return_counts:
-                raise ValueError("Argument `return_counts` is not used currently")
-            result = ops.unique_indexed_string(src.indices[:], src.values[:])
-            return np.sort([x.tobytes().decode() for x in result])
+        if src.indexed:
+            return ops.unique_for_indexed_string(src.indices[:], src.values[:], return_index, return_inverse, return_counts) 
         else:
             return np.unique(src.data[:], return_index=return_index, return_inverse=return_inverse, return_counts=return_counts)
