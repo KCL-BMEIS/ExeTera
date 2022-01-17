@@ -5,10 +5,7 @@ import numpy as np
 from numba import jit, njit
 import numba
 import numba.typed as nt
-<<<<<<< HEAD
 import numba.core.types as nct
-=======
->>>>>>> 49ae7a736d3d44be4d908c03e5a8f820a6a7951b
 
 from exetera.core import validation as val
 from exetera.core.abstract_types import Field
@@ -2908,7 +2905,6 @@ def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, wr
             a += 1
 
 
-<<<<<<< HEAD
 
 def unique_for_indexed_string(indices, values, return_index, return_inverse, return_counts):
     # type-expression is not supported in jit functions.
@@ -2952,14 +2948,6 @@ def indexed_string_unique(indices, values, unique_result, unique_index, unique_i
     lengths_seen = {-1} # initiate length with type given (int)
 
     for i in range(0, len(indices)-1):
-=======
-@njit
-def unique_indexed_string(indices, values):
-    unique_result = nt.List([values[indices[0]:indices[1]]])
-    lengths_seen = {indices[1] - indices[0]}
-
-    for i in range(1, len(indices)-1):
->>>>>>> 49ae7a736d3d44be4d908c03e5a8f820a6a7951b
         length = indices[i+1] - indices[i]
         v = values[indices[i]:indices[i+1]]
 
@@ -2967,7 +2955,6 @@ def unique_indexed_string(indices, values):
         if length not in lengths_seen:
             lengths_seen.add(length)
             unique_result.append(v)
-<<<<<<< HEAD
             if unique_index is not None:
                 unique_index.append(i)
 
@@ -2977,14 +2964,11 @@ def unique_indexed_string(indices, values):
             if unique_counts is not None:
                 unique_counts.append(1)
 
-=======
->>>>>>> 49ae7a736d3d44be4d908c03e5a8f820a6a7951b
             continue
 
         # If we have seen same length before, then compare to existing unique values
         # Can probably be further optimized by only comparing to those with same length
         is_unique = True
-<<<<<<< HEAD
         for j, unique_v in enumerate(unique_result):
             if np.array_equal(v, unique_v):
                 is_unique = False
@@ -2995,17 +2979,11 @@ def unique_indexed_string(indices, values):
                 if unique_counts is not None:
                     unique_counts[j] += 1
                 
-=======
-        for unique_v in unique_result:
-            if np.array_equal(v, unique_v):
-                is_unique = False
->>>>>>> 49ae7a736d3d44be4d908c03e5a8f820a6a7951b
                 break
 
         if is_unique:
             unique_result.append(v)
 
-<<<<<<< HEAD
             if unique_index is not None:
                 unique_index.append(i)
 
@@ -3014,6 +2992,3 @@ def unique_indexed_string(indices, values):
 
             if unique_counts is not None:
                 unique_counts.append(1)
-=======
-    return unique_result
->>>>>>> 49ae7a736d3d44be4d908c03e5a8f820a6a7951b
