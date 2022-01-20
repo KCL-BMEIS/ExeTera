@@ -2913,7 +2913,7 @@ def unique_for_indexed_string(indices, values, return_index, return_inverse, ret
     if return_counts:
         unique_counts = nt.List.empty_list(item_type=nct.int64)
 
-    if return_index or return_inverse:
+    if return_index:
         unique_index = nt.List.empty_list(item_type=nct.int64)
 
     if return_inverse:
