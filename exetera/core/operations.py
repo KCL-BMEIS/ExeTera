@@ -2907,6 +2907,9 @@ def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, wr
 
 
 def unique_for_indexed_string(indices, values, return_index, return_inverse, return_counts):
+    """
+    Find the unique elements for indexed string field.
+    """
     # type-expression is not supported in jit functions.
     unique_result = nt.List.empty_list(item_type=nct.uint8[:])
     unique_index, unique_inverse, unique_counts = None, None, None
@@ -2944,7 +2947,9 @@ def unique_for_indexed_string(indices, values, return_index, return_inverse, ret
 
 @njit
 def indexed_string_unique(indices, values, unique_result, unique_index, unique_inverse, unique_counts):
-
+    """
+    Find the unique elements for indexed string field using njit function.
+    """
     lengths_seen = {-1} # initiate length with type given (int)
 
     for i in range(0, len(indices)-1):

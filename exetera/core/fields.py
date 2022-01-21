@@ -554,6 +554,7 @@ class IndexedStringMemField(MemoryField):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of IndexedStringMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -635,6 +636,7 @@ class FixedStringMemField(MemoryField):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of FixedStringMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -796,6 +798,7 @@ class NumericMemField(MemoryField):
         return FieldDataOps.logical_not(self._session, self)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of NumericMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -909,6 +912,7 @@ class CategoricalMemField(MemoryField):
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of CategoricalMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1045,6 +1049,7 @@ class TimestampMemField(MemoryField):
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of TimestampMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1242,6 +1247,7 @@ class IndexedStringField(HDF5Field):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of IndexedStringField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1340,6 +1346,7 @@ class FixedStringField(HDF5Field):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of FixedStringField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1562,6 +1569,7 @@ class NumericField(HDF5Field):
         return FieldDataOps.logical_not(self._session, self)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of NumericField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1709,6 +1717,7 @@ class CategoricalField(HDF5Field):
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of CategoricalField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1881,6 +1890,7 @@ class TimestampField(HDF5Field):
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of TimestampField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
