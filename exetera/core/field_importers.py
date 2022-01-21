@@ -114,6 +114,16 @@ class Date(ImporterDefinition):
 #============= Field Importers ============
 
 class CategoricalImporter:
+    """
+    Importer for Categorical field.
+
+    :param session: session. It will be deprecated in future version.
+    :parram df: source dataframe.
+    :param name: field name of this categorical field.
+    :param categories: dictionary that contain key/value pair.
+    :param value_type: value type in the dictionary. Default is 'int8'.
+    :param timestamp: timestamp for creating this categorical field. Default is None.
+    """
     def __init__(self, session, df:DataFrame, name:str, categories:Mapping[str, str], value_type:str='int8', timestamp=None):
         if not isinstance(categories, dict):
             raise ValueError("'categories' must be of type dict but is {} in the field '{}'".format(type(categories), name))
@@ -136,6 +146,16 @@ class CategoricalImporter:
 
 
 class LeakyCategoricalImporter:
+    """
+    Importer for LeakyCategoricalField when allow_freetext is True.
+
+    :param session: session. It will be deprecated in future version.
+    :parram df: source dataframe.
+    :param name: field name of this leaky categorical field.
+    :param categories: dictionary that contain key/value pair.
+    :param value_type: value type in the dictionary. Default is 'int8'.
+    :param timestamp: timestamp for creating this leaky categorical field. Default is None.
+    """
     def __init__(self, session, df:DataFrame, name:str, categories:Mapping[str, str],
                        value_type:str='int8', timestamp=None):
         self.byte_map = ops.get_byte_map(categories)
@@ -171,6 +191,20 @@ class LeakyCategoricalImporter:
         
 
 class NumericImporter:
+    """
+    Importer for Numeric field.
+
+    :param session: session. It will be deprecated in future version.
+    :parram df: source dataframe.
+    :param name: field name of this numeric field.
+    :param dtype: datatype. The admitted datatype is as following: 'int', 'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16',
+                  'uint32', 'uint64', 'float', 'float32', 'float64', 'bool'
+    :param invalid_value: replace the data with invalid_value when the data is invalid. The default is 0.
+    :param validation_mode: three validation mode: "strict", "allow_empty", "relaxed". The default is "allow_empty"
+    :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
+    :param flag_field_name: the suffix for the flag field. The default is "_valid".
+    :param timestamp: timestamp for creating this numeric field. Default is None.
+    """
     def __init__(self, session, df:DataFrame, name:str, dtype:str, invalid_value=0,
                        validation_mode='allow_empty', create_flag_field=True, flag_field_suffix='_valid',
                        timestamp=None):
@@ -237,6 +271,14 @@ class NumericImporter:
 
 
 class IndexedStringImporter:
+    """
+    Importer for Indexed String field.
+
+    :param session: session. It will be deprecated in future version.
+    :parram df: source dataframe.
+    :param name: field name of this indexed string field.
+    :param timestamp: timestamp for creating this indexed string field. Default is None.
+    """
     def __init__(self, session, df, name, timestamp=None):
         self.field = df.create_indexed_string(name, timestamp, None)
         self.chunk_accumulated = 0
@@ -266,6 +308,15 @@ class IndexedStringImporter:
 
 
 class FixedStringImporter:
+    """
+    Importer for Fixed String field.
+
+    :param session: session. It will be deprecated in future version.
+    :parram df: source dataframe.
+    :param name: field name of this fixed string field.
+    :param strlen: set the fixed length for this fixed string field.
+    :param timestamp: timestamp for creating this fixed string field. Default is None.
+    """
     def __init__(self, session, df, name, strlen, timestamp = None):
         self.field = df.create_fixed_string(name, strlen, timestamp, None)  
         self.strlen = strlen
@@ -282,6 +333,16 @@ class FixedStringImporter:
 
 
 class DateTimeImporter:
+    """
+    Importer for DateTime field.
+
+    :param session: session. It will be deprecated in future version.
+    :parram df: source dataframe.
+    :param name: field name of this datetime field.
+    :param create_day_field: create extra field which contains the date information.
+    :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
+    :param timestamp: timestamp for creating this datetime field. Default is None.
+    """
     def __init__(self, session, df, name, create_day_field=False, create_flag_field=False, timestamp=None):
         self.field = df.create_timestamp(name, timestamp, None)   
         self.day_field = None
@@ -341,7 +402,17 @@ class DateTimeImporter:
 
 
 class DateImporter:
-    def __init__(self, session, df, name, create_day_field=False, create_flag_field=False, timestamp=None, chunksize=None):
+    """
+    Importer for Date field.
+
+    :param session: session. It will be deprecated in future version.
+    :parram df: source dataframe.
+    :param name: field name of this date field.
+    :param create_day_field: create extra field which contains the date information.
+    :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
+    :param timestamp: timestamp for creating this date field. Default is None.
+    """
+    def __init__(self, session, df, name, create_day_field=False, create_flag_field=False, timestamp=None):
         self.field = df.create_timestamp(name, timestamp, None)   
         self.day_field = None
         print('create_day_field' , create_day_field)
@@ -385,7 +456,15 @@ class DateImporter:
             self.flag_field.data.complete()
 
 class TimestampImporter:
-    def __init__(self, session, df, name, timestamp=None, chunksize=None):
+    """
+    Importer for Timestamp field.
+
+    :param session: session. It will be deprecated in future version.
+    :parram df: source dataframe.
+    :param name: field name of this timestamp field.
+    :param timestamp: timestamp for creating this timestamp field. Default is None.
+    """
+    def __init__(self, session, df, name, timestamp=None):
         self.field = df.create_timestamp(name, timestamp, None)
 
     def write_part(self, values):

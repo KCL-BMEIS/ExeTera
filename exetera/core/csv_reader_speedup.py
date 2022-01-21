@@ -9,6 +9,9 @@ from io import StringIO
 
 
 def get_file_stat(source, chunk_row_size):
+    """
+    Get statistics of the given file
+    """
     total_byte_size, count_columns = 0, 0
 
     if isinstance(source,str):
@@ -35,6 +38,9 @@ def get_file_stat(source, chunk_row_size):
 
 
 def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, index_map, field_importer_list=None, stop_after_rows=None):
+    """
+    Parse csv file in the parsers.py
+    """
     ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
     SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
     NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
@@ -127,6 +133,9 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
 
 @njit
 def fast_csv_reader(source, start_index, column_inds, column_vals, column_offsets, hasHeader, escape_value, separator_value, newline_value, whitespace_value ):
+    """
+    Read csv file in bytes and represent content with indices and byte arrays.
+    """
     colcount = column_inds.shape[0]
     maxrowcount = np.int64(column_inds.shape[1] - 1)  # -1: minus the first element (0) in the row that created for prefix
     

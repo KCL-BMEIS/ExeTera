@@ -2793,7 +2793,9 @@ def raiseNumericException(exception_message, exception_args):
 
 def transform_int(column_inds, column_vals, column_offsets, col_idx,
                     written_row_count, invalid_value, validation_mode, data_type, field_name):
-
+    """
+    Tranform int method for numeric importer in field_importer.py
+    """
     widths = column_inds[col_idx, 1:written_row_count + 1] - column_inds[col_idx, :written_row_count]
     width = widths.max()
     elements = np.zeros(written_row_count, 'S{}'.format(width))
@@ -2836,7 +2838,9 @@ def transform_int(column_inds, column_vals, column_offsets, col_idx,
 
 def transform_float(column_inds, column_vals, column_offsets, col_idx,
                       written_row_count, invalid_value, validation_mode, data_type, field_name):
-
+    """
+    Tranform float method for numeric importer in field_importer.py
+    """
     widths = column_inds[col_idx, 1:written_row_count + 1] - column_inds[col_idx, :written_row_count]
     width = widths.max()
     elements = np.zeros(written_row_count, 'S{}'.format(width))
@@ -2894,6 +2898,9 @@ def transform_to_values(column_inds, column_vals, column_offsets, col_idx, writt
 @njit
 def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, written_row_count,
                            strlen, memory):
+    """
+    Tranform method for fixed string importer in field_importer.py
+    """
     col_offset = column_offsets[col_idx]
     for i in range(written_row_count):
         a = i * strlen
