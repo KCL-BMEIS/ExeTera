@@ -19,6 +19,8 @@ import numpy as np
 from numba import njit
 from ctypes import sizeof, c_float, c_double, c_int8, c_uint8, c_int16, c_uint16, c_int32, c_uint32, c_int64
 
+from codecs import BOM_UTF8, BOM_UTF16_BE, BOM_UTF16_LE, BOM_UTF32_BE, BOM_UTF32_LE
+
 
 SECONDS_PER_DAY = 86400
 
@@ -395,3 +397,24 @@ def one_dim_data_to_indexed_for_test(data, field_size):
          
     return indices, values, offsets, count_row
 
+
+def guess_encoding(filename):
+    """
+    Attempt to determine the encodig of the given text file by reading the byte order mark, defaulting to utf-8 if 
+    none is found.
+    
+    :param filename: path to a text file containing possible UTF-8, UTF-16, or UTF-32 text
+    :return: encoding name, one of utf-8, utf-8-sig, utf-16, utf-32
+    """
+    with open(filename,"rb") as o:
+        dat=o.read(4)
+        
+    if BOM_UTF32_BE in dat or BOM_UTF32_LE in dat:
+        return "utf-32"
+    elif BOM_UTF16_BE in dat or BOM_UTF16_LE in dat:
+        return "utf-16"
+    elif BOM_UTF8 in dat:
+        return "utf-8-sig"
+    else:
+        return "utf-8"
+    
