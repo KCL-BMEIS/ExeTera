@@ -403,8 +403,8 @@ def guess_encoding(filename):
     Attempt to determine the encodig of the given text file by reading the byte order mark, defaulting to utf-8 if 
     none is found.
     
-    Args:
-        filename: path to a text file containing possible UTF-8, UTF-16, or UTF-32 text
+    :param filename: path to a text file containing possible UTF-8, UTF-16, or UTF-32 text
+    :return: encoding name, one of utf-8, utf-8-sig, utf-16, utf-32
     """
     with open(filename,"rb") as o:
         dat=o.read(4)
