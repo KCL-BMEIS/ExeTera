@@ -4,6 +4,7 @@ import numpy as np
 from io import BytesIO
 
 import h5py
+from datetime import datetime
 
 from exetera.core import session
 from exetera.core import fields
@@ -347,6 +348,35 @@ class TestMemoryFields(unittest.TestCase):
                     'f3', fields.dtype_to_str(r.data.dtype)).data.write(r)
                 test_simple(expected, df['f3'])
 
+    def _execute_unary_field_test(self, a1, function):
+
+        def test_simple(expected, actual):
+            self.assertListEqual(expected.tolist(), actual.data[:].tolist())
+
+        def test_tuple(expected, actual):
+            self.assertListEqual(expected[0].tolist(), actual[0].data[:].tolist())
+            self.assertListEqual(expected[1].tolist(), actual[1].data[:].tolist())
+
+        expected = function(a1)
+
+        test_equal = test_tuple if isinstance(expected, tuple) else test_simple
+
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+
+            m1 = fields.NumericMemField(s, fields.dtype_to_str(a1.dtype))
+            m1.data.write(a1)
+
+            f1 = df.create_numeric('f1', fields.dtype_to_str(a1.dtype))
+            f1.data.write(a1)
+
+            # test memory field and field operations
+            test_equal(expected, function(f1))
+            test_equal(expected, function(f1))
+            test_equal(expected, function(m1))
+
     def test_mixed_field_add(self):
 
         a1 = np.array([1, 2, 3, 4], dtype=np.int32)
@@ -416,6 +446,20 @@ class TestMemoryFields(unittest.TestCase):
         a2 = np.array([2, 3, 4, 5], dtype=np.int32)
         self._execute_memory_field_test(a1, a2, 1, lambda x, y: x | y)
         self._execute_field_test(a1, a2, 1, lambda x, y: x | y)
+
+    def test_mixed_field_invert(self):
+        a1 = np.array([0, 0, 1, 1], dtype=np.int32)
+        self._execute_unary_field_test(a1, lambda x: ~x)
+
+    def test_logical_not(self):
+        a1 = np.array([0, 0, 1, 1], dtype=np.int32)
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+            num = df.create_numeric('num', 'uint32')
+            num.data.write(a1)
+            self.assertListEqual(np.logical_not(a1).tolist(), num.logical_not().data[:].tolist())
 
     def test_less_than(self):
 
@@ -1281,3 +1325,80 @@ class TestFieldCreateLikeWithGroups(unittest.TestCase):
                 g = f.create_like(df, "g")
                 self.assertIsInstance(g, fields.TimestampField)
                 self.assertEqual(0, len(g.data))
+
+
+class TestNumericFieldAsType(unittest.TestCase):
+
+    def test_numeric_field_astype(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            num = df.create_numeric('num', 'int16')
+            num.data.write([1, 2, 3, 4, 5])
+
+            num = num.astype('int32')
+            self.assertEqual(num.data[:].dtype.type, np.int32)
+            num = num.astype('int64')
+            self.assertEqual(num.data[:].dtype.type, np.int64)
+            num = num.astype('float32')
+            self.assertEqual(num.data[:].dtype.type, np.float32)
+            num = num.astype('float64')
+            self.assertEqual(num.data[:].dtype.type, np.float64)
+            with self.assertRaises(Exception) as context:
+                num.astype('int32', casting='safe')
+            self.assertTrue(isinstance(context.exception,TypeError))
+
+
+class TestFieldUnique(unittest.TestCase):
+
+    def test_unique_numeric(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_numeric('f', 'int16').data.write([1, 2, 3, 1, 2])
+
+            self.assertEqual(df['f'].unique().tolist(), [1,2,3])
+
+    def test_unique_indexed_string(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_indexed_string('foo').data.write(['ccc','bb','a','bb'])
+
+            self.assertEqual(df['foo'].unique().tolist(), ['a', 'bb', 'ccc'])
+
+    def test_unique_fixed_string(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_fixed_string('foo', 2).data.write(['bb','aa','cc','aa'])
+
+            self.assertEqual(df['foo'].unique().tolist(), [b'aa', b'bb', b'cc'])
+
+    def test_unique_categorical_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = df.create_categorical('f', 'int8', {'a': 0, 'c': 1, 'd': 2, 'b': 3})
+            f.data.write([0, 1, 3, 2, 3, 2, 0, 1])
+            self.assertEqual(df['f'].unique().tolist(), [0, 1, 2, 3])
+        
+    def test_unique_timestamp_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+
+            ts1 = datetime(2021, 12, 1).timestamp()
+            ts2 = datetime(2022, 1, 1).timestamp()
+            df.create_timestamp('ts').data.write([ts2, ts2, ts1])
+
+            self.assertEqual(df['ts'].unique().tolist(), [ts1, ts2])
+
+
+
