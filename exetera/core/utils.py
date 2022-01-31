@@ -23,6 +23,7 @@ from codecs import BOM_UTF8, BOM_UTF16_BE, BOM_UTF16_LE, BOM_UTF32_BE, BOM_UTF32
 
 
 SECONDS_PER_DAY = 86400
+PERMITTED_NUMERIC_TYPES = ('float32', 'float64', 'bool', 'int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64')
 
 
 def validate_file_exists(file_name):
