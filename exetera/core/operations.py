@@ -9,7 +9,8 @@ import numba.core.types as nct
 
 from exetera.core import validation as val
 from exetera.core.abstract_types import Field
-from exetera.core import fields, utils
+from exetera.core import fields
+from exetera.core import utils
 
 DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62

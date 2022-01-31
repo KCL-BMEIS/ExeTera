@@ -2077,8 +2077,9 @@ class FieldDataOps:
     def apply_filter_to_indexed_field(source, filter_to_apply, target=None, in_place=False):
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
+        
+        filter_to_apply_ = val.validate_filter(filter_to_apply)
 
-        filter_to_apply_ = val.array_from_field_or_lower('filter_to_apply', filter_to_apply)
 
         dest_indices, dest_values = \
             ops.apply_filter_to_index_values(filter_to_apply_,
@@ -2157,7 +2158,7 @@ class FieldDataOps:
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
-        filter_to_apply_ = val.array_from_field_or_lower('filter_to_apply', filter_to_apply)
+        filter_to_apply_ = val.validate_filter(filter_to_apply)
 
         dest_data = source.data[:][filter_to_apply_]
 

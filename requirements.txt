@@ -1,5 +1,6 @@
 numpy
 pandas
 h5py
-numba<=0.53
+numba<0.54
 cython
+
