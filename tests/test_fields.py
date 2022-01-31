@@ -1352,7 +1352,7 @@ class TestNumericFieldAsType(unittest.TestCase):
 
 class TestFieldUnique(unittest.TestCase):
 
-    def test_unique_numeric(self):
+    def test_unique_numeric_with_input_in_order(self):
         bio = BytesIO()
         with session.Session() as s:
             src = s.open_dataset(bio, 'w', 'src')
@@ -1361,7 +1361,28 @@ class TestFieldUnique(unittest.TestCase):
 
             self.assertEqual(df['f'].unique().tolist(), [1,2,3])
 
-    def test_unique_indexed_string(self):
+
+    def test_unique_numeric_with_input_out_of_order(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_numeric('f', 'int16').data.write([3, 2, 1, 2, 1])
+
+            self.assertEqual(df['f'].unique().tolist(), [1,2,3])
+
+
+    def test_unique_indexed_string_with_input_in_order(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_indexed_string('foo').data.write(['a','bb','bb', 'ccc', 'a', 'bb'])
+
+            self.assertEqual(df['foo'].unique().tolist(), ['a', 'bb', 'ccc'])
+
+
+    def test_unique_indexed_string_with_input_out_of_order(self):
         bio = BytesIO()
         with session.Session() as s:
             src = s.open_dataset(bio, 'w', 'src')
@@ -1407,7 +1428,17 @@ class TestFieldUnique(unittest.TestCase):
             self.assertEqual(counts.tolist(), [1,2,1])
 
 
-    def test_unique_fixed_string(self):
+    def test_unique_fixed_stringwith_with_input_in_order(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_fixed_string('foo', 2).data.write(['aa','aa','bb','cc', 'bb'])
+
+            self.assertEqual(df['foo'].unique().tolist(), [b'aa', b'bb', b'cc'])
+
+
+    def test_unique_fixed_stringwith_with_input_out_of_order(self):
         bio = BytesIO()
         with session.Session() as s:
             src = s.open_dataset(bio, 'w', 'src')
@@ -1416,16 +1447,41 @@ class TestFieldUnique(unittest.TestCase):
 
             self.assertEqual(df['foo'].unique().tolist(), [b'aa', b'bb', b'cc'])
 
-    def test_unique_categorical_field(self):
+
+    def test_unique_categorical_field_with_input_in_order(self):
         bio = BytesIO()
         with session.Session() as s:
             src = s.open_dataset(bio, 'w', 'src')
             df = src.create_dataframe('df')
             f = df.create_categorical('f', 'int8', {'a': 0, 'c': 1, 'd': 2, 'b': 3})
-            f.data.write([0, 1, 3, 2, 3, 2, 0, 1])
+            f.data.write([0, 1, 2, 2, 3, 3, 0, 2, 2, 3])
+            self.assertEqual(df['f'].unique().tolist(), [0, 1, 2, 3])
+
+
+    def test_unique_categorical_field_with_input_out_of_order(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = df.create_categorical('f', 'int8', {'a': 0, 'c': 1, 'd': 2, 'b': 3})
+            f.data.write([0, 1, 3, 2, 3, 2, 0, 1, 0])
             self.assertEqual(df['f'].unique().tolist(), [0, 1, 2, 3])
         
-    def test_unique_timestamp_field(self):
+
+    def test_unique_timestamp_field_with_input_in_order(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+
+            ts1 = datetime(2021, 12, 1).timestamp()
+            ts2 = datetime(2022, 1, 1).timestamp()
+            df.create_timestamp('ts').data.write([ts1, ts2, ts1])
+
+            self.assertEqual(df['ts'].unique().tolist(), [ts1, ts2])
+
+
+    def test_unique_timestamp_field_with_input_out_of_order(self):
         bio = BytesIO()
         with session.Session() as s:
             src = s.open_dataset(bio, 'w', 'src')
