@@ -525,7 +525,7 @@ class TestFieldApplyFilter(unittest.TestCase):
     def test_indexed_string_apply_filter(self):
 
         data = ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
-        filt = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0], dtype=bool)
+        filt = np.array([0, 2, 0, 1, 0, 1, 0, 1, 0])
 
         expected_indices = [0, 1, 3, 6, 10, 10, 14, 17, 19, 20]
         expected_values = [97, 98, 98, 99, 99, 99, 100, 100, 100, 100,
@@ -594,7 +594,7 @@ class TestFieldApplyFilter(unittest.TestCase):
 
     def test_fixed_string_apply_filter(self):
         data = np.array([b'a', b'bb', b'ccc', b'dddd', b'eeee', b'fff', b'gg', b'h'], dtype='S4')
-        filt = np.array([0, 1, 0, 1, 0, 1, 0, 1], dtype=bool)
+        filt = np.array([0, 1, 0, 1, 0, 1, 0, 1])
         expected = [b'bb', b'dddd', b'fff', b'h']
 
         bio = BytesIO()
@@ -1350,6 +1350,55 @@ class TestNumericFieldAsType(unittest.TestCase):
             self.assertTrue(isinstance(context.exception,TypeError))
 
 
+class TestFieldUnique(unittest.TestCase):
+
+    def test_unique_numeric(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_numeric('f', 'int16').data.write([1, 2, 3, 1, 2])
+
+            self.assertEqual(df['f'].unique().tolist(), [1,2,3])
+
+    def test_unique_indexed_string(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_indexed_string('foo').data.write(['ccc','bb','a','bb'])
+
+            self.assertEqual(df['foo'].unique().tolist(), ['a', 'bb', 'ccc'])
+
+    def test_unique_fixed_string(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_fixed_string('foo', 2).data.write(['bb','aa','cc','aa'])
+
+            self.assertEqual(df['foo'].unique().tolist(), [b'aa', b'bb', b'cc'])
+
+    def test_unique_categorical_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = df.create_categorical('f', 'int8', {'a': 0, 'c': 1, 'd': 2, 'b': 3})
+            f.data.write([0, 1, 3, 2, 3, 2, 0, 1])
+            self.assertEqual(df['f'].unique().tolist(), [0, 1, 2, 3])
+        
+    def test_unique_timestamp_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+
+            ts1 = datetime(2021, 12, 1).timestamp()
+            ts2 = datetime(2022, 1, 1).timestamp()
+            df.create_timestamp('ts').data.write([ts2, ts2, ts1])
+
+            self.assertEqual(df['ts'].unique().tolist(), [ts1, ts2])
 
 class TestFieldIsIn(unittest.TestCase):
     def test_module_field_isin(self):

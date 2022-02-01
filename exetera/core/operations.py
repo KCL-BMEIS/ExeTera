@@ -4,11 +4,12 @@ from typing import Optional, Union
 import numpy as np
 from numba import jit, njit
 import numba
-from numba.typed import List
+import numba.typed as nt
 
 from exetera.core import validation as val
 from exetera.core.abstract_types import Field
-from exetera.core import fields, utils
+from exetera.core import fields
+from exetera.core import utils
 
 DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62
@@ -2480,8 +2481,8 @@ def streaming_sort_merge(src_index_f, src_value_f, tgt_index_f, tgt_value_f,
     # the (chunk_local) length for each segment
     in_chunk_lengths = np.zeros(segment_count, dtype=np.int64)
 
-    src_value_chunks = List()
-    src_index_chunks = List()
+    src_value_chunks = nt.List()
+    src_index_chunks = nt.List()
 
     # get the first chunk for each segment
     for i in range(segment_count):
@@ -2527,8 +2528,8 @@ def streaming_sort_merge(src_index_f, src_value_f, tgt_index_f, tgt_value_f,
             chunk_indices = chunk_indices[chunk_filter]
             in_chunk_indices = in_chunk_indices[chunk_filter]
             in_chunk_lengths = in_chunk_lengths[chunk_filter]
-            filtered_value_chunks = List()
-            filtered_index_chunks = List()
+            filtered_value_chunks = nt.List()
+            filtered_index_chunks = nt.List()
             for i in range(len(src_value_chunks)):
                 if chunk_filter[i]:
                     filtered_value_chunks.append(src_value_chunks[i])
@@ -2890,7 +2891,6 @@ def transform_to_values(column_inds, column_vals, column_offsets, col_idx, writt
     return data
 
 
-
 @njit
 def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, written_row_count,
                            strlen, memory):
@@ -2902,7 +2902,6 @@ def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, wr
         for c in range(start_idx, end_idx):
             memory[a] = column_vals[c]
             a += 1
-
 
 
 @njit
@@ -2920,3 +2919,33 @@ def isin_indexed_string_speedup(test_elements, indices, values):
             is_equal = True
         result[i] = is_equal
     return result
+
+  
+@njit
+def unique_indexed_string(indices, values):
+    unique_result = nt.List([values[indices[0]:indices[1]]])
+    lengths_seen = {indices[1] - indices[0]}
+
+    for i in range(1, len(indices)-1):
+        length = indices[i+1] - indices[i]
+        v = values[indices[i]:indices[i+1]]
+
+        # If we have not seen length of value, we can add it directly
+        if length not in lengths_seen:
+            lengths_seen.add(length)
+            unique_result.append(v)
+            continue
+
+        # If we have seen same length before, then compare to existing unique values
+        # Can probably be further optimized by only comparing to those with same length
+        is_unique = True
+        for unique_v in unique_result:
+            if np.array_equal(v, unique_v):
+                is_unique = False
+                break
+
+        if is_unique:
+            unique_result.append(v)
+
+    return unique_result
+
