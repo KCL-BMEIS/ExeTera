@@ -74,7 +74,10 @@ class Field(ABC):
     @abstractmethod
     def get_spans(self):
         raise NotImplementedError()
-        
+
+    @abstractmethod
+    def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        raise NotImplementedError()
 
 class Dataset(ABC):
     """
