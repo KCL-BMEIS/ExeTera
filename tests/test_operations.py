@@ -1335,7 +1335,7 @@ class TestFieldImporter(unittest.TestCase):
     def test_get_byte_map(self):
         byte_map_keys, byte_map_key_indices, byte_map_value = ops.get_byte_map({'a':1, 'bb':2, 'ccc':3, 'dddd':4})
 
-        print(ops.get_byte_map({'Yes':1, 'No':0}))
+        #print(ops.get_byte_map({'Yes':1, 'No':0}))
 
         expected_byte_map_keys = np.array([97, 98, 98, 99, 99, 99, 100, 100, 100, 100])
         expected_byte_map_key_indices = np.array([0, 1, 3, 6, 10])
