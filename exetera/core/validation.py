@@ -17,6 +17,7 @@ import h5py
 from exetera.core.abstract_types import DataFrame, Field
 from exetera.core import readerwriter as rw
 from exetera.core import fields as flds
+from exetera.core.utils import PERMITTED_NUMERIC_TYPES
 
 
 def _writer_from_writer_or_group(writer_getter, param_name, writer):
@@ -354,3 +355,15 @@ def validate_boolean_row_filter(name, field):
 def validate_chunk_size(chunk_size_name, chunk_size):
     if chunk_size <= 0:
         raise ValueError("'{}' must be larger than 0.".format(chunk_size_name))
+
+
+def validate_filter(filter_to_apply):
+    filter = array_from_field_or_lower('filter_to_apply', filter_to_apply)
+
+    if filter.dtype not in PERMITTED_NUMERIC_TYPES:
+        raise Exception(f"apply_filter has an invalid filter '{filter.dtype}'. Permitted types are {PERMITTED_NUMERIC_TYPES}")
+
+    if filter.dtype != 'bool':
+        filter = (filter != 0)
+        
+    return filter
