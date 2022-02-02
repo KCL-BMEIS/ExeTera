@@ -23,7 +23,7 @@ FIELD_MAPPING_TO_IMPORTER = {
             lambda s, df, name, ts: DateImporter(s, df, name, create_day_field, create_flag_field, ts),
 }
 
-#========= ImporterDefinition, include Categorical, Numeric, , , Datetime =========
+#========= ImporterDefinition, include Categorical, Numeric, String, Datetime, Date =========
 
 class ImporterDefinition:
     def __init__(self):
@@ -33,7 +33,9 @@ class ImporterDefinition:
 
 class Categorical(ImporterDefinition):
     """
-    Categorical is an importer definition for categorical fields. It's the means that you define categorical field in the schema dictionary.
+    Categorical is an importer definition for categorical fields. It's the means that users define categorical field in the schema dictionary.
+    e.g. (1) Categorical(categories={"": 0, "NW1":1, "E1":2, "SW1P":3, "NW3":4})
+         (2) Categorical(categories={"":0, "bachelor":1, "master":2, "doctor":3}, allow_freetext=True)
 
     :param categories: dictionary that contain key/value pair for Categorical Field
     :param value_type: value type in the dictionary. Default is 'int8'.
@@ -50,7 +52,8 @@ class Categorical(ImporterDefinition):
 
 class Numeric(ImporterDefinition):
     """
-    Numeric is an importer definition for numeric fields. It's the means that you define numeric field in the schema dictionary.
+    Numeric is an importer definition for numeric fields. It's the means that users define numeric field in the schema dictionary.
+    e.g. Numeric('float32', invalid_value = 160.5, validation_mode='relaxed', flag_field_name= '_valid_test')
 
     :param dtype: datatype. The admitted datatype is as following: 'int', 'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 
                   'uint32', 'uint64', 'float', 'float32', 'float64', 'bool'
@@ -74,7 +77,9 @@ class Numeric(ImporterDefinition):
 
 class String(ImporterDefinition):
     """
-    String is an importer definition for string fields. It's the means that you define string field in the schema dictionary.
+    String is an importer definition for string fields. It's the means that users define string field in the schema dictionary.
+    e.g. (1) String()
+         (2) String(fixed_length=4)
 
     :param fixed_length: set the fixed_length if the field type is fixed string.
     """
@@ -89,7 +94,8 @@ class String(ImporterDefinition):
 
 class DateTime(ImporterDefinition):
     """
-    DateTime is an importer definition for DateTime fields. It's the means that you define DateTime field in the schema dictionary.
+    DateTime is an importer definition for DateTime fields. It's the means that users define DateTime field in the schema dictionary.
+    e.g. DateTime(create_day_field=True)
 
     :param create_day_field: create extra field which contains the date information.
     :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
@@ -101,7 +107,8 @@ class DateTime(ImporterDefinition):
 
 class Date(ImporterDefinition):
     """
-    Date is an importer definition for Date fields. It's the means that you define Date field in the schema dictionary.
+    Date is an importer definition for Date fields. It's the means that users define Date field in the schema dictionary.
+    e.g. Date(create_day_field=True)
 
     :param create_day_field: create extra field which contains the date information.
     :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
@@ -115,7 +122,7 @@ class Date(ImporterDefinition):
 
 class CategoricalImporter:
     """
-    Importer for Categorical field.
+    Importer for Categorical field, a private attribute defined in Categorical ImporterDefinition.
 
     :param session: session. It will be deprecated in future version.
     :param df: source dataframe.
@@ -147,7 +154,7 @@ class CategoricalImporter:
 
 class LeakyCategoricalImporter:
     """
-    Importer for LeakyCategoricalField when allow_freetext is True.
+    Importer for LeakyCategoricalField when allow_freetext is True, a private attribute defined in Categorical ImporterDefinition.
 
     :param session: session. It will be deprecated in future version.
     :param df: source dataframe.
@@ -192,7 +199,7 @@ class LeakyCategoricalImporter:
 
 class NumericImporter:
     """
-    Importer for Numeric field.
+    Importer for Numeric field, a private attribute defined in Numeric ImporterDefinition.
 
     :param session: session. It will be deprecated in future version.
     :param df: source dataframe.
@@ -272,7 +279,7 @@ class NumericImporter:
 
 class IndexedStringImporter:
     """
-    Importer for Indexed String field.
+    Importer for Indexed String field, a private attribute defined in String ImporterDefinition.
 
     :param session: session. It will be deprecated in future version.
     :param df: source dataframe.
@@ -309,7 +316,7 @@ class IndexedStringImporter:
 
 class FixedStringImporter:
     """
-    Importer for Fixed String field.
+    Importer for Fixed String field, a private attribute defined in String ImporterDefinition.
 
     :param session: session. It will be deprecated in future version.
     :param df: source dataframe.
@@ -334,7 +341,7 @@ class FixedStringImporter:
 
 class DateTimeImporter:
     """
-    Importer for DateTime field.
+    Importer for DateTime field, a private attribute defined in DateTime ImporterDefinition.
 
     :param session: session. It will be deprecated in future version.
     :param df: source dataframe.
@@ -403,7 +410,7 @@ class DateTimeImporter:
 
 class DateImporter:
     """
-    Importer for Date field.
+    Importer for Date field, a private attribute defined in Date ImporterDefinition.
 
     :param session: session. It will be deprecated in future version.
     :param df: source dataframe.
@@ -457,7 +464,7 @@ class DateImporter:
 
 class TimestampImporter:
     """
-    Importer for Timestamp field.
+    Importer for Timestamp field, currently only used in parser.py to parse timestamp field.
 
     :param session: session. It will be deprecated in future version.
     :param df: source dataframe.
