@@ -744,9 +744,6 @@ class HDF5DataFrame(DataFrame):
 class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
     def __init__(self, columns, by, sorted_index, spans):
-        """
-        Create a HDF5DataFrameGroupBy instance.
-        """
         self._by = by
         self._columns = columns
         self._all = columns.keys()

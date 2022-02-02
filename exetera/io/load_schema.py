@@ -2,7 +2,7 @@ from io import StringIO
 import json
 from typing import Union
 
-from exetera.core.field_importers import Categorical, Numeric, String, DateTime, Date
+from exetera.io.field_importers import Categorical, Numeric, String, DateTime, Date
 from exetera.core import validation as val
 from exetera.core import utils
 
