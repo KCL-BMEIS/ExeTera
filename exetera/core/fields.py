@@ -16,7 +16,7 @@ import operator
 import numpy as np
 import h5py
 from numba import njit, jit
-from numba.typed import List
+import numba.typed as nt
 
 from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
@@ -2474,7 +2474,7 @@ class FieldDataOps:
             test_elements = list(test_elements)
 
         if source.indexed:
-            test_elements = list([np.frombuffer(x.encode(), dtype=np.uint8) for x in test_elements])
+            test_elements = nt.List([np.frombuffer(x.encode(), dtype=np.uint8) for x in test_elements])
             return ops.isin_indexed_string_speedup(test_elements, source.indices[:], source.values[:])
         else: 
             return np.isin(source.data[:], test_elements)

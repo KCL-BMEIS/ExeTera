@@ -2911,12 +2911,9 @@ def isin_indexed_string_speedup(test_elements, indices, values):
         v = values[indices[i] : indices[i+1]]
         is_equal = False
         for test_value in test_elements:
-            if len(v) != len(test_value):
-                continue
-            for idx, t_char in enumerate(test_value):
-                if t_char != v[idx]:
-                    break
-            is_equal = True
+            if np.array_equal(v, test_value):
+                is_equal = True
+                break
         result[i] = is_equal
     return result
 

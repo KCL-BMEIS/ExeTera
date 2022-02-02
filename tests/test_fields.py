@@ -1426,6 +1426,7 @@ class TestFieldIsIn(unittest.TestCase):
             self.assertEqual(df['f'].isin([1,2,3]).tolist(), [True, True, True, False, False])
             # single test_element
             self.assertEqual(df['f'].isin(3).tolist(), [False, False, True, False, False])
+            self.assertEqual(df['f'].isin(8).tolist(), [False, False, False, False, False])
 
 
     def test_isin_on_indexed_string_field(self):
@@ -1439,6 +1440,8 @@ class TestFieldIsIn(unittest.TestCase):
             self.assertEqual(df['foo'].isin(['a','bb']), [True, True, False])
             self.assertEqual(df['foo'].isin(['a','ccc']), [True, False, True])
             self.assertEqual(df['foo'].isin(['a','ccc','bb']), [True, True, True])
+            self.assertEqual(df['foo'].isin(['a','cc','dd']), [True, False,False])
+
 
     def test_isin_on_fixed_string_field(self):
         bio = BytesIO()
