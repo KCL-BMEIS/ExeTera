@@ -131,8 +131,7 @@ class HDF5Field(Field):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
 
-
-    def where(self, cond, b, inplace=False):     
+    def where(self, cond, b, inplace=False):
 
         if callable(cond):
             cond = cond(self.data[:])
@@ -195,6 +194,24 @@ class MemoryField(Field):
 
     def apply_index(self, index_to_apply, dstfld=None):
         raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
+
+    def where(self, cond, b, inplace=False):
+
+        if callable(cond):
+            cond = cond(self.data[:])
+        elif isinstance(cond, np.ndarray) and cond.dtype == 'bool':
+            cond = cond
+        elif isinstance(cond, NumericMemField):
+            cond = cond.data[:]
+        else:
+            raise Exception("'cond' parameter needs to be either callable lambda function, or boolean ndarray, or NumericMemField")
+
+        result = np.where(cond, self.data[:], b)
+
+        if inplace:
+            self.data.clear()
+            self.data.write(result)
+        return result
 
 
 class ReadOnlyFieldArray:
