@@ -933,7 +933,7 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
             try:
                 a.move('x', '/b/y')
             except Exception as e:
-                print(e)
+                #print(e)
                 self.assertEqual(
                     "Unable to move link (an object with that name already exists)", str(e))
             self.assertListEqual([1, 2, 3, 4, 5], hf['/b/y'][:].tolist())
@@ -961,8 +961,8 @@ class TestPersistanceMiscellaneous(unittest.TestCase):
                 da = hf2.create_group('a')
                 for k in a.keys():
                     da.copy(a[k], da)
-                print(da.keys())
-                print(da['b'].keys())
+                #print(da.keys())
+                #print(da['b'].keys())
 
 
     def test_predicate(self):

@@ -10,7 +10,7 @@ from exetera.core import fields
 from exetera.core import dataframe
 from exetera.core import persistence as per
 from exetera.core import utils
-from exetera.core import field_importers as fi
+from exetera.io import field_importers as fi
 
 
 class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):

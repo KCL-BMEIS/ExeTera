@@ -189,7 +189,7 @@ class TestGeneratePeriodOffsetMap(unittest.TestCase):
         end_dt = D(2021, 3, 1)
         periods = dth.get_periods(end_dt, start_dt, 'week', -1)
         periods.reverse()
-        print(periods)
+        #print(periods)
 
 
 class TestGetPeriodOffsets(unittest.TestCase):

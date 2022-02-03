@@ -23,7 +23,7 @@ FIELD_MAPPING_TO_IMPORTER = {
             lambda s, df, name, ts: DateImporter(s, df, name, create_day_field, create_flag_field, ts),
 }
 
-#========= ImporterDefinition, include Categorical, Numeric, , , Datetime =========
+#========= ImporterDefinition, include Categorical, Numeric, String, Datetime, Date =========
 
 class ImporterDefinition:
     def __init__(self):
@@ -33,7 +33,9 @@ class ImporterDefinition:
 
 class Categorical(ImporterDefinition):
     """
-    Categorical is an importer definition for categorical fields. It's the means that you define categorical field in the schema dictionary.
+    Categorical is an importer definition for categorical fields. It's the means that users define categorical field in the schema dictionary.
+    e.g. (1) Categorical(categories={"": 0, "NW1":1, "E1":2, "SW1P":3, "NW3":4})
+         (2) Categorical(categories={"":0, "bachelor":1, "master":2, "doctor":3}, allow_freetext=True)
 
     :param categories: dictionary that contain key/value pair for Categorical Field
     :param value_type: value type in the dictionary. Default is 'int8'.
@@ -50,7 +52,8 @@ class Categorical(ImporterDefinition):
 
 class Numeric(ImporterDefinition):
     """
-    Numeric is an importer definition for numeric fields. It's the means that you define numeric field in the schema dictionary.
+    Numeric is an importer definition for numeric fields. It's the means that users define numeric field in the schema dictionary.
+    e.g. Numeric('float32', invalid_value = 160.5, validation_mode='relaxed', flag_field_name= '_valid_test')
 
     :param dtype: datatype. The admitted datatype is as following: 'int', 'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 
                   'uint32', 'uint64', 'float', 'float32', 'float64', 'bool'
@@ -74,7 +77,9 @@ class Numeric(ImporterDefinition):
 
 class String(ImporterDefinition):
     """
-    String is an importer definition for string fields. It's the means that you define string field in the schema dictionary.
+    String is an importer definition for string fields. It's the means that users define string field in the schema dictionary.
+    e.g. (1) String()
+         (2) String(fixed_length=4)
 
     :param fixed_length: set the fixed_length if the field type is fixed string.
     """
@@ -89,7 +94,8 @@ class String(ImporterDefinition):
 
 class DateTime(ImporterDefinition):
     """
-    DateTime is an importer definition for DateTime fields. It's the means that you define DateTime field in the schema dictionary.
+    DateTime is an importer definition for DateTime fields. It's the means that users define DateTime field in the schema dictionary.
+    e.g. DateTime(create_day_field=True)
 
     :param create_day_field: create extra field which contains the date information.
     :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
@@ -101,7 +107,8 @@ class DateTime(ImporterDefinition):
 
 class Date(ImporterDefinition):
     """
-    Date is an importer definition for Date fields. It's the means that you define Date field in the schema dictionary.
+    Date is an importer definition for Date fields. It's the means that users define Date field in the schema dictionary.
+    e.g. Date(create_day_field=True)
 
     :param create_day_field: create extra field which contains the date information.
     :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
@@ -114,6 +121,16 @@ class Date(ImporterDefinition):
 #============= Field Importers ============
 
 class CategoricalImporter:
+    """
+    Importer for Categorical field, a private attribute defined in Categorical ImporterDefinition.
+
+    :param session: session. It will be deprecated in future version.
+    :param df: source dataframe.
+    :param name: field name of this categorical field.
+    :param categories: dictionary that contain key/value pair.
+    :param value_type: value type in the dictionary. Default is 'int8'.
+    :param timestamp: timestamp for creating this categorical field. Default is None.
+    """
     def __init__(self, session, df:DataFrame, name:str, categories:Mapping[str, str], value_type:str='int8', timestamp=None):
         if not isinstance(categories, dict):
             raise ValueError("'categories' must be of type dict but is {} in the field '{}'".format(type(categories), name))
@@ -136,6 +153,16 @@ class CategoricalImporter:
 
 
 class LeakyCategoricalImporter:
+    """
+    Importer for LeakyCategoricalField when allow_freetext is True, a private attribute defined in Categorical ImporterDefinition.
+
+    :param session: session. It will be deprecated in future version.
+    :param df: source dataframe.
+    :param name: field name of this leaky categorical field.
+    :param categories: dictionary that contain key/value pair.
+    :param value_type: value type in the dictionary. Default is 'int8'.
+    :param timestamp: timestamp for creating this leaky categorical field. Default is None.
+    """
     def __init__(self, session, df:DataFrame, name:str, categories:Mapping[str, str],
                        value_type:str='int8', timestamp=None):
         self.byte_map = ops.get_byte_map(categories)
@@ -171,6 +198,20 @@ class LeakyCategoricalImporter:
         
 
 class NumericImporter:
+    """
+    Importer for Numeric field, a private attribute defined in Numeric ImporterDefinition.
+
+    :param session: session. It will be deprecated in future version.
+    :param df: source dataframe.
+    :param name: field name of this numeric field.
+    :param dtype: datatype. The admitted datatype is as following: 'int', 'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16',
+                  'uint32', 'uint64', 'float', 'float32', 'float64', 'bool'
+    :param invalid_value: replace the data with invalid_value when the data is invalid. The default is 0.
+    :param validation_mode: three validation mode: "strict", "allow_empty", "relaxed". The default is "allow_empty"
+    :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
+    :param flag_field_name: the suffix for the flag field. The default is "_valid".
+    :param timestamp: timestamp for creating this numeric field. Default is None.
+    """
     def __init__(self, session, df:DataFrame, name:str, dtype:str, invalid_value=0,
                        validation_mode='allow_empty', create_flag_field=True, flag_field_suffix='_valid',
                        timestamp=None):
@@ -237,6 +278,14 @@ class NumericImporter:
 
 
 class IndexedStringImporter:
+    """
+    Importer for Indexed String field, a private attribute defined in String ImporterDefinition.
+
+    :param session: session. It will be deprecated in future version.
+    :param df: source dataframe.
+    :param name: field name of this indexed string field.
+    :param timestamp: timestamp for creating this indexed string field. Default is None.
+    """
     def __init__(self, session, df, name, timestamp=None):
         self.field = df.create_indexed_string(name, timestamp, None)
         self.chunk_accumulated = 0
@@ -266,6 +315,15 @@ class IndexedStringImporter:
 
 
 class FixedStringImporter:
+    """
+    Importer for Fixed String field, a private attribute defined in String ImporterDefinition.
+
+    :param session: session. It will be deprecated in future version.
+    :param df: source dataframe.
+    :param name: field name of this fixed string field.
+    :param strlen: set the fixed length for this fixed string field.
+    :param timestamp: timestamp for creating this fixed string field. Default is None.
+    """
     def __init__(self, session, df, name, strlen, timestamp = None):
         self.field = df.create_fixed_string(name, strlen, timestamp, None)  
         self.strlen = strlen
@@ -282,6 +340,16 @@ class FixedStringImporter:
 
 
 class DateTimeImporter:
+    """
+    Importer for DateTime field, a private attribute defined in DateTime ImporterDefinition.
+
+    :param session: session. It will be deprecated in future version.
+    :param df: source dataframe.
+    :param name: field name of this datetime field.
+    :param create_day_field: create extra field which contains the date information.
+    :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
+    :param timestamp: timestamp for creating this datetime field. Default is None.
+    """
     def __init__(self, session, df, name, create_day_field=False, create_flag_field=False, timestamp=None):
         self.field = df.create_timestamp(name, timestamp, None)   
         self.day_field = None
@@ -341,7 +409,17 @@ class DateTimeImporter:
 
 
 class DateImporter:
-    def __init__(self, session, df, name, create_day_field=False, create_flag_field=False, timestamp=None, chunksize=None):
+    """
+    Importer for Date field, a private attribute defined in Date ImporterDefinition.
+
+    :param session: session. It will be deprecated in future version.
+    :param df: source dataframe.
+    :param name: field name of this date field.
+    :param create_day_field: create extra field which contains the date information.
+    :param create_flag_field: create extra field which indicate if the data is valid or not. The default is True.
+    :param timestamp: timestamp for creating this date field. Default is None.
+    """
+    def __init__(self, session, df, name, create_day_field=False, create_flag_field=False, timestamp=None):
         self.field = df.create_timestamp(name, timestamp, None)   
         self.day_field = None
         print('create_day_field' , create_day_field)
@@ -385,7 +463,15 @@ class DateImporter:
             self.flag_field.data.complete()
 
 class TimestampImporter:
-    def __init__(self, session, df, name, timestamp=None, chunksize=None):
+    """
+    Importer for Timestamp field, currently only used in parser.py to parse timestamp field.
+
+    :param session: session. It will be deprecated in future version.
+    :param df: source dataframe.
+    :param name: field name of this timestamp field.
+    :param timestamp: timestamp for creating this timestamp field. Default is None.
+    """
+    def __init__(self, session, df, name, timestamp=None):
         self.field = df.create_timestamp(name, timestamp, None)
 
     def write_part(self, values):

@@ -30,7 +30,7 @@ class TestSessionMerge(unittest.TestCase):
         d1_id = np.chararray(9)
         d1_id[:] = np.asarray(['a', 'a', 'b', 'b', 'c', 'e', 'e', 'e', 'g'])
         d1_v1 = np.asarray([100, 101, 200, 201, 300, 500, 501, 502, 700])
-        print(d1_id)
+        #print(d1_id)
 
         d1_jvf = np.asarray([ts1, ts1, ts1, ts1, ts1, ts1, ts1, ts1, ts1])
         d1_jvt = np.asarray([tsf, tsf, tsf, tsf, tsf, tsf, tsf, tsf, tsf])
