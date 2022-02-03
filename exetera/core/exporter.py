@@ -22,7 +22,9 @@ def schema_from_reader_type(reader):
 
 
 def export_to_csv(destination, datastore, fields):
-
+    """
+    Export selected fields of selected dataframe to csv file.
+    """
     expected_length = None
     for f in fields:
         if expected_length is None:
