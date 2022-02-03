@@ -1,14 +1,24 @@
 import csv
 import time
+from xmlrpc.client import boolean
 from numba import njit,jit
 import numpy as np
 from exetera.core import utils
 import time
 from collections import Counter
 from io import StringIO
+from typing import Union
 
 
-def get_file_stat(source, chunk_row_size):
+
+def get_file_stat(source: Union[str, StringIO], chunk_row_size: int):
+    """
+    Get statistics of the given file.
+    
+    :param source: source filename (str) or source data (StringIO)
+    :param chunk_row_size: read file chunk by chunk. Row sizes in each chunk is chunk_row_size.
+    :return: A tuple representing total byte size of source input, total columns, total rows of chunk, and total byte size of chunk irrespectively.
+    """
     total_byte_size, count_columns = 0, 0
 
     if isinstance(source,str):
@@ -34,7 +44,22 @@ def get_file_stat(source, chunk_row_size):
     return total_byte_size, count_columns, count_rows, chunk_byte_size
 
 
-def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, index_map, field_importer_list=None, stop_after_rows=None):
+def read_file_using_fast_csv_reader(source: Union[str, StringIO],
+                                    chunk_row_size:int,
+                                    column_offsets:np.ndarray,
+                                    index_map: np.ndarray,
+                                    field_importer_list: list = None,
+                                    stop_after_rows:int = None):
+    """
+    Parse csv file in the parsers.py
+
+    :param source: source filename (str) or source data (StringIO)
+    :param chunk_row_size: read file chunk by chunk. Row sizes in each chunk is chunk_row_size.
+    :param column_offsets: column offset for all fields from csv file.
+    :param index_map: list of indices. Each element is the index of to-be-used field in the original list of field from csv file.
+    :param field_importer_list: list of to-be-used field importers
+    :param stop_after_rows: stop read file after stop_after_rows rows.
+    """
     ESCAPE_VALUE = np.frombuffer(b'"', dtype='S1')[0][0]
     SEPARATOR_VALUE = np.frombuffer(b',', dtype='S1')[0][0]
     NEWLINE_VALUE = np.frombuffer(b'\n', dtype='S1')[0][0]
@@ -126,7 +151,31 @@ def read_file_using_fast_csv_reader(source, chunk_row_size, column_offsets, inde
 
 
 @njit
-def fast_csv_reader(source, start_index, column_inds, column_vals, column_offsets, hasHeader, escape_value, separator_value, newline_value, whitespace_value ):
+def fast_csv_reader(source: Union[str, StringIO],
+                    start_index: int,
+                    column_inds: np.ndarray,
+                    column_vals: np.ndarray,
+                    column_offsets: np.ndarray,
+                    hasHeader: boolean,
+                    escape_value: int,
+                    separator_value: int,
+                    newline_value: int,
+                    whitespace_value: int):
+    """
+    Read csv file in bytes and represent content with indices and byte arrays. Speed up using njit from numba.
+
+    :param source: source filename (str) or source data (StringIO)
+    :param start_index: start reading source from index of start_index
+    :param column_inds: store column indices
+    :param column_vals: store column values
+    :param column_offsets: column offsets
+    :param hasHeader: if current chunk is first chunk of file, as the first row in first chunk is list of filenames
+    :param escape_value: escape value in ASCII
+    :param separator_value: separator value in ASCII
+    :param newline_value: newline value in ASCII
+    :param whitespace_value: whitespace_value value in ASCII
+    """
+
     colcount = column_inds.shape[0]
     maxrowcount = np.int64(column_inds.shape[1] - 1)  # -1: minus the first element (0) in the row that created for prefix
     

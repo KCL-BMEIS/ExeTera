@@ -5,7 +5,7 @@ import numpy as np
 from datetime import datetime, timezone
 
 from exetera.core.abstract_types import DataFrame
-from exetera.core.field_importers import ImporterDefinition, TimestampImporter, IndexedStringImporter, INDEXED_STRING_FIELD_SIZE
+from exetera.io.field_importers import ImporterDefinition, TimestampImporter, IndexedStringImporter, INDEXED_STRING_FIELD_SIZE
 from exetera.core.csv_reader_speedup import read_file_using_fast_csv_reader
 from exetera.io import load_schema
 from exetera.core import operations as ops

@@ -103,6 +103,9 @@ class HDF5DataFrame(DataFrame):
 
     def drop(self,
              name: str):
+        """
+        Drop a field from this dataframe as well as the HDF5 Group
+        """
         del self._columns[name]
         del self._h5group[name]
 
@@ -285,12 +288,21 @@ class HDF5DataFrame(DataFrame):
             self.__delitem__(name)
 
     def keys(self):
+        """
+        Return all the field names
+        """
         return self._columns.keys()
 
     def values(self):
+        """
+        Return all the field values
+        """
         return self._columns.values()
 
     def items(self):
+        """
+        Return all the field names and their corresponding field values
+        """
         return self._columns.items()
 
     def __iter__(self):
