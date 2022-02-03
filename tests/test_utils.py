@@ -30,17 +30,17 @@ class TestUtils(unittest.TestCase):
         from io import StringIO
 
         src = ['A', '"B', 'C,D', 'E"F']
-        print(src)
+        #print(src)
         with StringIO() as s:
             csvw = csv.writer(s)
             csvw.writerow(src)
             result = s.getvalue()
-        print(result)
+        #print(result)
 
         with StringIO(result) as s:
             csvr = csv.reader(s)
             result = next(csvr)
-        print(result)
+        #print(result)
 
     def test_to_escaped(self):
         self.assertEqual(to_escaped(''), '')

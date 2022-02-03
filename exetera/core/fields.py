@@ -839,11 +839,24 @@ class CategoricalMemField(MemoryField):
         return keys
 
     def remap(self, key_map, new_key):
+        """
+        Remap the key names and key values.
+
+        :param key_map: The mapping rule of convert the old key into the new key.
+        :param new_key: The new key.
+        :return: A CategoricalMemField with the new key.
+        """
+        # make sure all key values are included in the key_map
+        for k in self._keys.values():
+            if k not in [x[0] for x in key_map]:
+                raise ValueError("Not all old key values are included in the mapping rule.")
+        # remap the value
         values = self.data[:]
+        new_values = np.zeros(len(values), values.dtype)
         for k in key_map:
-            values = np.where(values == k[0], k[1], values)
+            new_values = np.where(values == k[0], k[1], new_values)
         result = CategoricalMemField(self._session, self._nformat, new_key)
-        result.data.write(values)
+        result.data.write(new_values)
         return result
 
     def apply_filter(self, filter_to_apply, target=None, in_place=False):
@@ -1626,12 +1639,29 @@ class CategoricalField(HDF5Field):
         return keys
 
     def remap(self, key_map, new_key):
+        """
+        Remap the key names and key values.
+
+        :param key_map: The mapping rule of convert the old key into the new key.
+        :param new_key: The new key.
+        :return: A CategoricalMemField with the new key.
+        """
         self._ensure_valid()
+        # make sure all key values are included in the key_map
+        if isinstance(self._field['key_values'][0], str):  # convert into bytearray to keep up with linux
+            kv = [bytes(i, 'utf-8') for i in self._field['key_values']]
+        else:
+            kv = self._field['key_values']
+        for k in kv:
+            if k not in [x[0] for x in key_map]:
+                raise ValueError("Not all old key values are included in the mapping rule.")
+        #remap the value
         values = self.data[:]
+        new_values = np.zeros(len(values), values.dtype)
         for k in key_map:
-            values = np.where(values == k[0], k[1], values)
+            new_values = np.where(values == k[0], k[1], new_values)
         result = CategoricalMemField(self._session, self._nformat, new_key)
-        result.data.write(values)
+        result.data.write(new_values)
         return result
 
     def apply_filter(self, filter_to_apply, target=None, in_place=False):
