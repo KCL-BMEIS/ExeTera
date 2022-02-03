@@ -3,3 +3,4 @@ pandas
 h5py
 numba<0.54
 cython
+

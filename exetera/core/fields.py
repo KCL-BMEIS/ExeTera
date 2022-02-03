@@ -563,6 +563,7 @@ class IndexedStringMemField(MemoryField):
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of IndexedStringMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -647,6 +648,7 @@ class FixedStringMemField(MemoryField):
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of FixedStringMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -812,6 +814,7 @@ class NumericMemField(MemoryField):
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of NumericMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -941,6 +944,7 @@ class CategoricalMemField(MemoryField):
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of CategoricalMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1081,6 +1085,7 @@ class TimestampMemField(MemoryField):
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of TimestampMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1280,6 +1285,7 @@ class IndexedStringField(HDF5Field):
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of IndexedStringField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1380,6 +1386,7 @@ class FixedStringField(HDF5Field):
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of FixedStringField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1605,6 +1612,7 @@ class NumericField(HDF5Field):
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of NumericField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1772,6 +1780,7 @@ class CategoricalField(HDF5Field):
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of CategoricalField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1947,6 +1956,7 @@ class TimestampField(HDF5Field):
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
+        "Find the unique elements of TimestampField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
       
 
@@ -2511,14 +2521,7 @@ class FieldDataOps:
 
     @staticmethod
     def apply_unique(src: Field, return_index=False, return_inverse=False, return_counts=False) -> np.ndarray:
-        if src.indexed:               
-            if return_index:
-                raise ValueError("Argument `return_index` is not used currently")
-            if return_inverse:
-                raise ValueError("Argument `return_inverse` is not used currently")
-            if return_counts:
-                raise ValueError("Argument `return_counts` is not used currently")
-            result = ops.unique_indexed_string(src.indices[:], src.values[:])
-            return np.sort([x.tobytes().decode() for x in result])
+        if src.indexed:
+            return ops.unique_for_indexed_string(src.indices[:], src.values[:], return_index, return_inverse, return_counts) 
         else:
             return np.unique(src.data[:], return_index=return_index, return_inverse=return_inverse, return_counts=return_counts)
