@@ -1533,7 +1533,7 @@ class TestFieldIsIn(unittest.TestCase):
             self.assertEqual(df['foo'].isin(['a','bb']), [True, True, False])
             self.assertEqual(df['foo'].isin(['a','ccc']), [True, False, True])
             self.assertEqual(df['foo'].isin(['a','ccc','bb']), [True, True, True])
-            self.assertEqual(df['foo'].isin(['a','cc','dd']), [True, False,False])
+            self.assertEqual(df['foo'].isin(['a','dd','cc']), [True, False,False])
 
 
     def test_isin_on_fixed_string_field(self):
@@ -1555,5 +1555,4 @@ class TestFieldIsIn(unittest.TestCase):
             ts2 = datetime(2022, 1, 1).timestamp()
             ts3 = datetime(2022, 2, 1).timestamp()
             df.create_timestamp('ts').data.write([ts2, ts3, ts1])
-
-            self.assertEqual(df['ts'].isin({ts1, ts2}).tolist(), [True, False, True])
+            self.assertEqual(df['ts'].isin({ts1, ts2}), [True, False, True])

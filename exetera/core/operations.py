@@ -2,7 +2,8 @@ from datetime import datetime
 from typing import Optional, Union
 
 import numpy as np
-from numba import jit, njit
+import math
+from numba import njit
 import numba
 import numba.typed as nt
 import numba.core.types as nct
@@ -3006,14 +3007,69 @@ def indexed_string_unique(indices, values, unique_result, unique_index, unique_i
                 unique_counts.append(1)
 
 
+def isin_for_indexed_string_field(test_elements, indices, values):
+    if isinstance(test_elements, set):
+        test_elements = list(test_elements)
+
+    # sort first
+    test_elements = np.sort(test_elements)
+    # convert string to an array of ascii code
+    test_elements = nt.List([np.frombuffer(x.encode(), dtype=np.uint8) for x in test_elements])
+    return isin_indexed_string_speedup(test_elements, indices, values)
+
+
 @njit
 def isin_indexed_string_speedup(test_elements, indices, values):
     result = [False] * (len(indices) - 1)
+    len_test_eles = len(test_elements)
     for i in range(len(indices)-1):
         v = values[indices[i] : indices[i+1]]
         is_equal = False
-        for test_value in test_elements:
-            if np.array_equal(v, test_value):
+
+        # for each v, binary search the test_elements
+        start, end = 0, len_test_eles - 1
+        while start <= end:
+            mid = (start + end) // 2
+            compare_res = compare_arrays(v, test_elements[mid])
+            if compare_res == 0:
+                is_equal = True
+                break
+            if compare_res == 1: # v > test_elements[mid]
+                start = mid + 1
+            else:
+                end = mid - 1
+
+        result[i] = is_equal
+    return result
+
+@njit
+def compare_arrays(a, b):
+    """
+    a and b are typically views into the larger arrays
+    compare_arrays(source[s1: s2], target[t1: t2])
+    """
+    for i in range(min(a.size, b.size)):
+        if a[i] < b[i]:
+            return -1
+        if a[i] > b[i]:
+            return 1
+
+    if a.size < b.size:
+        return -1
+    if b.size < a.size:
+        return 1
+    return 0
+
+
+def isin_for_timestamp_field(data, test_elements):
+    """
+    Timestamp field has large numbers. Two large numbers need to use math.isclose to check if they're equal.
+    """
+    result = [False] * len(data)
+    for i, d in enumerate(data):
+        is_equal = False
+        for t in test_elements:
+            if math.isclose(d, t):
                 is_equal = True
                 break
         result[i] = is_equal

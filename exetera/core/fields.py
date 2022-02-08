@@ -15,8 +15,6 @@ import operator
 
 import numpy as np
 import h5py
-from numba import njit, jit
-import numba.typed as nt
 
 from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
@@ -2509,14 +2507,12 @@ class FieldDataOps:
 
 
     @staticmethod
-    def apply_isin(source: Field, test_elements:Union[list, set, np.ndarray]):
-        if isinstance(test_elements, set):
-            test_elements = list(test_elements)
-
+    def apply_isin(source: Field, test_elements: Union[list, set, np.ndarray]):
         if source.indexed:
-            test_elements = nt.List([np.frombuffer(x.encode(), dtype=np.uint8) for x in test_elements])
-            return ops.isin_indexed_string_speedup(test_elements, source.indices[:], source.values[:])
-        else: 
+            return ops.isin_for_indexed_string_field(test_elements, source.indices[:], source.values[:])
+        elif isinstance(source, TimestampField):
+            return ops.isin_for_timestamp_field(source.data[:], test_elements)
+        else:
             return np.isin(source.data[:], test_elements)
 
     @staticmethod
