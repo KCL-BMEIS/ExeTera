@@ -28,7 +28,7 @@ setup(
     author='Ben Murray',
     author_email='benjamin.murray@kcl.ac.uk',
     license='http://www.apache.org/licenses/LICENSE-2.0',
-    packages=['exetera', 'exetera.core', 'exetera.processing'],
+    packages=['exetera', 'exetera.core', 'exetera.processing', 'exetera.io'],
     scripts=['exetera/bin/exetera'],
     ext_modules = cythonize(pyx_full_path),
     python_requires='>=3.7',
