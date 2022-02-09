@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 from pkg_resources import parse_requirements
 from Cython.Build import cythonize
 
@@ -28,7 +28,7 @@ setup(
     author='Ben Murray',
     author_email='benjamin.murray@kcl.ac.uk',
     license='http://www.apache.org/licenses/LICENSE-2.0',
-    packages=['exetera', 'exetera.core', 'exetera.processing'],
+    packages=find_packages(),
     scripts=['exetera/bin/exetera'],
     ext_modules = cythonize(pyx_full_path),
     python_requires='>=3.7',
