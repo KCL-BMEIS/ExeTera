@@ -2,9 +2,10 @@ from io import StringIO
 import json
 from typing import Union
 
-from exetera.core.field_importers import Categorical, Numeric, String, DateTime, Date
+from exetera.io.field_importers import Categorical, Numeric, String, DateTime, Date
 from exetera.core import validation as val
 from exetera.core import utils
+from exetera.core.utils import PERMITTED_NUMERIC_TYPES
 
 
 def load_schema(source: Union[str, StringIO], verbosity=0):
@@ -50,8 +51,6 @@ def load_schema_file(source: Union[str, StringIO], verbosity=0):
 
 
 def schema_file_to_dict(schema):
-    permitted_numeric_types = ('float32', 'float64', 'bool', 'int8', 'uint8', 
-                               'int16', 'uint16', 'int32', 'uint32', 'int64')
 
     fields = schema.get('fields', None)
 
@@ -87,9 +86,9 @@ def schema_file_to_dict(schema):
             val.validate_require_key(fk, 'value_type', fv)
             value_type = fv['value_type']
 
-            if value_type not in permitted_numeric_types:
+            if value_type not in PERMITTED_NUMERIC_TYPES:
                 msg = "Field {} has an invalid value_type '{}'. Permitted types are {}"
-                raise ValueError(msg.format(fk, value_type, permitted_numeric_types))
+                raise ValueError(msg.format(fk, value_type, PERMITTED_NUMERIC_TYPES))
         
             # default value for invalid numeric value
             invalid_value = 0

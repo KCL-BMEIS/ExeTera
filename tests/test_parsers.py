@@ -5,7 +5,7 @@ from io import BytesIO, StringIO
 import numpy as np
 from datetime import datetime, timezone
 
-from exetera.core.field_importers import Categorical, Numeric, String, DateTime, Date
+from exetera.io.field_importers import Categorical, Numeric, String, DateTime, Date
 from exetera.core import utils, session, operations as ops
 from exetera.io import parsers
 from .test_importer import TEST_SCHEMA, TEST_CSV_CONTENTS

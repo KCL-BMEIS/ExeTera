@@ -4,11 +4,13 @@ from typing import Optional, Union
 import numpy as np
 from numba import jit, njit
 import numba
-from numba.typed import List
+import numba.typed as nt
+import numba.core.types as nct
 
 from exetera.core import validation as val
 from exetera.core.abstract_types import Field
-from exetera.core import fields, utils
+from exetera.core import fields
+from exetera.core import utils
 
 DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62
@@ -2480,8 +2482,8 @@ def streaming_sort_merge(src_index_f, src_value_f, tgt_index_f, tgt_value_f,
     # the (chunk_local) length for each segment
     in_chunk_lengths = np.zeros(segment_count, dtype=np.int64)
 
-    src_value_chunks = List()
-    src_index_chunks = List()
+    src_value_chunks = nt.List()
+    src_index_chunks = nt.List()
 
     # get the first chunk for each segment
     for i in range(segment_count):
@@ -2527,8 +2529,8 @@ def streaming_sort_merge(src_index_f, src_value_f, tgt_index_f, tgt_value_f,
             chunk_indices = chunk_indices[chunk_filter]
             in_chunk_indices = in_chunk_indices[chunk_filter]
             in_chunk_lengths = in_chunk_lengths[chunk_filter]
-            filtered_value_chunks = List()
-            filtered_index_chunks = List()
+            filtered_value_chunks = nt.List()
+            filtered_index_chunks = nt.List()
             for i in range(len(src_value_chunks)):
                 if chunk_filter[i]:
                     filtered_value_chunks.append(src_value_chunks[i])
@@ -2613,7 +2615,7 @@ def get_byte_map(string_map):
 @njit           
 def categorical_transform(chunk, i_c, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values):
     """
-    Tranform method for categorical importer in readerwriter.py
+    Transform method for categorical importer in readerwriter.py
     """   
     col_offset = column_offsets[i_c]
 
@@ -2644,7 +2646,7 @@ def categorical_transform(chunk, i_c, column_inds, column_vals, column_offsets, 
 @njit           
 def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values):
     """
-    Tranform method for categorical importer in readerwriter.py
+    Transform method for categorical importer in readerwriter.py
     """   
     col_offset = column_offsets[i_c] 
 
@@ -2793,7 +2795,9 @@ def raiseNumericException(exception_message, exception_args):
 
 def transform_int(column_inds, column_vals, column_offsets, col_idx,
                     written_row_count, invalid_value, validation_mode, data_type, field_name):
-
+    """
+    Transform int method for numeric importer in field_importer.py
+    """
     widths = column_inds[col_idx, 1:written_row_count + 1] - column_inds[col_idx, :written_row_count]
     width = widths.max()
     elements = np.zeros(written_row_count, 'S{}'.format(width))
@@ -2836,7 +2840,9 @@ def transform_int(column_inds, column_vals, column_offsets, col_idx,
 
 def transform_float(column_inds, column_vals, column_offsets, col_idx,
                       written_row_count, invalid_value, validation_mode, data_type, field_name):
-
+    """
+    Transform float method for numeric importer in field_importer.py
+    """
     widths = column_inds[col_idx, 1:written_row_count + 1] - column_inds[col_idx, :written_row_count]
     width = widths.max()
     elements = np.zeros(written_row_count, 'S{}'.format(width))
@@ -2894,6 +2900,9 @@ def transform_to_values(column_inds, column_vals, column_offsets, col_idx, writt
 @njit
 def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, written_row_count,
                            strlen, memory):
+    """
+    Transform method for fixed string importer in field_importer.py
+    """
     col_offset = column_offsets[col_idx]
     for i in range(written_row_count):
         a = i * strlen
@@ -2902,3 +2911,97 @@ def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, wr
         for c in range(start_idx, end_idx):
             memory[a] = column_vals[c]
             a += 1
+
+
+
+def unique_for_indexed_string(indices, values, return_index, return_inverse, return_counts):
+    """
+    Find the unique elements for indexed string field.
+    """
+    # type-expression is not supported in jit functions.
+    unique_result = nt.List.empty_list(item_type=nct.uint8[:])
+    unique_index, unique_inverse, unique_counts = None, None, None
+    if return_counts:
+        unique_counts = nt.List.empty_list(item_type=nct.int64)
+
+    if return_index:
+        unique_index = nt.List.empty_list(item_type=nct.int64)
+
+    if return_inverse:
+        unique_inverse = nt.List.empty_list(item_type=nct.int64)
+
+    indexed_string_unique(indices, values, unique_result, unique_index, unique_inverse, unique_counts)
+
+    sorted_unique_result = np.sort([x.tobytes().decode() for x in unique_result])
+
+    if np.any([return_index, return_inverse, return_counts]) == False:
+        return sorted_unique_result
+
+    combined_result = [sorted_unique_result]
+    indices_sort = np.argsort([x.tobytes().decode() for x in unique_result])
+    
+    if return_index:
+        combined_result.append(np.array(unique_index)[indices_sort])
+    if return_inverse:
+        unique_inverse = np.array(unique_inverse)
+        for i in range(0, len(unique_inverse)):
+            unique_inverse[i] = indices_sort[unique_inverse[i]]
+        combined_result.append(unique_inverse)
+    if return_counts:
+        combined_result.append(np.array(unique_counts)[indices_sort])
+
+    return combined_result
+     
+
+@njit
+def indexed_string_unique(indices, values, unique_result, unique_index, unique_inverse, unique_counts):
+    """
+    Find the unique elements for indexed string field using njit function.
+    """
+    lengths_seen = {-1} # initiate length with type given (int)
+
+    for i in range(0, len(indices)-1):
+        length = indices[i+1] - indices[i]
+        v = values[indices[i]:indices[i+1]]
+
+        # If we have not seen length of value, we can add it directly
+        if length not in lengths_seen:
+            lengths_seen.add(length)
+            unique_result.append(v)
+            if unique_index is not None:
+                unique_index.append(i)
+
+            if unique_inverse is not None:
+                unique_inverse.append(i)
+
+            if unique_counts is not None:
+                unique_counts.append(1)
+
+            continue
+
+        # If we have seen same length before, then compare to existing unique values
+        # Can probably be further optimized by only comparing to those with same length
+        is_unique = True
+        for j, unique_v in enumerate(unique_result):
+            if np.array_equal(v, unique_v):
+                is_unique = False
+
+                if unique_inverse is not None:
+                    unique_inverse.append(j)
+
+                if unique_counts is not None:
+                    unique_counts[j] += 1
+                
+                break
+
+        if is_unique:
+            unique_result.append(v)
+
+            if unique_index is not None:
+                unique_index.append(i)
+
+            if unique_inverse is not None:
+                unique_inverse.append(i)
+
+            if unique_counts is not None:
+                unique_counts.append(1)

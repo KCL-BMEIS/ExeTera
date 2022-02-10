@@ -30,17 +30,17 @@ class TestUtils(unittest.TestCase):
         from io import StringIO
 
         src = ['A', '"B', 'C,D', 'E"F']
-        print(src)
+        #print(src)
         with StringIO() as s:
             csvw = csv.writer(s)
             csvw.writerow(src)
             result = s.getvalue()
-        print(result)
+        #print(result)
 
         with StringIO(result) as s:
             csvr = csv.reader(s)
             result = next(csvr)
-        print(result)
+        #print(result)
 
     def test_to_escaped(self):
         self.assertEqual(to_escaped(''), '')
@@ -83,8 +83,8 @@ class TestUtils(unittest.TestCase):
 
 
     def test_get_min_max_for_permitted_types(self):
-        permitted_numeric_types = ('float32', 'float64', 'int8', 'uint8', 'int16', 'uint16', 
-                                    'int32', 'uint32', 'int64')
+        permitted_numeric_types_without_bool = ('float32', 'float64', 'int8', 'uint8', 'int16', 'uint16', 
+                                                'int32', 'uint32', 'int64')
         expected_min_max_values = {
             'float32': (-2147483648, 2147483647),
             'float64': (-9223372036854775808, 9223372036854775807),
@@ -96,7 +96,7 @@ class TestUtils(unittest.TestCase):
             'uint32': (0, 4294967295),
             'int64': (-9223372036854775808, 9223372036854775807)
         }
-        for value_type in permitted_numeric_types:
+        for value_type in permitted_numeric_types_without_bool:
             (min_value, max_value) = get_min_max(value_type)
             self.assertEqual(min_value, expected_min_max_values[value_type][0])
             self.assertEqual(max_value, expected_min_max_values[value_type][1])

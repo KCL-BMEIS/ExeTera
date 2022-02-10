@@ -103,6 +103,9 @@ class HDF5DataFrame(DataFrame):
 
     def drop(self,
              name: str):
+        """
+        Drop a field from this dataframe as well as the HDF5 Group
+        """
         del self._columns[name]
         del self._h5group[name]
 
@@ -285,12 +288,21 @@ class HDF5DataFrame(DataFrame):
             self.__delitem__(name)
 
     def keys(self):
+        """
+        Return all the field names
+        """
         return self._columns.keys()
 
     def values(self):
+        """
+        Return all the field values
+        """
         return self._columns.values()
 
     def items(self):
+        """
+        Return all the field names and their corresponding field values
+        """
         return self._columns.items()
 
     def __iter__(self):
@@ -404,16 +416,18 @@ class HDF5DataFrame(DataFrame):
         :param ddf: optional- the destination data frame
         :returns: a dataframe contains all the fields filterd, self if ddf is not set
         """
+        filter_to_apply_ = val.validate_filter(filter_to_apply)
+
         if ddf is not None:
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self._columns.items():
                 newfld = field.create_like(ddf, name)
-                field.apply_filter(filter_to_apply, target=newfld)
+                field.apply_filter(filter_to_apply_, target=newfld)
             return ddf
         else:
             for field in self._columns.values():
-                field.apply_filter(filter_to_apply, in_place=True)
+                field.apply_filter(filter_to_apply_, in_place=True)
             return self
 
     def apply_index(self, index_to_apply, ddf=None):
@@ -565,12 +579,13 @@ class HDF5DataFrame(DataFrame):
         
         return HDF5DataFrameGroupBy(self._columns, by, sorted_index, spans)
 
-    def describe(self, include=None, exclude=None):
+    def describe(self, include=None, exclude=None, output='terminal'):
         """
         Show the basic statistics of the data in each field.
 
         :param include: The field name or data type or simply 'all' to indicate the fields included in the calculation.
         :param exclude: The filed name or data type to exclude in the calculation.
+        :param output: Display the result in stdout if set to terminal, otherwise silent.
         :return: A dataframe contains the statistic results.
 
         """
@@ -716,15 +731,15 @@ class HDF5DataFrame(DataFrame):
         # display
         columns_to_show = ['fields', 'count', 'unique', 'top', 'freq', 'mean', 'std', 'min', '25%', '50%', '75%', 'max']
         # 5 fields each time for display
-        for col in range(0, len(result['fields']), 5):  # 5 column each time
-            for i in columns_to_show:
-                if i in result:
-                    print(i, end='\t')
-                    for f in result[i][col:col + 5 if col + 5 < len(result[i]) - 1 else len(result[i])]:
-                        print('{:>15}'.format(f), end='\t')
-                    print('')
-            print('\n')
-
+        if output == 'terminal':
+            for col in range(0, len(result['fields']), 5):  # 5 column each time
+                for i in columns_to_show:
+                    if i in result:
+                        print(i, end='\t')
+                        for f in result[i][col:col + 5 if col + 5 < len(result[i]) - 1 else len(result[i])]:
+                            print('{:>15}'.format(f), end='\t')
+                        print('')
+                print('\n')
         return result
 
 
@@ -750,9 +765,9 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
                 
                 if self._sorted_index is not None:                    
                     field.apply_index(self._sorted_index, target=newfld)                  
-                    newfld.apply_filter(self._spans[:-1], in_place=True)
+                    newfld.apply_index(self._spans[:-1], in_place=True)
                 else:
-                    field.apply_filter(self._spans[:-1], target=newfld)
+                    field.apply_index(self._spans[:-1], target=newfld)
 
     
     def count(self, ddf: DataFrame, write_keys=True) -> DataFrame:

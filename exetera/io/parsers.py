@@ -5,10 +5,11 @@ import numpy as np
 from datetime import datetime, timezone
 
 from exetera.core.abstract_types import DataFrame
-from exetera.core.field_importers import ImporterDefinition, TimestampImporter, IndexedStringImporter, INDEXED_STRING_FIELD_SIZE
+from exetera.io.field_importers import ImporterDefinition, TimestampImporter, IndexedStringImporter, INDEXED_STRING_FIELD_SIZE
 from exetera.core.csv_reader_speedup import read_file_using_fast_csv_reader
 from exetera.io import load_schema
 from exetera.core import operations as ops
+from exetera.core.utils import guess_encoding
 
 
 def read_csv(csv_file: str, 
@@ -90,7 +91,9 @@ def read_csv_with_schema_dict(csv_file: str,
     # get field_mapping
     field_mapping = {k.strip(): v for k, v in schema_dictionary.items()}
 
-    with open(csv_file, encoding='utf-8') as sf:
+    encoding = guess_encoding(csv_file)
+    
+    with open(csv_file, encoding=encoding) as sf:
         csvf = csv.DictReader(sf, delimiter=',', quotechar='"')
         csvf_fieldnames = [k.strip() for k in csvf.fieldnames]
 
