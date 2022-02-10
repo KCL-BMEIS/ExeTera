@@ -9,7 +9,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Dict, Optional, Union
 import os
+import io
 from datetime import datetime, MAXYEAR
 from itertools import accumulate
 from io import StringIO
@@ -19,15 +21,56 @@ from exetera.io import load_schema, parsers
 from exetera.core import utils
 
 
-def import_with_schema(session, timestamp, dataset_name, schema_file, files, overwrite, include=None, exclude=None, chunk_row_size = 1 << 20):
+# options:
+# . close the dataset once the data is imported
+# . provide a field for the dataset name as an optional parameter
+# . use dataset_name if it is a string, or 'importN' where N is the lowest
+#   number that doesn't clash with an existing open dataset on the session
+
+def import_with_schema(session: 'Session',
+                       dataset_filename: Union[str, io.BytesIO],
+                       dataset_alias: str,
+                       schema_file: Union[str, io.BytesIO, io.StringIO],
+                       files: Union[str, dict],
+                       overwrite: bool,
+                       include: Optional[Dict] = None,
+                       exclude: Optional[Dict] = None,
+                       timestamp: Union[str, datetime] = None,
+                       chunk_row_size: int = 1 << 20):
+    """
+    Imports the source data described by 'files' into a dataset specified by 'dataset_name',
+    with the session alias 'dataset_alias'. The source data described by 'files' must conform to
+    the schema specified in 'schema_file'.
+
+    If 'dataset_name' refers to an existing dataset, an error will be raised unless 'overwrite' is
+    set to True, otherwise, 'overwrite' doesn't do anything.
+
+    :param session: The exetera Session object used to hold the resulting open dataset
+    :param dataset_filename: A relative or absolute path and name for the dataset. If this refers
+    to an existing file, and the caller has not specified 'overwrite' to be True, an error will be
+    raised. Otherwise, a dataset will be created at this location. This can also be a BytesIO
+    object, primarily for testing purposes.
+    :param dataset_alias: An alias for the dataset in the session. This is required so that the
+    dataset can be easily retrieved from the session subsequently.
+    :param schema_file: The path / name of an exetera schema file that describes the data in the
+    data sources specified by 'files'.
+    :param include: An optional parameter that specifies fields to be included from the data
+    sources. Only one of 'include' or 'exclude' may be used for each data source.
+    :param exclude: An optional parameter that specifies fields to be excluded from the data
+    soures. Only one of 'include' or 'exclude' may be used for each data source.
+    :param timestamp: An optional parameter the specifies an official timestamp for the dataset.
+    If this is not set, a timestamp will be generated using at the moment this method is called.
+    :param chunk_row_size: An optional parameter that tweaks the import performance. Larger values
+    use more memory but improve import speed. Typically this should be left at its default value.
+    """
  
     schema = load_schema.load_schema(schema_file)
 
     mode = 'w' if overwrite else 'r+'
-    if isinstance(dataset_name, str) and not os.path.exists(dataset_name):
+    if isinstance(dataset_filename, str) and not os.path.exists(dataset_filename):
         mode = 'w'
 
-    ds = session.open_dataset(dataset_name, mode, 'dest')
+    ds = session.open_dataset(dataset_filename, mode, dataset_alias)
 
     any_parts_present = False
     for sk in schema.keys():
@@ -67,7 +110,3 @@ def import_with_schema(session, timestamp, dataset_name, schema_file, files, ove
         ddf = ds.require_dataframe(sk)
 
         parsers.read_csv_with_schema_dict(csv_file, ddf, schema_dict, ts, include_fields, exclude_fields, chunk_row_size=chunk_row_size)
-
-
-
- 
