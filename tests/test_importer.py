@@ -123,7 +123,16 @@ class TestImporter(unittest.TestCase):
 
         bio = BytesIO()
         with session.Session() as s:
-            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, include, exclude, chunk_row_size=self.chunk_row_size)
+            importer.import_with_schema(s,
+                                        bio,
+                                        self.ds_name,
+                                        self.schema,
+                                        self.files,
+                                        False,
+                                        include,
+                                        exclude,
+                                        self.ts,
+                                        chunk_row_size=self.chunk_row_size)
 
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
@@ -136,15 +145,26 @@ class TestImporter(unittest.TestCase):
             self.assertEqual(hf['schema_key']['id']['values'][:].tolist(), [1,2,3,4,5])
             self.assertEqual(hf['schema_key']['name']['index'][:].tolist(), [0,1,3,6,10,15])
 
-
     def test_importer_with_wrong_arg_include(self):
         bio = BytesIO()
         include, exclude = {'schema_wrong_key': ['id', 'name']}, {}
 
+        s = session.Session()
         with self.assertRaises(Exception) as context:
-            importer.import_with_schema(None, self.ts, self.ds_name, bio, self.schema, self.files, False, include, exclude, chunk_row_size=self.chunk_row_size)
-        
-        self.assertEqual(str(context.exception), "-n/--include: the following include table(s) are not part of any input files: {'schema_wrong_key'}")
+            importer.import_with_schema(s,
+                                        bio,
+                                        self.ds_name,
+                                        self.schema,
+                                        self.files,
+                                        False,
+                                        include,
+                                        exclude,
+                                        self.ts,
+                                        chunk_row_size=self.chunk_row_size)
+
+        self.assertEqual(str(context.exception),
+                         "-n/--include: the following include table(s) are not part of "
+                         "any input files: {'schema_wrong_key'}")
                     
 
     def test_importer_with_arg_exclude(self):
@@ -152,7 +172,16 @@ class TestImporter(unittest.TestCase):
         include, exclude = {}, {'schema_key':['updated_at']}
 
         with session.Session() as s:
-            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, include, exclude, chunk_row_size=self.chunk_row_size)
+            importer.import_with_schema(s,
+                                        bio,
+                                        self.ds_name,
+                                        self.schema,
+                                        self.files,
+                                        False,
+                                        include,
+                                        exclude,
+                                        self.ts,
+                                        chunk_row_size=self.chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
             self.assertTrue('updated_at' not in df)
@@ -166,7 +195,16 @@ class TestImporter(unittest.TestCase):
 
         bio = BytesIO()
         with session.Session() as s:
-            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+            importer.import_with_schema(s,
+                                        bio,
+                                        self.ds_name,
+                                        self.schema,
+                                        self.files,
+                                        False,
+                                        {},
+                                        {},
+                                        self.ts,
+                                        chunk_row_size=self.chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
             self.assertEqual(df['birthday'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() for x in expected_birthday_date])
@@ -181,14 +219,23 @@ class TestImporter(unittest.TestCase):
 
         bio = BytesIO()
         with session.Session() as s:
-            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+            importer.import_with_schema(s,
+                                        bio,
+                                        self.ds_name,
+                                        self.schema,
+                                        self.files,
+                                        False,
+                                        {},
+                                        {},
+                                        self.ts,
+                                        chunk_row_size=self.chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
             self.assertEqual(df['updated_at'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp() for x in expected_updated_at_list])
             self.assertEqual(df['updated_at_day'].data[:].tolist(), expected_updated_at_date_list )
 
         with h5py.File(bio, 'r') as hf:
-            print(hf['schema_key']['updated_at']['values'][:])              
+            print(hf['schema_key']['updated_at']['values'][:])
             self.assertAlmostEqual(hf['schema_key']['updated_at']['values'][:].tolist(), [datetime.strptime(x, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp() for x in expected_updated_at_list])
             self.assertEqual(hf['schema_key']['updated_at_day']['values'][:].tolist(), expected_updated_at_date_list)
 
@@ -203,7 +250,16 @@ class TestImporter(unittest.TestCase):
 
         bio = BytesIO()
         with session.Session() as s:
-            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+            importer.import_with_schema(s,
+                                        bio,
+                                        self.ds_name,
+                                        self.schema,
+                                        self.files,
+                                        False,
+                                        {},
+                                        {},
+                                        self.ts,
+                                        chunk_row_size=self.chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
             self.assertEqual(df['age'].data[:].tolist(), expected_age_list)
@@ -232,13 +288,22 @@ class TestImporter(unittest.TestCase):
         bio = BytesIO()
         with self.assertRaises(ValueError) as context:
             with session.Session() as s:
-                importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+                importer.import_with_schema(s,
+                                            bio,
+                                            self.ds_name,
+                                            self.schema,
+                                            files,
+                                            False,
+                                            {},
+                                            {},
+                                            self.ts,
+                                            chunk_row_size=self.chunk_row_size)
 
         self.assertEqual(str(context.exception), "Field 'id' contains values that cannot be converted to float in 'strict' mode")
         
         os.close(fd_csv)
 
-        
+
     def test_numeric_importer_with_non_numeric_value_in_strict_mode(self):
         TEST_CSV_CONTENTS_EMPTY_VALUE = '\n'.join((
             'name, id',
@@ -255,7 +320,16 @@ class TestImporter(unittest.TestCase):
         bio = BytesIO()
         with self.assertRaises(ValueError) as context:
             with session.Session() as s:
-                importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+                importer.import_with_schema(s,
+                                            bio,
+                                            self.ds_name,
+                                            self.schema,
+                                            files,
+                                            False,
+                                            {},
+                                            {},
+                                            self.ts,
+                                            chunk_row_size=self.chunk_row_size)
 
         self.assertEqual(str(context.exception), "Field 'id' contains values that cannot be converted to float in 'strict' mode")
 
@@ -265,7 +339,16 @@ class TestImporter(unittest.TestCase):
     def test_numeric_importer_with_non_empty_valid_value_in_strict_mode(self):
         bio = BytesIO()
         with session.Session() as s:
-            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+            importer.import_with_schema(s,
+                                        bio,
+                                        self.ds_name,
+                                        self.schema,
+                                        self.files,
+                                        False,
+                                        {},
+                                        {},
+                                        self.ts,
+                                        chunk_row_size=self.chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
             self.assertEqual(df['id'].data[:].tolist(), [1,2,3,4,5])
@@ -279,7 +362,16 @@ class TestImporter(unittest.TestCase):
     def test_numeric_importer_in_allow_empty_mode(self):
         bio = BytesIO()
         with session.Session() as s:
-            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, {}, {}, chunk_row_size=self.chunk_row_size)
+            importer.import_with_schema(s,
+                                        bio,
+                                        self.ds_name,
+                                        self.schema,
+                                        self.files,
+                                        False,
+                                        {},
+                                        {},
+                                        self.ts,
+                                        chunk_row_size=self.chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
             self.assertEqual(df['age_valid'].data[:].tolist(),  [True, True, True, True, True])
@@ -296,7 +388,16 @@ class TestImporter(unittest.TestCase):
 
         bio = BytesIO()
         with session.Session() as s:
-            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, None, None, chunk_row_size=self.chunk_row_size)
+            importer.import_with_schema(s,
+                                        bio,
+                                        self.ds_name,
+                                        self.schema,
+                                        self.files,
+                                        False,
+                                        None,
+                                        None,
+                                        self.ts,
+                                        chunk_row_size=self.chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
             self.assertEqual(df['height'].data[:].tolist(), expected_height_list)
@@ -317,7 +418,16 @@ class TestImporter(unittest.TestCase):
 
         bio = BytesIO()
         with session.Session() as s:
-            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, None, None, chunk_row_size=chunk_row_size)
+            importer.import_with_schema(s,
+                                        bio,
+                                        self.ds_name,
+                                        self.schema,
+                                        self.files,
+                                        False,
+                                        None,
+                                        None,
+                                        self.ts,
+                                        chunk_row_size=chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
             self.assertEqual(df['name'].data[:], ['a','bb','ccc','dddd','eeeee'])
@@ -340,7 +450,16 @@ class TestImporter(unittest.TestCase):
         
         bio = BytesIO()
         with session.Session() as s:
-            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, None, None, chunk_row_size=chunk_row_size)
+            importer.import_with_schema(s,
+                                        bio,
+                                        self.ds_name,
+                                        self.schema,
+                                        self.files,
+                                        True,
+                                        None,
+                                        None,
+                                        self.ts,
+                                        chunk_row_size=chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
             self.assertEqual(df['postcode'].data[:].tolist(), expected_postcode_value_list)
@@ -357,7 +476,16 @@ class TestImporter(unittest.TestCase):
 
         bio = BytesIO()
         with session.Session() as s:
-            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, None, None, chunk_row_size=self.chunk_row_size)
+            importer.import_with_schema(s,
+                                        bio,
+                                        self.ds_name,
+                                        self.schema,
+                                        self.files,
+                                        False,
+                                        None,
+                                        None,
+                                        self.ts,
+                                        chunk_row_size=self.chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
             self.assertEqual(df['patient_id'].data[:].tolist(), expected_patient_id_value_list)            
@@ -373,7 +501,16 @@ class TestImporter(unittest.TestCase):
 
         bio = BytesIO()
         with session.Session() as s:
-            importer.import_with_schema(s, self.ts, self.ds_name, bio, self.schema, self.files, False, None, None, chunk_row_size=self.chunk_row_size)
+            importer.import_with_schema(s,
+                                        bio,
+                                        self.ds_name,
+                                        self.schema,
+                                        self.files,
+                                        False,
+                                        None,
+                                        None,
+                                        self.ts,
+                                        chunk_row_size=self.chunk_row_size)
             ds = s.get_dataset(self.ds_name)
             df = ds.get_dataframe('schema_key')
             self.assertEqual(df['degree'].data[:].tolist(), expected_degree_value_list)
@@ -388,4 +525,3 @@ class TestImporter(unittest.TestCase):
 
     def tearDown(self):
         os.close(self.fd_csv)
-
