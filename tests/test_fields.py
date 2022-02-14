@@ -1330,7 +1330,7 @@ class TestFieldCreateLikeWithGroups(unittest.TestCase):
 class TestFieldWhereFunc(unittest.TestCase):
 
     def test_module_where_numeric(self):
-        input_data = [1,2,3,4]
+        input_data = [1,2,3,5,9,8,6,4,7,0]
         data = np.asarray(input_data, dtype=np.int32)
         bio = BytesIO()
         with session.Session() as s:
@@ -1339,11 +1339,11 @@ class TestFieldWhereFunc(unittest.TestCase):
             f = df.create_numeric('foo', 'int32')
             f.data.write(data)
 
-            r = fields.where(f > 2, 1, 0)
-            self.assertEqual(r.tolist(), [0,0,1,1])
+            r = fields.where(f > 5, 1, 0)
+            self.assertEqual(r.tolist(), [0,0,0,0,1,1,1,0,1,0])
 
     def test_instance_where_numeric(self):
-        input_data = [1,2,3,4]
+        input_data = [1,2,3,5,9,8,6,4,7,0]
         data = np.asarray(input_data, dtype=np.int32)
         bio = BytesIO()
         with session.Session() as s:
@@ -1351,11 +1351,11 @@ class TestFieldWhereFunc(unittest.TestCase):
             df = src.create_dataframe('df')
             f = df.create_numeric('foo', 'int32')
             f.data.write(data)
-            r = f.where(f > 2, 0)
-            self.assertEqual(r.tolist(), [0,0,3,4])
+            r = f.where(f > 5, 0)
+            self.assertEqual(r.tolist(), [0,0,0,0,9,8,6,0,7,0])
 
     def test_instance_where_numeric_inplace(self):
-        input_data = [1,2,3,4]
+        input_data = [1,2,3,5,9,8,6,4,7,0]
         data = np.asarray(input_data, dtype=np.int32)
         bio = BytesIO()
         with session.Session() as s:
@@ -1364,13 +1364,13 @@ class TestFieldWhereFunc(unittest.TestCase):
             f = df.create_numeric('foo', 'int32')
             f.data.write(data)
 
-            r = f.where(f > 2, 0)
-            self.assertEqual(list(f.data[:]), [1,2,3,4])
-            r = f.where(f > 2, 0, inplace=True)
-            self.assertEqual(list(f.data[:]), [0,0,3,4])
+            r = f.where(f > 5, 0)
+            self.assertEqual(list(f.data[:]), [1,2,3,5,9,8,6,4,7,0])
+            r = f.where(f > 5, 0, inplace=True)
+            self.assertEqual(list(f.data[:]), [0,0,0,0,9,8,6,0,7,0])
 
     def test_instance_where_with_callable(self):
-        input_data = [10,20,30,40]
+        input_data = [1,2,3,5,9,8,6,4,7,0]
         data = np.asarray(input_data, dtype=np.int32)
         bio = BytesIO()
         with session.Session() as s:
@@ -1379,11 +1379,11 @@ class TestFieldWhereFunc(unittest.TestCase):
             f = df.create_numeric('foo', 'int32')
             f.data.write(data)
 
-            r = f.where(lambda x: x > 25, 0)
-            self.assertEqual(r.tolist(), [0,0,30,40])
+            r = f.where(lambda x: x > 5, 0)
+            self.assertEqual(r.tolist(), [0,0,0,0,9,8,6,0,7,0])
 
     def test_where_bool_condition(self):
-        input_data = [1,2,3,4]
+        input_data = [1,2,3,5,9,8,6,4,7,0]
         data = np.asarray(input_data, dtype=np.int32)
         bio = BytesIO()
         with session.Session() as s:
@@ -1392,9 +1392,9 @@ class TestFieldWhereFunc(unittest.TestCase):
             f = df.create_numeric('foo', 'int32')
             f.data.write(data)
 
-            cond = np.array([False,False,True,True])
+            cond = np.array([False,False,True,True, False, True, True, False, False, True])
             r = f.where(cond, 0)
-            self.assertEqual(r.tolist(), [0, 0, 3, 4])
+            self.assertEqual(r.tolist(), [0,0,3,5,0,8,6,0,0,0])
 
 
 class TestNumericFieldAsType(unittest.TestCase):
