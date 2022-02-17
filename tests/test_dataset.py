@@ -69,6 +69,11 @@ class TestDataSet(unittest.TestCase):
             self.assertTrue(isinstance(dst['df3'], DataFrame))
             self.assertEqual([b'a', b'b', b'c', b'd'], dst['df3']['fs'].data[:].tolist())
 
+            # set dataframe within the same dataset (rename)
+            dst['df4'] = dst['df3']
+            self.assertTrue(isinstance(dst['df4'], DataFrame))
+            self.assertEqual([b'a', b'b', b'c', b'd'], dst['df4']['fs'].data[:].tolist())
+
     def test_dataset_static_func(self):
         bio = BytesIO()
         bio2 = BytesIO()
