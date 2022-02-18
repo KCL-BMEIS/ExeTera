@@ -268,6 +268,22 @@ class TestMemoryFieldCreateLike(unittest.TestCase):
             self.assertListEqual([2, 3, 4, 5], foo2.data[:].tolist())
 
 
+    def test_indexed_string_create_like(self):
+        data = np.array(['bb', 'a', 'ccc', 'ccd'])
+        bio = BytesIO()
+        with session.Session() as s:
+            ds = s.open_dataset(bio, 'w', 'ds')
+            df = ds.create_dataframe('df')
+
+            mf = fields.IndexedStringMemField(s)
+            mf.data.write(data)
+            self.assertIsInstance(mf, fields.IndexedStringMemField)
+
+            mmmf = mf.create_like(df, 'mmmf')
+            mmmf.data.write(data)
+            self.assertListEqual(data.tolist(), mmmf.data[:])
+
+
 class TestMemoryFields(unittest.TestCase):
 
     def _execute_memory_field_test(self, a1, a2, scalar, function):
@@ -589,7 +605,11 @@ class TestFieldApplyFilter(unittest.TestCase):
             self.assertListEqual(expected_filt_values, mb.values[:].tolist())
             self.assertListEqual(expected_filt_data, mb.data[:])
 
-            df2 = ds.create_dataframe("filter")
+            df_t = ds.create_dataframe('df_t')
+            df_t['bar'] = b.apply_filter(filt)
+            self.assertListEqual(expected_filt_indices, df_t['bar'].indices[:].tolist())
+            self.assertListEqual(expected_filt_values, df_t['bar'].values[:].tolist())
+            self.assertListEqual(expected_filt_data, df_t['bar'].data[:])
 
 
     def test_fixed_string_apply_filter(self):
