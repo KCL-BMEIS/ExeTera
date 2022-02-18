@@ -465,7 +465,7 @@ class IndexedStringMemField(MemoryField):
         return self
 
     def create_like(self, group=None, name=None, timestamp=None):
-        return FieldDataOps.indexed_string_create_like(group, name, timestamp)
+        return FieldDataOps.indexed_string_create_like(self, group, name, timestamp)
 
     @property
     def indexed(self):
