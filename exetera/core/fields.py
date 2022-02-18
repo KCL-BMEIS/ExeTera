@@ -2252,7 +2252,6 @@ class FieldDataOps:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
         spans_ = val.array_from_field_or_lower('spans', spans)
-        result_inds = np.zeros(len(spans))
         results = np.zeros(len(spans) - 1, dtype=source.data.dtype)
         predicate(spans_, source.data[:], results)
 

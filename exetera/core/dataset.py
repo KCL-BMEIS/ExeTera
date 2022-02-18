@@ -205,6 +205,7 @@ class HDF5Dataset(Dataset):
             # rename a dataframe
             del self._dataframes[dataframe.name]
             dataframe.name = name
+            self._dataframes[name] = dataframe
             self._file.move(dataframe.h5group.name, name)
         else:
             # new dataframe from another dataset

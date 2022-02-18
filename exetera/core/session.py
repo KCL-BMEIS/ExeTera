@@ -467,7 +467,8 @@ class Session(AbstractSession):
             dest_f.data.write(results)
             return results
         else:
-            results = np.zeros(len(spans) - 1, dtype=target_.dtype)
+            data_type = 'int32' if len(spans) < 2000000000 else 'int64'
+            results = np.zeros(len(spans) - 1, dtype=data_type)
             predicate(spans, target_, results)
             return results
 
