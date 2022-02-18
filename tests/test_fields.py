@@ -1504,10 +1504,10 @@ class TestFieldIsIn(unittest.TestCase):
             f.data.write([1, 2, 3, 4, 5])
 
             r1 = fields.isin(f, [1,2,3]) # test_element is list
-            self.assertEqual(r1.tolist(), [True, True, True, False, False])
+            self.assertEqual(r1.data[:].tolist(), [True, True, True, False, False])
 
             r2 = fields.isin(f, 3) # single test_element
-            self.assertEqual(r2.tolist(), [False, False, True, False, False])       
+            self.assertEqual(r2.data[:].tolist(), [False, False, True, False, False])
 
     def test_isin_on_numeric_field(self):
         bio = BytesIO()

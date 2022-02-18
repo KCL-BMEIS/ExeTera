@@ -26,7 +26,9 @@ def isin(field, test_elements):
     if not isinstance(field, Field):
         raise Exception("'field' should be field type")
 
-    return np.isin(field.data[:], test_elements)
+    ret = NumericMemField(field._session, 'bool')
+    ret.data.write(FieldDataOps.apply_isin(field, test_elements))
+    return ret
 
 
 class HDF5Field(Field):
