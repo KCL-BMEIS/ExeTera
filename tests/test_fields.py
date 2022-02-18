@@ -1,3 +1,4 @@
+from pickle import FALSE
 import unittest
 
 import numpy as np
@@ -1522,18 +1523,32 @@ class TestFieldIsIn(unittest.TestCase):
             self.assertEqual(df['f'].isin(8).tolist(), [False, False, False, False, False])
 
 
-    def test_isin_on_indexed_string_field(self):
+    def test_isin_on_indexed_string_field_with_testelements_all_unique(self):
         bio = BytesIO()
         with session.Session() as s:
             src = s.open_dataset(bio, 'w', 'src')
             df = src.create_dataframe('df')
-            df.create_indexed_string('foo').data.write(['a','bb','ccc'])
+            df.create_indexed_string('foo').data.write(['a', '', 'apple','app', 'APPLE', 'APP', 'app/', 'apple12', 'ip'])
 
-            self.assertEqual(df['foo'].isin(['a']), [True, False, False])
-            self.assertEqual(df['foo'].isin(['a','bb']), [True, True, False])
-            self.assertEqual(df['foo'].isin(['a','ccc']), [True, False, True])
-            self.assertEqual(df['foo'].isin(['a','ccc','bb']), [True, True, True])
-            self.assertEqual(df['foo'].isin(['a','dd','cc']), [True, False,False])
+            self.assertEqual(df['foo'].isin(['APPLE', '']), [False, True, False, False, True, False, False, False, False])
+            self.assertEqual(df['foo'].isin(['app','APP']), [False, False, False, True, False, True, False, False, False])
+            self.assertEqual(df['foo'].isin(['app/','app//']), [False, False, False, False, False, False, True, False, False])
+            self.assertEqual(df['foo'].isin(['apple12','APPLE12', 'apple13']), [False, False, False, False, False, False, False, True, False])
+            self.assertEqual(df['foo'].isin(['ip','ipd']), [False, False, False, False, False, False, False, False, True])
+
+
+    def test_isin_on_indexed_string_field_with_duplicate_in_testelements(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_indexed_string('foo').data.write(['a', '', 'apple','app', 'APPLE', 'APP', 'app/', 'apple12', 'ip'])
+
+            self.assertEqual(df['foo'].isin(['APPLE', '', '', 'APPLE']), [False, True, False, False, True, False, False, False, False])
+            self.assertEqual(df['foo'].isin(['app','APP', 'app', 'APP']), [False, False, False, True, False, True, False, False, False])
+            self.assertEqual(df['foo'].isin(['app/','app//', 'app//']), [False, False, False, False, False, False, True, False, False])
+            self.assertEqual(df['foo'].isin(['APPLE12', 'apple12', 'apple12', 'APPLE12', 'apple13']), [False, False, False, False, False, False, False, True, False])
+            self.assertEqual(df['foo'].isin(['ip','ipd', 'id']), [False, False, False, False, False, False, False, False, True])
 
 
     def test_isin_on_fixed_string_field(self):
