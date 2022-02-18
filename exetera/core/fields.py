@@ -2508,10 +2508,11 @@ class FieldDataOps:
 
     @staticmethod
     def apply_isin(source: Field, test_elements: Union[list, set, np.ndarray]):
+        if isinstance(test_elements, set):
+            test_elements = list(test_elements)
+
         if source.indexed:
             return ops.isin_for_indexed_string_field(test_elements, source.indices[:], source.values[:])
-        # elif isinstance(source, TimestampField):
-        #     return ops.isin_for_timestamp_field(source.data[:], test_elements)
         else:
             return np.isin(source.data[:], test_elements)
 

@@ -3060,17 +3060,3 @@ def compare_arrays(a, b):
         return 1
     return 0
 
-
-def isin_for_timestamp_field(data, test_elements):
-    """
-    Timestamp field has large numbers. Two large numbers need to use math.isclose to check if they're equal.
-    """
-    result = [False] * len(data)
-    for i, d in enumerate(data):
-        is_equal = False
-        for t in test_elements:
-            if math.isclose(d, t):
-                is_equal = True
-                break
-        result[i] = is_equal
-    return result
