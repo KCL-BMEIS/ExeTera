@@ -1,9 +1,9 @@
 
 [build-system]
-requires = ["setuptools", "wheel", "cython"]
+requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ExeTera"
 
-dependencies = ["numpy", "pandas", "h5py", "numba", "cython"]
+dependencies = ["numpy", "pandas", "h5py", "numba"]
