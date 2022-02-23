@@ -418,4 +418,20 @@ def guess_encoding(filename):
         return "utf-8-sig"
     else:
         return "utf-8"
-    
+
+
+def guess_dtype(src_dtype=None, length=None):
+    """
+    The dtype is specified by two parameters: 1) the source data type, when copy the data from the source;
+    or 2) the source data length, when calculating the index or span of the source.
+
+    :param src_dtype:
+    :param length:
+    :return: suggested data type as string
+    """
+    if src_dtype is None and length is None:
+        raise ValueError('Please specify at least one parameter to use the guess_dtype function.')
+    elif length is not None:
+        return 'int32' if length < 2**32 else 'int64'
+    elif src_dtype is not None:
+        return str(src_dtype)
