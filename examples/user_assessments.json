@@ -1,0 +1,121 @@
+
+{
+  "exetera": {
+    "version": "1.0.0"
+  },
+  "schema": {
+    "users": {
+      "primary_keys": [
+        "id"
+      ],
+      "fields": {
+        "id": {
+          "field_type": "fixed_string",
+          "length": 32
+        },
+        "FirstName": {
+          "field_type": "string"
+        },
+        "LastName": {
+          "field_type": "string"
+        },
+        "bmi": {
+          "field_type": "numeric",
+          "value_type": "int32"
+        },
+        "has_diabetes": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "height_cm": {
+          "field_type": "numeric",
+          "value_type": "int32"
+        },   
+        "year_of_birth": {
+          "field_type": "numeric",
+          "value_type": "int32"
+        }
+      }
+    },
+    "assessments": {
+      "primary_keys": [
+        "id"
+      ],
+      "foreign_keys": {
+        "user_id_key": {
+          "space": "users",
+          "key": "id"
+        }
+      },
+      "fields": {
+        "id": {
+          "field_type": "fixed_string",
+          "length": 32
+        },
+        "date": {
+          "field_type": "datetime"
+        },
+        "user_id": {
+          "field_type": "fixed_string",
+          "length": 32
+        },
+        "abdominal_pain": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "brain_fog": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "loss_of_smell": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "False": 1,
+              "True": 2
+            }
+          }
+        },
+        "tested_covid_positive": {
+          "field_type": "categorical",
+          "categorical": {
+            "value_type": "int8",
+            "strings_to_values": {
+              "": 0,
+              "waiting": 1,
+              "no": 2,
+              "yes": 3
+            }
+          }
+        },
+        "temperature_f": {
+          "field_type": "numeric",
+          "value_type": "float32"
+        }
+      }
+    }
+  }
+}
