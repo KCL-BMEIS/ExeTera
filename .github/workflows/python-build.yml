@@ -6,11 +6,15 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Test Build & upload
+name: Build and publish (test publish and publish on release)
 
 on:
   push:
     branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  release:
+    types: [published]
 
 jobs:
   deploy:
@@ -44,9 +48,24 @@ jobs:
        platform: x64
     - name: Build package
       run: python setup.py bdist_wheel
-    - name: Test publish package
+    - if: github.event == 'push'
+      name: Test publish package
         run: |
           python3 -m twine upload -r testpypi dist/*
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+    - if: github.event == 'pull_request'
+      name: Test publish package
+        run: |
+          python3 -m twine upload -r testpypi dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+    - if: github.event == 'release'
+      name: Publish package on release
+        run: |
+          python3 -m twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.YPI_API_TOKEN }}
