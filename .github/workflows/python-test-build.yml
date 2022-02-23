@@ -45,8 +45,8 @@ jobs:
     - name: Build package
       run: python setup.py bdist_wheel
     - name: Test publish package
-        run: |
-          python3 -m twine upload -r testpypi dist/*
+      run: |
+        python3 -m twine upload -r testpypi dist/*
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
