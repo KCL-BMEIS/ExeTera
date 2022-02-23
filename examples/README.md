@@ -5,7 +5,7 @@ This folder contains a few examples on how to use ExeTera in different scenarios
 #### Names dataset
 This example shows how to generate ExeTera HDF5 datafile through 'importer.import_with_schema' function, and a few basic commands to print the dataset content.
 
-#### simple_linked_dataset
+#### import_dataset
 This example shows how to import multiple CSV files into a ExeTera HDF5 datafile. The example datafile has a similar structure to Covid Symptom Study (CSS) dataset, including a user table and a assessments table.
 
 
