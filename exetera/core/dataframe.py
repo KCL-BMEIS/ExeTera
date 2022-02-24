@@ -105,6 +105,8 @@ class HDF5DataFrame(DataFrame):
              name: str):
         """
         Drop a field from this dataframe as well as the HDF5 Group
+
+        :pararm name: name of field to be dropped
         """
         del self._columns[name]
         del self._h5group[name]
@@ -129,6 +131,11 @@ class HDF5DataFrame(DataFrame):
         Create a indexed string type field.
         Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#indexedstringfield for
         a detailed description of indexed string fields
+
+        :param name: name of field to be created
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :param chunksize: optional - If set, the chunksize that should be used to create the new field.
+        :return: a newly created indexed string type field
         """
         fld.indexed_string_field_constructor(self._dataset.session, self, name,
                                              timestamp, chunksize)
@@ -146,6 +153,11 @@ class HDF5DataFrame(DataFrame):
         Create a fixed string type field.
         Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#fixedstringfield for
         a detailed description of fixed string fields
+
+        :param name: name of field to be created
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :param chunksize: optional - If set, the chunksize that should be used to create the new field.
+        :return: a newly created fixed string type field
         """
         fld.fixed_string_field_constructor(self._dataset.session, self, name,
                                            length, timestamp, chunksize)
@@ -163,6 +175,13 @@ class HDF5DataFrame(DataFrame):
         Create a numeric type field.
         Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#numericfield for
         a detailed description of numeric fields
+
+        :param name: name of field to be created
+        :param nformat: A numerical type in the set (int8, uint8, int16, uint18, int32, uint32, int64, uint64, float32, float64). \
+                        It is recommended to avoid uint64 as certain operations in numpy cause conversions to floating point values.
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :param chunksize: optional - If set, the chunksize that should be used to create the new field.
+        :return: a newly created numeric type field
         """
         fld.numeric_field_constructor(self._dataset.session, self, name,
                                       nformat, timestamp, chunksize)
@@ -181,6 +200,13 @@ class HDF5DataFrame(DataFrame):
         Create a categorical type field.
         Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#categoricalfield for
         a detailed description of indexed string fields
+
+        :param name: name of field to be created
+        :param nformat: A numerical type in the set (int8, uint8, int16, uint18, int32, uint32, int64, uint64, float32, float64). \
+                        It is recommended to use 'int8'.
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :param chunksize: optional - If set, the chunksize that should be used to create the new field.
+        :return: a newly created categorical type field
         """
         fld.categorical_field_constructor(self._dataset.session, self, name, nformat, key,
                                           timestamp, chunksize)
@@ -197,6 +223,11 @@ class HDF5DataFrame(DataFrame):
         Create a timestamp type field.
         Please see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#timestampfield for
         a detailed description of timestamp fields
+
+        :param name: name of field to be created
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :param chunksize: optional - If set, the chunksize that should be used to create the new field.
+        :return: a newly created timestamp type field
         """
         fld.timestamp_field_constructor(self._dataset.session, self, name,
                                         timestamp, chunksize)
@@ -210,7 +241,7 @@ class HDF5DataFrame(DataFrame):
         check if dataframe contains a field, by the field name
 
         :param name: the name of the field to check
-        :return: A boolean value indicating whether this DataFrame contains a Field with the
+        :return: A boolean value indicating whether this DataFrame contains a Field with the \
             name in question
         """
         if not isinstance(name, str):
@@ -223,6 +254,7 @@ class HDF5DataFrame(DataFrame):
         check if dataframe contains a field by the field object
 
         :param field: the filed object to check, return a tuple(bool,str). The str is the name stored in dataframe.
+        :return: boolean value indicating whether this DataFrame contains a Field
         """
         if not isinstance(field, fld.Field):
             raise TypeError("The field must be a Field object")
@@ -236,7 +268,8 @@ class HDF5DataFrame(DataFrame):
         """
         Get a field stored by the field name.
 
-        :param name: The name of field to get.
+        :param name: the name of field to get.
+        :return: field to get.
         """
         if not isinstance(name, str):
             raise TypeError("The name must be of type str but is of type '{}'".format(str))
@@ -249,11 +282,19 @@ class HDF5DataFrame(DataFrame):
         """
         Get a field stored by the field name.
 
-        :param name: The name of field to get.
+        :param name: the name of field to get.
+        :return: field to get.
         """
         return self.__getitem__(name)
 
     def __setitem__(self, name, field):
+        """
+        Set a field with given name and given field data
+
+        :param name: the name of field to set.
+        :param field: given field to provide data.
+        :return: None.
+        """
         if not isinstance(name, str):
             raise TypeError("The name must be of type str but is of type '{}'".format(str))
         if not isinstance(field, fld.Field):
@@ -267,6 +308,12 @@ class HDF5DataFrame(DataFrame):
         self._columns[name] = nfield
 
     def __delitem__(self, name):
+        """
+        Remove field from dataframe by field name
+
+        :param field: The field to be delete from this dataframe.
+        :return: None.
+        """
         if not self.__contains__(name=name):
             raise ValueError("There is no field named '{}' in this dataframe".format(name))
         else:
@@ -278,6 +325,7 @@ class HDF5DataFrame(DataFrame):
         Remove field from dataframe by field.
 
         :param field: The field to delete from this dataframe.
+        :return: None.
         """
         if field.dataframe != self:
             raise ValueError("This field is owned by a different dataframe")
@@ -412,6 +460,17 @@ class HDF5DataFrame(DataFrame):
         """
         Apply the filter to all the fields in this dataframe, return a dataframe with filtered fields.
 
+        Example::
+
+            # apply boolean fitler to dataframe in place
+            bfilter = np.array([0, 1, 0, 1, 0, 1, 1, 0], dtype='bool')
+            df.apply_filter(bfilter)
+
+            # apply numeric fitler to dataframe and store filtered result to designated dataframe
+            nfilter = np.array([0, 1, 0, 1, 0, 1, 1, 0])
+            df.apply_filter(nfilter, ddf = df2)
+
+
         :param filter_to_apply: the filter to be applied to the source field, an array of boolean
         :param ddf: optional- the destination data frame
         :returns: a dataframe contains all the fields filterd, self if ddf is not set
@@ -433,6 +492,15 @@ class HDF5DataFrame(DataFrame):
     def apply_index(self, index_to_apply, ddf=None):
         """
         Apply the index to all the fields in this dataframe, return a dataframe with indexed fields.
+
+        Example::
+            # apply index inplace
+            index = np.array([4, 3, 2, 1, 0])
+            df.apply_index(index)
+
+            # apply index and store new result to designated dataframe
+            df.apply_index(index, ddf=df2)
+
 
         :param index_to_apply: the index to be applied to the fields, an ndarray of integers
         :param ddf: optional- the destination data frame
@@ -458,7 +526,16 @@ class HDF5DataFrame(DataFrame):
     def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):
         """
         Sort by the values of a field or a list of fields
+
+        Example::
+
+            # sort inplace
+            df.sort_values(by = 'idx')
+
+            # sort and store sorted value in designated dataframe
+            df.sort_values(by = 'idx', ddf = ddf)
         
+
         :param by: Name (str) or list of names (str) to sort by.
         :param ddf: optional - the destination data frame
         :param axis: Axis to be sorted. Currently only supports 0
@@ -487,6 +564,19 @@ class HDF5DataFrame(DataFrame):
     def to_csv(self, filepath:str, row_filter:Union[np.ndarray, fld.Field]=None, column_filter:Union[str, List[str]]=None, chunk_row_size:int=1<<15):
         """
         Write object to a comma-separated values (csv) file.
+
+        Example::
+
+            # write to csv file
+            df.to_csv(csv_file_name)
+
+            # write to csv file with column_filter
+            df.to_csv(csv_file_name, column_filter=['foo', 'bar'])
+
+            # write to csv file with row_filter
+            df.to_csv(csv_file_name, row_filter=df['foo'])
+
+
         :param filepath: File path.
         :param row_filter: A boolean array / field. Only select rows when filter value is True
         :param column_filter: A sequence of string names for the fields.
@@ -535,7 +625,16 @@ class HDF5DataFrame(DataFrame):
                        ddf: DataFrame = None,
                        hint_keys_is_sorted=False):
         """
-        Distinct values of a field or a list of field, return a dataframe with distinct values.
+        Distinct values of a field or a list of fields, return a dataframe with distinct values.
+
+        Example::
+
+            # return distinct values of a single field
+            df.drop_duplicates(by = 'foo', ddf = ddf)
+
+            # return distinct values of multiple fields
+            df.drop_duplicates(by = ['foo', 'bar'], ddf = ddf)
+
         
         :param by: Name (str) or list of names (str) to distinct.
         :param ddf: optional - the destination dataframe
@@ -547,6 +646,15 @@ class HDF5DataFrame(DataFrame):
     def groupby(self, by: Union[str, List[str]], hint_keys_is_sorted=False):         
         """
         Group DataFrame using a field or a list of field, return a groupby object.
+
+        Example::
+
+            # group by on single field, then compute count
+            df.groupby(by = 'foo').count(ddf = ddf)
+
+            # group by on multiple field, then compute max
+            df.groupby(by = ['foo', 'bar']).max(ddf = ddf)
+
 
         :param by: Name (str) or list of names (str) to group by.
         :param hint_keys_is_sorted: an optional flag that users could set to skip the sorted check. \
@@ -582,6 +690,19 @@ class HDF5DataFrame(DataFrame):
     def describe(self, include=None, exclude=None, output='terminal'):
         """
         Show the basic statistics of the data in each field.
+
+        Example::
+            # Display staticstic results in stdout by default, and return dataframe that contains staticstic results.
+            result = df.describe()
+
+            # Not display staticstic results
+            result = df.describe(output='None')
+
+            # Include a single field and exclude multiple fields
+            reuslt = df.describe(include='foo', exclude=['bar', 'baz'])
+
+            # Include multiple data types
+            result = df.describe(include=[np.int32, np.bytes_])
 
         :param include: The field name or data type or simply 'all' to indicate the fields included in the calculation.
         :param exclude: The filed name or data type to exclude in the calculation.
@@ -772,12 +893,14 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
     
     def count(self, ddf: DataFrame, write_keys=True) -> DataFrame:
         """
-        Compute max of group values.
+        Compute count of group values.
 
-        :param target: Name (str) or list of names (str) to compute count.
+        Example::
+            # group by on single field, then compute count
+            df.groupby(by = 'foo').count(ddf = ddf)
+
         :param ddf: the destination data frame
-        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
-        
+        :param write_keys: optional - write groupby keys to ddf only if write_key=True. Default is True.
         :return: dataframe with count of group values
         """        
         self._write_groupby_keys(ddf, write_keys)
@@ -790,6 +913,17 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         return ddf
 
     def distinct(self, ddf: DataFrame, write_keys=True) -> DataFrame:
+        """
+        Compute distinct values of a field or a list of field
+
+        Example::
+            # group by on multiple fields, then compute distinct
+            df.groupby(by = ['foo', 'bar', 'baz']).distinct(ddf = ddf)
+
+        :param ddf: the destination data frame
+        :param write_keys: optional - write groupby keys to ddf only if write_key=True. Default is True.
+        :return: dataframe with distinct values of a field or a list of field
+        """
         self._write_groupby_keys(ddf, write_keys)
         return ddf
         
@@ -798,9 +932,13 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         """
         Compute max of group values.
 
+        Example::
+            # group by on a single field, then compute max on multiple target fields
+            df.groupby(by = 'foo').max(target = ['bar','baz'], ddf = ddf)
+
         :param target: Name (str) or list of names (str) to compute max.
         :param ddf: the destination data frame
-        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+        :param write_keys: optional - write groupby keys to ddf only if write_key=True. Default is True.
         
         :return: dataframe with max of group values
         """
@@ -828,9 +966,13 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         """
         Compute min of group values.
 
+        Example::
+            # group by on a single field, then compute min on a single target field
+            df.groupby(by = 'foo').min(target = 'bar', ddf = ddf)
+
         :param target: Name (str) or list of names (str) to compute min.
         :param ddf: the destination data frame
-        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+        :param write_keys: optional - write groupby keys to ddf only if write_key=True. Default is True.
         
         :return: dataframe with min of group values
         """
@@ -858,9 +1000,13 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         """
         Get first of group values.
 
+        Example::
+            # group by on multiple fields, then compute first on a single target field
+            df.groupby(by = ['foobar', 'foo']).first(target = 'bar', ddf = ddf)
+
         :param target: Name (str) or list of names (str) to get first value.
         :param ddf: the destination data frame
-        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+        :param write_keys: optional - write groupby keys to ddf only if write_key=True. Default is True.
         
         :return: dataframe with first of group values
         """
@@ -887,9 +1033,13 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         """
         Get last of group values.
 
+        Example::
+            # group by on multiple fields, then compute last on multiple target fields
+            df.groupby(by = ['foobar', 'foo']).last(target = ['bar', 'baz'], ddf = ddf)
+
         :param target: Name (str) or list of names (str) to get last value.
         :param ddf: the destination data frame
-        :param write_keys: write groupby keys to ddf only if write_key=True. Default is True.
+        :param write_keys: optional - write groupby keys to ddf only if write_key=True. Default is True.
         
         :return: dataframe with last of group values
         """
@@ -913,41 +1063,49 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
 
 
-def copy(field: fld.Field, dataframe: DataFrame, name: str):
+def copy(field: fld.Field, ddf: DataFrame, name: str):
     """
     Copy a field to another dataframe as well as underlying dataset.
 
+    Example::
+        # Copy a field ('foobar') of dataframe (df1) to another dataframe (df2) with new field name ('foo')
+        dataframe.copy(df1['foobar'], df2, 'foo')
+
     :param field: The source field to copy.
-    :param dataframe: The destination dataframe to copy to.
+    :param ddf: The destination dataframe to copy to.
     :param name: The name of field under destination dataframe.
     """
-    dfield = field.create_like(dataframe, name)
+    dfield = field.create_like(ddf, name)
     if field.indexed:
         dfield.indices.write(field.indices[:])
         dfield.values.write(field.values[:])
     else:
         dfield.data.write(field.data[:])
-    dataframe.columns[name] = dfield
-    return dataframe[name]
+    ddf.columns[name] = dfield
+    return ddf[name]
 
 
-def move(field: fld.Field, dest_df: DataFrame, name: str):
+def move(field: fld.Field, ddf: DataFrame, name: str):
     """
     Move a field to another dataframe as well as underlying dataset.
 
+    Example::
+        # Move a field ('foobar') of dataframe (df1) to another dataframe (df2) with new field name ('foo')
+        dataframe.move(df1['foobar'], df2, 'foo')
+
     :param src_df: The source dataframe where the field is located.
     :param field: The field to move.
-    :param dest_df: The destination dataframe to move to.
+    :param ddf: The destination dataframe to move to.
     :param name: The name of field under destination dataframe.
     """
-    if field.dataframe == dest_df:
-        dest_df.rename(field.name, name)
+    if field.dataframe == ddf:
+        ddf.rename(field.name, name)
         return field
     else:
-        copy(field, dest_df, name)
+        copy(field, ddf, name)
         field.dataframe.drop(field.name)
         field._valid_reference = False
-        return dest_df[name]
+        return ddf[name]
 
 
 def merge(left: DataFrame,
@@ -983,6 +1141,7 @@ def merge(left: DataFrame,
 
     :param left: The left dataframe
     :param right: The right dataframe
+    :param dest: The destination dataframe
     :param left_on: The field corresponding to the left key used to perform the join. This is either the
         the name of the field, or a field object. If it is a field object, it can be from another
         dataframe but it must be the same length as the fields being joined. This can also be a tuple
