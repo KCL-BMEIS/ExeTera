@@ -14,15 +14,21 @@ from datetime import datetime, timezone
 import operator
 
 import numpy as np
-import numba
 import h5py
-from numba import njit, jit
-from numba.typed import List
 
 from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
 from exetera.core import validation as val
+
+
+def isin(field, test_elements):
+    if not isinstance(field, Field):
+        raise Exception("'field' should be field type")
+
+    ret = NumericMemField(field._session, 'bool')
+    ret.data.write(FieldDataOps.apply_isin(field, test_elements))
+    return ret
 
 
 class HDF5Field(Field):
@@ -553,6 +559,9 @@ class IndexedStringMemField(MemoryField):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
+
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         "Find the unique elements of IndexedStringMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
@@ -635,9 +644,13 @@ class FixedStringMemField(MemoryField):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
+
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         "Find the unique elements of FixedStringMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
+
 
 
 class NumericMemField(MemoryField):
@@ -796,6 +809,9 @@ class NumericMemField(MemoryField):
 
     def logical_not(self):
         return FieldDataOps.logical_not(self._session, self)
+    
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         "Find the unique elements of NumericMemField"
@@ -924,9 +940,13 @@ class CategoricalMemField(MemoryField):
     def __ge__(self, value):
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
+
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         "Find the unique elements of CategoricalMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
+
 
 
 class TimestampMemField(MemoryField):
@@ -1061,10 +1081,12 @@ class TimestampMemField(MemoryField):
     def __ge__(self, value):
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
+
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         "Find the unique elements of TimestampMemField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
-
 
 
 # HDF5 field constructors
@@ -1259,10 +1281,12 @@ class IndexedStringField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
+
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         "Find the unique elements of IndexedStringField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
-
 
 
 class FixedStringField(HDF5Field):
@@ -1357,6 +1381,9 @@ class FixedStringField(HDF5Field):
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
+
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         "Find the unique elements of FixedStringField"
@@ -1581,6 +1608,9 @@ class NumericField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.logical_not(self._session, self)
 
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
+
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         "Find the unique elements of NumericField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
@@ -1745,6 +1775,9 @@ class CategoricalField(HDF5Field):
     def __ge__(self, value):
         self._ensure_valid()
         return FieldDataOps.greater_than_equal(self._session, self, value)
+    
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         "Find the unique elements of CategoricalField"
@@ -1919,10 +1952,13 @@ class TimestampField(HDF5Field):
         self._ensure_valid()
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        return FieldDataOps.apply_isin(self, test_elements)
+
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         "Find the unique elements of TimestampField"
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
-
+      
 
 # Operation implementations
 # =========================
@@ -2470,6 +2506,16 @@ class FieldDataOps:
         else:
             return group.create_timestamp(name, ts)
 
+
+    @staticmethod
+    def apply_isin(source: Field, test_elements: Union[list, set, np.ndarray]):
+        if isinstance(test_elements, set):
+            test_elements = list(test_elements)
+
+        if source.indexed:
+            return ops.isin_for_indexed_string_field(test_elements, source.indices[:], source.values[:])
+        else:
+            return np.isin(source.data[:], test_elements)
 
     @staticmethod
     def apply_unique(src: Field, return_index=False, return_inverse=False, return_counts=False) -> np.ndarray:

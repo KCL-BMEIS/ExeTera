@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 from pkg_resources import parse_requirements
-from Cython.Build import cythonize
+#from Cython.Build import cythonize
 
 from os import path
 this_directory = path.abspath(path.dirname(__file__))
@@ -15,8 +15,8 @@ with open(path.join(this_directory, "exetera", "_version.py")) as o:
 with open(path.join(this_directory, "requirements.txt")) as o:
     requirements = [str(r) for r in parse_requirements(o.read())]
 
-pyxfiles = ['ops.pyx']
-pyx_full_path = [path.join(this_directory, 'exetera', '_libs', pyx) for pyx in pyxfiles]
+#pyxfiles = ['ops.pyx']
+#pyx_full_path = [path.join(this_directory, 'exetera', '_libs', pyx) for pyx in pyxfiles]
 
 setup(
     name='exetera',
@@ -30,7 +30,7 @@ setup(
     license='http://www.apache.org/licenses/LICENSE-2.0',
     packages=find_packages(),
     scripts=['exetera/bin/exetera'],
-    ext_modules = cythonize(pyx_full_path),
+    #ext_modules = cythonize(pyx_full_path),
     python_requires='>=3.7',
     install_requires=requirements
 )
