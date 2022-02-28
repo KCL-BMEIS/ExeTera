@@ -18,6 +18,7 @@ on:
 
 jobs:
   deploy:
+    environment: CI
 
     runs-on: ${{ matrix.os }}
     strategy:
@@ -52,10 +53,10 @@ jobs:
       name: Test publish package
       run: |
         python3 -m twine upload -r testpypi dist/*
-        env:
+        with:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.TESTPYPI_API_TOKEN }}
-          
+
     - if: github.event_name == 'release'
       name: Publish package on release
       run: |
