@@ -22,7 +22,15 @@ from exetera.core import operations as ops
 from exetera.core import validation as val
 
 
-def isin(field, test_elements):
+def isin(field:Field, test_elements:Union[list, set, np.ndarray]):
+    """
+    Returns a boolean array of the same length as field \
+    that is True where an element of field is in test_elements and False otherwise.
+
+    :param field: The field to check.
+    :param test_elements: The values against which to test each value of field.
+    :return: a boolean array of the same length as field
+    """
     if not isinstance(field, Field):
         raise Exception("'field' should be field type")
 
@@ -133,26 +141,45 @@ class MemoryField(Field):
 
     @property
     def valid(self):
+        """
+        Check if field is valid
+        :return: bool
+        """
         return True
 
     @property
     def name(self):
+        """
+        :return: None.
+        """
         return None
 
     @property
     def dataframe(self):
+        """
+        :return: None.
+        """
         return None
 
     @property
     def timestamp(self):
+        """
+        :return: None.
+        """
         return None
 
     @property
     def chunksize(self):
+        """
+        :return: None.
+        """
         return None
 
     @property
     def indexed(self):
+        """
+        :return: bool.
+        """
         return False
 
     def __bool__(self):
@@ -216,63 +243,122 @@ class WriteableFieldArray:
         self._dataset = field[dataset_name]
 
     def __len__(self):
+        """
+        Returns length of field array
+        :return: int
+        """
         return len(self._dataset)
 
     @property
     def dtype(self):
+        """
+        :return: dtype of field array
+        """
         return self._dataset.dtype
 
     def __getitem__(self, item):
+        """
+        :return: item in field array
+        """
         return self._dataset[item]
 
     def __setitem__(self, key, value):
+        """
+        Set item in field array
+        :return: None
+        """
         self._dataset[key] = value
 
     def clear(self):
+        """
+        Clears field array
+        :return: None
+        """
         nformat = self._dataset.dtype
         DataWriter._clear_dataset(self._field, self._name)
         DataWriter.write(self._field, self._name, [], 0, nformat)
         self._dataset = self._field[self._name]
 
     def write_part(self, part):
+        """
+        Writes part to field
+        :return: None
+        """
         DataWriter.write(self._field, self._name, part, len(part), dtype=self._dataset.dtype)
 
     def write(self, part):
+        """
+        Writes part to field and marks write complete 
+        :return: None
+        """
         if isinstance(part, Field):
             part = part.data[:]
         DataWriter.write(self._field, self._name, part, len(part), dtype=self._dataset.dtype)
         self.complete()
 
     def complete(self):
+        """
+        :return: None
+        """
         DataWriter.flush(self._field[self._name])
 
 
 class MemoryFieldArray:
 
     def __init__(self, dtype):
+        """
+        :param dtype: dtype of memory field.
+        """
         self._dtype = dtype
         self._dataset = None
 
     def __len__(self):
+        """
+        Returns length of field dataset, returns 0 if no dataset for field. 
+        :return: int
+        """
         return 0 if self._dataset is None else len(self._dataset)
 
     @property
     def dtype(self):
+        """
+        :return: dtype of field
+        """
         return self._dtype
 
     def __getitem__(self, item):
+        """
+        :param item: index of item in dataset.
+        :return: item in field dataset
+        """
         if self._dataset is None:
             # raise ValueError("Cannot get data from an empty Field")
             return np.zeros(0, dtype=np.uint8)
         return self._dataset[item]
 
     def __setitem__(self, key, value):
+        """
+        Set a field with given name and given field data
+
+        :param key: index of item in field dataset.
+        :param value: value to set on index
+        :return: None
+        """
         self._dataset[key] = value
 
     def clear(self):
+        """
+        Set dataset to None
+        :return: None
+        """
         self._dataset = None
 
     def write_part(self, part, move_mem=False):
+        """
+        :param part: numpy array to write to field
+        :param move_mem: boolean, use part directly or make copy. 
+        :return: None
+        """
         if not isinstance(part, np.ndarray):
             raise ValueError("'part' must be a numpy array but is '{}'".format(type(part)))
         if self._dataset is None:
@@ -287,20 +373,38 @@ class MemoryFieldArray:
             self._dataset = new_dataset
 
     def write(self, part):
+        """
+        Write part and mark as completed.
+        :param part: Numpy array to write
+        :return: None
+        """
         self.write_part(part)
         self.complete()
 
     def complete(self):
+        """
+        :return: None
+        """
         pass
 
 
 class ReadOnlyIndexedFieldArray:
     def __init__(self, field, indices, values):
+        """
+        :param field: Field to use
+        :param indices: Indices for numpy array
+        :param values: Values for numpy array
+        :return: None
+        """
         self._field = field
         self._indices = indices
         self._values = values
 
     def __len__(self):
+        """
+        Length of field 
+        :return: number
+        """
         # TODO: this occurs because of the initialized state of an indexed string. It would be better for the
         # index to be initialised as [0]
         return max(len(self._indices) - 1, 0)
@@ -310,6 +414,11 @@ class ReadOnlyIndexedFieldArray:
         return self._dtype
 
     def __getitem__(self, item):
+        """
+        Return item in field dataset on index
+        :param item: Index
+        :return: Item value from dataset
+        """
         try:
             if isinstance(item, slice):
                 start = item.start if item.start is not None else 0
@@ -360,6 +469,12 @@ class ReadOnlyIndexedFieldArray:
 
 class WriteableIndexedFieldArray:
     def __init__(self, chunksize, indices, values):
+        """
+        :param: chunksize: Size of chunk 
+        :param indices: Numpy array of indices
+        :param values: Numpy array of values 
+        :return: None
+        """
         # self._field = field
         self._indices = indices
         self._values = values
@@ -372,13 +487,26 @@ class WriteableIndexedFieldArray:
         self._value_index = 0
 
     def __len__(self):
+        """
+        Length of field 
+        :return: int
+        """
         return max(len(self._indices) - 1, 0)
 
     @property
     def dtype(self):
+        """
+        Returns dtype of field
+        :return: dtype
+        """
         return self._dtype
 
     def __getitem__(self, item):
+        """
+        Return item in field dataset on index
+        :param item: int or slice
+        :return: Item value from dataset
+        """
         try:
             if isinstance(item, slice):
                 start = item.start if item.start is not None else 0
@@ -416,12 +544,21 @@ class WriteableIndexedFieldArray:
                               "use clear and then write/write_part or write_raw/write_part_raw")
 
     def clear(self):
+        """
+        Reset values in field
+        :return: None
+        """
         self._accumulated = 0
         self._indices.clear()
         self._values.clear()
         self._accumulated = 0
 
     def write_part(self, part):
+        """
+        Write part to field
+        :param part: ndarray
+        :return: None
+        """
         for s in part:
             evalue = s.encode()
             for v in evalue:
@@ -440,10 +577,19 @@ class WriteableIndexedFieldArray:
                 self._index_index = 0
 
     def write(self, part):
+        """
+        Write part and mark as complete
+        :param part: ndarray
+        :return: None
+        """
         self.write_part(part)
         self.complete()
 
     def complete(self):
+        """
+        Marks write as complete
+        :return: None
+        """
         if self._value_index != 0:
             self._values.write(self._raw_values[:self._value_index])
             self._value_index = 0
@@ -468,22 +614,42 @@ class IndexedStringMemField(MemoryField):
         self._value_wrapper = None
 
     def writeable(self):
+        """
+        :return: self
+        """
         return self
 
     def create_like(self, group=None, name=None, timestamp=None):
+        """
+        :param group:h5group
+        :param name: string 
+        :param timestamp: timestamp
+        :return: Indexed string field
+        """
         return FieldDataOps.indexed_string_create_like(self, group, name, timestamp)
 
     @property
     def indexed(self):
+        """
+        :return: boolean
+        """
         return True
 
     @property
     def data(self):
+        """
+        Returns indexes writable field array with values of field
+        :return: WriteableIndexedFieldArray
+        """
         if self._data_wrapper is None:
             self._data_wrapper = WriteableIndexedFieldArray(self._chunksize, self.indices, self.values)
         return self._data_wrapper
 
     def is_sorted(self):
+        """
+        Checks if field is sorted
+        :return: boolean
+        """
         if len(self) < 2:
             return True
 
@@ -499,20 +665,35 @@ class IndexedStringMemField(MemoryField):
 
     @property
     def indices(self):
+        """
+        Get indices for field
+        :return: MemoryFieldArray('int64')
+        """
         if self._index_wrapper is None:
             self._index_wrapper = MemoryFieldArray('int64')
         return self._index_wrapper
 
     @property
     def values(self):
+        """
+        Get values for field
+        :return: MemoryFieldArray('8')
+        """
         if self._value_wrapper is None:
             self._value_wrapper = MemoryFieldArray('int8')
         return self._value_wrapper
 
     def __len__(self):
+        """
+        Get length of field
+        :return: int
+        """
         return len(self.data)
 
     def get_spans(self):
+        """
+        :return: Span of indices as List
+        """
         return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
 
     def apply_filter(self, filter_to_apply, target=None, in_place=False):
@@ -548,22 +729,88 @@ class IndexedStringMemField(MemoryField):
         return FieldDataOps.apply_index_to_indexed_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (first). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (last). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (min). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (max). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def isin(self, test_elements:Union[list, set, np.ndarray]):
+        """
+        Returns a boolean array of the same length as field \
+        that is True where an element of field is in test_elements and False otherwise.
+
+        :param test_elements: The values against which to test each value of field.
+        :return: a boolean array of the same length as field
+        """        
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
-        "Find the unique elements of IndexedStringMemField"
+        """
+        Find the unique elements of IndexedStringMemField
+
+        :param return_index: boolean, if true returns index of unique elements
+        :param return_inverse: boolean, if true returns result in reverse
+        :param return_counts: boolean, if true returns counts of unique elements
+        :return: ndarray 
+        """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -580,24 +827,43 @@ class FixedStringMemField(MemoryField):
         return self
 
     def create_like(self, group=None, name=None, timestamp=None):
+        """
+        :return: FixedStringMemField
+        """
         return FieldDataOps.fixed_string_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
+        """
+        Get data in field
+        :return: MemoryFieldArray
+        """
         if self._value_wrapper is None:
             self._value_wrapper = MemoryFieldArray("S{}".format(self._length))
         return self._value_wrapper
 
     def is_sorted(self):
+        """
+        Check if field is sorted
+        :return: bool
+        """
         if len(self) < 2:
             return True
         data = self.data[:]
         return np.all(np.char.compare_chararrays(data[:-1], data[1:], "<=", False))
 
     def __len__(self):
+        """
+        Get length of field
+        :return: int
+        """
         return len(self.data)
 
     def get_spans(self):
+        """
+        Get spans of field
+        :return: Spans of field
+        """
         return ops.get_spans_for_field(self.data[:])
 
     def apply_filter(self, filter_to_apply, target=None, in_place=False):
@@ -633,24 +899,89 @@ class FixedStringMemField(MemoryField):
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (first). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (last). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (min). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (max). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def isin(self, test_elements:Union[list, set, np.ndarray]):
+        """
+        Returns a boolean array of the same length as field \
+        that is True where an element of field is in test_elements and False otherwise.
+
+        :param test_elements: The values against which to test each value of field.
+        :return: a boolean array of the same length as field
+        """
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
-        "Find the unique elements of FixedStringMemField"
-        return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
+        """
+        Find the unique elements of FixedStringMemField
 
+        :param return_index: boolean, if true returns index of unique elements
+        :param return_inverse: boolean, if true returns result in reverse
+        :param return_counts: boolean, if true returns counts of unique elements
+        :return: ndarray 
+        """
+        return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
 class NumericMemField(MemoryField):
@@ -671,15 +1002,27 @@ class NumericMemField(MemoryField):
         return self._value_wrapper
 
     def is_sorted(self):
+        """
+        Check if sorted
+        :return: bool
+        """
         if len(self) < 2:
             return True
         data = self.data[:]
         return np.all(data[:-1] <= data[1:])
 
     def __len__(self):
+        """
+        Get length of field
+        :return: int
+        """
         return len(self.data)
 
     def get_spans(self):
+        """
+        Get spans of field
+        :return: Spans of field
+        """
         return ops.get_spans_for_field(self.data[:])
 
     def apply_filter(self, filter_to_apply, target=None, in_place=False):
@@ -715,12 +1058,51 @@ class NumericMemField(MemoryField):
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans to (first). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (last). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (minimum). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
@@ -811,10 +1193,24 @@ class NumericMemField(MemoryField):
         return FieldDataOps.logical_not(self._session, self)
     
     def isin(self, test_elements:Union[list, set, np.ndarray]):
+        """
+        Returns a boolean array of the same length as field \
+        that is True where an element of field is in test_elements and False otherwise.
+
+        :param test_elements: The values against which to test each value of field.
+        :return: a boolean array of the same length as field
+        """
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
-        "Find the unique elements of NumericMemField"
+        """
+        Find the unique elements of NumericMemField
+        
+        :param return_index: boolean, if true returns index of unique elements
+        :param return_inverse: boolean, if true returns result in reverse
+        :param return_counts: boolean, if true returns counts of unique elements
+        :return: ndarray 
+        """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -911,15 +1307,67 @@ class CategoricalMemField(MemoryField):
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (first). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (last). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (min). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (max). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def __lt__(self, value):
@@ -941,10 +1389,24 @@ class CategoricalMemField(MemoryField):
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
     def isin(self, test_elements:Union[list, set, np.ndarray]):
+        """
+        Returns a boolean array of the same length as field \
+        that is True where an element of field is in test_elements and False otherwise.
+
+        :param test_elements: The values against which to test each value of field.
+        :return: a boolean array of the same length as field
+        """
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
-        "Find the unique elements of CategoricalMemField"
+        """
+        Find the unique elements of CategoricalMemField
+
+        :param return_index: boolean, if true returns index of unique elements
+        :param return_inverse: boolean, if true returns result in reverse
+        :param return_counts: boolean, if true returns counts of unique elements
+        :return: ndarray 
+        """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1010,15 +1472,67 @@ class TimestampMemField(MemoryField):
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (first). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (last). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (min). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (max). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def __add__(self, second):
@@ -1082,10 +1596,24 @@ class TimestampMemField(MemoryField):
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
     def isin(self, test_elements:Union[list, set, np.ndarray]):
+        """
+        Returns a boolean array of the same length as field \
+        that is True where an element of field is in test_elements and False otherwise.
+
+        :param test_elements: The values against which to test each value of field.
+        :return: a boolean array of the same length as field
+        """
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
-        "Find the unique elements of TimestampMemField"
+        """
+        Find the unique elements of TimestampMemField
+
+        :param return_index: boolean, if true returns index of unique elements
+        :param return_inverse: boolean, if true returns result in reverse
+        :param return_counts: boolean, if true returns counts of unique elements
+        :return: ndarray 
+        """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1172,8 +1700,7 @@ class IndexedStringField(HDF5Field):
 
     def create_like(self, group=None, name=None, timestamp=None):
         """
-        Create an empty field of the same type as this field.
-
+        Create an empty field of IndexedStringField.
         """
         self._ensure_valid()
         return FieldDataOps.indexed_string_create_like(self, group, name, timestamp)
@@ -1266,26 +1793,92 @@ class IndexedStringField(HDF5Field):
         return FieldDataOps.apply_index_to_indexed_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (first). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (last). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (min). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (max). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def isin(self, test_elements:Union[list, set, np.ndarray]):
+        """
+        Returns a boolean array of the same length as field \
+        that is True where an element of field is in test_elements and False otherwise.
+
+        :param test_elements: The values against which to test each value of field.
+        :return: a boolean array of the same length as field
+        """
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
-        "Find the unique elements of IndexedStringField"
+        """
+        Find the unique elements of IndexedStringField
+
+        :param return_index: boolean, if true returns index of unique elements
+        :param return_inverse: boolean, if true returns result in reverse
+        :param return_counts: boolean, if true returns counts of unique elements
+        :return: ndarray 
+        """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1304,6 +1897,7 @@ class FixedStringField(HDF5Field):
                                 write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
+        
         self._ensure_valid()
         return FieldDataOps.fixed_string_field_create_like(self, group, name, timestamp)
 
@@ -1367,26 +1961,92 @@ class FixedStringField(HDF5Field):
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (first). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (last). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (min). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (max). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def isin(self, test_elements:Union[list, set, np.ndarray]):
+        """
+        Returns a boolean array of the same length as field \
+        that is True where an element of field is in test_elements and False otherwise.
+
+        :param test_elements: The values against which to test each value of field.
+        :return: a boolean array of the same length as field
+        """
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
-        "Find the unique elements of FixedStringField"
+        """
+        Find the unique elements of FixedStringField
+
+        :param return_index: boolean, if true returns index of unique elements
+        :param return_inverse: boolean, if true returns result in reverse
+        :param return_counts: boolean, if true returns counts of unique elements
+        :return: ndarray 
+        """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1481,18 +2141,70 @@ class NumericField(HDF5Field):
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (first). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (last). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (min). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (max). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
@@ -1609,10 +2321,24 @@ class NumericField(HDF5Field):
         return FieldDataOps.logical_not(self._session, self)
 
     def isin(self, test_elements:Union[list, set, np.ndarray]):
+        """
+        Returns a boolean array of the same length as field \
+        that is True where an element of field is in test_elements and False otherwise.
+
+        :param test_elements: The values against which to test each value of field.
+        :return: a boolean array of the same length as field
+        """
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
-        "Find the unique elements of NumericField"
+        """
+        Find the unique elements of NumericField
+
+        :param return_index: boolean, if true returns index of unique elements
+        :param return_inverse: boolean, if true returns result in reverse
+        :param return_counts: boolean, if true returns counts of unique elements
+        :return: ndarray 
+        """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1737,18 +2463,70 @@ class CategoricalField(HDF5Field):
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (first). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (last). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (min). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (max). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
@@ -1777,10 +2555,24 @@ class CategoricalField(HDF5Field):
         return FieldDataOps.greater_than_equal(self._session, self, value)
     
     def isin(self, test_elements:Union[list, set, np.ndarray]):
+        """
+        Returns a boolean array of the same length as field \
+        that is True where an element of field is in test_elements and False otherwise.
+
+        :param test_elements: The values against which to test each value of field.
+        :return: a boolean array of the same length as field
+        """
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
-        "Find the unique elements of CategoricalField"
+        """
+        Find the unique elements of CategoricalField
+
+        :param return_index: boolean, if true returns index of unique elements
+        :param return_inverse: boolean, if true returns result in reverse
+        :param return_counts: boolean, if true returns counts of unique elements
+        :return: ndarray 
+        """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
 
@@ -1857,18 +2649,70 @@ class TimestampField(HDF5Field):
         return FieldDataOps.apply_index_to_field(self, index_to_apply, target, in_place)
 
     def apply_spans_first(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (first). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_first(self, spans_to_apply, target, in_place)
 
     def apply_spans_last(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (last). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_last(self, spans_to_apply, target, in_place)
 
     def apply_spans_min(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (min). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (max). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         self._ensure_valid()
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
@@ -1953,10 +2797,24 @@ class TimestampField(HDF5Field):
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
     def isin(self, test_elements:Union[list, set, np.ndarray]):
+        """
+        Returns a boolean array of the same length as field \
+        that is True where an element of field is in test_elements and False otherwise.
+
+        :param test_elements: The values against which to test each value of field.
+        :return: a boolean array of the same length as field
+        """
         return FieldDataOps.apply_isin(self, test_elements)
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
-        "Find the unique elements of TimestampField"
+        """
+        Find the unique elements of TimestampField
+
+        :param return_index: boolean, if true returns index of unique elements
+        :param return_inverse: boolean, if true returns result in reverse
+        :param return_counts: boolean, if true returns counts of unique elements
+        :return: ndarray 
+        """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
       
 
@@ -1989,6 +2847,11 @@ def argsort(field: Field,
 
 
 def dtype_to_str(dtype):
+    """
+    return string name for given data type
+    :param dtype: given data type
+    :return: string name
+    """
     if isinstance(dtype, str):
         return dtype
 
@@ -2220,7 +3083,14 @@ class FieldDataOps:
 
     @staticmethod
     def apply_filter_to_field(source, filter_to_apply, target=None, in_place=False):
-
+        """
+        Apply filter to field  
+        :param source: Field
+        :param filter_to_apply: a Field or numpy array that contains the indices to filter
+        :param target: Optional, Field, if set create a field like as target
+        :param in_place: optional, bool, if set changes data in field
+        :return: Field with filter applied
+        """
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
@@ -2250,6 +3120,14 @@ class FieldDataOps:
 
     @staticmethod
     def apply_index_to_field(source, index_to_apply, target=None, in_place=False):
+        """
+        Apply index to field  
+        :param source: Field
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: Optional, Field, if set create a field like as target
+        :param in_place: bool, if set changes data in field
+        :return: Field with index
+        """
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
@@ -2283,7 +3161,15 @@ class FieldDataOps:
                          spans: Union[Field, np.ndarray],
                          target: Optional[Field] = None,
                          in_place: bool = False) -> Field:
-
+        """
+        Apply spans src   
+        :param source: Field
+        :param predicate: Callable[[np.ndarray, np.ndarray, np.ndarray], Field]
+        :param spans: Field or ndarray
+        :param target: Optional, Field, if set create a field like as target
+        :param in_place: bool, if set changes data in field
+        :return: Field
+        """
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
@@ -2315,7 +3201,15 @@ class FieldDataOps:
                                  spans: Union[Field, np.ndarray],
                                  target: Optional[Field] = None,
                                  in_place: bool = False) -> Field:
-
+        """
+        Apply spans indexed src   
+        :param source: Field
+        :param predicate: Callable[[np.ndarray, np.ndarray, np.ndarray, np.ndarray], Field] 
+        :param spans: Field or ndarray
+        :param target: Optional, Field, if set create a field like as target
+        :param in_place: bool, if set changes data in field
+        :return: Field
+        """
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
@@ -2334,7 +3228,15 @@ class FieldDataOps:
                                     spans: Union[Field, np.ndarray],
                                     target: Optional[Field] = None,
                                     in_place: bool = False) -> Field:
-
+        """
+        Apply spans indexed no src   
+        :param source: Field
+        :param predicate: Callable[[np.ndarray, np.ndarray], Field] 
+        :param spans: Field or ndarray
+        :param target: Optional, Field, if set create a field like as target
+        :param in_place: bool, if set changes data in field
+        :return: Field
+        """
         if in_place is True and target is not None:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
@@ -2352,7 +3254,14 @@ class FieldDataOps:
                           spans: Union[Field, np.ndarray],
                           target: Optional[Field] = None,
                           in_place: bool = None) -> Field:
-
+        """
+        Apply spans (first)   
+        :param source: Field
+        :param spans: Field or ndarray
+        :param target: Optional, Field, if set create a field like as target
+        :param in_place: bool, if set changes data in field
+        :return: Field
+        """
         spans_ = val.array_from_field_or_lower('spans', spans)
         if np.any(spans_[:-1] == spans_[1:]):
             raise ValueError("cannot perform 'first' on spans with empty entries")
@@ -2370,7 +3279,14 @@ class FieldDataOps:
                          spans: Union[Field, np.ndarray],
                          target: Optional[Field] = None,
                          in_place: bool = None) -> Field:
-
+        """
+        Apply spans (last)   
+        :param source: Field
+        :param spans: Field or ndarray
+        :param target: Optional, Field, if set create a field like as target
+        :param in_place: bool, if set changes data in field
+        :return: Field
+        """
         spans_ = val.array_from_field_or_lower('spans', spans)
         if np.any(spans_[:-1] == spans_[1:]):
             raise ValueError("cannot perform 'first' on spans with empty entries")
@@ -2388,7 +3304,14 @@ class FieldDataOps:
                         spans: Union[Field, np.ndarray],
                         target: Optional[Field] = None,
                         in_place: bool = None) -> Field:
-
+        """
+        Apply spans (min)   
+        :param source: Field
+        :param spans: Field or ndarray
+        :param target: Optional, Field, if set create a field like as target
+        :param in_place: bool, if set changes data in field
+        :return: Field
+        """
         spans_ = val.array_from_field_or_lower('spans', spans)
         if np.any(spans_[:-1] == spans_[1:]):
             raise ValueError("cannot perform 'first' on spans with empty entries")
@@ -2406,7 +3329,14 @@ class FieldDataOps:
                         spans: Union[Field, np.ndarray],
                         target: Optional[Field] = None,
                         in_place: bool = None) -> Field:
-
+        """
+        Apply spans (max)   
+        :param source: Field
+        :param spans: Field or ndarray
+        :param target: Optional, Field, if set create a field like as target
+        :param in_place: bool, if set changes data in field
+        :return: Field
+        """
         spans_ = val.array_from_field_or_lower('spans', spans)
         if np.any(spans_[:-1] == spans_[1:]):
             raise ValueError("cannot perform 'first' on spans with empty entries")
@@ -2421,6 +3351,12 @@ class FieldDataOps:
 
     @staticmethod
     def indexed_string_create_like(source, group, name, timestamp):
+        """
+        :param group: h5py group
+        :param name: string
+        :param timestamp: timestamp, see: https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#timestampfield 
+        :return: Indexed string field 
+        """
         if group is None and name is not None:
             raise ValueError("if 'group' is None, 'name' must also be 'None'")
 
@@ -2437,6 +3373,12 @@ class FieldDataOps:
 
     @staticmethod
     def fixed_string_field_create_like(source, group, name, timestamp):
+        """
+        :param group: h5py group
+        :param name: str
+        :param timestamp: TimestampField, see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#timestampfield 
+        :return: FixedStringField or FixedStringMemField
+        """
         if group is None and name is not None:
             raise ValueError("if 'group' is None, 'name' must also be 'None'")
 
@@ -2454,6 +3396,12 @@ class FieldDataOps:
 
     @staticmethod
     def numeric_field_create_like(source, group, name, timestamp):
+        """
+        :param group: h5py group
+        :param name: string
+        :param timestamp: TimestampField, see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#timestampfield 
+        :return: NumericField or NumericMemField
+        """
         if group is None and name is not None:
             raise ValueError("if 'group' is None, 'name' must also be 'None'")
 
@@ -2471,6 +3419,12 @@ class FieldDataOps:
 
     @staticmethod
     def categorical_field_create_like(source, group, name, timestamp):
+        """
+        :param group: h5py group
+        :param name: string
+        :param timestamp: timestamp
+        :return: CategoricalField or CategoricalMemField
+        """
         if group is None and name is not None:
             raise ValueError("if 'group' is None, 'name' must also be 'None'")
 
@@ -2492,6 +3446,12 @@ class FieldDataOps:
 
     @staticmethod
     def timestamp_field_create_like(source, group, name, timestamp):
+        """
+        :param group: h5py group
+        :param name: str
+        :param timestamp: TimestampField, see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#timestampfield 
+        :return: TimestampField, see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#timestampfield
+        """
         if group is None and name is not None:
             raise ValueError("if 'group' is None, 'name' must also be 'None'")
 
@@ -2509,6 +3469,12 @@ class FieldDataOps:
 
     @staticmethod
     def apply_isin(source: Field, test_elements: Union[list, set, np.ndarray]):
+        """
+        Apply isin operation for elements on Field
+        :param source: Field
+        :param test_elements: list, set or ndarray
+        :return: boolean
+        """
         if isinstance(test_elements, set):
             test_elements = list(test_elements)
 
@@ -2519,6 +3485,14 @@ class FieldDataOps:
 
     @staticmethod
     def apply_unique(src: Field, return_index=False, return_inverse=False, return_counts=False) -> np.ndarray:
+        """
+        Find unique elements in field
+        :param src: Field
+        :param return_index: boolean, if true returns index of unique elements
+        :param return_inverse: boolean, if true returns result in reverse
+        :param return_counts: boolean, if true returns counts of unique elements
+        :return: ndarray 
+        """
         if src.indexed:
             return ops.unique_for_indexed_string(src.indices[:], src.values[:], return_index, return_inverse, return_counts) 
         else:

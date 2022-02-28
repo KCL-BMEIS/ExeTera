@@ -746,6 +746,11 @@ def check_if_sorted_for_multi_fields(fields_data):
 
 @njit
 def _get_spans_for_index_string_field(indices,values):
+    """
+    :param indices: Field Array
+    :param values: Field Array
+    :return: Span of indices as List
+    """
     result = []
     result.append(0)
     for i in range(1, len(indices) - 1):
