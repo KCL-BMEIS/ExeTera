@@ -35,27 +35,27 @@ jobs:
         python -m pip install --upgrade pip
         pip install flake8 wheel
         pip install -r requirements.txt
-    - if: runner.os == 'ubuntu-latest'
+    - if: runner.os == 'ubuntu'
       name: Set up GCC
       uses: egor-tensin/setup-gcc@v1
       with:
         version: latest
         platform: x64
-    - if: runner.os == 'windows-latest'
+    - if: runner.os == 'windows'
       name: Set up MinGW
       uses: egor-tensin/setup-mingw@v2
       with:
        platform: x64
     - name: Build package
       run: python setup.py bdist_wheel
-    - if: github.event == 'push' || github.event == 'pull_request'
+    - if: github.event_name == 'push' || github.event_name == 'pull_request'
       name: Test publish package
       run: |
         python3 -m twine upload -r testpypi dist/*
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-    - if: github.event == 'release'
+    - if: github.event_name == 'release'
       name: Publish package on release
       run: |
         python3 -m twine upload dist/*
