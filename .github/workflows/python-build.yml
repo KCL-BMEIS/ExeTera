@@ -35,19 +35,19 @@ jobs:
         python -m pip install --upgrade pip
         pip install flake8 wheel
         pip install -r requirements.txt
-    - if: runner.os == 'ubuntu'
+    - if: runner.os == 'Linux'
       name: Set up GCC
       uses: egor-tensin/setup-gcc@v1
       with:
         version: latest
         platform: x64
-    - if: runner.os == 'windows'
+    - if: runner.os == 'Windows'
       name: Set up MinGW
       uses: egor-tensin/setup-mingw@v2
       with:
        platform: x64
     - name: Build package
-      run: python setup.py bdist_wheel
+      run: python setup.py bdist_wheel twine
     - if: github.event_name == 'push' || github.event_name == 'pull_request'
       name: Test publish package
       run: |
