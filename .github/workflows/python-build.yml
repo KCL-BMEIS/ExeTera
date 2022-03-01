@@ -56,7 +56,7 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.TESTPYPI_API_TOKEN }}
         TWINE_USERNAME: __token__
       run: |
-        echo $TWINE_PASSWORD
+        echo '123'$TWINE_PASSWORD
         python3 -m twine upload -r testpypi dist/* --non-interactive --verbose
 
 
