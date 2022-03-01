@@ -52,12 +52,10 @@ jobs:
       name: Test publish package
       env:
         TWINE_USERNAME: __token__
-
+        TWINE_PASSWORD: ${{ secrets.TESTPYPI_API_TOKEN }}
       run: |
+        echo ${{ secrets.TESTPYPI_API_TOKEN }}
         python3 -m twine upload -r testpypi dist/* --non-interactive --verbose
-        with:
-          TWINE_PASSWORD: ${{ secrets.TESTPYPI_API_TOKEN }}
-
 
 
     - if: github.event_name == 'release'
