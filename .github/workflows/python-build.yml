@@ -24,6 +24,8 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
 
+    environment: deployment
+
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python
