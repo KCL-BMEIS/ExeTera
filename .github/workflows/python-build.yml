@@ -53,7 +53,7 @@ jobs:
     - if: github.event_name == 'push' || github.event_name == 'pull_request'
       name: Test publish package
       env:
-        TWINE_PASSWORD: ${{ secrets.TESTPYPI_API_TOKEN }}
+        TWINE_PASSWORD: ${{ secrets.TESTPYPI }}
         TWINE_USERNAME: __token__
       run: |
         echo '123'$TWINE_PASSWORD
