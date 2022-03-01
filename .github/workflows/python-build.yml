@@ -53,12 +53,10 @@ jobs:
     - if: github.event_name == 'push' || github.event_name == 'pull_request'
       name: Test publish package
       env:
-        TWINE_PASSWORD: ${{ secrets.TESTPYPI }}
         TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.TESTPYPI }}
       run: |
-        echo '123'$TWINE_PASSWORD
         python3 -m twine upload -r testpypi dist/* --non-interactive --verbose
-
 
     - if: github.event_name == 'release'
       name: Publish package on release
