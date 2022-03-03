@@ -1,3 +1,4 @@
+from pickle import FALSE
 import unittest
 
 import numpy as np
@@ -1513,5 +1514,82 @@ class TestFieldUnique(unittest.TestCase):
 
             self.assertEqual(df['ts'].unique().tolist(), [ts1, ts2])
 
+class TestFieldIsIn(unittest.TestCase):
+    def test_module_field_isin(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = df.create_numeric('f', 'int16')
+            f.data.write([1, 2, 3, 4, 5])
+
+            r1 = fields.isin(f, [1,2,3]) # test_element is list
+            self.assertIsInstance(r1, fields.NumericMemField)
+            self.assertEqual(r1.data[:].tolist(), [True, True, True, False, False])
+
+            r2 = fields.isin(f, 3) # single test_element
+            self.assertIsInstance(r2, fields.NumericMemField)
+            self.assertEqual(r2.data[:].tolist(), [False, False, True, False, False])
+
+    def test_isin_on_numeric_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_numeric('f', 'int16').data.write([1, 2, 3, 4, 5])
+
+            # test_element is list
+            self.assertEqual(df['f'].isin([1,2,3]).tolist(), [True, True, True, False, False])
+            # single test_element
+            self.assertEqual(df['f'].isin(3).tolist(), [False, False, True, False, False])
+            self.assertEqual(df['f'].isin(8).tolist(), [False, False, False, False, False])
 
 
+    def test_isin_on_indexed_string_field_with_testelements_all_unique(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_indexed_string('foo').data.write(['a', '', 'apple','app', 'APPLE', 'APP', 'app/', 'apple12', 'ip'])
+
+            self.assertEqual(df['foo'].isin(['APPLE', '']), [False, True, False, False, True, False, False, False, False])
+            self.assertEqual(df['foo'].isin(['app','APP']), [False, False, False, True, False, True, False, False, False])
+            self.assertEqual(df['foo'].isin(['app/','app//']), [False, False, False, False, False, False, True, False, False])
+            self.assertEqual(df['foo'].isin(['apple12','APPLE12', 'apple13']), [False, False, False, False, False, False, False, True, False])
+            self.assertEqual(df['foo'].isin(['ip','ipd']), [False, False, False, False, False, False, False, False, True])
+
+
+    def test_isin_on_indexed_string_field_with_duplicate_in_testelements(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_indexed_string('foo').data.write(['a', '', 'apple','app', 'APPLE', 'APP', 'app/', 'apple12', 'ip'])
+
+            self.assertEqual(df['foo'].isin(['APPLE', '', '', 'APPLE']), [False, True, False, False, True, False, False, False, False])
+            self.assertEqual(df['foo'].isin(['app','APP', 'app', 'APP']), [False, False, False, True, False, True, False, False, False])
+            self.assertEqual(df['foo'].isin(['app/','app//', 'app//']), [False, False, False, False, False, False, True, False, False])
+            self.assertEqual(df['foo'].isin(['APPLE12', 'apple12', 'apple12', 'APPLE12', 'apple13']), [False, False, False, False, False, False, False, True, False])
+            self.assertEqual(df['foo'].isin(['ip','ipd', 'id']), [False, False, False, False, False, False, False, False, True])
+
+
+    def test_isin_on_fixed_string_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            df.create_fixed_string('foo', 2).data.write([b'aa', b'bb', b'cc'])
+
+            self.assertEqual(df['foo'].isin([b'aa', b'zz']).tolist(), [True, False, False])
+
+    def test_isin_on_timestamp_field(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+
+            ts1 = datetime(2021, 12, 1).timestamp()
+            ts2 = datetime(2022, 1, 1).timestamp()
+            ts3 = datetime(2022, 2, 1).timestamp()
+            df.create_timestamp('ts').data.write([ts2, ts3, ts1])
+            self.assertEqual(df['ts'].isin({ts1, ts2}).tolist(), [True, False, True])

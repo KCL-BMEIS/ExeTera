@@ -11,6 +11,8 @@
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
+from typing import Union
+import numpy as np
 
 
 class Field(ABC):
@@ -76,6 +78,10 @@ class Field(ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def isin(self, test_elements:Union[list, set, np.ndarray]):
+        raise NotImplementedError()
+        
+    @abstractmethod   
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         raise NotImplementedError()
 
