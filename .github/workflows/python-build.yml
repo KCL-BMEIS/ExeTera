@@ -50,11 +50,8 @@ jobs:
       run: python setup.py bdist_wheel
     - if: github.event_name == 'push' || github.event_name == 'pull_request'
       name: Test publish package
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.TESTPYPI_API_TOKEN }}
       run: |
-        python3 -m twine upload -r testpypi dist/* --non-interactive --verbose
+        python3 -m twine check dist/*
 
     - if: github.event_name == 'release'
       name: Publish package on release
