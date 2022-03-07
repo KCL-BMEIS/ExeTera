@@ -106,7 +106,7 @@ class HDF5DataFrame(DataFrame):
         """
         Drop a field from this dataframe as well as the HDF5 Group
 
-        :pararm name: name of field to be dropped
+        :param name: name of field to be dropped
         """
         del self._columns[name]
         del self._h5group[name]
@@ -177,7 +177,7 @@ class HDF5DataFrame(DataFrame):
         a detailed description of numeric fields
 
         :param name: name of field to be created
-        :param nformat: A numerical type in the set (int8, uint8, int16, uint18, int32, uint32, int64, uint64, float32, float64). \
+        :param nformat: A numerical type in the set (int8, uint8, int16, uint18, int32, uint32, int64, uint64, float32, float64).
                         It is recommended to avoid uint64 as certain operations in numpy cause conversions to floating point values.
         :param timestamp: optional - If set, the timestamp that should be given to the new field.
         :param chunksize: optional - If set, the chunksize that should be used to create the new field.
@@ -254,7 +254,7 @@ class HDF5DataFrame(DataFrame):
         check if dataframe contains a field by the field object
 
         :param field: the filed object to check, return a tuple(bool,str). The str is the name stored in dataframe.
-        :return: boolean value indicating whether this DataFrame contains a Field
+        :return: bool value indicating whether this DataFrame contains a Field
         """
         if not isinstance(field, fld.Field):
             raise TypeError("The field must be a Field object")
@@ -373,10 +373,10 @@ class HDF5DataFrame(DataFrame):
         Example::
         
             # rename a single field
-            df.rename('a', 'b')
+            df.rename('old_field_name', 'new_field_name')
     
             # rename multiple fields
-            df.rename({'a': 'b', 'b': 'c', 'c': 'a'})
+            df.rename({'old_field_name_a': 'new_field_name_a', 'old_field_name_a': 'new_field_name_b'})
 
         Field renaming can fail if the resulting set of renamed fields would have name clashes. If
         this is the case, none of the rename operations go ahead and the dataframe remains unmodified.
@@ -458,7 +458,8 @@ class HDF5DataFrame(DataFrame):
 
     def apply_filter(self, filter_to_apply, ddf=None):
         """
-        Apply the filter to all the fields in this dataframe, return a dataframe with filtered fields.
+        Apply a filter to all fields in this dataframe, returns \
+        filtered dataframe (itself) or a new target (destination) dataframe
 
         Example::
 
@@ -491,7 +492,8 @@ class HDF5DataFrame(DataFrame):
 
     def apply_index(self, index_to_apply, ddf=None):
         """
-        Apply the index to all the fields in this dataframe, return a dataframe with indexed fields.
+        Apply an index to all fields in this dataframe, returns \
+        filtered dataframe (itself) or a new target (destination) dataframe
 
         Example::
             # apply index inplace
@@ -500,7 +502,6 @@ class HDF5DataFrame(DataFrame):
 
             # apply index and store new result to designated dataframe
             df.apply_index(index, ddf=df2)
-
 
         :param index_to_apply: the index to be applied to the fields, an ndarray of integers
         :param ddf: optional- the destination data frame
@@ -525,17 +526,15 @@ class HDF5DataFrame(DataFrame):
 
     def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):
         """
-        Sort by the values of a field or a list of fields
+        Sort one or multiple fields in dataframe (itself) or a new target (destination) dataframe
 
         Example::
-
             # sort inplace
             df.sort_values(by = 'idx')
 
             # sort and store sorted value in designated dataframe
             df.sort_values(by = 'idx', ddf = ddf)
         
-
         :param by: Name (str) or list of names (str) to sort by.
         :param ddf: optional - the destination data frame
         :param axis: Axis to be sorted. Currently only supports 0
@@ -625,7 +624,7 @@ class HDF5DataFrame(DataFrame):
                        ddf: DataFrame = None,
                        hint_keys_is_sorted=False):
         """
-        Distinct values of a field or a list of fields, return a dataframe with distinct values.
+        Removes duplicated values in a field or list of fields, returns a dataframe with distinct values.
 
         Example::
 

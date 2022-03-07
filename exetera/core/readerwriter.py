@@ -315,10 +315,21 @@ class IndexedStringWriter(Writer):
         super().flush()
 
     def write(self, values):
+        """
+        Writes a list of strings in indexed string form to a field.
+
+        :param values: a list of utf8 strings
+        """
         self.write_part(values)
         self.flush()
 
     def write_part_raw(self, index, values):
+        """
+        Writes index and values to a field.
+
+        :param index: ndarray(np.int64)
+        :param values: ndarray(np.uint8)
+        """
         if index.dtype != np.int64:
             raise ValueError(f"'index' must be an ndarray of '{np.int64}'")
         if values.dtype not in (np.uint8, 'S1'):
@@ -418,16 +429,42 @@ class CategoricalImporter:
         return np.zeros(length, dtype='int8')
 
     def write_part(self, values):
+        """
+        Writes data part to field, follwed by calling flush()
+
+        Example::
+            part = np.array([97, 97, 100])
+            field.write_part(part)
+            field.flush()
+
+        :param values: ndarray (int8) to write to field
+        :return: None
+        """
         self.writer.write_part(values)
 
     def flush(self):
         self.writer.flush()
 
     def write(self, values):
+        """
+        Writes data part to field, and flush field.
+
+        Example::
+            part = np.array([97, 97, 100])
+            field.write(part)
+
+        :param values: ndarray (int8) to write to field
+        :return: None
+        """
         self.write_part(values)
         self.flush()
 
     def write_strings(self, values):
+        """
+        Writes an strings to a field.
+
+        :param values: a list of utf8 strings
+        """
         results = np.zeros(len(values), dtype='int8')
         keys = self.writer.keys
         for i in range(len(values)):
@@ -482,6 +519,16 @@ class CategoricalWriter(Writer):
         super().flush()
 
     def write(self, values):
+        """
+        Writes data part to field, and flush field.
+
+        Example::
+            part = np.array([97, 97, 100])
+            field.write(part)
+
+        :param values: ndarray (int8) to write to field
+        :return: None
+        """
         self.write_part(values)
         self.flush()
 
@@ -511,7 +558,7 @@ class NumericImporter:
         Given a list of strings, parse the strings and write the parsed values. Values that
         cannot be parsed are written out as zero for the values, and zero for the flags to
         indicate that that entry is not valid.
-        
+
         :param values: a list of strings to be parsed
         """
         elements = np.zeros(len(values), dtype=self.data_writer.nformat)
@@ -536,6 +583,12 @@ class NumericImporter:
 
 
     def import_part(self, column_inds, column_vals, column_offsets, col_idx, written_row_count):
+        """
+        :param column_inds: store column indices (ndarray)
+        :param column_vals: store column values (ndarray)
+        :param column_offsets: column offsets (ndarray)
+        """
+
         # elements = np.zeros(written_row_count, dtype=self.data_writer.nformat)
         # validity = np.ones(written_row_count, dtype=bool)
 
@@ -604,6 +657,16 @@ class NumericWriter(Writer):
         return np.zeros(length, dtype=nformat)
 
     def write_part(self, values):
+        """
+        Writes data part to field, and flush field.
+
+        Example::
+            part = np.array([97, 97, 100])
+            field.write(part)
+
+        :param values: ndarray to write to field
+        :return: None
+        """
         if not np.issubdtype(values.dtype, np.dtype(self.nformat)):
             values = values.astype(self.nformat)
         DataWriter.write(self.field, 'values', values, len(values))
@@ -831,6 +894,13 @@ class TimestampWriter(Writer):
         return np.zeros(length, dtype=f'float64')
 
     def write_part(self, values):
+        """
+        Given a list of strings, parse the strings and write the parsed values. Values that
+        cannot be parsed are written out as zero for the values, and zero for the flags to
+        indicate that that entry is not valid.
+
+        :param values: a list of strings to be parsed
+        """
         DataWriter.write(self.field, 'values', values, len(values))
 
     def flush(self):
