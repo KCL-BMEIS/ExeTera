@@ -52,7 +52,7 @@ jobs:
       name: Test publish package
       run: |
         python3 -m twine check dist/*
-        
+
     - if: github.event_name == 'release'
       name: Publish package on release
       run: |
