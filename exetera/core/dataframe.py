@@ -530,8 +530,31 @@ class HDF5DataFrame(DataFrame):
                 else:
                     start_row += chunk_row_size
 
-            
-    def drop_duplicates(self, by: Union[str, List[str]], 
+    def to_pandas(self, row_filter=None, col_filter: Union[str, List[str]] = None):
+        """
+        Convert an ExeTera dataframe to Pandas DataFrame.
+        :param row_filter:
+        :param col_filter:
+        :returns: A pandas dataframe.
+
+        Example::
+
+            pandas_df = df.to_pandas()
+        """
+        col_to_convert = list(self._columns.keys()) if col_filter is None else col_filter
+        if isinstance(col_to_convert, list):  # checking data length if multiple columns
+            bench_length = len(self._columns[col_to_convert[0]].data)
+            for field in col_to_convert:
+                if len(self._columns[field].data) != bench_length:
+                    raise ValueError("All fields must be of the same length.")
+
+        col_to_convert = col_to_convert if isinstance(col_to_convert, list) else [col_to_convert]  # case of one column
+        temp = {}
+        for field in col_to_convert:
+            temp[field] = self._columns[field].data[:] if row_filter is None else np.array(self._columns[field].data[:])[row_filter]
+        return pd.DataFrame(temp)
+
+    def drop_duplicates(self, by: Union[str, List[str]],
                        ddf: DataFrame = None,
                        hint_keys_is_sorted=False):
         """
