@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 from io import BytesIO
-
+from numba import njit
 import h5py
 
 from exetera.core import session
@@ -818,6 +818,74 @@ class TestSessionAggregate(unittest.TestCase):
             s.create_numeric(ds, 'vals', 'int64').data.write(vals)
             s.apply_spans_max(spans, s.get(ds['vals']), dest=s.create_numeric(ds, 'result2', 'int64'))
             self.assertListEqual([0, 8, 6, 9], s.get(ds['result2']).data[:].tolist())
+
+    def test_apply_spans_index_of_min(self):
+        #short one
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        vals = np.asarray([0, 8, 2, 6, 4, 5, 3, 7, 1, 9], dtype=np.int64)
+        with session.Session() as s:
+            spans = s.get_spans(idx)
+            results = s.apply_spans_index_of_min(spans, vals)
+            self.assertListEqual([0, 2, 4, 8], results.tolist())
+
+            idx = np.zeros(2**32+1, dtype=np.int32)
+            vals = np.zeros(2**32+1, dtype=np.int32)
+            spans = s.get_spans(idx)
+            results = s.apply_spans_index_of_min(spans, vals)
+            self.assertEqual(str(results.dtype), 'int64')
+
+        #long one, need ~30G of memory, ~30seconds of running time
+            # idx = np.zeros(4295000000, dtype=np.int32)
+            # vals = np.zeros(4295000000, dtype=np.int32)
+            #
+            # templist = [i for i in range(1000000)]
+            # for i in range((len(idx) // 1000000) - 1):
+            #     idx[i * 1000000:(i + 1) * 1000000] = [i] * 1000000
+            #     vals[i * 1000000:(i + 1) * 1000000] = templist
+            #
+            # spans = s.get_spans(idx)
+            # results = s.apply_spans_index_of_min(spans, vals)
+            # right = [i for i in range(0, 4295000000, 1000000)]
+            # self.assertListEqual(right, results.tolist())
+
+
+    def test_apply_spans_index_of_max(self):
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        vals = np.asarray([0, 8, 2, 6, 4, 5, 3, 7, 1, 9], dtype=np.int64)
+        with session.Session() as s:
+            spans = s.get_spans(idx)
+            results = s.apply_spans_index_of_max(spans, vals)
+            self.assertListEqual([0, 1, 3, 9], results.tolist())
+
+            idx = np.zeros(2**32+1, dtype=np.int32)
+            vals = np.zeros(2**32+1, dtype=np.int32)
+            spans = s.get_spans(idx)
+            results = s.apply_spans_index_of_max(spans, vals)
+            self.assertEqual(str(results.dtype), 'int64')
+
+    def test_apply_spans_index_of_first(self):
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        with session.Session() as s:
+            spans = s.get_spans(idx)
+            results = s.apply_spans_index_of_first(spans)
+            self.assertListEqual([0, 1, 3, 6], results.tolist())
+
+            idx = np.zeros(2**32+1, dtype=np.int32)
+            spans = s.get_spans(idx)
+            results = s.apply_spans_index_of_first(spans)
+            self.assertEqual(str(results.dtype), 'int64')
+
+    def test_apply_spans_index_of_last(self):
+        idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
+        with session.Session() as s:
+            spans = s.get_spans(idx)
+            results = s.apply_spans_index_of_last(spans)
+            self.assertListEqual([0, 2, 5, 9], results.tolist())
+
+            idx = np.zeros(2**32+1, dtype=np.int32)
+            spans = s.get_spans(idx)
+            results = s.apply_spans_index_of_last(spans)
+            self.assertEqual(str(results.dtype), 'int64')
 
     def test_apply_spans_concat(self):
         idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)

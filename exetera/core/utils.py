@@ -425,9 +425,18 @@ def guess_dtype(src_dtype=None, length=None):
     The dtype is specified by two parameters: 1) the source data type, when copy the data from the source;
     or 2) the source data length, when calculating the index or span of the source.
 
-    :param src_dtype:
-    :param length:
-    :return: suggested data type as string
+    :param src_dtype: the data type of the source field, used in min/max type of operations.
+    :param length: the length of the source filed, used in 'index of' type of operations.
+    :return: suggested data type as string.
+
+    Example::
+
+    >>> src_field = df.create_numeric('num', 'int64').data.write([range(10000)])
+    >>> guess_dtype(src_dtype=src_field.data.dtype)
+    int64
+    >>> guess_dtype(length=len(src_file.data))
+    int32
+
     """
     if src_dtype is None and length is None:
         raise ValueError('Please specify at least one parameter to use the guess_dtype function.')

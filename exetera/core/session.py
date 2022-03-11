@@ -435,7 +435,7 @@ class Session(AbstractSession):
             dest_f.data.write(results)
             return results
         else:
-            results = np.zeros(len(spans) - 1, dtype=utils.guess_dtype(length=len(spans)))
+            results = np.zeros(len(spans) - 1, dtype=utils.guess_dtype(length=spans[-1]))
             predicate(spans, results)
             return results
 
@@ -469,7 +469,7 @@ class Session(AbstractSession):
             return results
         else:
             if 'index' in predicate.__name__:
-                data_type = utils.guess_dtype(length=len(spans))
+                data_type = utils.guess_dtype(length=spans[-1])
             else:
                 data_type = utils.guess_dtype(src_dtype=target_.dtype)
             results = np.zeros(len(spans) - 1, dtype=data_type)
