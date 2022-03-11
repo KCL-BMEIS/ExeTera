@@ -530,11 +530,11 @@ class HDF5DataFrame(DataFrame):
                 else:
                     start_row += chunk_row_size
 
-    def to_pandas(self, row_filter=None, col_filter: Union[str, List[str]] = None):
+    def to_pandas(self, row_filter: List[bool] = None, col_filter: Union[str, List[str]] = None):
         """
         Convert an ExeTera dataframe to Pandas DataFrame.
-        :param row_filter:
-        :param col_filter:
+        :param row_filter: A boolean array indicates which rows to export.
+        :param col_filter: String or list of strings indicates which columns to export.
         :returns: A pandas dataframe.
 
         Example::
