@@ -551,7 +551,8 @@ class HDF5DataFrame(DataFrame):
         col_to_convert = col_to_convert if isinstance(col_to_convert, list) else [col_to_convert]  # case of one column
         temp = {}
         for field in col_to_convert:
-            temp[field] = self._columns[field].data[:] if row_filter is None else np.array(self._columns[field].data[:])[row_filter]
+            field_arr = np.array(self._columns[field].data[:])
+            temp[field] = field_arr if row_filter is None else field_arr[row_filter]
         return pd.DataFrame(temp)
 
     def drop_duplicates(self, by: Union[str, List[str]],

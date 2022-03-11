@@ -964,6 +964,10 @@ class TestdataFrameToPandas(unittest.TestCase):
         pddf2 = self.pddf2.astype(pddf1.dtypes)
         self.assertTrue(pddf1.equals(pddf2))
 
+        self.df.create_numeric('num2', 'int32').data.write([i for i in range(30)])
+        self.assertRaises(ValueError, self.df.to_pandas)
+        del self.df['num2']
+
     def test_to_pandas_df_row_filter(self):
         row_filter = [True if i % 2 == 0 else False for i in range(20)]
         pddf1 = self.df.to_pandas(row_filter=row_filter)
