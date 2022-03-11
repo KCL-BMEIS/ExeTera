@@ -110,9 +110,9 @@ class TestUtils(unittest.TestCase):
         dtype = guess_dtype(src_dtype=array.dtype, length=len(array))  # length take precedence
         self.assertEqual('int32', dtype)
 
-        array = np.zeros(2 ** 32+1, 'int32')
+        array = np.zeros(2 ** 32+1, 'int8')
         dtype = guess_dtype(src_dtype=array.dtype)
-        self.assertEqual('int32', dtype)
+        self.assertEqual('int8', dtype)
         dtype = guess_dtype(length=len(array))
         self.assertEqual('int64', dtype)
 
