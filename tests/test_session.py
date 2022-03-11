@@ -828,8 +828,8 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.apply_spans_index_of_min(spans, vals)
             self.assertListEqual([0, 2, 4, 8], results.tolist())
 
-            idx = np.zeros(2**32+1, dtype=np.int32)
-            vals = np.zeros(2**32+1, dtype=np.int32)
+            idx = np.zeros(2**32+1, dtype=np.int8)
+            vals = np.zeros(2**32+1, dtype=np.int8)
             spans = s.get_spans(idx)
             results = s.apply_spans_index_of_min(spans, vals)
             self.assertEqual(str(results.dtype), 'int64')
@@ -857,8 +857,8 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.apply_spans_index_of_max(spans, vals)
             self.assertListEqual([0, 1, 3, 9], results.tolist())
 
-            idx = np.zeros(2**32+1, dtype=np.int32)
-            vals = np.zeros(2**32+1, dtype=np.int32)
+            idx = np.zeros(2**32+1, dtype=np.int8)
+            vals = np.zeros(2**32+1, dtype=np.int8)
             spans = s.get_spans(idx)
             results = s.apply_spans_index_of_max(spans, vals)
             self.assertEqual(str(results.dtype), 'int64')
@@ -870,7 +870,7 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.apply_spans_index_of_first(spans)
             self.assertListEqual([0, 1, 3, 6], results.tolist())
 
-            idx = np.zeros(2**32+1, dtype=np.int32)
+            idx = np.zeros(2**32+1, dtype=np.int8)
             spans = s.get_spans(idx)
             results = s.apply_spans_index_of_first(spans)
             self.assertEqual(str(results.dtype), 'int64')
@@ -882,7 +882,7 @@ class TestSessionAggregate(unittest.TestCase):
             results = s.apply_spans_index_of_last(spans)
             self.assertListEqual([0, 2, 5, 9], results.tolist())
 
-            idx = np.zeros(2**32+1, dtype=np.int32)
+            idx = np.zeros(2**32+1, dtype=np.int8)
             spans = s.get_spans(idx)
             results = s.apply_spans_index_of_last(spans)
             self.assertEqual(str(results.dtype), 'int64')
