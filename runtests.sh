@@ -39,6 +39,7 @@ if [ $do_coverage = true ]
 then
     rm -f .coverage coverage.xml
     coverage run --branch -m unittest -c $*
+    result=$?
     coverage xml
     
     if [ $do_report = true ]
@@ -53,4 +54,7 @@ then
     fi
 else
     python -m unittest -c $*
+    result=$?
 fi
+
+exit $result
