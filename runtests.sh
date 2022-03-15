@@ -2,7 +2,13 @@
 
 do_coverage=false
 do_report=false
+do_html=false
 
+# get the directory the script lives in and cd to it, might want this variable for later additions
+homedir="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$homedir"
+
+# parse arguments
 while [[ $# -gt 0 ]]
 do
     key="$1"
@@ -13,8 +19,11 @@ do
         --report)
             do_report=true
         ;;
+        --html)
+            do_html=true
+        ;;
         --help)
-            echo "runtests.sh [--coverage] [--report] [--help] FILES*"
+            echo "runtests.sh [--coverage] [--report] [--html] [--help] FILES*"
             exit 0
         ;;
         *)
@@ -25,19 +34,23 @@ do
     shift
 done
 
-homedir="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$homedir"
-
+# run tests and other coverage operations if requested
 if [ $do_coverage = true ]
 then
-    rm -f .coverage
-    coverage run -m unittest $*
+    rm -f .coverage coverage.xml
+    coverage run --branch -m unittest -c $*
     coverage xml
-else
-    python -m unittest $*
-fi
+    
+    if [ $do_report = true ]
+    then
+        coverage report
+    fi
 
-if [ $do_report = true ]
-then
-    coverage report
+    if [ $do_html = true ]
+    then
+        rm -rf htmlcov
+        coverage html
+    fi
+else
+    python -m unittest -c $*
 fi
