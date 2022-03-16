@@ -2,7 +2,6 @@ import unittest
 
 import numpy as np
 from io import BytesIO
-from numba import njit
 import h5py
 
 from exetera.core import session

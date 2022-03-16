@@ -2321,7 +2321,6 @@ class FieldDataOps:
         spans_ = val.array_from_field_or_lower('spans', spans)
 
         # step 1: get the indices through the index predicate
-        #results = np.zeros(len(spans) - 1, dtype=np.int64)
         results = predicate(spans_, source.indices[:], source.values[:])
 
         # step 2: run apply_index on the source
