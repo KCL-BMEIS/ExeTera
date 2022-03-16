@@ -762,7 +762,8 @@ def _get_spans_for_index_string_field(indices,values):
 
 
 @njit
-def apply_spans_index_of_min(spans, src_array, dest_array):
+def apply_spans_index_of_min(spans, src_array, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=spans.dtype) if dest_array is None else dest_array
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
@@ -776,7 +777,8 @@ def apply_spans_index_of_min(spans, src_array, dest_array):
 
 
 @njit
-def apply_spans_index_of_min_indexed(spans, src_indices, src_values, dest_array):
+def apply_spans_index_of_min_indexed(spans, src_indices, src_values, dest_array=None):
+    dest_array = np.zeros(len(spans)-1, dtype=spans.dtype) if dest_array is None else dest_array
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
@@ -815,7 +817,8 @@ def apply_spans_index_of_min_indexed(spans, src_indices, src_values, dest_array)
 
 
 @njit
-def apply_spans_index_of_max_indexed(spans, src_indices, src_values, dest_array):
+def apply_spans_index_of_max_indexed(spans, src_indices, src_values, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=spans.dtype) if dest_array is None else dest_array
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
@@ -854,7 +857,9 @@ def apply_spans_index_of_max_indexed(spans, src_indices, src_values, dest_array)
 
 
 @njit
-def apply_spans_index_of_max(spans, src_array, dest_array):
+def apply_spans_index_of_max(spans, src_array, dest_array=None):
+    dest_array = np.zeros(len(spans)-1, dtype=spans.dtype) if dest_array is None else dest_array
+
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
@@ -868,13 +873,17 @@ def apply_spans_index_of_max(spans, src_array, dest_array):
 
 
 @njit
-def apply_spans_index_of_first(spans, dest_array):
+def apply_spans_index_of_first(spans, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=spans.dtype) if dest_array is None else dest_array
     dest_array[:] = spans[:-1]
+    return dest_array
 
 
 @njit
-def apply_spans_index_of_last(spans, dest_array):
+def apply_spans_index_of_last(spans, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=spans.dtype) if dest_array is None else dest_array
     dest_array[:] = spans[1:] - 1
+    return dest_array
 
 
 @njit
@@ -940,25 +949,32 @@ def apply_spans_index_of_last_filter(spans, dest_array, filter_array):
 
 
 @njit
-def apply_spans_count(spans, dest_array):
+def apply_spans_count(spans, dest_array=None):
+    if dest_array is None:
+        dest_array = np.zeros(len(spans) - 1, np.int64)
     for i in range(len(spans)-1):
-        dest_array[i] = np.int64(spans[i+1] - spans[i])
+        dest_array[i] = spans[i+1] - spans[i]
+    return dest_array
 
 
 @njit
-def apply_spans_first(spans, src_array, dest_array):
+def apply_spans_first(spans, src_array, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=src_array.dtype) if dest_array is None else dest_array
     dest_array[:] = src_array[spans[:-1]]
+    return dest_array
 
 
 @njit
-def apply_spans_last(spans, src_array, dest_array):
+def apply_spans_last(spans, src_array, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=src_array.dtype) if dest_array is None else dest_array
     spans = spans[1:]-1
     dest_array[:] = src_array[spans]
+    return dest_array
 
 
 @njit
-def apply_spans_max(spans, src_array, dest_array):
-
+def apply_spans_max(spans, src_array, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=src_array.dtype) if dest_array is None else dest_array
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
@@ -966,11 +982,12 @@ def apply_spans_max(spans, src_array, dest_array):
             dest_array[i] = src_array[cur]
         else:
             dest_array[i] = src_array[cur:next].max()
+    return dest_array
 
 
 @njit
-def apply_spans_min(spans, src_array, dest_array):
-
+def apply_spans_min(spans, src_array, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=src_array.dtype) if dest_array is None else dest_array
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
@@ -978,6 +995,7 @@ def apply_spans_min(spans, src_array, dest_array):
             dest_array[i] = src_array[cur]
         else:
             dest_array[i] = src_array[cur:next].min()
+    return dest_array
 
 
 # def _apply_spans_concat(spans, src_field):

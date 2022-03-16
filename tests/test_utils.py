@@ -13,7 +13,7 @@ import unittest
 
 import numpy as np
 
-from exetera.core.utils import find_longest_sequence_of, to_escaped, bytearray_to_escaped, get_min_max, guess_dtype
+from exetera.core.utils import find_longest_sequence_of, to_escaped, bytearray_to_escaped, get_min_max
 
 class TestUtils(unittest.TestCase):
 
@@ -100,20 +100,4 @@ class TestUtils(unittest.TestCase):
             (min_value, max_value) = get_min_max(value_type)
             self.assertEqual(min_value, expected_min_max_values[value_type][0])
             self.assertEqual(max_value, expected_min_max_values[value_type][1])
-
-    def test_guess_dtype_nparray(self):
-        array = np.zeros(2**16, 'int16')
-        dtype = guess_dtype(src_dtype=array.dtype)
-        self.assertEqual('int16', dtype)
-        dtype = guess_dtype(length=len(array))
-        self.assertEqual('int32', dtype)
-        dtype = guess_dtype(src_dtype=array.dtype, length=len(array))  # length take precedence
-        self.assertEqual('int32', dtype)
-
-        array = np.zeros(2 ** 32+1, 'int8')
-        dtype = guess_dtype(src_dtype=array.dtype)
-        self.assertEqual('int8', dtype)
-        dtype = guess_dtype(length=len(array))
-        self.assertEqual('int64', dtype)
-
 
