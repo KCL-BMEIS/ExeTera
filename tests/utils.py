@@ -17,17 +17,17 @@ RAND_STATE = np.random.RandomState(SEED)
 
 TEST_TYPE_VAR = "TEST_TYPE"
 HARD_FLOATS = [
-    float("nan"),
+    # float("nan"),
     float("-inf"),
     float("+inf"),
     float(np.finfo(np.float32).min),
     float(np.finfo(np.float32).max),
     float(-np.finfo(np.float32).tiny),
     float(np.finfo(np.float32).tiny),
-    float(np.finfo(np.float64).min),
-    float(np.finfo(np.float64).max),
-    float(-np.finfo(np.float64).tiny),
-    float(np.finfo(np.float64).tiny),
+    # float(np.finfo(np.float64).min),
+    # float(np.finfo(np.float64).max),
+    # float(-np.finfo(np.float64).tiny),
+    # float(np.finfo(np.float64).tiny),
 ]
 
 
