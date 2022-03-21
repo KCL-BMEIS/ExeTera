@@ -24,7 +24,7 @@ from exetera.core import validation as val
 
 def isin(field:Field, test_elements:Union[list, set, np.ndarray]):
     """
-    Returns a boolean array of the same length as field \
+    Returns a boolean array of the same length as field
     that is True where an element of field is in test_elements and False otherwise.
 
     :param field: The field to check.
@@ -61,6 +61,7 @@ class HDF5Field(Field):
         Returns whether the field is a valid field object. Fields can become invalid as a result
         of certain operations, such as a field being moved from one dataframe to another. A field
         that is invalid with throw exceptions if any other operation is performed on them.
+        :return: bool
         """
         return self._valid_reference
 
@@ -68,6 +69,7 @@ class HDF5Field(Field):
     def name(self):
         """
         The name of the field within a dataframe, if the field belongs to a dataframe
+        :return: str
         """
         self._ensure_valid()
         return self._field.name.split('/')[-1]
@@ -75,7 +77,8 @@ class HDF5Field(Field):
     @property
     def dataframe(self):
         """
-        The owning dataframe of this field, or None if the field is now owned by a dataframe
+        The owning dataframe of this field, or None if the field is not owned by a dataframe
+        :return str or None
         """
         self._ensure_valid()
         return self._dataframe
@@ -86,6 +89,7 @@ class HDF5Field(Field):
         The timestamp representing the field creation time. This is the time at which the data
         for this field was added to the dataset, rather than the point at which the field wrapper
         was created.
+        :return: timestamp
         """
         self._ensure_valid()
         return self._field.attrs['timestamp']
@@ -142,7 +146,9 @@ class MemoryField(Field):
     @property
     def valid(self):
         """
-        Check if field is valid
+        Returns whether the field is a valid field object. Fields can become invalid as a result
+        of certain operations, such as a field being moved from one dataframe to another. A field
+        that is invalid with throw exceptions if any other operation is performed on them.
         :return: bool
         """
         return True
@@ -150,35 +156,41 @@ class MemoryField(Field):
     @property
     def name(self):
         """
-        :return: None.
+        The name of the field within a dataframe, if the field belongs to a dataframe
+        :return: str or None
         """
         return None
 
     @property
     def dataframe(self):
         """
-        :return: None.
+        The owning dataframe of this field, or None if the field is now owned by a dataframe
         """
         return None
 
     @property
     def timestamp(self):
         """
-        :return: None.
+        The timestamp representing the field creation time. This is the time at which the data
+        for this field was added to the dataset, rather than the point at which the field wrapper
+        was created.
         """
         return None
 
     @property
     def chunksize(self):
         """
-        :return: None.
+        The chunksize for the field. This is not generally required for users, and may be
+        ignored depending on the storage medium.
         """
         return None
 
     @property
     def indexed(self):
         """
-        :return: bool.
+        Whether the field is an indexed field or not. Indexed fields store their data internally
+        as index and value arrays for efficiency, as well as making it accessible through the data
+        property.
         """
         return False
 
@@ -252,26 +264,20 @@ class WriteableFieldArray:
     @property
     def dtype(self):
         """
-        :return: dtype of field array
+        Returns the datatype for the dataset
+        :return: dtype
         """
         return self._dataset.dtype
 
     def __getitem__(self, item):
-        """
-        :return: item in field array
-        """
         return self._dataset[item]
 
     def __setitem__(self, key, value):
-        """
-        Set item in field array
-        :return: None
-        """
         self._dataset[key] = value
 
     def clear(self):
         """
-        Clears field array
+        Replaces current dataset with empty dataset.
         :return: None
         """
         nformat = self._dataset.dtype
@@ -281,14 +287,27 @@ class WriteableFieldArray:
 
     def write_part(self, part):
         """
-        Writes part to field
+        Writes data part to field, followed by calling complete().
+
+        Example::
+            part = np.array([97, 97, 100])
+            field.write_part(part)
+            field.complete()
+
+        :param part: numpy array to write to field
         :return: None
         """
         DataWriter.write(self._field, self._name, part, len(part), dtype=self._dataset.dtype)
 
     def write(self, part):
         """
-        Writes part to field and marks write complete 
+        Writes data to field and marks it as complete.
+
+        Example::
+            part = np.array([97, 97, 100])
+            field.write(part)
+
+        :param part: numpy array to write to field
         :return: None
         """
         if isinstance(part, Field):
@@ -298,6 +317,12 @@ class WriteableFieldArray:
 
     def complete(self):
         """
+        Writes remaining data, used after calling write_part.
+
+        Example::
+            field.write_part(part)
+            field.complete()
+
         :return: None
         """
         DataWriter.flush(self._field[self._name])
@@ -307,7 +332,7 @@ class MemoryFieldArray:
 
     def __init__(self, dtype):
         """
-        :param dtype: dtype of memory field.
+        :param dtype: datatype (dtype) to be used for this memory field.
         """
         self._dtype = dtype
         self._dataset = None
@@ -355,8 +380,15 @@ class MemoryFieldArray:
 
     def write_part(self, part, move_mem=False):
         """
-        :param part: numpy array to write to field
-        :param move_mem: boolean, use part directly or make copy. 
+        Writes data part to field, followed by calling complete().
+
+        Example::
+            part = np.array([97, 97, 100])
+            field.write_part(part)
+            field.complete()
+
+        :param part: numpy array to written to field
+        :param move_mem: boolean, use part provided directly or make copy before writing. 
         :return: None
         """
         if not isinstance(part, np.ndarray):
@@ -374,8 +406,13 @@ class MemoryFieldArray:
 
     def write(self, part):
         """
-        Write part and mark as completed.
-        :param part: Numpy array to write
+        Writes data to field and marks it as complete.
+
+        Example::
+            part = np.array([97, 97, 100])
+            field.write(part)
+
+        :param part: numpy array to write to field
         :return: None
         """
         self.write_part(part)
@@ -383,7 +420,7 @@ class MemoryFieldArray:
 
     def complete(self):
         """
-        :return: None
+        Writes remaining data, used after calling write_part.
         """
         pass
 
@@ -403,7 +440,7 @@ class ReadOnlyIndexedFieldArray:
     def __len__(self):
         """
         Length of field 
-        :return: number
+        :return: int
         """
         # TODO: this occurs because of the initialized state of an indexed string. It would be better for the
         # index to be initialised as [0]
@@ -416,6 +453,7 @@ class ReadOnlyIndexedFieldArray:
     def __getitem__(self, item):
         """
         Return item in field dataset on index
+
         :param item: Index
         :return: Item value from dataset
         """
@@ -470,7 +508,7 @@ class ReadOnlyIndexedFieldArray:
 class WriteableIndexedFieldArray:
     def __init__(self, chunksize, indices, values):
         """
-        :param: chunksize: Size of chunk 
+        :param: chunksize: Size of each chunk
         :param indices: Numpy array of indices
         :param values: Numpy array of values 
         :return: None
@@ -496,7 +534,7 @@ class WriteableIndexedFieldArray:
     @property
     def dtype(self):
         """
-        Returns dtype of field
+        Returns datatype of field
         :return: dtype
         """
         return self._dtype
@@ -545,7 +583,8 @@ class WriteableIndexedFieldArray:
 
     def clear(self):
         """
-        Reset values in field
+        Resets field, clears all indices and values.
+
         :return: None
         """
         self._accumulated = 0
@@ -555,8 +594,14 @@ class WriteableIndexedFieldArray:
 
     def write_part(self, part):
         """
-        Write part to field
-        :param part: ndarray
+        Writes data part to field, followed by calling complete().
+
+        Example::
+            part = np.array([97, 97, 100])
+            field.write_part(part)
+            field.complete()
+
+        :param part: List of strings to be written
         :return: None
         """
         for s in part:
@@ -578,8 +623,13 @@ class WriteableIndexedFieldArray:
 
     def write(self, part):
         """
-        Write part and mark as complete
-        :param part: ndarray
+        Writes data to field and marks it as complete.
+
+        Example::
+            part = np.array([97, 97, 100])
+            field.write(part)
+
+        :param part: List of strings to write to field
         :return: None
         """
         self.write_part(part)
@@ -587,7 +637,12 @@ class WriteableIndexedFieldArray:
 
     def complete(self):
         """
-        Marks write as complete
+        Writes remaining data, used after calling write_part.
+
+        Example::
+            field.write_part(part)
+            field.complete()
+
         :return: None
         """
         if self._value_index != 0:
@@ -615,15 +670,18 @@ class IndexedStringMemField(MemoryField):
 
     def writeable(self):
         """
-        :return: self
+        Indicates whether this field permits write operations. By default, dataframe fields
+        are read-only in order to protect accidental writes to datasets
         """
         return self
 
     def create_like(self, group=None, name=None, timestamp=None):
         """
-        :param group:h5group
-        :param name: string 
-        :param timestamp: timestamp
+        Creates a empty field of same type as this.
+
+        :param group: h5group
+        :param name: Name of new the field
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
         :return: Indexed string field
         """
         return FieldDataOps.indexed_string_create_like(self, group, name, timestamp)
@@ -631,14 +689,16 @@ class IndexedStringMemField(MemoryField):
     @property
     def indexed(self):
         """
-        :return: boolean
+        Whether the field is an indexed field or not. Indexed fields store their data internally
+        as index and value arrays for efficiency, as well as making it accessible through the data
+        property.
         """
         return True
 
     @property
     def data(self):
         """
-        Returns indexes writable field array with values of field
+        Returns indexed writable field array with values from this field
         :return: WriteableIndexedFieldArray
         """
         if self._data_wrapper is None:
@@ -647,8 +707,8 @@ class IndexedStringMemField(MemoryField):
 
     def is_sorted(self):
         """
-        Checks if field is sorted
-        :return: boolean
+        Returns if data in field is sorted
+        :return: bool
         """
         if len(self) < 2:
             return True
@@ -794,7 +854,7 @@ class IndexedStringMemField(MemoryField):
 
     def isin(self, test_elements:Union[list, set, np.ndarray]):
         """
-        Returns a boolean array of the same length as field \
+        Returns a boolean array of the same length as field
         that is True where an element of field is in test_elements and False otherwise.
 
         :param test_elements: The values against which to test each value of field.
@@ -814,7 +874,7 @@ class IndexedStringMemField(MemoryField):
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
         :param return_counts: boolean, if true returns counts of unique elements
-        :return: ndarray 
+        :return: numpy array
         """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
@@ -829,18 +889,27 @@ class FixedStringMemField(MemoryField):
         self._length = length
 
     def writeable(self):
+        """
+        Indicates whether this field permits write operations. By default, dataframe fields
+        are read-only in order to protect accidental writes to datasets
+        """
         return self
 
     def create_like(self, group=None, name=None, timestamp=None):
         """
-        :return: FixedStringMemField
+        Creates a empty field of same type as this.
+
+        :param group: h5group
+        :param name: Name of new the field
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :return: Indexed string field
         """
         return FieldDataOps.fixed_string_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
         """
-        Get data in field
+        Returns moemory field array with values from this field
         :return: MemoryFieldArray
         """
         if self._value_wrapper is None:
@@ -849,7 +918,7 @@ class FixedStringMemField(MemoryField):
 
     def is_sorted(self):
         """
-        Check if field is sorted
+        Returns if data in field is sorted
         :return: bool
         """
         if len(self) < 2:
@@ -989,7 +1058,7 @@ class FixedStringMemField(MemoryField):
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
         :param return_counts: boolean, if true returns counts of unique elements
-        :return: ndarray 
+        :return: numpy array
         """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
@@ -1000,20 +1069,36 @@ class NumericMemField(MemoryField):
         self._nformat = nformat
 
     def writeable(self):
+        """
+        Indicates whether this field permits write operations. By default, dataframe fields
+        are read-only in order to protect accidental writes to datasets
+        """
         return self
 
     def create_like(self, group=None, name=None, timestamp=None):
+        """
+        Creates a empty field of same type as this.
+
+        :param group: h5group
+        :param name: Name of new the field
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :return: Indexed string field
+        """
         return FieldDataOps.numeric_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
+        """
+        Returns memory field array with values from this field
+        :return: MemoryFieldArray
+        """
         if self._value_wrapper is None:
             self._value_wrapper = MemoryFieldArray(self._nformat)
         return self._value_wrapper
 
     def is_sorted(self):
         """
-        Check if sorted
+        Returns if data in field is sorted
         :return: bool
         """
         if len(self) < 2:
@@ -1225,7 +1310,7 @@ class NumericMemField(MemoryField):
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
         :param return_counts: boolean, if true returns counts of unique elements
-        :return: ndarray 
+        :return: numpy array
         """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
@@ -1237,18 +1322,38 @@ class CategoricalMemField(MemoryField):
         self._keys = keys
 
     def writeable(self):
+        """
+        Indicates whether this field permits write operations. By default, dataframe fields
+        are read-only in order to protect accidental writes to datasets
+        """
         return self
 
     def create_like(self, group=None, name=None, timestamp=None):
+        """
+        Creates a empty field of same type as this.
+
+        :param group: h5group
+        :param name: Name of new the field
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :return: Indexed string field
+        """
         return FieldDataOps.categorical_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
+        """
+        Returns memory field array with values from this field
+        :return: MemoryFieldArray
+        """
         if self._value_wrapper is None:
             self._value_wrapper = MemoryFieldArray(self._nformat)
         return self._value_wrapper
 
     def is_sorted(self):
+        """
+        Returns if data in field is sorted
+        :return: bool
+        """
         if len(self) < 2:
             return True
         data = self.data[:]
@@ -1426,7 +1531,7 @@ class CategoricalMemField(MemoryField):
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
         :param return_counts: boolean, if true returns counts of unique elements
-        :return: ndarray 
+        :return: numpy array
         """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
@@ -1437,18 +1542,38 @@ class TimestampMemField(MemoryField):
         super().__init__(session)
 
     def writeable(self):
+        """
+        Indicates whether this field permits write operations. By default, dataframe fields
+        are read-only in order to protect accidental writes to datasets
+        """
         return self
 
     def create_like(self, group=None, name=None, timestamp=None):
+        """
+        Creates a empty field of same type as this.
+
+        :param group: h5group
+        :param name: Name of new the field
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :return: Indexed string field
+        """
         return FieldDataOps.timestamp_field_create_like(self, group, name, timestamp)
 
     @property
     def data(self):
+        """
+        Returns memory field array with values from this field
+        :return: MemoryFieldArray
+        """
         if self._value_wrapper is None:
             self._value_wrapper = MemoryFieldArray(np.float64)
         return self._value_wrapper
 
     def is_sorted(self):
+        """
+        Returns if data in field is sorted
+        :return: bool
+        """
         if len(self) < 2:
             return True
         data = self.data[:]
@@ -1638,7 +1763,7 @@ class TimestampMemField(MemoryField):
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
         :param return_counts: boolean, if true returns counts of unique elements
-        :return: ndarray 
+        :return: numpy array
         """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
@@ -1726,18 +1851,32 @@ class IndexedStringField(HDF5Field):
 
     def create_like(self, group=None, name=None, timestamp=None):
         """
-        Create an empty field of IndexedStringField.
+        Creates a empty field of same type as this.
+
+        :param group: h5group
+        :param name: Name of new the field
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :return: Indexed string field
         """
         self._ensure_valid()
         return FieldDataOps.indexed_string_create_like(self, group, name, timestamp)
 
     @property
     def indexed(self):
+        """
+        Whether the field is an indexed field or not. Indexed fields store their data internally
+        as index and value arrays for efficiency, as well as making it accessible through the data
+        property.
+        """
         self._ensure_valid()
         return True
 
     @property
     def data(self):
+        """
+        Returns indexes writable field array with values of field
+        :return: WriteableIndexedFieldArray
+        """
         self._ensure_valid()
         if self._data_wrapper is None:
             wrapper = \
@@ -1746,6 +1885,10 @@ class IndexedStringField(HDF5Field):
         return self._data_wrapper
 
     def is_sorted(self):
+        """
+        Returns if data in field is sorted
+        :return: bool
+        """
         self._ensure_valid()
         if len(self) < 2:
             return True
@@ -1909,7 +2052,7 @@ class IndexedStringField(HDF5Field):
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
         :param return_counts: boolean, if true returns counts of unique elements
-        :return: ndarray 
+        :return: numpy array
         """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
@@ -1924,12 +2067,23 @@ class FixedStringField(HDF5Field):
         self._length = self._field.attrs['strlen']
 
     def writeable(self):
+        """
+        Indicates whether this field permits write operations. By default, dataframe fields
+        are read-only in order to protect accidental writes to datasets
+        """
         self._ensure_valid()
         return FixedStringField(self._session, self._field, self._dataframe,
                                 write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
-        
+        """
+        Creates a empty field of same type as this.
+
+        :param group: h5group
+        :param name: Name of new the field
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :return: Indexed string field
+        """
         self._ensure_valid()
         return FieldDataOps.fixed_string_field_create_like(self, group, name, timestamp)
 
@@ -1944,6 +2098,10 @@ class FixedStringField(HDF5Field):
         return self._value_wrapper
 
     def is_sorted(self):
+        """
+        Returns if data in field is sorted
+        :return: bool
+        """
         self._ensure_valid()
         if len(self) < 2:
             return True
@@ -2082,7 +2240,7 @@ class FixedStringField(HDF5Field):
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
         :param return_counts: boolean, if true returns counts of unique elements
-        :return: ndarray 
+        :return: numpy array
         """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
@@ -2093,10 +2251,22 @@ class NumericField(HDF5Field):
         self._nformat = self._field.attrs['nformat']
 
     def writeable(self):
+        """
+        Indicates whether this field permits write operations. By default, dataframe fields
+        are read-only in order to protect accidental writes to datasets
+        """
         self._ensure_valid()
         return NumericField(self._session, self._field, None, write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
+        """
+        Creates a empty field of same type as this.
+
+        :param group: h5group
+        :param name: Name of new the field
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :return: Indexed string field
+        """
         self._ensure_valid()
         return FieldDataOps.numeric_field_create_like(self, group, name, timestamp)
 
@@ -2111,6 +2281,10 @@ class NumericField(HDF5Field):
         return self._value_wrapper
 
     def is_sorted(self):
+        """
+        Returns if data in field is sorted
+        :return: bool
+        """
         self._ensure_valid()
         if len(self) < 2:
             return True
@@ -2379,7 +2553,7 @@ class NumericField(HDF5Field):
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
         :param return_counts: boolean, if true returns counts of unique elements
-        :return: ndarray 
+        :return: numpy array
         """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
@@ -2390,11 +2564,23 @@ class CategoricalField(HDF5Field):
         self._nformat = self._field.attrs['nformat'] if 'nformat' in self._field.attrs else 'int8'
 
     def writeable(self):
+        """
+        Indicates whether this field permits write operations. By default, dataframe fields
+        are read-only in order to protect accidental writes to datasets
+        """
         self._ensure_valid()
         return CategoricalField(self._session, self._field, self._dataframe,
                                 write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
+        """
+        Creates a empty field of same type as this.
+
+        :param group: h5group
+        :param name: Name of new the field
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :return: Indexed string field
+        """
         self._ensure_valid()
         return FieldDataOps.categorical_field_create_like(self, group, name, timestamp)
 
@@ -2409,6 +2595,10 @@ class CategoricalField(HDF5Field):
         return self._value_wrapper
 
     def is_sorted(self):
+        """
+        Returns if data in field is sorted
+        :return: bool
+        """
         self._ensure_valid()
         if len(self) < 2:
             return True
@@ -2618,7 +2808,7 @@ class CategoricalField(HDF5Field):
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
         :param return_counts: boolean, if true returns counts of unique elements
-        :return: ndarray 
+        :return: numpy array
         """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
 
@@ -2628,11 +2818,23 @@ class TimestampField(HDF5Field):
         super().__init__(session, group, dataframe, write_enabled=write_enabled)
 
     def writeable(self):
+        """
+        Indicates whether this field permits write operations. By default, dataframe fields
+        are read-only in order to protect accidental writes to datasets
+        """
         self._ensure_valid()
         return TimestampField(self._session, self._field, self._dataframe,
                               write_enabled=True)
 
     def create_like(self, group=None, name=None, timestamp=None):
+        """
+        Creates a empty field of same type as this.
+
+        :param group: h5group
+        :param name: Name of new the field
+        :param timestamp: optional - If set, the timestamp that should be given to the new field.
+        :return: Indexed string field
+        """
         self._ensure_valid()
         return FieldDataOps.timestamp_field_create_like(self, group, name, timestamp)
 
@@ -2647,6 +2849,10 @@ class TimestampField(HDF5Field):
         return self._value_wrapper
 
     def is_sorted(self):
+        """
+        Returns if data in field is sorted
+        :return: bool
+        """
         self._ensure_valid()
         if len(self) < 2:
             return True
@@ -2865,7 +3071,7 @@ class TimestampField(HDF5Field):
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
         :param return_counts: boolean, if true returns counts of unique elements
-        :return: ndarray 
+        :return: numpy array
         """
         return FieldDataOps.apply_unique(self, return_index, return_inverse, return_counts)
       
@@ -2900,9 +3106,9 @@ def argsort(field: Field,
 
 def dtype_to_str(dtype):
     """
-    return string name for given data type
+    Returns string name for given data type
     :param dtype: given data type
-    :return: string name
+    :return: str
     """
     if isinstance(dtype, str):
         return dtype
@@ -3136,7 +3342,8 @@ class FieldDataOps:
     @staticmethod
     def apply_filter_to_field(source, filter_to_apply, target=None, in_place=False):
         """
-        Apply filter to field  
+        Apply filter to field, either in place (itself) or a target (new) field
+
         :param source: Field
         :param filter_to_apply: a Field or numpy array that contains the indices to filter
         :param target: Optional, Field, if set create a field like as target
@@ -3173,7 +3380,8 @@ class FieldDataOps:
     @staticmethod
     def apply_index_to_field(source, index_to_apply, target=None, in_place=False):
         """
-        Apply index to field  
+        Apply index to field, either in place (itself) or a target (new) field
+
         :param source: Field
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: Optional, Field, if set create a field like as target
@@ -3214,7 +3422,8 @@ class FieldDataOps:
                          target: Optional[Field] = None,
                          in_place: bool = False) -> Field:
         """
-        Apply spans src   
+        Apply spans, either in place (itself) or a target (new) field
+
         :param source: Field
         :param predicate: Callable[[np.ndarray, np.ndarray, np.ndarray], Field]
         :param spans: Field or ndarray
@@ -3254,7 +3463,8 @@ class FieldDataOps:
                                  target: Optional[Field] = None,
                                  in_place: bool = False) -> Field:
         """
-        Apply spans indexed src   
+        Apply spans, either in place (itself) or a target (new) field
+
         :param source: Field
         :param predicate: Callable[[np.ndarray, np.ndarray, np.ndarray, np.ndarray], Field] 
         :param spans: Field or ndarray
@@ -3281,7 +3491,8 @@ class FieldDataOps:
                                     target: Optional[Field] = None,
                                     in_place: bool = False) -> Field:
         """
-        Apply spans indexed no src   
+        Apply spans, either in place (itself) or a target (new) field
+
         :param source: Field
         :param predicate: Callable[[np.ndarray, np.ndarray], Field] 
         :param spans: Field or ndarray
@@ -3307,7 +3518,8 @@ class FieldDataOps:
                           target: Optional[Field] = None,
                           in_place: bool = None) -> Field:
         """
-        Apply spans (first)   
+        Apply spans first, either in place (itself) or a target (new) field
+
         :param source: Field
         :param spans: Field or ndarray
         :param target: Optional, Field, if set create a field like as target
@@ -3332,7 +3544,8 @@ class FieldDataOps:
                          target: Optional[Field] = None,
                          in_place: bool = None) -> Field:
         """
-        Apply spans (last)   
+        Apply spans last, either in place (itself) or a target (new) field
+
         :param source: Field
         :param spans: Field or ndarray
         :param target: Optional, Field, if set create a field like as target
@@ -3357,7 +3570,8 @@ class FieldDataOps:
                         target: Optional[Field] = None,
                         in_place: bool = None) -> Field:
         """
-        Apply spans (min)   
+        Apply spans min, either in place (itself) or a target (new) field
+
         :param source: Field
         :param spans: Field or ndarray
         :param target: Optional, Field, if set create a field like as target
@@ -3382,7 +3596,8 @@ class FieldDataOps:
                         target: Optional[Field] = None,
                         in_place: bool = None) -> Field:
         """
-        Apply spans (max)   
+        Apply spans max, either in place (itself) or a target (new) field
+
         :param source: Field
         :param spans: Field or ndarray
         :param target: Optional, Field, if set create a field like as target
@@ -3405,7 +3620,7 @@ class FieldDataOps:
     def indexed_string_create_like(source, group, name, timestamp):
         """
         :param group: h5py group
-        :param name: string
+        :param name: Name of indexed string field
         :param timestamp: timestamp, see: https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#timestampfield 
         :return: Indexed string field 
         """
@@ -3450,7 +3665,7 @@ class FieldDataOps:
     def numeric_field_create_like(source, group, name, timestamp):
         """
         :param group: h5py group
-        :param name: string
+        :param name: str
         :param timestamp: TimestampField, see https://github.com/KCL-BMEIS/ExeTera/wiki/Datatypes#timestampfield 
         :return: NumericField or NumericMemField
         """
@@ -3473,7 +3688,7 @@ class FieldDataOps:
     def categorical_field_create_like(source, group, name, timestamp):
         """
         :param group: h5py group
-        :param name: string
+        :param name: str
         :param timestamp: timestamp
         :return: CategoricalField or CategoricalMemField
         """
@@ -3526,7 +3741,7 @@ class FieldDataOps:
 
         :param source: Field
         :param test_elements: list, set or ndarray
-        :return: boolean
+        :return: bool
         """
         if isinstance(test_elements, set):
             test_elements = list(test_elements)
@@ -3550,7 +3765,7 @@ class FieldDataOps:
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
         :param return_counts: boolean, if true returns counts of unique elements
-        :return: ndarray 
+        :return: numpy array
         """
         if src.indexed:
             return ops.unique_for_indexed_string(src.indices[:], src.values[:], return_index, return_inverse, return_counts) 
