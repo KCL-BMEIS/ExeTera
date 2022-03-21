@@ -804,7 +804,12 @@ class IndexedStringMemField(MemoryField):
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         """
-        Find the unique elements of IndexedStringMemField
+        Find the unique elements of an IndexedStringMemField.
+        Returns the sorted unique elements of an IndexedStringMemField. 
+        There are three optional outputs in addition to the unique elements:
+        (1) the indices of the input array that give the unique values
+        (2) the indices of the unique array that reconstruct the input array
+        (3) the number of times each unique value comes up in the input array
 
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
@@ -974,7 +979,12 @@ class FixedStringMemField(MemoryField):
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         """
-        Find the unique elements of FixedStringMemField
+        Find the unique elements of a FixedStringMemField. 
+        Returns the sorted unique elements of a FixedStringMemField. 
+        There are three optional outputs in addition to the unique elements:
+        (1) the indices of the input array that give the unique values
+        (2) the indices of the unique array that reconstruct the input array
+        (3) the number of times each unique value comes up in the input array
 
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
@@ -1204,7 +1214,13 @@ class NumericMemField(MemoryField):
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         """
-        Find the unique elements of NumericMemField
+        Find the unique elements of a NumericMemField.
+        Returns the sorted unique elements of a NumericMemField. 
+        There are three optional outputs in addition to the unique elements:
+        (1) the indices of the input array that give the unique values
+        (2) the indices of the unique array that reconstruct the input array
+        (3) the number of times each unique value comes up in the input array
+
         
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
@@ -1390,7 +1406,7 @@ class CategoricalMemField(MemoryField):
 
     def isin(self, test_elements:Union[list, set, np.ndarray]):
         """
-        Returns a boolean array of the same length as field \
+        Returns a boolean array of the same length as field 
         that is True where an element of field is in test_elements and False otherwise.
 
         :param test_elements: The values against which to test each value of field.
@@ -1400,7 +1416,12 @@ class CategoricalMemField(MemoryField):
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         """
-        Find the unique elements of CategoricalMemField
+        Find the unique elements of a CategoricalMemField.
+        Returns the sorted unique elements of a CategoricalMemField. 
+        There are three optional outputs in addition to the unique elements:
+        (1) the indices of the input array that give the unique values
+        (2) the indices of the unique array that reconstruct the input array
+        (3) the number of times each unique value comes up in the input array
 
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
@@ -1607,7 +1628,12 @@ class TimestampMemField(MemoryField):
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         """
-        Find the unique elements of TimestampMemField
+        Find the unique elements of a TimestampMemField.
+        Returns the sorted unique elements of a TimestampMemField. 
+        There are three optional outputs in addition to the unique elements:
+        (1) the indices of the input array that give the unique values
+        (2) the indices of the unique array that reconstruct the input array
+        (3) the number of times each unique value comes up in the input array
 
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
@@ -1872,7 +1898,13 @@ class IndexedStringField(HDF5Field):
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         """
-        Find the unique elements of IndexedStringField
+        Find the unique elements of an IndexedStringField.
+        Returns the sorted unique elements of an IndexedStringField. 
+        There are three optional outputs in addition to the unique elements:
+        (1) the indices of the input array that give the unique values
+        (2) the indices of the unique array that reconstruct the input array
+        (3) the number of times each unique value comes up in the input array
+        
 
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
@@ -2040,7 +2072,12 @@ class FixedStringField(HDF5Field):
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         """
-        Find the unique elements of FixedStringField
+        Find the unique elements of a FixedStringField.
+        Returns the sorted unique elements of a FixedStringField. 
+        There are three optional outputs in addition to the unique elements:
+        (1) the indices of the input array that give the unique values
+        (2) the indices of the unique array that reconstruct the input array
+        (3) the number of times each unique value comes up in the input array
 
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
@@ -2332,7 +2369,12 @@ class NumericField(HDF5Field):
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         """
-        Find the unique elements of NumericField
+        Find the unique elements of a NumericField.
+        Returns the sorted unique elements of a NumericField. 
+        There are three optional outputs in addition to the unique elements:
+        (1) the indices of the input array that give the unique values
+        (2) the indices of the unique array that reconstruct the input array
+        (3) the number of times each unique value comes up in the input array
 
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
@@ -2566,8 +2608,13 @@ class CategoricalField(HDF5Field):
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         """
-        Find the unique elements of CategoricalField
-
+        Find the unique elements of a CategoricalField.
+        Returns the sorted unique elements of a CategoricalField. 
+        There are three optional outputs in addition to the unique elements:
+        (1) the indices of the input array that give the unique values
+        (2) the indices of the unique array that reconstruct the input array
+        (3) the number of times each unique value comes up in the input array
+        
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
         :param return_counts: boolean, if true returns counts of unique elements
@@ -2808,7 +2855,12 @@ class TimestampField(HDF5Field):
 
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         """
-        Find the unique elements of TimestampField
+        Find the unique elements of a TimestampField.
+        Returns the sorted unique elements of a TimestampField. 
+        There are three optional outputs in addition to the unique elements:
+        (1) the indices of the input array that give the unique values
+        (2) the indices of the unique array that reconstruct the input array
+        (3) the number of times each unique value comes up in the input array
 
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse
@@ -3471,6 +3523,7 @@ class FieldDataOps:
     def apply_isin(source: Field, test_elements: Union[list, set, np.ndarray]):
         """
         Apply isin operation for elements on Field
+
         :param source: Field
         :param test_elements: list, set or ndarray
         :return: boolean
@@ -3486,7 +3539,13 @@ class FieldDataOps:
     @staticmethod
     def apply_unique(src: Field, return_index=False, return_inverse=False, return_counts=False) -> np.ndarray:
         """
-        Find unique elements in field
+        Find unique elements in field. 
+        Returns the sorted unique elements of a field. 
+        There are three optional outputs in addition to the unique elements:
+        (1) the indices of the input array that give the unique values
+        (2) the indices of the unique array that reconstruct the input array
+        (3) the number of times each unique value comes up in the input array
+        
         :param src: Field
         :param return_index: boolean, if true returns index of unique elements
         :param return_inverse: boolean, if true returns result in reverse

@@ -462,11 +462,11 @@ class HDF5DataFrame(DataFrame):
 
         Example::
 
-            # apply boolean fitler to dataframe in place
+            # apply boolean filter to dataframe in place
             bfilter = np.array([0, 1, 0, 1, 0, 1, 1, 0], dtype='bool')
             df.apply_filter(bfilter)
 
-            # apply numeric fitler to dataframe and store filtered result to designated dataframe
+            # apply numeric filter to dataframe and store filtered result to designated dataframe
             nfilter = np.array([0, 1, 0, 1, 0, 1, 1, 0])
             df.apply_filter(nfilter, ddf = df2)
 
@@ -494,6 +494,7 @@ class HDF5DataFrame(DataFrame):
         Apply the index to all the fields in this dataframe, return a dataframe with indexed fields.
 
         Example::
+
             # apply index inplace
             index = np.array([4, 3, 2, 1, 0])
             df.apply_index(index)
@@ -692,6 +693,7 @@ class HDF5DataFrame(DataFrame):
         Show the basic statistics of the data in each field.
 
         Example::
+
             # Display staticstic results in stdout by default, and return dataframe that contains staticstic results.
             result = df.describe()
 
@@ -896,6 +898,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         Compute count of group values.
 
         Example::
+
             # group by on single field, then compute count
             df.groupby(by = 'foo').count(ddf = ddf)
 
@@ -917,6 +920,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         Compute distinct values of a field or a list of field
 
         Example::
+
             # group by on multiple fields, then compute distinct
             df.groupby(by = ['foo', 'bar', 'baz']).distinct(ddf = ddf)
 
@@ -933,6 +937,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         Compute max of group values.
 
         Example::
+
             # group by on a single field, then compute max on multiple target fields
             df.groupby(by = 'foo').max(target = ['bar','baz'], ddf = ddf)
 
@@ -967,6 +972,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         Compute min of group values.
 
         Example::
+
             # group by on a single field, then compute min on a single target field
             df.groupby(by = 'foo').min(target = 'bar', ddf = ddf)
 
@@ -1001,6 +1007,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         Get first of group values.
 
         Example::
+
             # group by on multiple fields, then compute first on a single target field
             df.groupby(by = ['foobar', 'foo']).first(target = 'bar', ddf = ddf)
 
@@ -1034,6 +1041,7 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         Get last of group values.
 
         Example::
+
             # group by on multiple fields, then compute last on multiple target fields
             df.groupby(by = ['foobar', 'foo']).last(target = ['bar', 'baz'], ddf = ddf)
 
@@ -1068,6 +1076,7 @@ def copy(field: fld.Field, ddf: DataFrame, name: str):
     Copy a field to another dataframe as well as underlying dataset.
 
     Example::
+
         # Copy a field ('foobar') of dataframe (df1) to another dataframe (df2) with new field name ('foo')
         dataframe.copy(df1['foobar'], df2, 'foo')
 
@@ -1090,6 +1099,7 @@ def move(field: fld.Field, ddf: DataFrame, name: str):
     Move a field to another dataframe as well as underlying dataset.
 
     Example::
+
         # Move a field ('foobar') of dataframe (df1) to another dataframe (df2) with new field name ('foo')
         dataframe.move(df1['foobar'], df2, 'foo')
 
