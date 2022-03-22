@@ -9,41 +9,43 @@ In order to store very large data arrays as efficiently as possible, Fields stor
 
 ## Field operations
 Operations on fields can be divided into the following groups:
- * accessing underlying data
- * constructing compatible empty fields
- * arithmetic operations
- * logical operations
- * comparison operations
- * application of filters, indices and spans
+
+ - accessing underlying data
+ - constructing compatible empty fields
+ - arithmetic operations
+ - logical operations
+ - comparison operations
+ - application of filters, indices and spans
 
 ### Accessing underlying data
 
 Underlying data can be accessed as follows:
- * All fields have a `data` property that provides access to the underlying data that they contain. For most field types, it is very efficient to read from and write to this property, provided it is done using slice syntax
-   * Indexed string fields provide `data` as a convenience method, but this should only be used when performance is not a consideration
-   * Indexed string fields provide `indices` and `values` properties should you need to interact with their underlying data efficiently and directly. For the most part, we discourage this and have tried to provide you with all of the methods that you need under the hood
+
+ - All fields have a `data` property that provides access to the underlying data that they contain. For most field types, it is very efficient to read from and write to this property, provided it is done using slice syntax
+ - Indexed string fields provide `data` as a convenience method, but this should only be used when performance is not a consideration
+ - Indexed string fields provide `indices` and `values` properties should you need to interact with their underlying data efficiently and directly. For the most part, we discourage this and have tried to provide you with all of the methods that you need under the hood
 
 ### Constructing compatible empty fields
 
 Fields have a `create_like` method that can be used to construct an empty field of a compatible type
- * when called with no arguments, this creates an in-memory field that can be further manipulated before eventually being assigned to a DataFrame (or not)
- * when called with a DataFrame and a name, it will create an empty field on that DataFrame of the given name that can subsequently be written to
+ - when called with no arguments, this creates an in-memory field that can be further manipulated before eventually being assigned to a DataFrame (or not)
+ - when called with a DataFrame and a name, it will create an empty field on that DataFrame of the given name that can subsequently be written to
 See below for examples
 
 ### Arithmetic operations
 
 Numeric and timestamp fields have the standard set of arithmetic operations that can be applied to them:
- * These are `+`, `-`, `*`, `/`, `//`, `%`, and `divmod`
+ - These are `+`, `-`, `*`, `/`, `//`, `%`, and `divmod`
 
 ### Element-wise logical operators
 
 Numeric fields can have logical operations performed on them on an element-wise basis
- * These are `&`, `|`, `^`
+ - These are `&`, `|`, `^`
 
 ### Comparison operators
 
 Numeric, categorical and timestamp fields have comparison operations that can be applied to them:
- * These are `<`, `<=`, `==`, `|=`, `>=`, `>`
+ - These are `<`, `<=`, `==`, `|=`, `>=`, `>`
 
 
 ## Field usage examples
@@ -149,11 +151,11 @@ In order to maximise performance, both in terms of processing speed and memory f
 # ExeTera Datatypes
 
 ExeTera makes the following datatypes available for use:
-* Variable length (indexed) strings as `IndexedStringField` objects
-* Fixed-length strings as `FixedStringField` objects
-* Numerical values as `NumericField` objects
-* Categorical values as `CategoricalField` objects
-* DateTime / Date values `TimestampField` objects
+- Variable length (indexed) strings as `IndexedStringField` objects
+- Fixed-length strings as `FixedStringField` objects
+- Numerical values as `NumericField` objects
+- Categorical values as `CategoricalField` objects
+- DateTime / Date values `TimestampField` objects
 
 ## `IndexedStringField`
 

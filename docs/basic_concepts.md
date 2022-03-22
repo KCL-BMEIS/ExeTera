@@ -64,19 +64,19 @@ ExeTera encourages the use of strongly-typed fields for fields that represent a 
 
 The following datatypes are provided:
 
-* Numeric fields
-* Categorical fields
-* DateTime / Date fields
-* Fixed string fields
-* Indexed string fields
+- Numeric fields
+- Categorical fields
+- DateTime / Date fields
+- Fixed string fields
+- Indexed string fields
 
 ### Numeric fields
 
 Numeric fields can hold any of the following values:
 
-* bool
-* int8, int16, int32, int64
-* uint8, uint16, uint32, uint64
+- bool
+- int8, int16, int32, int64
+- uint8, uint16, uint32, uint64
 
 Please note, uint64 usage is discouraged. ExeTera makes heavy use of `numpy` under the hood and `numpy` has some odd conventions when it comes to `uint64` processing. In particular:
 ```

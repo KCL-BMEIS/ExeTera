@@ -24,9 +24,10 @@ s = Session()
 
 Once you have a session, the next step is typically to open a dataset.
 Datasets can be opened in one of three modes:
- * read - the dataset can be read from but not written to
- * append - the dataset can be read from and written to
- * write - a new dataset is created (and will overwrite an existing dataset with the same name)
+
+ - read - the dataset can be read from but not written to
+ - append - the dataset can be read from and written to
+ - write - a new dataset is created (and will overwrite an existing dataset with the same name)
 
 ```
 with Session() as s:
@@ -173,5 +174,3 @@ result = session.apply_index(index, session.get(src['foo']) # refer to the field
 result = session.apply_index(index, session.get(src['foo'].data[:]) # refer to the data in the field
 result = session.apply_index(index, raw_foo) # refer to a numpy array
 ```
-
-
