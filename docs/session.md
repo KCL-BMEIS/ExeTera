@@ -12,7 +12,7 @@ Creating a `Session` object can be done multiple ways, but we recommend that you
 Opening and closing datasets is very fast. When working in jupyter notebooks or jupyter lab, please feel free to create a new `Session` object for each cell.
 
 ```
-from hystore.core.session import Session
+from exetera.core.session import Session
 
 # recommended
 with Session() as s:
