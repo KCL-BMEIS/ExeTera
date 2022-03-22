@@ -63,6 +63,7 @@ The metadata is typically loaded for the whole dataset up front, whereas the dat
 ExeTera encourages the use of strongly-typed fields for fields that represent a specific underlying type, such as floating point numbers, integers or categorical variables. These are typically far more efficient to process than string fields and should be used whenever possible.
 
 The following datatypes are provided:
+
  * Numeric fields
  * Categorical fields
  * DateTime / Date fields
@@ -72,6 +73,7 @@ The following datatypes are provided:
 ### Numeric fields
 
 Numeric fields can hold any of the following values:
+
  * bool
  * int8, int16, int32, int64
  * uint8, uint16, uint32, uint64
@@ -146,6 +148,7 @@ This reads the whole of a given field from the dataset.
 
 ## Writing to fields
 Fields are written to in one of three ways:
+
  * one or more calls to `write_part`, followed by `flush`
  * a single call to `write`
  * writing to the data member, if overwriting existing contents but maintaining the field length
