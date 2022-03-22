@@ -1,9 +1,6 @@
 # What is ExeTera
 
-ExeTera is a data curation and analysis software that enables users to work effectively with large, related tables of data. It focuses on three features which we consider essential to being able to effective curate and analyse data:
-1. Scale
-1. Journaling of snapshots
-1. Curation features
+ExeTera is a data curation and analysis software that enables users to work effectively with large, related tables of data. It focuses on the scale and efficiency which we consider essential to being able to effective curate and analyse data:
 
 ## Scale
 
