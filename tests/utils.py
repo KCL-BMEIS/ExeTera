@@ -12,22 +12,45 @@ from exetera.core import session, abstract_types
 
 ArrayLike = Union[MutableSequence, np.ndarray]
 
-SEED = 42
-RAND_STATE = np.random.RandomState(SEED)
+DEFAULT_SEED = 42
+RAND_STATE = np.random.RandomState(DEFAULT_SEED)
 
-TEST_TYPE_VAR = "TEST_TYPE"
+TEST_TYPE_VAR = "TEST_TYPE"  # name of the global variable containing the test type, eg. "slow"
+
+# set of difficult float values to test for as input or output, not an exhaustive list of values to test
 HARD_FLOATS = [
-    # float("nan"),
+    float("nan"),
     float("-inf"),
     float("+inf"),
     float(np.finfo(np.float32).min),
     float(np.finfo(np.float32).max),
     float(-np.finfo(np.float32).tiny),
     float(np.finfo(np.float32).tiny),
-    # float(np.finfo(np.float64).min),
-    # float(np.finfo(np.float64).max),
-    # float(-np.finfo(np.float64).tiny),
-    # float(np.finfo(np.float64).tiny),
+    float(np.finfo(np.float64).min),
+    float(np.finfo(np.float64).max),
+    float(-np.finfo(np.float64).tiny),
+    float(np.finfo(np.float64).tiny),
+    float(np.finfo(np.float64).min),
+    float(np.finfo(np.float64).max),
+    float(-np.finfo(np.float64).tiny),
+    float(np.finfo(np.float64).tiny),
+]
+
+# set of difficult int values to test for as input or output, not an exhaustive list of values to test
+HARD_INTS = [
+    0,
+    int(np.iinfo(np.int8).min),
+    int(np.iinfo(np.int8).max),
+    int(np.iinfo(np.int16).min),
+    int(np.iinfo(np.int16).max),
+    int(np.iinfo(np.int32).min),
+    int(np.iinfo(np.int32).max),
+    int(np.iinfo(np.uint8).max),
+    int(np.iinfo(np.uint16).max),
+    int(np.iinfo(np.uint32).max),
+    int(np.iinfo(np.int64).min),
+    int(np.iinfo(np.int64).max),
+    # int(np.iinfo(np.uint64).max)  # not supported by HDF5?
 ]
 
 
@@ -38,7 +61,7 @@ def utc_timestamp(year, month, day, hour=0, minute=0, second=0, microsecond=0):
     return datetime(year, month, day, hour, minute, second, microsecond, tzinfo=timezone.utc).timestamp()
 
 
-def shuffle_randstate(arr: ArrayLike, seed=SEED) -> ArrayLike:
+def shuffle_randstate(arr: ArrayLike, seed=DEFAULT_SEED) -> ArrayLike:
     """
     Shuffles `arr` based on a random state using seed value `seed`, then returns the shuffled array.
     """
@@ -50,18 +73,18 @@ def shuffle_randstate(arr: ArrayLike, seed=SEED) -> ArrayLike:
 # default field initialization values for every field type, format is:
 # (creator method, field name, args for method, kwargs for method, data)
 DEFAULT_FIELD_DATA = [
-    ("create_numeric", "f_i8", {"nformat": "int8"}, shuffle_randstate(list(range(-10, 10)) + [-(2**7), 2**7 - 1])),
+    ("create_numeric", "f_i8", {"nformat": "int8"}, shuffle_randstate(list(range(-10, 10)) + HARD_INTS)),
     (
         "create_numeric",
         "f_i32",
         {"nformat": "int32"},
-        shuffle_randstate(list(range(-10, 10)) + [-(2**15), 2**15 - 1]),
+        shuffle_randstate(list(range(-10, 10)) + HARD_INTS),
     ),
     (
         "create_numeric",
         "f_i64",
         {"nformat": "int64"},
-        shuffle_randstate(list(range(-10, 10)) + [-(2**31), 2**31 - 1]),
+        shuffle_randstate(list(range(-10, 10)) + HARD_INTS),
     ),
     ("create_numeric", "f_f32", {"nformat": "float32"}, shuffle_randstate(list(range(-10, 10)) + HARD_FLOATS)),
     ("create_numeric", "f_f64", {"nformat": "float64"}, shuffle_randstate(list(range(-10, 10)) + HARD_FLOATS)),
@@ -168,7 +191,7 @@ class SessionTestCase(unittest.TestCase):
 
         return field
 
-    def assertFieldEqual(self, data: ArrayLike, field: abstract_types.Field, msg: Optional[str] = None):
+    def assertFieldEqual(self, data: ArrayLike, field: abstract_types.Field, msg: str = "Error comparing field values"):
         """
         Asserts that `field` has contents equal to `data`, raising an exception with message `msg` if not.
         """
@@ -184,7 +207,7 @@ class SessionTestCase(unittest.TestCase):
         self,
         data: ArrayLike,
         field: abstract_types.Field,
-        msg: Optional[str] = None,
+        msg: str = "Error comparing field values",
         rtol=1e-07,
         atol=0,
         equal_nan=True,

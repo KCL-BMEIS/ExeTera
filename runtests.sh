@@ -38,7 +38,7 @@ done
 if [ $do_coverage = true ]
 then
     rm -f .coverage coverage.xml
-    coverage run --branch -m unittest -c $*
+    coverage run --omit=tests/*.py --branch -m unittest -c $*
     result=$?
     coverage xml
     

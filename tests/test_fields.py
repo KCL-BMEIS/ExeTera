@@ -6,6 +6,9 @@ from io import BytesIO
 
 import h5py
 from datetime import datetime
+from parameterized import parameterized
+
+from .utils import SessionTestCase, shuffle_randstate, allow_slow_tests, DEFAULT_FIELD_DATA
 
 from exetera.core import session
 from exetera.core import fields
@@ -13,22 +16,32 @@ from exetera.core import persistence as per
 from exetera.io import field_importers as fi
 from exetera.core import utils
 
+NUMERIC_ONLY = [d for d in DEFAULT_FIELD_DATA if d[0] == "create_numeric"]
 
-class TestFieldExistence(unittest.TestCase):
 
-    def test_field_truthness(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            dst = s.open_dataset(bio, "w", "src")
-            src=dst.create_dataframe('src')
-            f = s.create_indexed_string(src, "a")
-            self.assertTrue(bool(f))
-            f = s.create_fixed_string(src, "b", 5)
-            self.assertTrue(bool(f))
-            f = s.create_numeric(src, "c", "int32")
-            self.assertTrue(bool(f))
-            f = s.create_categorical(src, "d", "int8", {"no": 0, "yes": 1})
-            self.assertTrue(bool(f))
+class TestDefaultData(SessionTestCase):
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_fields(self, creator, name, kwargs, data):
+        """
+        Tests basic creation of every field type, checking it's contents are actually what was put into them.
+        """
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        
+        # Convert numeric fields and use Numpy's conversion as an oracle to test overflown values in field. If a value
+        # overflows when stored in a field then the field's contents will obviously vary compared to `data`, so change
+        # data to match by using Numpy to handle overflow for us.
+        if "nformat" in kwargs:
+            data = np.asarray(data, dtype=kwargs["nformat"])
+        
+        self.assertFieldEqual(data, f)
+        
+
+class TestFieldExistence(SessionTestCase):
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_field_truthness(self, creator, name, kwargs, data):
+        """Test every field object is considered True."""
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        self.assertTrue(bool(f))
 
 
 class TestFieldGetSpans(unittest.TestCase):
@@ -220,26 +233,29 @@ class TestIndexedStringFields(unittest.TestCase):
             self.assertListEqual([0, 1, 3, 6, 8, 9, 12], s.get_spans(idx))
 
 
-class TestFieldArray(unittest.TestCase):
+class TestFieldArray(SessionTestCase):
+    @parameterized.expand(NUMERIC_ONLY)
+    def test_write_part(self, creator, name, kwargs, data):
+        """
+        Checks that `write_part` will write the data into each field type.
+        """
+        f = self.s.create_numeric(self.df, name, **kwargs)
+        f.data.write_part(data)
+        
+        if "nformat" in kwargs:
+            data = np.asarray(data, dtype=kwargs["nformat"])
+        
+        self.assertFieldEqual(data, f)
 
-    def test_write_part(self):
-        bio = BytesIO()
-        s = session.Session()
-        ds = s.open_dataset(bio, "w", "src")
-        dst = ds.create_dataframe('src')
-        num = s.create_numeric(dst, 'num', 'int32')
-        num.data.write_part(np.arange(10))
-        self.assertListEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], list(num.data[:]))
-
-    def test_clear(self):
-        bio = BytesIO()
-        s = session.Session()
-        ds = s.open_dataset(bio, "w", "src")
-        dst = ds.create_dataframe('src')
-        num = s.create_numeric(dst, 'num', 'int32')
-        num.data.write_part(np.arange(10))
-        num.data.clear()
-        self.assertListEqual([], list(num.data[:]))
+    @parameterized.expand(NUMERIC_ONLY)
+    def test_clear(self, creator, name, kwargs, data):
+        """
+        Checks that `clear` removes data from every field type.
+        """
+        f = self.s.create_numeric(self.df, name, **kwargs)
+        f.data.write_part(data)
+        f.data.clear()
+        self.assertFieldEqual([], f)
 
 
 class TestMemoryFieldCreateLike(unittest.TestCase):
