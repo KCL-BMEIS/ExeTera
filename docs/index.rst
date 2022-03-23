@@ -27,7 +27,6 @@ Getting started
 
    whatisexetera.md
    basic_concepts.md
-   datatypes.md
 
 .. toctree::
     :maxdepth: 1
