@@ -10,7 +10,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  unittests:
 
     runs-on: ${{ matrix.os }}
     strategy:
