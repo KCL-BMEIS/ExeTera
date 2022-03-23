@@ -89,7 +89,7 @@ The work is divided into four tiers:
 
 As all ExeTera data frames are backed up by the drive, filtering operations, either row or column-based, and sorting operations can quickly consume large amounts of memory, as well as being unnecessarily slow to complete. As such, ExeTera would benefit from the ability to present filtered views based on existing dataframes.
 
-This is covered in more detail in [DataFrame Views](Viewer), but to summarise:
+This is covered in more detail in DataFrame Views, but to summarise:
  * Filtering columns should always be able to be a view onto an existing DataFrame
  * Filtering rows should usually be a view onto an existing dataframe, with a corresponding filter fields
  * Sorting rows can potentially be a view onto an existing dataframe, but we may want some API by which the user prefers that to a hard copy of the DataFrame
@@ -125,7 +125,7 @@ HDF5 has worked to provide us a good initial implementation for the serialized d
 3. It has some restrictions on read-based concurrency
 4. The `h5py` python library that wraps the underlying C library is very inefficient, particularly for iteration
 
-These points are described in more detail in [Roadmap: Move away from HDF5](Roadmap-Move-Away-From-HDF5)
+These points are described in more detail in Roadmap: Move away from HDF5.
 
 
 ## Performance and scale

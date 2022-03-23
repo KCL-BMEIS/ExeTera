@@ -149,9 +149,9 @@ This reads the whole of a given field from the dataset.
 ## Writing to fields
 Fields are written to in one of three ways:
 
- * one or more calls to `write_part`, followed by `flush`
- * a single call to `write`
- * writing to the data member, if overwriting existing contents but maintaining the field length
+- one or more calls to `write_part`, followed by `flush`
+- a single call to `write`
+- writing to the data member, if overwriting existing contents but maintaining the field length
 
 ```
 w = session.create_numeric(dataset, 'foo', 'int32')

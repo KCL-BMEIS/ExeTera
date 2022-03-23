@@ -101,7 +101,7 @@ df2['c'] = df3['c'] # copy a field between datasets
 ## Fields
 
 ### Get a field
-The field being loaded must represent a valid field (see [Concepts](Concepts))
+The field being loaded must represent a valid field (see 'Basic Concepts' section).
 
 Getting fields has now been simplified. You can still call session.get, but it is simpler to fetch it directly from a DataFrame.
 
