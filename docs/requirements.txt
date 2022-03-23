@@ -10,4 +10,5 @@ sphinxcontrib-qthelp
 sphinxcontrib-serializinghtml
 sphinx-autodoc-typehints==1.11.1
 myst-parser==0.15.2
+docutils==0.16
 
