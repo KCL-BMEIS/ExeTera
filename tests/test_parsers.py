@@ -226,8 +226,8 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
     def test_read_csv_with_schema_missing_field(self):
         bio = BytesIO()
         with session.Session() as s:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
+            with warnings.catch_warnings(record = True ) as w:
+                warnings.simplefilter("always")
                 dst = s.open_dataset(bio, 'w', 'dst')
                 df = dst.create_dataframe('df')
     
@@ -238,6 +238,7 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
                                  ['2020-05-12 07:00:00', '2020-05-13 01:00:00', '2020-05-14 03:00:00', '2020-05-15 03:00:00', '2020-05-16 03:00:00'])
                 self.assertEqual(df['birthday'].data[:], ['1990-01-01', '1980-03-04', '1970-04-05', '1960-04-05', '1950-04-05'])
                 self.assertEqual(df['postcode'].data[:], ['NW1', 'SW1P', 'E1', '', 'NW3'])
+                self.assertEqual(len(w), 1)
         
 
 class TestSchemaJsonFileReadCSV(TestReadCSV):
