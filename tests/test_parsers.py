@@ -1,5 +1,6 @@
 from unittest import TestCase
 import tempfile
+import warnings
 import os
 from io import BytesIO, StringIO
 import numpy as np
@@ -225,16 +226,18 @@ class TestSchemaDictionaryReadCSV(TestReadCSV):
     def test_read_csv_with_schema_missing_field(self):
         bio = BytesIO()
         with session.Session() as s:
-            dst = s.open_dataset(bio, 'w', 'dst')
-            df = dst.create_dataframe('df')
-
-            missing_schema_dict = {'name': String()}
-            parsers.read_csv(self.csv_file_name, df, missing_schema_dict)
-            self.assertListEqual(df['id'].data[:], ['1','2','3','4','5']) 
-            self.assertEqual([i.replace('\r', '') for i in df['updated_at'].data[:]],  # remove \r due to windows
-                             ['2020-05-12 07:00:00', '2020-05-13 01:00:00', '2020-05-14 03:00:00', '2020-05-15 03:00:00', '2020-05-16 03:00:00'])
-            self.assertEqual(df['birthday'].data[:], ['1990-01-01', '1980-03-04', '1970-04-05', '1960-04-05', '1950-04-05'])
-            self.assertEqual(df['postcode'].data[:], ['NW1', 'SW1P', 'E1', '', 'NW3'])
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                dst = s.open_dataset(bio, 'w', 'dst')
+                df = dst.create_dataframe('df')
+    
+                missing_schema_dict = {'name': String()}
+                parsers.read_csv(self.csv_file_name, df, missing_schema_dict)
+                self.assertListEqual(df['id'].data[:], ['1','2','3','4','5']) 
+                self.assertEqual([i.replace('\r', '') for i in df['updated_at'].data[:]],  # remove \r due to windows
+                                 ['2020-05-12 07:00:00', '2020-05-13 01:00:00', '2020-05-14 03:00:00', '2020-05-15 03:00:00', '2020-05-16 03:00:00'])
+                self.assertEqual(df['birthday'].data[:], ['1990-01-01', '1980-03-04', '1970-04-05', '1960-04-05', '1950-04-05'])
+                self.assertEqual(df['postcode'].data[:], ['NW1', 'SW1P', 'E1', '', 'NW3'])
         
 
 class TestSchemaJsonFileReadCSV(TestReadCSV):
@@ -245,7 +248,7 @@ class TestSchemaJsonFileReadCSV(TestReadCSV):
             dst = s.open_dataset(bio, 'w', 'dst')
             df = dst.create_dataframe('df')
 
-            print('csv_file_name', self.csv_file_name)
+            #print('csv_file_name', self.csv_file_name)
 
             parsers.read_csv(self.csv_file_name, df, schema_file=self.schema_file)
 

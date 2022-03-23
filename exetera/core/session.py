@@ -1149,15 +1149,15 @@ class Session(AbstractSession):
 
         'get_index' maps a primary key ('target') into the space of a foreign key ('foreign_key').
         """
-        print('  building patient_id index')
+        #print('  building patient_id index')
         t0 = time.time()
         target_lookup = dict()
         target_ = val.raw_array_from_parameter(self, "target", target)
         for i, v in enumerate(target_):
             target_lookup[v] = i
-        print(f'  target lookup built in {time.time() - t0}s')
+        #print(f'  target lookup built in {time.time() - t0}s')
 
-        print('  perform initial index')
+        #print('  perform initial index')
         t0 = time.time()
         foreign_key_elems = val.raw_array_from_parameter(self, "foreign_key", foreign_key)
         # foreign_key_index = np.asarray([target_lookup.get(i, -1) for i in foreign_key_elems],
@@ -1171,7 +1171,7 @@ class Session(AbstractSession):
                 current_invalid += 1
                 target_lookup[k] = index
             foreign_key_index[i_k] = index
-        print(f'  initial index performed in {time.time() - t0}s')
+        #print(f'  initial index performed in {time.time() - t0}s')
 
         if destination is not None:
             if val.is_field_parameter(destination):

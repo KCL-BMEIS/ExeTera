@@ -50,10 +50,10 @@ def _make_test_data(schema, count, chunk_row_size, fields_to_use=None):
         elif s['type'] == 'float':
             arr = rng.uniform(size=count)
             columns[s['name']] = arr
-            for x in arr:
-                if len(str(x)) > 30:
-                    print('float')
-                    print(x)
+            #for x in arr:
+            #    if len(str(x)) > 30:
+            #        print('float')
+            #        print(x)
 
         elif s['type'] == 'int':
             arr = rng.randint(10, size = count)
