@@ -1,0 +1,11 @@
+id,FirstName,LastName,bmi,has_diabetes,height_cm,year_of_birth
+0,"Grace","None",39,1,130,1967
+1,"Carol","Nobody",38,0,119,1975
+2,"Wendy","Random",28,0,128,1926
+3,"Mallory","Nobody",25,0,117,1944
+4,"Xavier","Unknown",29,1,190,1974
+5,"Olivia","Thunk",26,0,107,2004
+6,"Xavier","Anon",30,0,175,1973
+7,"Xavier","Null",37,0,140,1963
+8,"Ivan","Bloggs",37,0,134,1999
+9,"Trudy","Bar",28,0,116,1929
