@@ -1,3 +1,4 @@
+jinja2==3.0.3
 commonmark==0.9.1
 recommonmark==0.6.0
 Sphinx==3.3.0
@@ -11,4 +12,3 @@ sphinxcontrib-serializinghtml
 sphinx-autodoc-typehints==1.11.1
 myst-parser==0.15.2
 docutils==0.16
-
