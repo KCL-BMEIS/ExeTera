@@ -658,11 +658,14 @@ def get_spans_for_field(ndarray):
 
     results[0] = True
     results[-1] = True
-    return np.nonzero(results)[0]
+    if len(ndarray) < utils.INT64_INDEX_LENGTH:
+        return np.nonzero(results)[0].astype('int32')
+    else:
+        return np.nonzero(results)[0]  # int64 by default
 
 
 @njit
-def _get_spans_for_2_fields_by_spans(span0, span1):
+def _get_spans_for_2_fields_by_spans(span0, span1):  # suggested, as can use int32 as span dtype
     spans = []
     j=0
     for i in range(len(span0)):
@@ -681,21 +684,21 @@ def _get_spans_for_2_fields_by_spans(span0, span1):
 @njit
 def _get_spans_for_2_fields(ndarray0, ndarray1):
     count = 0
-    spans = np.zeros(len(ndarray0)+1, dtype=np.uint32)
+    spans = np.zeros(len(ndarray0) + 1, dtype=np.int64)
     spans[0] = 0
     for i in np.arange(1, len(ndarray0)):
-        if ndarray0[i] != ndarray0[i-1] or ndarray1[i] != ndarray1[i-1]:
+        if ndarray0[i] != ndarray0[i - 1] or ndarray1[i] != ndarray1[i - 1]:
             count += 1
             spans[count] = i
-    spans[count+1] = len(ndarray0)
-    return spans[:count+2]
+    spans[count + 1] = len(ndarray0)
+    return spans[:count + 2]
 
     
 @njit
 def _get_spans_for_multi_fields(fields_data):
     count = 0
     length = len(fields_data[0])
-    spans = np.zeros(length + 1, dtype = np.uint32)
+    spans = np.zeros(length + 1, dtype=np.int64)
     spans[0] = 0
 
     for i in np.arange(1, length):
@@ -704,11 +707,11 @@ def _get_spans_for_multi_fields(fields_data):
             if f_d[i] != f_d[i - 1]:
                 not_equal = True
                 break
-        
+
         if not_equal:
             count += 1
             spans[count] = i
-        
+
     spans[count + 1] = length
     return spans[:count + 2]
 
