@@ -77,6 +77,9 @@ chunk_sizes = {
 
 
 def try_str_to_float_to_int(value, invalid=0):
+    """
+    DEPRECATED.
+    """
     try:
         return True, int(float(value))
     except ValueError:
@@ -84,6 +87,9 @@ def try_str_to_float_to_int(value, invalid=0):
 
 
 def try_str_to_bool(value, invalid=0):
+    """
+    DEPRECATED.
+    """
     try:
         return True, bool(value)
     except ValueError:
@@ -91,6 +97,9 @@ def try_str_to_bool(value, invalid=0):
 
 
 def try_str_to_int(value, invalid=0):
+    """
+    DEPRECATED.
+    """
     try:
         return True, int(value)
     except ValueError:
@@ -98,6 +107,9 @@ def try_str_to_int(value, invalid=0):
 
 
 def try_str_to_float(value, invalid=0):
+    """
+    DEPRECATED.
+    """
     try:
         return True, float(value)
     except ValueError:
@@ -168,7 +180,6 @@ def _apply_sort_to_array(index, values):
 
 @njit
 def _apply_sort_to_index_values(index, indices, values):
-
     s_indices = np.zeros_like(indices, dtype=np.int64)
     s_values = np.zeros_like(values)
     accumulated = np.int64(0)
@@ -190,6 +201,9 @@ def _apply_sort_to_index_values(index, indices, values):
 
 # TODO: merge implementation may still be required in the medium term
 def dataset_merge_sort(group, index, fields):
+    """
+    DEPRECATED.
+    """
     raise NotImplementedError()
     # def sort_comparison(*args):
     #     if len(args) == 1:
@@ -238,6 +252,9 @@ def dataset_merge_sort(group, index, fields):
 
 @contextmanager
 def temp_dataset():
+    """
+    DEPRECATED.
+    """    
     try:
         uid = str(uuid.uuid4())
         while os.path.exists(uid + '.hdf5'):
@@ -537,6 +554,9 @@ def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
 
 # TODO - this can go if it isn't needed
 def timestamp_to_date(values):
+    """
+    DEPRECATED
+    """
     results = np.zeros(len(values), dtype='|S10')
     template = "{:04d}-{:02d}-{:02d}"
     for i_r in range(len(values)):
@@ -547,6 +567,9 @@ def timestamp_to_date(values):
 # TODO: refactor into datastore
 @jit
 def filtered_iterator(values, filter, default=np.nan):
+    """
+    DEPRECATED
+    """
     for i in range(len(values)):
         if filter[i]:
             yield default
@@ -579,6 +602,9 @@ def _values_from_reader_or_ndarray(name, field):
 
 # TODO: handle usage of reader
 def filter_duplicate_fields(field):
+    """
+    DEPRECATED
+    """
     field_ = val.array_from_field_or_lower('field', field)
     filter_ = np.ones(len(field_), dtype=bool)
     _filter_duplicate_fields(field_, filter_)
@@ -598,6 +624,9 @@ def _filter_duplicate_fields(field, filter):
 
 
 def foreign_key_is_in_primary_key(primary_key, foreign_key):
+    """
+    DEPRECATED
+    """
     val._check_is_reader_or_ndarray('primary_key', primary_key)
     val._check_is_reader_or_ndarray('foreign_key', foreign_key)
     if isinstance(primary_key, rw.Reader):
@@ -664,7 +693,9 @@ def _aggregate_impl(predicate, fkey_indices=None, fkey_index_spans=None,
 
 
 class DataStore:
-
+    """
+    DEPRECATED. Please use Session instead.
+    """
     def __init__(self, chunksize=DEFAULT_CHUNKSIZE,
                  timestamp=str(datetime.now(timezone.utc))):
         if not isinstance(timestamp, str):

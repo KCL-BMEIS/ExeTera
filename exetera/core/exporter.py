@@ -8,6 +8,9 @@ from exetera.core import utils, persistence
 from exetera.core import readerwriter as rw
 
 def transform_from_reader_type(reader):
+    """
+    DEPRECATED.
+    """
     if isinstance(reader, rw.FixedStringReader):
         return lambda x: x.decode()
     if isinstance(reader, rw.TimestampReader):
@@ -16,6 +19,9 @@ def transform_from_reader_type(reader):
 
 
 def schema_from_reader_type(reader):
+    """
+    DEPRECATED.
+    """
     if isinstance(reader, rw.IndexedStringReader):
         return 'string'
 
@@ -23,6 +29,7 @@ def schema_from_reader_type(reader):
 
 def export_to_csv(destination, datastore, fields):
     """
+    DEPRECATED. Please use to_csv method in dataframe.
     Export selected fields of selected dataframe to csv file.
     """
     expected_length = None
@@ -62,6 +69,9 @@ def export_to_csv(destination, datastore, fields):
 
 
 def export_schema(destination, readers):
+    """
+    DEPRECATED.
+    """
     names = [r.name.split('/')[-1] for r in readers]
     schema_dict = {}
     for n in names:
