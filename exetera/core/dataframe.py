@@ -700,6 +700,7 @@ class HDF5DataFrame(DataFrame):
         Group DataFrame using a field or a list of field, return a groupby object.
 
         Example::
+
             df = ... # df contains two fields:
                      # field "foo" with data [1, 0, 0, 1, 1]
                      # field "bar" with data ["b", "b", "a", "a", "b"]

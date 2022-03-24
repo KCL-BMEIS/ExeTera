@@ -122,12 +122,21 @@ class HDF5Field(Field):
         return True
 
     def get_spans(self):
+        """
+        Get spans of the field.
+        """
         raise NotImplementedError("Please use get_spans() on specific fields, not the field base class.")
 
     def apply_filter(self, filter_to_apply, dstfld=None):
+        """
+        Apply filter on the field.
+        """
         raise NotImplementedError("Please use apply_filter() on specific fields, not the field base class.")
 
     def apply_index(self, index_to_apply, dstfld=None):
+        """
+        Apply index on the field.
+        """
         raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
 
     def _ensure_valid(self):
@@ -202,9 +211,15 @@ class MemoryField(Field):
         return True
 
     def apply_filter(self, filter_to_apply, dstfld=None):
+        """
+        Apply filter on the field.
+        """
         raise NotImplementedError("Please use apply_filter() on specific fields, not the field base class.")
 
     def apply_index(self, index_to_apply, dstfld=None):
+        """
+        Apply index on the field.
+        """
         raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
 
 
@@ -219,6 +234,9 @@ class ReadOnlyFieldArray:
 
     @property
     def dtype(self):
+        """
+        Return datatype of field.
+        """
         return self._dataset.dtype
 
     def __getitem__(self, item):
@@ -229,18 +247,30 @@ class ReadOnlyFieldArray:
                               "for a writeable copy of the field")
 
     def clear(self):
+        """
+        Clear Field Array.
+        """
         raise PermissionError("This field was created read-only; call <field>.writeable() "
                               "for a writeable copy of the field")
 
     def write_part(self, part):
+        """
+        Write data part to field.
+        """
         raise PermissionError("This field was created read-only; call <field>.writeable() "
                               "for a writeable copy of the field")
 
     def write(self, part):
+        """
+        Write data to field.
+        """
         raise PermissionError("This field was created read-only; call <field>.writeable() "
                               "for a writeable copy of the field")
 
     def complete(self):
+        """
+        Mark writing completed, usually used after calling write_part.
+        """
         raise PermissionError("This field was created read-only; call <field>.writeable() "
                               "for a writeable copy of the field")
 
@@ -317,7 +347,7 @@ class WriteableFieldArray:
 
     def complete(self):
         """
-        Writes remaining data, used after calling write_part.
+        Mark writing completed, usually used after calling write_part.
 
         Example::
             field.write_part(part)
@@ -420,7 +450,7 @@ class MemoryFieldArray:
 
     def complete(self):
         """
-        Writes remaining data, used after calling write_part.
+        Mark writing completed, usually used after calling write_part.
         """
         pass
 
@@ -448,6 +478,9 @@ class ReadOnlyIndexedFieldArray:
 
     @property
     def dtype(self):
+        """
+        Get datatype of field.
+        """
         return self._dtype
 
     def __getitem__(self, item):
@@ -489,18 +522,30 @@ class ReadOnlyIndexedFieldArray:
                               "for a writeable copy of the field")
 
     def clear(self):
+        """
+        Clears field array.
+        """
         raise PermissionError("This field was created read-only; call <field>.writeable() "
                               "for a writeable copy of the field")
 
     def write_part(self, part):
+        """
+        Writes data part to field.
+        """
         raise PermissionError("This field was created read-only; call <field>.writeable() "
                               "for a writeable copy of the field")
 
     def write(self, part):
+        """
+        Writes data to field.
+        """
         raise PermissionError("This field was created read-only; call <field>.writeable() "
                               "for a writeable copy of the field")
 
     def complete(self):
+        """
+        Mark writing completed, usually used after calling write_part.
+        """
         raise PermissionError("This field was created read-only; call <field>.writeable() "
                               "for a writeable copy of the field")
 
@@ -637,7 +682,7 @@ class WriteableIndexedFieldArray:
 
     def complete(self):
         """
-        Writes remaining data, used after calling write_part.
+        Mark writing completed, usually used after calling write_part.
 
         Example::
             field.write_part(part)
@@ -1201,6 +1246,19 @@ class NumericMemField(MemoryField):
         return FieldDataOps.apply_spans_min(self, spans_to_apply, target, in_place)
 
     def apply_spans_max(self, spans_to_apply, target=None, in_place=False):
+        """
+        Apply spans (max). This operation doesn't modify the field on which it
+        is called unless 'in_place is set to true'. The user can specify a 'target' field that
+        the reindexed data is written to.
+
+        :param index_to_apply: a Field or numpy array that contains the indices
+        :param target: if set, this is the field that is written to. This field must be writable.
+            If 'target' is set, 'in_place' must be False.
+        :param in_place: if True, perform the operation destructively on this field. This field
+            must be writable. If 'in_place' is True, 'target' must be None
+        :return: The respanned field. This is a new field instance unless 'target' is set, in which
+            case it is the target field, or unless 'in_place' is True, in which case it is this field.
+        """
         return FieldDataOps.apply_spans_max(self, spans_to_apply, target, in_place)
 
     def __add__(self, second):
@@ -1363,12 +1421,18 @@ class CategoricalMemField(MemoryField):
         return len(self.data)
 
     def get_spans(self):
+        """
+        Get spans of field.
+        """
         return ops.get_spans_for_field(self.data[:])
 
     # Note: key is presented as value: str, even though the dictionary must be presented
     # as str: value
     @property
     def keys(self):
+        """
+        Get keys.
+        """
         kv = self._keys.values()
         kn = self._keys.keys()
         keys = dict(zip(kv, kn))
@@ -1583,6 +1647,9 @@ class TimestampMemField(MemoryField):
         return len(self.data)
 
     def get_spans(self):
+        """
+        Get spans of field.
+        """
         return ops.get_spans_for_field(self.data[:])
 
     def apply_filter(self, filter_to_apply, target=None, in_place=False):
@@ -1905,6 +1972,9 @@ class IndexedStringField(HDF5Field):
 
     @property
     def indices(self):
+        """
+        Get indices.
+        """
         self._ensure_valid()
         if self._index_wrapper is None:
             wrapper = WriteableFieldArray if self._write_enabled else ReadOnlyFieldArray
@@ -1913,6 +1983,9 @@ class IndexedStringField(HDF5Field):
 
     @property
     def values(self):
+        """
+        Get values.
+        """
         self._ensure_valid()
         if self._value_wrapper is None:
             wrapper = WriteableFieldArray if self._write_enabled else ReadOnlyFieldArray
@@ -1924,6 +1997,9 @@ class IndexedStringField(HDF5Field):
         return len(self.data)
 
     def get_spans(self):
+        """
+        Get spans of field
+        """
         self._ensure_valid()
         return ops._get_spans_for_index_string_field(self.indices[:], self.values[:])
 
@@ -2089,6 +2165,9 @@ class FixedStringField(HDF5Field):
 
     @property
     def data(self):
+        """
+        Get data.
+        """
         self._ensure_valid()
         if self._value_wrapper is None:
             if self._write_enabled:
@@ -2113,6 +2192,9 @@ class FixedStringField(HDF5Field):
         return len(self.data)
 
     def get_spans(self):
+        """
+        Get spans of field.
+        """
         self._ensure_valid()
         return ops.get_spans_for_field(self.data[:])
 
@@ -2272,6 +2354,9 @@ class NumericField(HDF5Field):
 
     @property
     def data(self):
+        """
+        Get data.
+        """
         self._ensure_valid()
         if self._value_wrapper is None:
             if self._write_enabled:
@@ -2314,6 +2399,9 @@ class NumericField(HDF5Field):
             return fld
 
     def get_spans(self):
+        """
+        Get spans of field.
+        """
         self._ensure_valid()
         return ops.get_spans_for_field(self.data[:])
 
@@ -2586,6 +2674,9 @@ class CategoricalField(HDF5Field):
 
     @property
     def data(self):
+        """
+        Get data.
+        """
         self._ensure_valid()
         if self._value_wrapper is None:
             if self._write_enabled:
@@ -2610,11 +2701,17 @@ class CategoricalField(HDF5Field):
         return len(self.data)
 
     def get_spans(self):
+        """
+        Get spans of field.
+        """
         self._ensure_valid()
         return ops.get_spans_for_field(self.data[:])
 
     @property
     def nformat(self):
+        """
+        Get numeric format.
+        """
         self._ensure_valid()
         return self._nformat
 
@@ -2622,6 +2719,9 @@ class CategoricalField(HDF5Field):
     # as str: value
     @property
     def keys(self):
+        """
+        Get keys.
+        """
         self._ensure_valid()
         if isinstance(self._field['key_values'][0], str):  # convert into bytearray to keep up with linux
             kv = [bytes(i, 'utf-8') for i in self._field['key_values']]
@@ -2840,6 +2940,9 @@ class TimestampField(HDF5Field):
 
     @property
     def data(self):
+        """
+        Get data.
+        """
         self._ensure_valid()
         if self._value_wrapper is None:
             if self._write_enabled:
@@ -2864,6 +2967,9 @@ class TimestampField(HDF5Field):
         return len(self.data)
 
     def get_spans(self):
+        """
+        Get spans of field.
+        """
         self._ensure_valid()
         return ops.get_spans_for_field(self.data[:])
 
