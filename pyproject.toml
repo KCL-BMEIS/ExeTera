@@ -6,4 +6,4 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ExeTera"
 
-dependencies = ["numpy", "pandas", "h5py", "numba"]
+dependencies = ["numpy", "pandas", "h5py", "numba", "parameterized"]

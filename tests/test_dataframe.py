@@ -1,3 +1,4 @@
+import pandas as pd
 from exetera.core.operations import INVALID_INDEX
 import unittest
 from io import BytesIO
@@ -930,7 +931,65 @@ class TestDataFrameToCSV(unittest.TestCase):
         with open(csv_file_name, 'r') as f:
             self.assertEqual(f.readlines(), ['val1\n', '0\n', '2\n'])
 
-        os.close(fd_csv)      
+        os.close(fd_csv)
+
+
+class TestdataFrameToPandas(unittest.TestCase):
+
+    def setUp(self):
+        numeric_data = [i for i in range(20)]
+        fixed_str_data = [b'a' for i in range(20)]
+        ts_data = [1632234128 + i for i in range(20)]
+        categorical_data = [1 for i in range(20)]
+        idx_str_data = ['abc' for i in range(20)]
+
+        bio = BytesIO()
+        self.s = session.Session()
+        dst = self.s.open_dataset(bio, 'w', 'dst')
+        self.df = dst.create_dataframe('df')
+        self.df.create_numeric('num', 'int32').data.write(numeric_data)
+        self.df.create_fixed_string('fs1', 1).data.write(fixed_str_data)
+        self.df.create_timestamp('ts1').data.write(ts_data)
+        self.df.create_categorical('c1', 'int32', {'a': 1, 'b': 2}).data.write(categorical_data)
+        self.df.create_indexed_string('is1').data.write(idx_str_data)
+
+        self.pddf2 = pd.DataFrame(
+            {'num': numeric_data, 'fs1': fixed_str_data, 'ts1': ts_data, 'c1': categorical_data, 'is1': idx_str_data})
+
+    def tearDown(self):
+        self.s.close()
+
+    def test_to_pandas_df(self):
+        pddf1 = self.df.to_pandas()
+        pddf2 = self.pddf2.astype(pddf1.dtypes)
+        self.assertTrue(pddf1.equals(pddf2))
+
+        self.df.create_numeric('num2', 'int32').data.write([i for i in range(30)])
+        self.assertRaises(ValueError, self.df.to_pandas)
+        del self.df['num2']
+
+    def test_to_pandas_df_row_filter(self):
+        row_filter = [True if i % 2 == 0 else False for i in range(20)]
+        pddf1 = self.df.to_pandas(row_filter=row_filter)
+        pddf2 = self.pddf2.astype(pddf1.dtypes).loc[row_filter].reset_index(drop=True)
+        self.assertTrue(pddf1.equals(pddf2))
+
+    def test_to_pandas_df_col_filter(self):
+        pddf1 = self.df.to_pandas(col_filter='num')
+        pddf2 = pd.DataFrame(self.pddf2['num']).astype(pddf1.dtypes)
+        self.assertTrue(pddf1.equals(pddf2))
+
+        pddf1 = self.df.to_pandas(col_filter=['num', 'fs1', 'ts1', 'c1'])
+        pddf2 = self.pddf2.astype(pddf1.dtypes)[['num', 'fs1', 'ts1', 'c1']]
+        self.assertTrue(pddf1.equals(pddf2))
+
+    def test_to_pandas_df_filter(self):
+        row_filter = [True if i % 2 == 0 else False for i in range(20)]
+        col_filter = ['num', 'fs1', 'ts1', 'c1']
+        pddf1 = self.df.to_pandas(row_filter=row_filter, col_filter=col_filter)
+        pddf2 = self.pddf2[col_filter].loc[row_filter].astype(pddf1.dtypes).reset_index(drop=True)
+        self.assertTrue(pddf1.equals(pddf2))
+
 
 class TestDataFrameDescribe(unittest.TestCase):
 
