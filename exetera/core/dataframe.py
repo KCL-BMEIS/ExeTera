@@ -463,17 +463,17 @@ class HDF5DataFrame(DataFrame):
 
         Example::
 
-            df = ... # df contains a field ('foo') with data: ["a", "b", "c", "d", "e", "f", "g", "h"]
+            df = ... # df contains a field ('foo') with data: ["a", "b", "c", "d", "e", "f", "g"]
 
             # apply boolean filter to dataframe in place
-            bfilter = np.array([0, 1, 0, 1, 0, 1, 1, 0], dtype='bool')
+            bfilter = np.array([0, 1, 0, 1, 0, 1, 1], dtype='bool')
             df.apply_filter(bfilter)
-            print(df['foo']) # prints ["b", "d", "f", "g"]
+            print(df['foo'].data[:])     # prints ["b", "d", "f", "g"]
 
             # apply numeric filter to dataframe and store filtered result to designated dataframe
             nfilter = np.array([0, 1, 0, 1, 0, 1, 1, 0])
             df.apply_filter(nfilter, ddf = df2)
-            print(df2['foo']) # prints ["b", "d", "f", "g"]
+            print(df2['foo'].data[0:10]) # prints ["b", "d", "f", "g"]
 
 
         :param filter_to_apply: the filter to be applied to the source field, an array of boolean
@@ -506,11 +506,11 @@ class HDF5DataFrame(DataFrame):
             # apply index inplace
             index = np.array([4, 3, 2, 1, 0])
             df.apply_index(index)
-            print(df['foo']) # prints ["e", "d", "c", "b", "a"]
+            print(df['foo'].data[:])     # prints ["e", "d", "c", "b", "a"]
 
             # apply index and store new result to designated dataframe
             df.apply_index(index, ddf=df2)
-            print(df2['foo']) # prints ["e", "d", "c", "b", "a"]
+            print(df2['foo'].data[0:10]) # prints ["e", "d", "c", "b", "a"]
 
 
         :param index_to_apply: the index to be applied to the fields, an ndarray of integers
@@ -539,15 +539,16 @@ class HDF5DataFrame(DataFrame):
         Sort one or multiple fields in dataframe (itself) or a new target (destination) dataframe
 
         Example::
-            df = ... # df contains a field ('idx') with data: ["a", "c", "e", "h", "g", "b", "d", "f"]
+
+            df = ... # df contains a field ('idx') with data: ["a", "c", "e", "g", "f", "b", "d"]
 
             # sort inplace
             df.sort_values(by = 'idx')
-            print(df['idx'])  # prints ["a", "b", "c", "d", "e", "f", "g", "h"]
+            print(df['idx'].data[:])      # prints ["a", "b", "c", "d", "e", "f", "g"]
 
             # sort and store sorted value in designated dataframe
             df.sort_values(by = 'idx', ddf = df2)
-            print(df2['idx'])  # prints ["a", "b", "c", "d", "e", "f", "g", "h"]
+            print(df2['idx'].data[:10])  # prints ["a", "b", "c", "d", "e", "f", "g"]
 
         
         :param by: Name (str) or list of names (str) to sort by.
@@ -642,16 +643,25 @@ class HDF5DataFrame(DataFrame):
         Removes duplicated values in a field or list of fields, returns a dataframe with distinct values.
 
         Example::
-            df = ... # df contains two fields ["foo", "bar"] with two data arrays respectively: [1, 0, 0, 1], ["b", "b", "a", "a"]
+
+            df = ... # df contains two fields:
+                     # field "foo" with data [1, 0, 0, 1]
+                     # field "bar" with data ["b", "b", "a", "a"]
 
             # return distinct values of a single field
-            df.drop_duplicates(by = 'foo', ddf = ddf)
-            print(ddf['foo'])  # prints [0, 1]
+            df.drop_duplicates(by = 'foo', ddf = df2)
+            print(df2["foo"].data[:])  # prints [0, 1]
 
             # return distinct values of multiple fields
-            df.drop_duplicates(by = ['foo', 'bar'], ddf = ddf)
-            print(ddf['foo'])  # prints [0,  0, 1, 1]
-            print(ddf['bar'])  # prints ["a", "b", "a", "b"]
+            df.drop_duplicates(by = ['foo', 'bar'], ddf = df3)
+            # print dataframe (df3) data:
+            #
+            # "foo", "bar"
+            # -------------
+            #   0     "a"
+            #   0     "b"
+            #   1     "a"
+            #   1     "b"
 
         
         :param by: Name (str) or list of names (str) to distinct.
@@ -666,19 +676,29 @@ class HDF5DataFrame(DataFrame):
         Group DataFrame using a field or a list of field, return a groupby object.
 
         Example::
-
-            df = ... # df contains two fields ["foo", "bar"] with two data arrays respectively: [1, 0, 0, 1, 1], ["b", "b", "a", "a", "b"]
+            df = ... # df contains two fields:
+                     # field "foo" with data [1, 0, 0, 1, 1]
+                     # field "bar" with data ["b", "b", "a", "a", "b"]
 
             # group by on single field, then compute max
             df.groupby(by = 'bar').max(ddf = ddf)
-            print(ddf['bar'])      # prints ["a", "b"]
-            print(ddf['foo_max'])  # prints [1, 1]
+            # print dataframe (ddf) data:
+            #
+            # "bar", "foo_max"
+            # ----------------
+            #  "a"      1
+            #  "b"      1
 
             # group by on multiple field, then compute count
             df.groupby(by = ['foo', 'bar']).count(ddf = ddf)
-            print(ddf['foo'])      # prints [0, 0, 1, 1]
-            print(ddf['bar'])      # prints ["a", "b", "a", "b"]
-            print(ddf['count'])    # prints [1, 1, 1, 2]
+            # print dataframe (ddf) data:
+            #
+            # "foo", "bar", "count"
+            # ----------------------
+            #   0     "a"      1
+            #   0     "b"      1
+            #   1     "a"      1
+            #   1     "b"      2
 
 
         :param by: Name (str) or list of names (str) to group by.
@@ -718,21 +738,72 @@ class HDF5DataFrame(DataFrame):
 
         Example::
 
-            # Display staticstic results in stdout by default, and return dataframe that contains staticstic results.
+            df = ... # df contains three fields:
+                     # field "foo" with data [1, 0, 0, 1, 1]
+                     # field "bar" with data ["b", "b", "a", "a", "b"]
+                     # field "baz" with data [3.5, 6.0, 4.2, 7.2, 5.5]
+
+            # Display statistics results in stdout by default,
+            # and return dataframe that contains staticstic results.
             result = df.describe()
+            # Statistics results displayed
+            #
+            # fields    foo          baz
+            # ---------------------------------
+            # count      5           5
+            # mean       0.60        5.28
+            # std        0.49        1.31
+            # min        0.00        3.50
+            # 25%        0.00        3.51
+            # 50%        0.00        3.51
+            # 75%        0.00        3.52
+            # max        1.00        7.20
+
 
             # Not display staticstic results
             result = df.describe(output='None')
 
-            # Include a single field and exclude multiple fields
-            reuslt = df.describe(include='foo', exclude=['bar', 'baz'])
+
+            # Include multiple fields
+            reuslt = df.describe(include=['foo', 'bar', 'baz'])
+            # Statistics results displayed
+            #
+            # fields              foo             bar             baz
+            # --------------------------------------------------------
+            # count                 5               5               5
+            # unique              NaN               2             NaN
+            # top                 NaN            b'b'             NaN
+            # freq                NaN               3             NaN
+            # mean               0.60             NaN            5.28
+            # std                0.49             NaN            1.31
+            # min                0.00             NaN            3.50
+            # 25%                0.00             NaN            3.51
+            # 50%                0.00             NaN            3.51
+            # 75%                0.00             NaN            3.52
+            # max                1.00             NaN            7.20
+
 
             # Include multiple data types
-            result = df.describe(include=[np.int32, np.bytes_])
+            result = df.describe(include = [np.bytes_, np.float32])
+            # Statistics results displayed
+            #
+            # fields              bar             baz
+            # -----------------------------------------
+            # count                 5               5
+            # unique                2             NaN
+            # top                b'b'             NaN
+            # freq                  3             NaN
+            # mean                NaN            5.28
+            # std                 NaN            1.31
+            # min                 NaN            3.50
+            # 25%                 NaN            3.51
+            # 50%                 NaN            3.51
+            # 75%                 NaN            3.52
+            # max                 NaN            7.20
 
 
         :param include: The field name or data type or simply 'all' to indicate the fields included in the calculation.
-        :param exclude: The filed name or data type to exclude in the calculation.
+        :param exclude: The field name or data type to exclude in the calculation.
         :param output: Display the result in stdout if set to terminal, otherwise silent.
         :return: A dataframe contains the statistic results.
 
@@ -928,9 +999,12 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
             # group by on single field, then compute count
             df.groupby(by = 'foo').count(ddf = ddf)
-
-            print(ddf['foo'])      # prints [0, 1]
-            print(ddf['count'])    # prints [2, 3]
+            # print dataframe (ddf) data:
+            #
+            # "foo", "count"
+            # -------------
+            #   0     2
+            #   1     3
 
 
         :param ddf: the destination data frame
@@ -952,13 +1026,20 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
         Example::
 
-            df = ... # df contains two fields ["foo", "bar"] with two data arrays respectively: [1, 0, 0, 1, 1], ["b", "b", "a", "a", "b"]
+            df = ... # df contains two fields:
+                     # field "foo" with data [1, 0, 0, 1, 1]
+                     # field "bar" with data ["b", "b", "a", "a", "b"]
 
             # group by on multiple fields, then compute distinct
             df.groupby(by = ['foo', 'bar']).distinct(ddf = ddf)
-
-            print(ddf['foo'])      # prints [0, 0, 1, 1]
-            print(ddf['bar'])      # prints ["a", "b", "a", "b"]
+            # print dataframe (ddf) data:
+            #
+            # "foo", "bar"
+            # -------------
+            #   0     "a"
+            #   0     "b"
+            #   1     "a"
+            #   1     "b"
 
 
         :param ddf: the destination data frame
@@ -975,15 +1056,19 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
         Example::
 
-            df = ... # df contains two fields ["foo", "bar", "baz"] with three data arrays respectively:
-                      [1, 0, 0, 1, 1], ["b", "b", "a", "a", "b"], [3.5, 6.0, 4.2, 7.2, 5.5]
+            df = ... # df contains three fields:
+                     # field "foo" with data [1, 0, 0, 1, 1]
+                     # field "bar" with data ["b", "b", "a", "a", "b"]
+                     # field "baz" with data [3.5, 6.0, 4.2, 7.2, 5.5]
 
             # group by on a single field, then compute max on multiple target fields
             df.groupby(by = 'bar').max(target = ['foo','baz'], ddf = ddf)
-
-            print(ddf['bar'])      # prints ["a", "b"]
-            print(ddf['foo_max'])  # prints [1, 1]
-            print(ddf['baz_max'])  # prints [7.2, 6.0]
+            # print dataframe (ddf) data:
+            #
+            # "bar", "foo_max", "baz_max"
+            # ---------------------------
+            #  "a"      1         7.2
+            #  "b"      1         6.0
 
 
         :param target: Name (str) or list of names (str) to compute max.
@@ -1018,13 +1103,18 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
         Example::
 
-            df = ... # df contains two fields ["foo", "bar"] with two data arrays respectively: [1, 0, 0, 1, 1], ["b", "b", "a", "a", "b"]
+            df = ... # df contains two fields:
+                     # field "foo" with data [1, 0, 0, 1, 1]
+                     # field "bar" with data ["b", "b", "a", "a", "b"]
 
             # group by on a single field, then compute min on a single target field
             df.groupby(by = 'bar').min(target = 'foo', ddf = ddf)
-
-            print(ddf['bar'])      # prints ["a", "b"]
-            print(ddf['foo_min'])  # prints [0, 0]
+            # print dataframe (ddf) data:
+            #
+            # "bar", "foo_min"
+            # -------------
+            #  "a"      0
+            #  "b"      0
 
 
         :param target: Name (str) or list of names (str) to compute min.
@@ -1059,15 +1149,21 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
         Example::
 
-            df = ... # df contains two fields ["foo", "bar", "baz"] with three data arrays respectively:
-                      [1, 0, 0, 1, 1], ["b", "b", "a", "a", "b"], [3.5, 6.0, 4.2, 7.2, 5.5]
+            df = ... # df contains three fields:
+                     # field "foo" with data [1, 0, 0, 1, 1]
+                     # field "bar" with data ["b", "b", "a", "a", "b"]
+                     # field "baz" with data [3.5, 6.0, 4.2, 7.2, 5.5]
 
             # group by on multiple fields, then compute first on a single target field
             df.groupby(by = ['foo', 'bar']).first(target = 'baz', ddf = ddf)
-
-            print(ddf['foo'])        # prints [0, 0, 1, 1]
-            print(ddf['bar'])        # prints ["a", "b", "a", "b"]
-            print(ddf['baz_first'])  # prints [4.2, 6.0, 7.2, 3.5]
+            # print dataframe (ddf) data:
+            #
+            # "foo", "bar", "baz_first"
+            # -------------------------
+            #   0     "a"       4.2
+            #   0     "b"       6.0
+            #   1     "a"       7.2
+            #   1     "b"       3.5
 
 
         :param target: Name (str) or list of names (str) to get first value.
@@ -1101,15 +1197,21 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
 
         Example::
 
-            df = ... # df contains two fields ["foo", "bar", "baz"] with three data arrays respectively:
-                      [1, 0, 0, 1, 1], ["b", "b", "a", "a", "b"], [3.5, 6.0, 4.2, 7.2, 5.5]
+            df = ... # df contains three fields:
+                     # field "foo" with data [1, 0, 0, 1, 1]
+                     # field "bar" with data ["b", "b", "a", "a", "b"]
+                     # field "baz" with data [3.5, 6.0, 4.2, 7.2, 5.5]
 
-            # group by on multiple fields, then compute last on multiple target fields
-            df.groupby(by = ['foo', 'bar']).last(target = 'baz', ddf = ddf)
-
-            print(ddf['foo'])        # prints [0, 0, 1, 1]
-            print(ddf['bar'])        # prints ["a", "b", "a", "b"]
-            print(ddf['baz_last'])  # prints  [4.2, 6.0, 7.2, 5.5]
+            # group by on multiple fields, then compute first on a single target field
+            df.groupby(by = ['foo', 'bar']).first(target = 'baz', ddf = ddf)
+            # print dataframe (ddf) data:
+            #
+            # "foo", "bar", "baz_first"
+            # -------------------------
+            #   0     "a"       4.2
+            #   0     "b"       6.0
+            #   1     "a"       7.2
+            #   1     "b"       5.5
 
 
         :param target: Name (str) or list of names (str) to get last value.
