@@ -15,6 +15,9 @@ class Reader:
 
 
 class IndexedStringReader(Reader):
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, field):
         Reader.__init__(self, field)
         if 'fieldtype' not in field.attrs.keys():
@@ -68,6 +71,9 @@ class IndexedStringReader(Reader):
 
 
 class NumericReader(Reader):
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, field):
         Reader.__init__(self, field)
         if 'fieldtype' not in field.attrs.keys():
@@ -96,6 +102,9 @@ class NumericReader(Reader):
 
 
 class CategoricalReader(Reader):
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, field):
         Reader.__init__(self, field)
         if 'fieldtype' not in field.attrs.keys():
@@ -128,6 +137,9 @@ class CategoricalReader(Reader):
 
 
 class FixedStringReader(Reader):
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, field):
         Reader.__init__(self, field)
         if 'fieldtype' not in field.attrs.keys():
@@ -156,6 +168,9 @@ class FixedStringReader(Reader):
 
 
 class TimestampReader(Reader):
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, field):
         Reader.__init__(self, field)
         if 'fieldtype' not in field.attrs.keys():
@@ -218,6 +233,9 @@ class Writer:
 
 
 class IndexedStringWriter(Writer):
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, group, name,
                  timestamp=None, write_mode='write'):
         if timestamp is None:
@@ -354,6 +372,9 @@ class IndexedStringWriter(Writer):
 # TODO: should produce a warning for unmappable strings and a corresponding filter, rather
 # than raising an exception; or at least have a mode where this is possible
 class LeakyCategoricalImporter:
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, group, name, categories, out_of_range,
                  timestamp=None, write_mode='write'):
         if timestamp is None:
@@ -415,6 +436,9 @@ class LeakyCategoricalImporter:
 # TODO: should produce a warning for unmappable strings and a corresponding filter, rather
 # than raising an exception; or at least have a mode where this is possible
 class CategoricalImporter:
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, group, name, categories,
                  timestamp=None, write_mode='write'):
         if timestamp is None:
@@ -481,6 +505,9 @@ class CategoricalImporter:
 
 
 class CategoricalWriter(Writer):
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, group, name, categories,
                  timestamp=None, write_mode='write'):
         if timestamp is None:
@@ -534,6 +561,9 @@ class CategoricalWriter(Writer):
 
 
 class NumericImporter:
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, group, name, nformat, parser, invalid_value=0,
                  validation_mode='allow_empty', create_flag_field=True, flag_field_suffix='_valid',
                  timestamp=None, write_mode='write'):
@@ -639,6 +669,9 @@ class NumericImporter:
 
 
 class NumericWriter(Writer):
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, group, name, nformat,
                  timestamp=None, write_mode='write'):
         if timestamp is None:
@@ -685,6 +718,9 @@ class NumericWriter(Writer):
 
 
 class FixedStringWriter(Writer):
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, group, name, strlen,
                  timestamp=None, write_mode='write'):
         if timestamp is None:
@@ -724,6 +760,9 @@ class FixedStringWriter(Writer):
 
 
 class DateTimeImporter:
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, group, name, create_day_field=False,
                  optional=True, timestamp=None, write_mode='write'):
         if timestamp is None:
@@ -786,6 +825,9 @@ class DateTimeImporter:
 
 # TODO writers can write out more than one field; offset could be done this way
 class DateTimeWriter(Writer):
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, group, name,
                  timestamp=None, write_mode='write'):
         if timestamp is None:
@@ -838,6 +880,9 @@ class DateTimeWriter(Writer):
 
 
 class DateWriter(Writer):
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, group, name,
                  timestamp=None, write_mode='write'):
         if timestamp is None:
@@ -878,6 +923,9 @@ class DateWriter(Writer):
 
 
 class TimestampWriter(Writer):
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, group, name,
                  timestamp=None, write_mode='write'):
         if timestamp is None:
@@ -916,6 +964,9 @@ class TimestampWriter(Writer):
 
 
 class OptionalDateImporter:
+    """
+    DEPRECATED. Please use dataframe and fields instead.
+    """
     def __init__(self, datastore, group, name, create_day_field=False,
                  optional=True, timestamp=None, write_mode='write'):
         if timestamp is None:
