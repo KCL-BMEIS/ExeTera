@@ -44,6 +44,44 @@ class TestFieldExistence(SessionTestCase):
         self.assertTrue(bool(f))
 
 
+class TestFieldDataOps(SessionTestCase):
+    '''
+    Test data operations for each different field.
+    1, field is fixed, otherwise needs to use coordinate number operations to calculate the result.
+    2, one test function per unary/binary operation due to the number of arguments
+    3, one test function per field type as the specific operations is unique per field type
+    '''
+    def setUp(self):
+        super(TestFieldDataOps, self).setUp()
+        self.categorical_memfield = fields.CategoricalMemField(self.s, 'int32', {"a": 1, "b": 2, "c": 3})
+        self.categorical_memfield.data.write(np.array([1,1,1,2,2,3,3,3,3,3]))
+
+
+
+    @parameterized.expand([([1,1,2,2,2,4,3,3,4,3], fields.CategoricalMemField.__lt__, [False, False, True, False, False, True, False, False, True, False]),
+                           ([1,1,1,1,1,2,3,3,3,3], fields.CategoricalMemField.__le__, [True, True, True, False, False, False, True, True, True, True]),
+                           ([1,1,1,1,1,2,3,3,3,3], fields.CategoricalMemField.__eq__, [True, True, True, False, False, False, True, True, True, True]),
+                           ([1,1,1,1,1,2,3,3,3,3], fields.CategoricalMemField.__ne__, [False, False, False, True, True, True, False, False, False, False]),
+                           ([1,1,1,1,1,2,3,3,3,3], fields.CategoricalMemField.__ge__, [True, True, True, True, True, True, True, True, True, True]),
+                           ([1,1,1,1,1,2,3,3,3,3], fields.CategoricalMemField.__gt__, [False, False, False, True, True, True, False, False, False, False])])
+    def test_CategoricalMemField_unary_ops(self, data, ops, result):
+        rst = ops(self.categorical_memfield, data)
+        self.assertListEqual(result, list(rst.data[:]))
+
+    @parameterized.expand([(fields.CategoricalMemField.apply_spans_first, {"target":None, "in_place":False}, [1,2,3]),
+                           (fields.CategoricalMemField.apply_spans_first, {"target":None, "in_place":True}, [1,2,3])])
+    def test_CategoricalMemField_aggregation_funcs(self, ops, ops_args, result):
+        self.categorical_memfield.data.clear()  # in case of previous destructive functions (inplace=True)
+        self.categorical_memfield.data.write(np.array([1, 1, 1, 2, 2, 3, 3, 3, 3, 3]))
+        spans = self.categorical_memfield.get_spans()
+        rst = ops(self.categorical_memfield, spans, ops_args['target'], ops_args['in_place'])
+        self.assertListEqual(result, list(rst.data[:]))
+        if ops_args['target'] != None:  # target is a field
+            self.assertListEqual(result, ops_args['target'].data[:])
+        if ops_args['in_place'] == True:
+            self.assertListEqual(result, list(self.categorical_memfield.data[:]))
+
+
 class TestFieldGetSpans(unittest.TestCase):
 
     def test_get_spans(self):
