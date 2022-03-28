@@ -34,7 +34,7 @@ def export_to_csv(destination, datastore, fields):
             if length != expected_length:
                 raise ValueError(f"field '{f[1]}' is not the same length as the first field:"
                                  f"expected {expected_length} but got {length}")
-    print('expected_length:', expected_length)
+    #print('expected_length:', expected_length)
     readers = [datastore.get_reader(f[1]) for f in fields]
     transforms = [transform_from_reader_type(r) for r in readers]
 
@@ -50,7 +50,7 @@ def export_to_csv(destination, datastore, fields):
         row = [None] * len(fields)
         for chunk in datastore.chunks(expected_length):
             s = slice(chunk[0], chunk[1])
-            print(s)
+            #print(s)
             chunks = [r[s] for r in readers]
             for i_r in range(chunk[1] - chunk[0]):
                 for i_c, c in enumerate(chunks):
