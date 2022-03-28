@@ -3,13 +3,14 @@ import unittest
 import operator
 
 import numpy as np
+import numpy.testing
 from io import BytesIO
 
 import h5py
 from datetime import datetime
 from parameterized import parameterized
 
-from .utils import SessionTestCase, shuffle_randstate, allow_slow_tests, RAND_STATE,DEFAULT_FIELD_DATA
+from .utils import SessionTestCase, shuffle_randstate, allow_slow_tests, RAND_STATE,DEFAULT_FIELD_DATA, HARD_INTS, HARD_FLOATS, utc_timestamp
 
 from exetera.core import session
 from exetera.core import fields
@@ -46,27 +47,31 @@ class TestFieldExistence(SessionTestCase):
 
 
 class TestFieldDataOps(SessionTestCase):
-    '''
+    """
     Test data operations for each different field.
-    1, field is fixed, otherwise needs to use coordinate number operations to calculate the result.
-    2, one test function per unary/binary operation due to the number of arguments
-    3, one test function per field type as the specific operations is unique per field type
-    '''
+    1, compare the result of operations on field against operations on raw numpy data.
+    """
+
     def setUp(self):
         super(TestFieldDataOps, self).setUp()
-        self.categorical_memfield = fields.CategoricalMemField(self.s, 'int32', {"a": 1, "b": 2, "c": 3})
-        
-        self.memfield_data=RAND_STATE.randint(1, 4, 20)
-        self.categorical_memfield.data.write(self.memfield_data)
+
         
     @parameterized.expand([(operator.lt,),(operator.gt,),(operator.le,),(operator.ge,),(operator.ne,),(operator.eq,)])
     def test_CategoricalMemField_binary_op(self,op):
+        """
+        Categorical mem field ops against numpy, categorical memory field, categorical field
+        """
+        categorical_memfield = fields.CategoricalMemField(self.s, 'int32', {"a": 1, "b": 2, "c": 3})
+
+        memfield_data = RAND_STATE.randint(1, 4, 20)
+        categorical_memfield.data.write(memfield_data)
+
         for i in range(0,5):
-            indata=np.full(self.memfield_data.shape,i)
-            result=op(self.memfield_data,indata)
+            indata=np.full(memfield_data.shape,i)
+            result=op(memfield_data,indata)
             
             with self.subTest(f"Testing value numpy {i}"):
-                output=op(self.categorical_memfield,indata)
+                output=op(categorical_memfield,indata)
                 
                 np.testing.assert_array_equal(result,output)
                 
@@ -76,7 +81,7 @@ class TestFieldDataOps(SessionTestCase):
             with self.subTest(f"Testing value numpy {i}"):
                 test_field = fields.CategoricalMemField(self.s, 'int32', {"a": 1, "b": 2, "c": 3})        
                 test_field.data.write(result)
-                output=op(self.categorical_memfield,test_field)
+                output=op(categorical_memfield,test_field)
                 
                 np.testing.assert_array_equal(result,output)
                 self.assertIsInstance(output, fields.NumericMemField)
@@ -85,12 +90,64 @@ class TestFieldDataOps(SessionTestCase):
             with self.subTest(f"Testing value numpy {i}"):
                 test_field = self.df.create_categorical(f'name{i}','int32',{"a": 1, "b": 2, "c": 3})        
                 test_field.data.write(result)
-                output=op(self.categorical_memfield,test_field)
+                output=op(categorical_memfield,test_field)
                 
                 np.testing.assert_array_equal(result,output)
                 self.assertIsInstance(output, fields.NumericMemField)
                 self.assertEqual(output.data.dtype,"bool")
-            
+
+    @parameterized.expand([(operator.eq,),(operator.ge,),(operator.le,),(operator.lt,),(operator.ne,),])
+    def test_NumericField_binary_ops(self, op):
+        raw_data = shuffle_randstate(list(range(-10, 10)) + HARD_INTS)
+        numeric_field = self.df.create_numeric('num', 'int64')
+        numeric_field.data.write(raw_data)
+        target = shuffle_randstate(list(range(-10, 10)) + HARD_INTS)  # against numpy
+        result = op(raw_data, target)
+        output = op(numeric_field, target)
+        numpy.testing.assert_array_equal(result, output)
+
+        field2 = self.df.create_numeric('num2', 'int64')
+        field2.data.write(target)
+        output = op(numeric_field, field2)  # against numeric field
+        numpy.testing.assert_array_equal(result, output)
+
+        memfield = fields.NumericMemField(self.s, 'int64')
+        memfield.data.write(np.array(target))
+        output = op(numeric_field, field2)  # against memory numeric field
+        numpy.testing.assert_array_equal(result, output)
+
+    @parameterized.expand([(operator.add,), (operator.sub,), (operator.mul,), (operator.truediv,), (operator.floordiv,),
+                           (operator.mod,), (operator.lt,), (operator.le,), (operator.eq,), (operator.ne,), (operator.ge,), (operator.gt,)])
+    def test_TimestampField_binary_ops(self, op):
+        raw_data = np.array([utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17), utc_timestamp(1840, 10, 11),
+            utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7), utc_timestamp(2018, 2, 28),
+            utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1) ])
+        target = np.array([utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17), utc_timestamp(1840, 10, 11),
+            utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7), utc_timestamp(2018, 2, 28),
+            utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1) ])
+        ts_field = self.df.create_timestamp('ts_field')
+        ts_field.data.write(raw_data)
+        result = op(raw_data, target)  # timestampe field vs list
+        output = op(ts_field, target)
+        numpy.testing.assert_array_equal(result, output)
+
+        ts_field2 = self.df.create_timestamp('ts_field2')
+        ts_field2.data.write(target)
+        output = op(ts_field, ts_field2)  # timestamp field vs timestamp field
+        numpy.testing.assert_array_equal(result, output)
+
+        ts_field3 = fields.TimestampMemField(self.s)
+        ts_field3.data.write(target)
+        output = op(ts_field, ts_field3)  # timestamp field vs timestamp mem field
+        numpy.testing.assert_array_equal(result, output)
+    #missing divemod, reverse*
+
+    # @parameterized.expand([])
+    # def test_TimestampMemField_binary_ops(self, op):
+    #     pass
+
+
+
 
 
     # @parameterized.expand([(fields.CategoricalMemField.apply_spans_first, {"target":None, "in_place":False}, [1,2,3]),
