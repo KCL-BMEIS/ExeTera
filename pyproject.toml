@@ -5,13 +5,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "exetera"
-version = "0.6.0b0"
 description = "High-volume key-value store and analytics, based on hdf5"
 license = {file = "LICENSE.txt"}
 dependencies = ["numpy", "pandas", "h5py", "numba", "parameterized"]
-readme = "README.md"
 requires-python = ">=3.7"
 authors = [{ name = "Ben Murray", email = "benjamin.murray@kcl.ac.uk" }]
+dynamic = ["version", "readme"]
 
 [project.urls]
 home = "https://github.com/kcl-bmeis/ExeTera"
@@ -24,3 +23,7 @@ include = ["exetera*"]
 
 [metadata]
 description-file = "README.md"
+
+[tool.setuptools.dynamic]
+version = {attr = "exetera._version.__version__"}
+readme = {file = ["README.md"]}
