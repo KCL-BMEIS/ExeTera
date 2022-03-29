@@ -21,9 +21,9 @@ exetera = "exetera.bin.exetera:main"
 [tool.setuptools.packages.find]
 include = ["exetera*"]
 
-[metadata]
-description-file = "README.md"
-
 [tool.setuptools.dynamic]
 version = {attr = "exetera._version.__version__"}
 readme = {file = ["README.md"]}
+
+[metadata]
+description-file = "README.md"
