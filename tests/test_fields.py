@@ -117,7 +117,8 @@ class TestFieldDataOps(SessionTestCase):
         numpy.testing.assert_array_equal(result, output)
 
     @parameterized.expand([(operator.add,), (operator.sub,), (operator.mul,), (operator.truediv,), (operator.floordiv,),
-                           (operator.mod,), (operator.lt,), (operator.le,), (operator.eq,), (operator.ne,), (operator.ge,), (operator.gt,)])
+                           (operator.mod,), (operator.lt,), (operator.le,), (operator.eq,), (operator.ne,),
+                           (operator.ge,), (operator.gt,), (divmod,)])
     def test_TimestampField_binary_ops(self, op):
         raw_data = np.array([utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17), utc_timestamp(1840, 10, 11),
             utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7), utc_timestamp(2018, 2, 28),
@@ -129,40 +130,120 @@ class TestFieldDataOps(SessionTestCase):
         ts_field.data.write(raw_data)
         result = op(raw_data, target)  # timestampe field vs list
         output = op(ts_field, target)
-        numpy.testing.assert_array_equal(result, output)
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
 
         ts_field2 = self.df.create_timestamp('ts_field2')
         ts_field2.data.write(target)
         output = op(ts_field, ts_field2)  # timestamp field vs timestamp field
-        numpy.testing.assert_array_equal(result, output)
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
 
         ts_field3 = fields.TimestampMemField(self.s)
         ts_field3.data.write(target)
         output = op(ts_field, ts_field3)  # timestamp field vs timestamp mem field
-        numpy.testing.assert_array_equal(result, output)
-    #missing divemod, reverse*
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
 
-    # @parameterized.expand([])
-    # def test_TimestampMemField_binary_ops(self, op):
-    #     pass
+    @parameterized.expand([(operator.add,), (operator.sub,), (operator.mul,), (operator.truediv,), (operator.floordiv,),
+                           (operator.mod,), (divmod,)])
+    def test_TimestampField_binary_reverse(self, op):
+        raw_data = np.array([utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17),
+                             utc_timestamp(1840, 10, 11),
+                             utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7),
+                             utc_timestamp(2018, 2, 28),
+                             utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1)])
+        target = [utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17),
+                             utc_timestamp(1840, 10, 11),
+                             utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7),
+                             utc_timestamp(2018, 2, 28),
+                             utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1)]
+
+        ts_field = self.df.create_timestamp('ts_field')
+        ts_field.data.write(raw_data)
+        output = op(target, ts_field)  # list + field is not implemented, hence will call field.__radd__
+        result = op(raw_data, np.array(target))
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
 
 
+    @parameterized.expand([(operator.add,), (operator.sub,), (operator.mul,), (operator.truediv,), (operator.floordiv,),
+                           (operator.mod,), (operator.lt,), (operator.le,), (operator.eq,), (operator.ne,),
+                           (operator.ge,), (operator.gt,), (divmod,)])
+    def test_TimestampMemField_binary_ops(self, op):
+        raw_data = np.array([utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17),
+                             utc_timestamp(1840, 10, 11),
+                             utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7),
+                             utc_timestamp(2018, 2, 28),
+                             utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1)])
+        target = np.array([utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17),
+                           utc_timestamp(1840, 10, 11),
+                           utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7),
+                           utc_timestamp(2018, 2, 28),
+                           utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1)])
+        ts_field = fields.TimestampMemField(self.s)
+        ts_field.data.write(raw_data)
+        result = op(raw_data, target)  # timestampe field vs list
+        output = op(ts_field, target)
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
 
+        ts_field2 = self.df.create_timestamp('ts_field2')
+        ts_field2.data.write(target)
+        output = op(ts_field, ts_field2)  # timestamp field vs timestamp field
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
 
+        ts_field3 = fields.TimestampMemField(self.s)
+        ts_field3.data.write(target)
+        output = op(ts_field, ts_field3)  # timestamp field vs timestamp mem field
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
 
-    # @parameterized.expand([(fields.CategoricalMemField.apply_spans_first, {"target":None, "in_place":False}, [1,2,3]),
-                           # (fields.CategoricalMemField.apply_spans_first, {"target":None, "in_place":True}, [1,2,3])])
-    # def test_CategoricalMemField_aggregation_funcs(self, ops, ops_args, result):
-        # self.categorical_memfield.data.clear()  # in case of previous destructive functions (inplace=True)
-        # self.categorical_memfield.data.write(np.array([1, 1, 1, 2, 2, 3, 3, 3, 3, 3]))
-        # spans = self.categorical_memfield.get_spans()
-        # rst = ops(self.categorical_memfield, spans, ops_args['target'], ops_args['in_place'])
-        # self.assertListEqual(result, list(rst.data[:]))
-        # if ops_args['target'] != None:  # target is a field
-            # self.assertListEqual(result, ops_args['target'].data[:])
-        # if ops_args['in_place'] == True:
-            # self.assertListEqual(result, list(self.categorical_memfield.data[:]))
+    @parameterized.expand([(operator.add,), (operator.sub,), (operator.mul,), (operator.truediv,), (operator.floordiv,),
+                           (operator.mod,), (divmod,)])
+    def test_TimestampMemField_binary_reverse(self, op):
+        raw_data = np.array([utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17),
+                             utc_timestamp(1840, 10, 11),
+                             utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7),
+                             utc_timestamp(2018, 2, 28),
+                             utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1)])
+        target = [utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17),
+                  utc_timestamp(1840, 10, 11),
+                  utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7),
+                  utc_timestamp(2018, 2, 28),
+                  utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1)]
 
+        ts_field = fields.TimestampMemField(self.s)
+        ts_field.data.write(raw_data)
+        output = op(target, ts_field)  # list + field is not implemented, hence will call field.__radd__
+        result = op(raw_data, np.array(target))
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
 
 class TestFieldGetSpans(unittest.TestCase):
 
@@ -1155,6 +1236,146 @@ class TestFieldApplyIndex(unittest.TestCase):
             mb = b.apply_index(indices)
             self.assertListEqual(expected, mb.data[:].tolist())
 
+class TestFieldMemApplySpansCount(SessionTestCase):
+    def setUp(self):
+        super(TestFieldMemApplySpansCount, self).setUp()
+
+    @parameterized.expand([(fields.IndexedStringMemField.apply_spans_first, None, False, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_first, None, True, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_first, True, False, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_last, None, False, ['bb', 'ccc', 'fff', 'h']),
+                           (fields.IndexedStringMemField.apply_spans_last, None, True, ['bb', 'ccc', 'fff', 'h']),
+                           (fields.IndexedStringMemField.apply_spans_last, True, False, ['bb', 'ccc', 'fff', 'h']),
+                           (fields.IndexedStringMemField.apply_spans_min, None, False, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_min, None, True, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_min, True, False, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_max, None, False, ['bb', 'ccc', 'fff', 'h']),
+                           (fields.IndexedStringMemField.apply_spans_max, None, True, ['bb', 'ccc', 'fff', 'h']),
+                           (fields.IndexedStringMemField.apply_spans_max, True, False, ['bb', 'ccc', 'fff', 'h'])])
+    def test_indexed_string_mem_field(self, ops, target, inplace, expected):  # target is type field
+        src_data = ['a', 'bb', 'ccc', 'dddd', 'eeee', 'fff', 'gg', 'h']
+        f = fields.IndexedStringMemField(self.s)
+        f.data.write(src_data)
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+        dest = None
+        if target != None:
+            dest = fields.IndexedStringMemField(self.s)
+        output = ops(f, spans, dest, inplace)  # output is a mem field
+
+        self.assertListEqual(output.data[:], expected)
+        if target != None:
+            self.assertListEqual(dest.data[:], expected)
+        if inplace:
+            self.assertListEqual(f.data[:], expected)
+
+    @parameterized.expand([(fields.FixedStringMemField.apply_spans_first, None, False, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_first, None, True, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_first, True, False, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_last, None, False, [b'a2', b'b1', b'c3', b'd2']),
+                           (fields.FixedStringMemField.apply_spans_last, None, True, [b'a2', b'b1', b'c3', b'd2']),
+                           (fields.FixedStringMemField.apply_spans_last, True, False, [b'a2', b'b1', b'c3', b'd2']),
+                           (fields.FixedStringMemField.apply_spans_min, None, False, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_min, None, True, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_min, True, False, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_max, None, False, [b'a2', b'b1', b'c3', b'd2']),
+                           (fields.FixedStringMemField.apply_spans_max, None, True, [b'a2', b'b1', b'c3', b'd2']),
+                           (fields.FixedStringMemField.apply_spans_max, True, False, [b'a2', b'b1', b'c3', b'd2'])])
+    def test_fixed_string_mem_field(self,ops, target, inplace, expected):  # target is type field
+        src_data = np.array([b'a1', b'a2', b'b1', b'c1', b'c2', b'c3', b'd1', b'd2'])
+        f = fields.FixedStringMemField(self.s, 2)
+        f.data.write(src_data)
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+        dest = None
+        if target != None:
+            dest = fields.FixedStringMemField(self.s, 2)
+        output = ops(f, spans, dest, inplace)  # output is a mem field
+
+        self.assertListEqual(output.data[:].tolist(), expected)
+        if target != None:
+            self.assertListEqual(dest.data[:].tolist(), expected)
+        if inplace:
+            self.assertListEqual(f.data[:].tolist(), expected)
+
+    @parameterized.expand([(fields.CategoricalMemField.apply_spans_first, [0, 2, 0, 0]),
+                           (fields.CategoricalMemField.apply_spans_last, [1, 2, 2, 1]),
+                           (fields.CategoricalMemField.apply_spans_min, [0, 2, 0, 0]),
+                           (fields.CategoricalMemField.apply_spans_max, [1, 2, 2, 1])])
+    def test_categorical_mem_field(self, ops, expected):  # target is type field
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+        src_data = np.array([0, 1, 2, 0, 1, 2, 0, 1])
+        keys = {b'a': 0, b'b': 1, b'c': 2}
+
+        f = fields.CategoricalMemField(self.s, 'int32', keys)
+        f.data.write(src_data)
+
+        #no dest
+        output = ops(f, spans, None, False)  # output is a mem field
+        self.assertListEqual(output.data[:].tolist(), expected)
+
+        #dest
+        dest = fields.CategoricalMemField(self.s, 'int32', keys)
+        output = ops(f, spans, dest, False)  # output is a mem field
+        self.assertListEqual(dest.data[:].tolist(), expected)
+
+        #inplace
+        output = ops(f, spans, None, True)  # output is a mem field
+        self.assertListEqual(f.data[:].tolist(), expected)
+
+    @parameterized.expand([(fields.NumericMemField.apply_spans_first, [1, 11, 21, 31]),
+                           (fields.NumericMemField.apply_spans_last, [2, 11, 23, 32]),
+                           (fields.NumericMemField.apply_spans_min, [1, 11, 21, 31]),
+                           (fields.NumericMemField.apply_spans_max, [2, 11, 23, 32])])
+    def test_numeric_mem_field(self, ops, expected):  # target is type field
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+        src_data = np.array([1, 2, 11, 21, 22, 23, 31, 32])
+
+        f = fields.NumericMemField(self.s, 'int32')
+        f.data.write(src_data)
+
+        # no dest
+        output = ops(f, spans, None, False)  # output is a mem field
+        self.assertListEqual(output.data[:].tolist(), expected)
+
+        # dest
+        dest = fields.NumericMemField(self.s, 'int32')
+        output = ops(f, spans, dest, False)  # output is a mem field
+        self.assertListEqual(dest.data[:].tolist(), expected)
+
+        # inplace
+        output = ops(f, spans, None, True)  # output is a mem field
+        self.assertListEqual(f.data[:].tolist(), expected)
+
+    @parameterized.expand([(fields.TimestampMemField.apply_spans_first, [0, 2, 3, 6]),
+                           (fields.TimestampMemField.apply_spans_last, [1, 2, 5, 7]),
+                           (fields.TimestampMemField.apply_spans_min, [0, 2, 3, 7]),
+                           (fields.TimestampMemField.apply_spans_max, [1, 2, 5, 6])])
+    def test_timestamp_mem_field(self, ops, expected):  # target is type field
+        from datetime import datetime as D
+        from datetime import timezone
+        src_data = [D(2020, 1, 1, tzinfo=timezone.utc), D(2021, 5, 1, tzinfo=timezone.utc),
+                    D(2950, 8, 17, tzinfo=timezone.utc), D(1840, 10, 11, tzinfo=timezone.utc),
+                    D(2021, 1, 1, tzinfo=timezone.utc), D(2022, 5, 18, tzinfo=timezone.utc),
+                    D(2951, 8, 17, tzinfo=timezone.utc), D(1841, 10, 11, tzinfo=timezone.utc)]
+        src_data = np.asarray([d.timestamp() for d in src_data], dtype=np.float64)
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+
+        f = fields.TimestampMemField(self.s)
+        f.data.write(src_data)
+
+        # no dest
+        output = ops(f, spans, None, False)  # output is a mem field
+        self.assertListEqual(output.data[:].tolist(), src_data[expected].tolist())
+
+        # dest
+        dest = fields.TimestampMemField(self.s)
+        output = ops(f, spans, dest, False)  # output is a mem field
+        self.assertListEqual(dest.data[:].tolist(), src_data[expected].tolist())
+
+        # inplace
+        output = ops(f, spans, None, True)  # output is a mem field
+        self.assertListEqual(f.data[:].tolist(), src_data[expected].tolist())
+
+
 
 class TestFieldApplySpansCount(unittest.TestCase):
 
@@ -1163,7 +1384,7 @@ class TestFieldApplySpansCount(unittest.TestCase):
         with session.Session() as s:
             ds = s.open_dataset(bio, 'w', 'ds')
             df = ds.create_dataframe('df')
-            f = create_fn(df)
+            f = create_fn(s)
             f.data.write(src_data)
 
             actual = apply_fn(f, spans, None)
@@ -1182,6 +1403,10 @@ class TestFieldApplySpansCount(unittest.TestCase):
                                    lambda f, p, d: f.apply_spans_first(p, d))
 
         expected = ['bb', 'ccc', 'fff', 'h']
+        self._test_apply_spans_src(spans, src_data, expected,
+                                   lambda df: df.create_indexed_string('foo'),
+                                   lambda f, p, d: f.apply_spans_last(p, d))
+
         self._test_apply_spans_src(spans, src_data, expected,
                                    lambda df: df.create_indexed_string('foo'),
                                    lambda f, p, d: f.apply_spans_last(p, d))
