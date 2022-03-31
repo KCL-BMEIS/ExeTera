@@ -1384,7 +1384,7 @@ class TestFieldApplySpansCount(unittest.TestCase):
         with session.Session() as s:
             ds = s.open_dataset(bio, 'w', 'ds')
             df = ds.create_dataframe('df')
-            f = create_fn(s)
+            f = create_fn(df)
             f.data.write(src_data)
 
             actual = apply_fn(f, spans, None)
