@@ -91,6 +91,18 @@ class TestDataSet(unittest.TestCase):
             ds2.drop('df2')
             self.assertTrue(len(ds2) == 0)
 
+            df2 = ds2.create_dataframe('df2')
+            self.assertTrue(ds2.contains_dataframe(df2))
+            self.assertFalse(dst.create_dataframe('foo'))
+
+            dst.delete_dataframe(dst['foo'])
+            ds2.delete_dataframe(df2)
+            self.assertFalse(ds2.contains_dataframe(df2))
+
+            self.assertListEqual(['df'], list(dst.keys()))
+            self.assertListEqual([df], list(dst.values()))
+            self.assertDictEqual({'df': df}, {k: v for k, v in dst.items()})
+
             move(df, ds2, 'df2')
             self.assertTrue(len(dst) == 0)
             self.assertTrue(len(ds2) == 1)

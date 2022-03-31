@@ -20,10 +20,13 @@ class TestDataFrameCreateFields(unittest.TestCase):
             dst = s.open_dataset(bio, 'w', 'dst')
             # init
             df = dst.create_dataframe('dst')
+            self.assertEqual(len(df), 0)
             self.assertTrue(isinstance(df, dataframe.DataFrame))
             numf = df.create_numeric('numf', 'uint32')
             df2 = dst.create_dataframe('dst2', dataframe=df)
             self.assertTrue(isinstance(df2, dataframe.DataFrame))
+            self.assertEqual(len(df2), 1)
+            self.assertListEqual([numf], list(df.values()))
 
             # add & set & contains
             self.assertTrue('numf' in df)
@@ -33,6 +36,8 @@ class TestDataFrameCreateFields(unittest.TestCase):
             self.assertFalse(df.contains_field(cat))
             df['cat'] = cat
             self.assertTrue('cat' in df)
+            self.assertEqual(len(df2), 2)
+            self.assertEqual(len(df), 2)
 
             # list & get
             self.assertEqual(id(numf), id(df.get_field('numf')))
