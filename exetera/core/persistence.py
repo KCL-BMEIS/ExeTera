@@ -19,7 +19,7 @@ from distutils.util import strtobool
 import h5py
 import numpy as np
 import numba
-from numba import jit, njit
+#from numba import njit
 import pandas as pd
 
 from exetera.core import validation as val
@@ -27,6 +27,8 @@ from exetera.core import readerwriter as rw
 from exetera.core import fields as fld
 from exetera.core import operations as ops
 from exetera.core.operations import INVALID_INDEX, DEFAULT_CHUNKSIZE
+
+from exetera.core.utils import exetera_njit
 
 # TODO: rename this persistence file to hdf5persistence
 # TODO: wrap the dataset in a withable so that different underlying
@@ -108,7 +110,7 @@ def _apply_filter_to_array(values, filter):
     return values[filter]
 
 
-@njit
+@exetera_njit
 def _apply_filter_to_index_values(index_filter, indices, values):
     # pass 1 - determine the destination lengths
     cur_ = indices[:-1]
@@ -136,7 +138,7 @@ def _apply_filter_to_index_values(index_filter, indices, values):
     return dest_indices, dest_values
 
 
-@njit
+@exetera_njit
 def _apply_indices_to_index_values(indices_to_apply, indices, values):
     # pass 1 - determine the destination lengths
     cur_ = indices[:-1]
@@ -166,7 +168,7 @@ def _apply_sort_to_array(index, values):
     return values[index]
 
 
-@njit
+@exetera_njit
 def _apply_sort_to_index_values(index, indices, values):
 
     s_indices = np.zeros_like(indices, dtype=np.int64)
@@ -181,8 +183,8 @@ def _apply_sort_to_index_values(index, indices, values):
             s_values[accumulated:accumulated + length] =\
                 values[src_field_start:src_field_end]
         accumulated += length
-        if s_indices[di + 1] != 0:
-            print('non-zero index!')
+        #if s_indices[di + 1] != 0:
+        #    print('non-zero index!')
         s_indices[di + 1] = accumulated
 
     return s_indices, s_values
@@ -248,7 +250,7 @@ def temp_dataset():
         hd.flush()
         hd.close()
 
-@njit
+@exetera_njit
 def _index_spans(spans, results):
     sp_sta = spans[:-1]
     sp_end = spans[1:]
@@ -257,7 +259,7 @@ def _index_spans(spans, results):
     return results
 
 
-@njit
+@exetera_njit
 def _apply_spans_index_of_max(spans, src_array, dest_array):
     for i in range(len(spans)-1):
         cur = spans[i]
@@ -269,7 +271,7 @@ def _apply_spans_index_of_max(spans, src_array, dest_array):
             dest_array[i] = cur + src_array[cur:next].argmax()
 
 
-@njit
+@exetera_njit
 def _apply_spans_index_of_min(spans, src_array, dest_array, filter_array):
     for i in range(len(spans)-1):
         cur = spans[i]
@@ -282,34 +284,34 @@ def _apply_spans_index_of_min(spans, src_array, dest_array, filter_array):
             dest_array[i] = cur = src_array[cur:next].argmin()
 
 
-@njit
+@exetera_njit
 def _apply_spans_index_of_first(spans, dest_array):
     dest_array[:] = spans[:-1]
 
 
-@njit
+@exetera_njit
 def _apply_spans_index_of_last(spans, dest_array):
     dest_array[:] = spans[1:] - 1
 
 
-@njit
+@exetera_njit
 def _apply_spans_count(spans, dest_array):
     for i in range(len(spans)-1):
         dest_array[i] = np.int64(spans[i+1] - spans[i])
 
 
-@njit
+@exetera_njit
 def _apply_spans_first(spans, src_array, dest_array):
     dest_array[:] = src_array[spans[:-1]]
 
 
-@njit
+@exetera_njit
 def _apply_spans_last(spans, src_array, dest_array):
     spans = spans[1:]-1
     dest_array[:] = src_array[spans]
 
 
-@njit
+@exetera_njit
 def _apply_spans_max(spans, src_array, dest_array):
 
     for i in range(len(spans)-1):
@@ -321,7 +323,7 @@ def _apply_spans_max(spans, src_array, dest_array):
             dest_array[i] = src_array[cur:next].max()
 
 
-@njit
+@exetera_njit
 def _apply_spans_min(spans, src_array, dest_array):
 
     for i in range(len(spans)-1):
@@ -350,7 +352,7 @@ def _apply_spans_min(spans, src_array, dest_array):
 #             #     print(dest_values[i])
 #     return dest_values
 
-@njit
+@exetera_njit
 def _apply_spans_concat_2(spans, src_index, src_values, dest_index, dest_values,
                           max_index_i, max_value_i, separator, delimiter, sp_start, dest_start_v):
 
@@ -456,7 +458,7 @@ def _apply_spans_concat_2(spans, src_index, src_values, dest_index, dest_values,
     return s + 1, d_index_i, d_index_v
 
 
-@njit
+@exetera_njit
 def _apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
                         max_index_i, max_value_i, s_start, separator, delimiter):
     if s_start == 0:
@@ -545,7 +547,7 @@ def timestamp_to_date(values):
     return results
 
 # TODO: refactor into datastore
-@jit
+@exetera_njit
 def filtered_iterator(values, filter, default=np.nan):
     for i in range(len(values)):
         if filter[i]:
@@ -553,7 +555,7 @@ def filtered_iterator(values, filter, default=np.nan):
         else:
             yield values[i]
 
-@njit
+@exetera_njit
 def _map_valid_indices(src, map, default):
 
     filter = map < INVALID_INDEX
@@ -690,7 +692,7 @@ class DataStore:
         readers = tuple(self.get_reader(src_group[f]) for f in keys)
         t1 = time.time()
         sorted_index = self.dataset_sort(readers, np.arange(len(readers[0]), dtype=np.uint32))
-        print(f'sorted {keys} index in {time.time() - t1}s')
+        #print(f'sorted {keys} index in {time.time() - t1}s')
 
         t0 = time.time()
         for k in src_group.keys():
@@ -700,8 +702,8 @@ class DataStore:
             self.apply_sort(sorted_index, r, w)
             del r
             del w
-            print(f"  '{k}' reordered in {time.time() - t1}s")
-        print(f"fields reordered in {time.time() - t0}s")
+            #print(f"  '{k}' reordered in {time.time() - t1}s")
+        #print(f"fields reordered in {time.time() - t0}s")
 
 
     def dataset_sort(self, readers, index=None):
