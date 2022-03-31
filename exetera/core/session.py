@@ -29,6 +29,7 @@ from exetera.core import validation as val
 from exetera.core import operations as ops
 from exetera.core import dataset as ds
 from exetera.core import dataframe as df
+from exetera.core import utils
 
 
 class Session(AbstractSession):
@@ -425,18 +426,13 @@ class Session(AbstractSession):
         :param dest: if set, the field to which the results are written
         :returns: A numpy array containing the resulting values
         """
-        assert (dest is None or isinstance(dest, Field))
+        assert (dest is None or isinstance(dest, Field))  # dest is None or field
 
-        if dest is not None:
-            dest_f = val.field_from_parameter(self, 'dest', dest)
-            results = np.zeros(len(spans) - 1, dtype=dest_f.data.dtype)
-            predicate(spans, results)
-            dest_f.data.write(results)
-            return results
-        else:
-            results = np.zeros(len(spans) - 1, dtype='int64')
-            predicate(spans, results)
-            return results
+        results = predicate(spans)
+        if dest is not None:  # dest is a field
+            assert (results.dtype.type == dest.data.dtype.type, 'The field dtype does not match with the data type.')
+            dest.data.write(results)
+        return results
 
     def _apply_spans_src(self,
                          predicate: Callable[[np.ndarray, np.ndarray, np.ndarray], None],
@@ -453,24 +449,19 @@ class Session(AbstractSession):
         :param dest: if set, the field to which the results are written
         :returns: A numpy array containing the resulting values
         """
-        assert (dest is None or isinstance(dest, Field))
+        assert (dest is None or isinstance(dest, Field))  # dest is None or a field
         target_ = val.array_from_parameter(self, 'target', target)
         if len(target) != spans[-1]:
             error_msg = ("'target' (length {}) must be one element shorter than 'spans' "
                          "(length {})")
             raise ValueError(error_msg.format(len(target_), len(spans)))
 
-        if dest is not None:
-            dest_f = val.field_from_parameter(self, 'dest', dest)
-            results = np.zeros(len(spans) - 1, dtype=dest_f.data.dtype)
-            predicate(spans, target_, results)
-            dest_f.data.write(results)
-            return results
-        else:
-            data_type = 'int32' if len(spans) < 2000000000 else 'int64'
-            results = np.zeros(len(spans) - 1, dtype=data_type)
-            predicate(spans, target_, results)
-            return results
+        results = predicate(spans, target_)
+
+        if dest is not None:  # dest is a field
+            assert (results.dtype.type == dest.data.dtype.type, 'The field dtype does not match with the data type.')
+            dest.data.write(results)
+        return results
 
     def apply_spans_index_of_min(self,
                                  spans: np.ndarray,
