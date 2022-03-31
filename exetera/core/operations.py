@@ -681,10 +681,18 @@ def _get_spans_for_2_fields_by_spans(span0, span1):  # suggested, as can use int
     return spans
 
 
-@njit
 def _get_spans_for_2_fields(ndarray0, ndarray1):
+    if len(ndarray0) > utils.INT64_INDEX_LENGTH or len(ndarray1) > utils.INT64_INDEX_LENGTH:
+        spans = np.zeros(len(ndarray0) + 1, dtype=np.int64)
+    else:
+        spans = np.zeros(len(ndarray0) + 1, dtype=np.int32)
+    spans = _get_spans_for_2_fields_njit(ndarray0, ndarray1, spans)
+    return spans
+
+
+@njit
+def _get_spans_for_2_fields_njit(ndarray0, ndarray1, spans):
     count = 0
-    spans = np.zeros(len(ndarray0) + 1, dtype=np.int64)
     spans[0] = 0
     for i in np.arange(1, len(ndarray0)):
         if ndarray0[i] != ndarray0[i - 1] or ndarray1[i] != ndarray1[i - 1]:
@@ -693,14 +701,21 @@ def _get_spans_for_2_fields(ndarray0, ndarray1):
     spans[count + 1] = len(ndarray0)
     return spans[:count + 2]
 
-    
-@njit
+
 def _get_spans_for_multi_fields(fields_data):
+    length = len(fields_data[0])  # assume all fields are equal length
+    if length > utils.INT64_INDEX_LENGTH:
+        spans = np.zeros(length + 1, dtype=np.int64)
+    else:
+        spans = np.zeros(length + 1, dtype=np.int32)
+    return _get_spans_for_multi_fields_njit(fields_data, spans)  # call the njit func to boost performance
+
+
+@njit
+def _get_spans_for_multi_fields_njit(fields_data, spans):
     count = 0
     length = len(fields_data[0])
-    spans = np.zeros(length + 1, dtype=np.int64)
     spans[0] = 0
-
     for i in np.arange(1, length):
         not_equal = False
         for f_d in fields_data:
