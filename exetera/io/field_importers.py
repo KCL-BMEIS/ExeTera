@@ -422,7 +422,7 @@ class DateImporter:
     def __init__(self, session, df, name, create_day_field=False, create_flag_field=False, timestamp=None):
         self.field = df.create_timestamp(name, timestamp, None)   
         self.day_field = None
-        print('create_day_field' , create_day_field)
+        #print('create_day_field' , create_day_field)
         if create_day_field:
             self.day_field = df.create_fixed_string(f"{name}_day", 10, timestamp, None) 
 

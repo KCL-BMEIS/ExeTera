@@ -260,7 +260,7 @@ def hs_test_1(length, val_column_count):
 
 
 # from numba import njit
-# @njit
+# njit
 def fast_sum(d_it):
     dsum = np.int64(0)
     for d in d_it:

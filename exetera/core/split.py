@@ -36,7 +36,7 @@ def patient_splitter(input_filename, output_filenames, sorted_indices, bucket_si
     accumulated = 0
     for ofn in output_filenames:
         with open(ofn, 'w') as f_o:
-            print("writing", ofn)
+            #print("writing", ofn)
             csvw = csv.writer(f_o, delimiter=ch_del, quotechar=ch_quote)
 
             csvw.writerow(keys)

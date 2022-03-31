@@ -3,7 +3,7 @@ from typing import Optional, Union
 
 import numpy as np
 import math
-from numba import njit
+#from numba import njit
 import numba
 import numba.typed as nt
 import numba.core.types as nct
@@ -12,6 +12,8 @@ from exetera.core import validation as val
 from exetera.core.abstract_types import Field
 from exetera.core import fields
 from exetera.core import utils
+
+from exetera.core.utils import exetera_njit, numba_bool, USE_NUMBA
 
 DEFAULT_CHUNKSIZE = 1 << 20
 INVALID_INDEX = 1 << 62
@@ -77,7 +79,7 @@ def str_to_dtype(str_dtype):
     raise ValueError("Unsupported dtype '{}'".format(str_dtype))
 
 
-@njit
+@exetera_njit
 def chunks(length, chunksize=1 << 20):
     cur = 0
     while cur < length:
@@ -183,7 +185,7 @@ def next_untrimmed_chunk(field, chunk, chunk_size):
     return chunk, data, max_index, chunk[0], 0
 
 
-@njit
+@exetera_njit
 def get_valid_value_extents(chunk, start, end, invalid=-1):
     first = invalid
     for i in range(start, end):
@@ -226,7 +228,7 @@ def get_map_datatype_based_on_lengths(left_len, right_len):
 #         return safe_map_values(field, map_field, map_filter, empty_value)
 
 
-@njit
+@exetera_njit
 def safe_map_indexed_values(data_indices, data_values, map_field, map_filter, empty_value=None):
     empty_value_len = 0 if empty_value is None else len(empty_value)
     value_length = 0
@@ -262,7 +264,7 @@ def safe_map_indexed_values(data_indices, data_values, map_field, map_filter, em
     return i_result, v_result
 
 
-@njit
+@exetera_njit
 def safe_map_values(data_field, map_field, map_filter, empty_value=None):
     result = np.zeros_like(map_field, dtype=data_field.dtype)
     empty_val = result[0] if empty_value is None else empty_value
@@ -274,7 +276,7 @@ def safe_map_values(data_field, map_field, map_filter, empty_value=None):
     return result
 
 
-@njit
+@exetera_njit
 def map_valid(data_field, map_field, result=None, invalid=-1):
     if result is None:
         result = np.zeros_like(map_field, dtype=data_field.dtype)
@@ -320,7 +322,7 @@ def ordered_map_valid_stream_old(data_field, map_field, result_field,
         #     dfc = dfc[dd:]
 
 
-@njit
+@exetera_njit
 def ordered_map_valid_partial_old(d, data_field, map_field, result, invalid):
     i = 0
     while True:
@@ -335,7 +337,7 @@ def ordered_map_valid_partial_old(d, data_field, map_field, result, invalid):
             return i, val
 
 
-@njit
+@exetera_njit
 def next_map_subchunk(map_, sm, invalid, chunksize):
 
     start = -1
@@ -406,7 +408,7 @@ def ordered_map_valid_stream(data_field, map_field, result_field,
         #     m_chunk, map_, m_max, m_off, m = next_untrimmed_chunk(map_field, m_chunk, chunksize)
 
 
-@njit
+@exetera_njit
 def ordered_map_valid_partial(values,
                               map_values,
                               sm_start,
@@ -520,7 +522,7 @@ def ordered_map_valid_indexed_stream(data_field, map_field, result_field,
             ri, rv = 0, 0
 
 
-@njit
+@exetera_njit
 def ordered_map_valid_indexed_partial(sm_values,
                                       sm_start,
                                       sm_end,
@@ -583,7 +585,7 @@ def chunked_copy(src_field, dest_field, chunksize=1 << 20):
         element_chunked_copy(src_field.data, dest_field.data, chunksize)
 
 
-@njit
+@exetera_njit
 def data_iterator(data_field, chunksize=1 << 20):
     cur = np.int64(0)
     chunks_ = chunks(len(data_field.data), chunksize)
@@ -594,7 +596,7 @@ def data_iterator(data_field, chunksize=1 << 20):
             yield data[v]
 
 
-@njit
+@exetera_njit
 def apply_filter_to_index_values(index_filter, indices, values):
     # pass 1 - determine the destination lengths
     cur_ = indices[:-1]
@@ -622,7 +624,7 @@ def apply_filter_to_index_values(index_filter, indices, values):
     return dest_indices, dest_values
 
 
-@njit
+@exetera_njit
 def apply_indices_to_index_values(indices_to_apply, indices, values):
     # pass 1 - determine the destination lengths
     cur_ = indices[:-1]
@@ -664,8 +666,8 @@ def get_spans_for_field(ndarray):
         return np.nonzero(results)[0]  # int64 by default
 
 
-@njit
-def _get_spans_for_2_fields_by_spans(span0, span1):  # suggested, as can use int32 as span dtype
+@exetera_njit
+def _get_spans_for_2_fields_by_spans(span0, span1):
     spans = []
     j=0
     for i in range(len(span0)):
@@ -690,7 +692,7 @@ def _get_spans_for_2_fields(ndarray0, ndarray1):
     return spans
 
 
-@njit
+@exetera_njit
 def _get_spans_for_2_fields_njit(ndarray0, ndarray1, spans):
     count = 0
     spans[0] = 0
@@ -711,7 +713,7 @@ def _get_spans_for_multi_fields(fields_data):
     return _get_spans_for_multi_fields_njit(fields_data, spans)  # call the njit func to boost performance
 
 
-@njit
+@exetera_njit
 def _get_spans_for_multi_fields_njit(fields_data, spans):
     count = 0
     length = len(fields_data[0])
@@ -731,7 +733,7 @@ def _get_spans_for_multi_fields_njit(fields_data, spans):
     return spans[:count + 2]
 
 
-@njit
+@exetera_njit
 def check_if_sorted_for_multi_fields(fields_data):
     """
     Check if input fields data is sorted. Note that fields_data should be treat as a group key
@@ -762,7 +764,7 @@ def check_if_sorted_for_multi_fields(fields_data):
 
     
 
-@njit
+@exetera_njit
 def _get_spans_for_index_string_field(indices,values):
     result = []
     result.append(0)
@@ -779,7 +781,8 @@ def _get_spans_for_index_string_field(indices,values):
     return result
 
 
-@njit
+
+@exetera_njit
 def apply_spans_index_of_min(spans, src_array, dest_array=None):
     dest_array = np.zeros(len(spans) - 1, dtype=spans.dtype) if dest_array is None else dest_array
     for i in range(len(spans)-1):
@@ -794,7 +797,7 @@ def apply_spans_index_of_min(spans, src_array, dest_array=None):
     return dest_array
 
 
-@njit
+@exetera_njit
 def apply_spans_index_of_min_indexed(spans, src_indices, src_values, dest_array=None):
     dest_array = np.zeros(len(spans)-1, dtype=spans.dtype) if dest_array is None else dest_array
     for i in range(len(spans)-1):
@@ -834,7 +837,7 @@ def apply_spans_index_of_min_indexed(spans, src_indices, src_values, dest_array=
     return dest_array
 
 
-@njit
+@exetera_njit
 def apply_spans_index_of_max_indexed(spans, src_indices, src_values, dest_array=None):
     dest_array = np.zeros(len(spans) - 1, dtype=spans.dtype) if dest_array is None else dest_array
     for i in range(len(spans)-1):
@@ -874,10 +877,10 @@ def apply_spans_index_of_max_indexed(spans, src_indices, src_values, dest_array=
     return dest_array
 
 
-@njit
+
+@exetera_njit
 def apply_spans_index_of_max(spans, src_array, dest_array=None):
     dest_array = np.zeros(len(spans)-1, dtype=spans.dtype) if dest_array is None else dest_array
-
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
@@ -890,21 +893,21 @@ def apply_spans_index_of_max(spans, src_array, dest_array=None):
     return dest_array
 
 
-@njit
+@exetera_njit
 def apply_spans_index_of_first(spans, dest_array=None):
     dest_array = np.zeros(len(spans) - 1, dtype=spans.dtype) if dest_array is None else dest_array
     dest_array[:] = spans[:-1]
     return dest_array
 
 
-@njit
+@exetera_njit
 def apply_spans_index_of_last(spans, dest_array=None):
     dest_array = np.zeros(len(spans) - 1, dtype=spans.dtype) if dest_array is None else dest_array
     dest_array[:] = spans[1:] - 1
     return dest_array
 
 
-@njit
+@exetera_njit
 def apply_spans_index_of_min_filter(spans, src_array, dest_array, filter_array):
     for i in range(len(spans) - 1):
         cur = spans[i]
@@ -921,7 +924,7 @@ def apply_spans_index_of_min_filter(spans, src_array, dest_array, filter_array):
     return dest_array, filter_array
 
 
-@njit
+@exetera_njit
 def apply_spans_index_of_max_filter(spans, src_array, dest_array, filter_array):
     for i in range(len(spans) - 1):
         cur = spans[i]
@@ -938,7 +941,7 @@ def apply_spans_index_of_max_filter(spans, src_array, dest_array, filter_array):
     return dest_array, filter_array
 
 
-@njit
+@exetera_njit
 def apply_spans_index_of_first_filter(spans, dest_array, filter_array):
     for i in range(len(spans) - 1):
         cur = spans[i]
@@ -952,7 +955,7 @@ def apply_spans_index_of_first_filter(spans, dest_array, filter_array):
     return dest_array, filter_array
 
 
-@njit
+@exetera_njit
 def apply_spans_index_of_last_filter(spans, dest_array, filter_array):
     for i in range(len(spans) - 1):
         cur = spans[i]
@@ -966,7 +969,8 @@ def apply_spans_index_of_last_filter(spans, dest_array, filter_array):
     return dest_array, filter_array
 
 
-@njit
+
+@exetera_njit
 def apply_spans_count(spans, dest_array=None):
     if dest_array is None:
         dest_array = np.zeros(len(spans) - 1, np.int64)
@@ -975,14 +979,14 @@ def apply_spans_count(spans, dest_array=None):
     return dest_array
 
 
-@njit
+@exetera_njit
 def apply_spans_first(spans, src_array, dest_array=None):
     dest_array = np.zeros(len(spans) - 1, dtype=src_array.dtype) if dest_array is None else dest_array
     dest_array[:] = src_array[spans[:-1]]
     return dest_array
 
 
-@njit
+@exetera_njit
 def apply_spans_last(spans, src_array, dest_array=None):
     dest_array = np.zeros(len(spans) - 1, dtype=src_array.dtype) if dest_array is None else dest_array
     spans = spans[1:]-1
@@ -990,30 +994,43 @@ def apply_spans_last(spans, src_array, dest_array=None):
     return dest_array
 
 
-@njit
+@exetera_njit
 def apply_spans_max(spans, src_array, dest_array=None):
     dest_array = np.zeros(len(spans) - 1, dtype=src_array.dtype) if dest_array is None else dest_array
-    for i in range(len(spans)-1):
+    for i in range(len(spans) - 1):
         cur = spans[i]
-        next = spans[i+1]
+        next = spans[i + 1]
         if next - cur == 1:
             dest_array[i] = src_array[cur]
         else:
-            dest_array[i] = src_array[cur:next].max()
+            # dest_array[i] = src_array[cur:next].max()  # doesn't work for fixed strings in Python?
+            max_val = src_array[cur]
+            for idx in range(cur + 1, next):
+                if src_array[idx] > max_val:
+                    max_val = src_array[idx]
+
+            dest_array[i] = max_val
     return dest_array
 
 
-@njit
+@exetera_njit
 def apply_spans_min(spans, src_array, dest_array=None):
     dest_array = np.zeros(len(spans) - 1, dtype=src_array.dtype) if dest_array is None else dest_array
-    for i in range(len(spans)-1):
+    for i in range(len(spans) - 1):
         cur = spans[i]
-        next = spans[i+1]
+        next = spans[i + 1]
         if next - cur == 1:
             dest_array[i] = src_array[cur]
         else:
-            dest_array[i] = src_array[cur:next].min()
+            # dest_array[i] = src_array[cur:next].min()  # doesn't work for fixed strings in Python?
+            min_val = src_array[cur]
+            for idx in range(cur + 1, next):
+                if src_array[idx] < min_val:
+                    min_val = src_array[idx]
+
+            dest_array[i] = min_val
     return dest_array
+
 
 
 # def _apply_spans_concat(spans, src_field):
@@ -1034,7 +1051,7 @@ def apply_spans_min(spans, src_array, dest_array=None):
 #     return dest_values
 
 
-@njit
+@exetera_njit
 def apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
                        max_index_i, max_value_i, s_start):
     separator = np.frombuffer(b',', dtype=np.uint8)[0]
@@ -1199,7 +1216,7 @@ def generate_ordered_map_to_left_streamed(left: Field,
     r_result.data.complete()
 
 
-@njit
+@exetera_njit
 def generate_ordered_map_to_left_remaining(i_max, l_result, r_result, i_off, i, r, invalid):
     while i < i_max and r < len(l_result):
         l_result[r] = i_off + i
@@ -1362,7 +1379,7 @@ def generate_ordered_map_to_left_both_unique_streamed(left: Field,
     r_result.data.complete()
 
 
-@njit
+@exetera_njit
 def generate_ordered_map_to_left_partial(left,
                                          i_max,
                                          right,
@@ -1464,7 +1481,7 @@ def generate_ordered_map_to_left_partial(left,
     return i, j, r, ii, jj, ii_max, jj_max, inner
 
 
-@njit
+@exetera_njit
 def generate_ordered_map_to_left_left_unique_partial(left,
                                                      right,
                                                      j_max,
@@ -1494,7 +1511,7 @@ def generate_ordered_map_to_left_left_unique_partial(left,
     return i, j, r
 
 
-@njit
+@exetera_njit
 def generate_ordered_map_to_left_right_unique_partial(left,
                                                       i_max,
                                                       right,
@@ -1520,7 +1537,7 @@ def generate_ordered_map_to_left_right_unique_partial(left,
     return i, j, r
 
 
-@njit
+@exetera_njit
 def generate_ordered_map_to_left_both_unique_partial(left,
                                                      right,
                                                      r_result,
@@ -1547,7 +1564,7 @@ def generate_ordered_map_to_left_both_unique_partial(left,
     return i, j, r
 
 
-@njit
+@exetera_njit
 def generate_ordered_map_to_left_right_unique_remaining(i_max, r_result, i, r, invalid):
     while i < i_max and r < len(r_result):
         r_result[r] = invalid
@@ -1607,7 +1624,7 @@ def generate_ordered_map_to_left_right_unique_streamed_old(left,
     return unmapped > 0
 
 
-@njit
+@exetera_njit
 def generate_ordered_map_to_left_right_unique_partial_old(d_j, left, right, left_to_right, invalid):
     """
     Returns:
@@ -1826,7 +1843,7 @@ def generate_ordered_map_to_inner_both_unique_streamed(left: Field,
     r_result.data.complete()
 
 
-@njit
+@exetera_njit
 def generate_ordered_map_to_inner_partial(left,
                                           i_max,
                                           right,
@@ -1924,7 +1941,7 @@ def generate_ordered_map_to_inner_partial(left,
     return i, j, r, ii, jj, ii_max, jj_max, inner
 
 
-@njit
+@exetera_njit
 def generate_ordered_map_to_inner_left_unique_partial(left,
                                                       i_max,
                                                       right,
@@ -1951,7 +1968,7 @@ def generate_ordered_map_to_inner_left_unique_partial(left,
     return i, j, r
 
 
-@njit
+@exetera_njit
 def generate_ordered_map_to_inner_right_unique_partial(left,
                                                        i_max,
                                                        right,
@@ -1978,7 +1995,7 @@ def generate_ordered_map_to_inner_right_unique_partial(left,
     return i, j, r
 
 
-@njit
+@exetera_njit
 def generate_ordered_map_to_inner_both_unique_partial(left,
                                                       i_max,
                                                       right,
@@ -2008,7 +2025,7 @@ def generate_ordered_map_to_inner_both_unique_partial(left,
 # ================================================
 
 
-@njit
+@exetera_njit
 def generate_ordered_map_to_left_right_unique(first, second, result, invalid):
     if len(first) != len(result):
         msg = "'first' and 'result' must be the same length"
@@ -2036,7 +2053,7 @@ def generate_ordered_map_to_left_right_unique(first, second, result, invalid):
     return unmapped > 0
 
 
-@njit
+@exetera_njit
 def generate_ordered_map_to_left_both_unique(first, second, result, invalid):
     if len(first) != len(result):
         msg = "'second' and 'result' must be the same length"
@@ -2064,7 +2081,7 @@ def generate_ordered_map_to_left_both_unique(first, second, result, invalid):
     return unmapped > 0
 
 
-@njit
+@exetera_njit
 def ordered_left_map_result_size(left, right):
     i = 0
     j = 0
@@ -2094,7 +2111,7 @@ def ordered_left_map_result_size(left, right):
         result_size += left - i
 
 
-@njit
+@exetera_njit
 def ordered_inner_map_result_size(left, right):
     i = 0
     j = 0
@@ -2120,7 +2137,7 @@ def ordered_inner_map_result_size(left, right):
     return result_size
 
 
-@njit
+@exetera_njit
 def ordered_outer_map_result_size_both_unique(left, right):
     i = 0
     j = 0
@@ -2143,7 +2160,7 @@ def ordered_outer_map_result_size_both_unique(left, right):
     return result_size
 
 
-@njit
+@exetera_njit
 def ordered_inner_map_both_unique(left, right, left_to_inner, right_to_inner):
     i = 0
     j = 0
@@ -2200,7 +2217,7 @@ def ordered_inner_map_left_unique_streamed(left, right, left_to_inner, right_to_
             rc = rc[jj:]
 
 
-@njit
+@exetera_njit
 def ordered_inner_map_left_unique_partial(d_i, d_j, left, right,
                                           left_to_inner, right_to_inner):
     """
@@ -2228,7 +2245,7 @@ def ordered_inner_map_left_unique_partial(d_i, d_j, left, right,
     return i, j, m
 
 
-@njit
+@exetera_njit
 def ordered_inner_map_left_unique(left, right, left_to_inner, right_to_inner):
     i = 0
     j = 0
@@ -2250,7 +2267,7 @@ def ordered_inner_map_left_unique(left, right, left_to_inner, right_to_inner):
             j = cur_j + 1
 
 
-@njit
+@exetera_njit
 def ordered_inner_map(left, right, left_to_inner, right_to_inner):
     i = 0
     j = 0
@@ -2276,16 +2293,16 @@ def ordered_inner_map(left, right, left_to_inner, right_to_inner):
             j = cur_j + 1
 
 
-@njit
+@exetera_njit
 def ordered_get_last_as_filter(field):
-    result = np.zeros(len(field), dtype=numba.types.boolean)
+    result = np.zeros(len(field), dtype=numba_bool)
     for i in range(len(field)-1):
         result[i] = field[i] != field[i+1]
     result[-1] = True
     return result
 
 
-@njit
+@exetera_njit
 def ordered_generate_journalling_indices(old, new):
     i = 0
     j = 0
@@ -2358,7 +2375,7 @@ def ordered_generate_journalling_indices(old, new):
     return old_inds, new_inds
 
 
-@njit
+@exetera_njit
 def compare_rows_for_journalling(old_map, new_map, old_field, new_field, to_keep):
     for i in range(len(old_map)):
         if to_keep[i] == False:
@@ -2372,7 +2389,7 @@ def compare_rows_for_journalling(old_map, new_map, old_field, new_field, to_keep
                 to_keep[i] = old_field[old_map[i]] != new_field[new_map[i]]
 
 
-@njit
+@exetera_njit
 def compare_indexed_rows_for_journalling(old_map, new_map,
                                          old_indices, old_values, new_indices, new_values,
                                          to_keep):
@@ -2393,7 +2410,7 @@ def compare_indexed_rows_for_journalling(old_map, new_map,
                 to_keep[i] = not np.array_equal(old_value, new_value)
 
 
-@njit
+@exetera_njit
 def merge_journalled_entries(old_map, new_map, to_keep, old_src, new_src, dest):
     cur_old = 0
     cur_dest = 0
@@ -2416,7 +2433,7 @@ def merge_journalled_entries(old_map, new_map, to_keep, old_src, new_src, dest):
 #             dest.add_to(next(new_src))
 
 
-@njit
+@exetera_njit
 def merge_indexed_journalled_entries_count(old_map, new_map, to_keep, old_src_inds, new_src_inds):
     cur_old = 0
     acc_val = 0
@@ -2431,7 +2448,7 @@ def merge_indexed_journalled_entries_count(old_map, new_map, to_keep, old_src_in
     return acc_val
 
 
-@njit
+@exetera_njit
 def merge_indexed_journalled_entries(old_map, new_map, to_keep,
                                     old_src_inds, old_src_vals,
                                     new_src_inds, new_src_vals,
@@ -2576,7 +2593,7 @@ def streaming_sort_merge(src_index_f, src_value_f, tgt_index_f, tgt_value_f,
             src_index_chunks = filtered_index_chunks
 
 
-@njit
+@exetera_njit
 def streaming_sort_partial(in_chunk_indices, in_chunk_lengths,
                            src_value_chunks, src_index_chunks, dest_value_chunk, dest_index_chunk):
     dest_index = 0
@@ -2649,7 +2666,7 @@ def get_byte_map(string_map):
     return byte_map
 
 
-@njit           
+@exetera_njit           
 def categorical_transform(chunk, i_c, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values):
     """
     Transform method for categorical importer in readerwriter.py
@@ -2672,7 +2689,7 @@ def categorical_transform(chunk, i_c, column_inds, column_vals, column_offsets, 
             index = i
             for j in range(key_len):
                 entry_start = cat_index[i]
-                if column_vals[col_offset + key_start + j] != cat_keys[entry_start + j]:
+                if column_vals[int(col_offset + key_start + j)] != cat_keys[int(entry_start + j)]:
                     index = -1
                     break
 
@@ -2680,7 +2697,7 @@ def categorical_transform(chunk, i_c, column_inds, column_vals, column_offsets, 
                 chunk[row_idx] = cat_values[index]
                 
 
-@njit           
+@exetera_njit           
 def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, column_inds, column_vals, column_offsets, cat_keys, cat_index, cat_values):
     """
     Transform method for categorical importer in readerwriter.py
@@ -2719,7 +2736,7 @@ def leaky_categorical_transform(chunk, freetext_indices, freetext_values, i_c, c
             freetext_values[freetext_indices[row_idx]: freetext_indices[row_idx + 1]] = column_vals[col_offset + key_start: col_offset + key_end]
 
 
-@njit
+@exetera_njit
 def numeric_bool_transform(elements, validity, column_inds, column_vals, column_offsets, col_idx, written_row_count,
                            invalid_value, validation_mode, field_name):
     """
@@ -2920,7 +2937,7 @@ def transform_float(column_inds, column_vals, column_offsets, col_idx,
     return results, valids
 
 
-@njit
+@exetera_njit
 def transform_to_values(column_inds, column_vals, column_offsets, col_idx, written_row_count):
     """
     Trasnform method for byte data from np.int to np.bytes_
@@ -2928,12 +2945,14 @@ def transform_to_values(column_inds, column_vals, column_offsets, col_idx, writt
     data = []
     col_offset = column_offsets[col_idx]
     for row_idx in range(written_row_count):
-        val = column_vals[col_offset + column_inds[col_idx, row_idx]: col_offset + column_inds[col_idx, row_idx + 1]]
+        start_idx=int(col_offset + column_inds[col_idx, row_idx])
+        end_idx=int(col_offset + column_inds[col_idx, row_idx + 1])
+        val = column_vals[start_idx: end_idx]
         data.append(val)
     return data
 
 
-@njit
+@exetera_njit
 def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, written_row_count,
                            strlen, memory):
     """
@@ -2945,7 +2964,7 @@ def fixed_string_transform(column_inds, column_vals, column_offsets, col_idx, wr
         start_idx = column_inds[col_idx, i] + col_offset
         end_idx = min(column_inds[col_idx, i+1] + col_offset, start_idx + strlen)
         for c in range(start_idx, end_idx):
-            memory[a] = column_vals[c]
+            memory[a] = np.int8(column_vals[c])
             a += 1
 
 
@@ -2989,7 +3008,7 @@ def unique_for_indexed_string(indices, values, return_index, return_inverse, ret
     return combined_result
      
   
-@njit
+@exetera_njit
 def indexed_string_unique(indices, values, unique_result, unique_index, unique_inverse, unique_counts):
     """
     Find the unique elements for indexed string field using njit function.
@@ -3054,7 +3073,7 @@ def isin_for_indexed_string_field(test_elements, indices, values):
     return isin_indexed_string_speedup(test_elements, indices, values)
 
 
-@njit
+@exetera_njit
 def isin_indexed_string_speedup(test_elements, indices, values):
     result = [False] * (len(indices) - 1)
     len_test_eles = len(test_elements)
@@ -3078,7 +3097,7 @@ def isin_indexed_string_speedup(test_elements, indices, values):
         result[i] = is_equal
     return result
 
-@njit
+@exetera_njit
 def compare_arrays(a, b):
     """
     a and b are typically views into the larger arrays
