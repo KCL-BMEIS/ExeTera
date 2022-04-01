@@ -1405,10 +1405,6 @@ class TestFieldApplySpansCount(unittest.TestCase):
                                    lambda df: df.create_indexed_string('foo'),
                                    lambda f, p, d: f.apply_spans_last(p, d))
 
-        self._test_apply_spans_src(spans, src_data, expected,
-                                   lambda df: df.create_indexed_string('foo'),
-                                   lambda f, p, d: f.apply_spans_last(p, d))
-
         expected = ['a', 'ccc', 'dddd', 'gg']
         self._test_apply_spans_src(spans, src_data, expected,
                                    lambda df: df.create_indexed_string('foo'),
