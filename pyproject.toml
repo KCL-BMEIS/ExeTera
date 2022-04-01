@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "exetera"
 description = "High-volume key-value store and analytics, based on hdf5"
-license = {file = "LICENSE.txt"}
+license = {attr = "Apache 2.0 License, see LICENSE.txt"}
 dependencies = ["numpy", "pandas", "h5py", "numba", "parameterized"]
 requires-python = ">=3.7"
 authors = [{ name = "Ben Murray", email = "benjamin.murray@kcl.ac.uk" }]
