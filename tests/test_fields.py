@@ -1240,61 +1240,59 @@ class TestFieldMemApplySpansCount(SessionTestCase):
     def setUp(self):
         super(TestFieldMemApplySpansCount, self).setUp()
 
-    @parameterized.expand([(fields.IndexedStringMemField.apply_spans_first, None, False, ['a', 'ccc', 'dddd', 'gg']),
-                           (fields.IndexedStringMemField.apply_spans_first, None, True, ['a', 'ccc', 'dddd', 'gg']),
-                           (fields.IndexedStringMemField.apply_spans_first, True, False, ['a', 'ccc', 'dddd', 'gg']),
-                           (fields.IndexedStringMemField.apply_spans_last, None, False, ['bb', 'ccc', 'fff', 'h']),
-                           (fields.IndexedStringMemField.apply_spans_last, None, True, ['bb', 'ccc', 'fff', 'h']),
-                           (fields.IndexedStringMemField.apply_spans_last, True, False, ['bb', 'ccc', 'fff', 'h']),
-                           (fields.IndexedStringMemField.apply_spans_min, None, False, ['a', 'ccc', 'dddd', 'gg']),
-                           (fields.IndexedStringMemField.apply_spans_min, None, True, ['a', 'ccc', 'dddd', 'gg']),
-                           (fields.IndexedStringMemField.apply_spans_min, True, False, ['a', 'ccc', 'dddd', 'gg']),
-                           (fields.IndexedStringMemField.apply_spans_max, None, False, ['bb', 'ccc', 'fff', 'h']),
-                           (fields.IndexedStringMemField.apply_spans_max, None, True, ['bb', 'ccc', 'fff', 'h']),
-                           (fields.IndexedStringMemField.apply_spans_max, True, False, ['bb', 'ccc', 'fff', 'h'])])
-    def test_indexed_string_mem_field(self, ops, target, inplace, expected):  # target is type field
+    @parameterized.expand([(fields.IndexedStringMemField.apply_spans_first, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_first, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_first, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_last, ['bb', 'ccc', 'fff', 'h']),
+                           (fields.IndexedStringMemField.apply_spans_last, ['bb', 'ccc', 'fff', 'h']),
+                           (fields.IndexedStringMemField.apply_spans_last, ['bb', 'ccc', 'fff', 'h']),
+                           (fields.IndexedStringMemField.apply_spans_min, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_min, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_min, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_max, ['bb', 'ccc', 'fff', 'h']),
+                           (fields.IndexedStringMemField.apply_spans_max, ['bb', 'ccc', 'fff', 'h']),
+                           (fields.IndexedStringMemField.apply_spans_max, ['bb', 'ccc', 'fff', 'h'])])
+    def test_indexed_string_mem_field(self, ops, expected):  # target is type field
         src_data = ['a', 'bb', 'ccc', 'dddd', 'eeee', 'fff', 'gg', 'h']
         f = fields.IndexedStringMemField(self.s)
         f.data.write(src_data)
         spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
-        dest = None
-        if target != None:
-            dest = fields.IndexedStringMemField(self.s)
-        output = ops(f, spans, dest, inplace)  # output is a mem field
+
+        output = ops(f, spans, None, False)  # output is a mem field
 
         self.assertListEqual(output.data[:], expected)
-        if target != None:
-            self.assertListEqual(dest.data[:], expected)
-        if inplace:
-            self.assertListEqual(f.data[:], expected)
+        dest = fields.IndexedStringMemField(self.s)
+        output = ops(f, spans, dest, False)
+        self.assertListEqual(dest.data[:], expected)
+        output = ops(f, spans, None, True)
+        self.assertListEqual(f.data[:], expected)
 
-    @parameterized.expand([(fields.FixedStringMemField.apply_spans_first, None, False, [b'a1', b'b1', b'c1', b'd1']),
-                           (fields.FixedStringMemField.apply_spans_first, None, True, [b'a1', b'b1', b'c1', b'd1']),
-                           (fields.FixedStringMemField.apply_spans_first, True, False, [b'a1', b'b1', b'c1', b'd1']),
-                           (fields.FixedStringMemField.apply_spans_last, None, False, [b'a2', b'b1', b'c3', b'd2']),
-                           (fields.FixedStringMemField.apply_spans_last, None, True, [b'a2', b'b1', b'c3', b'd2']),
-                           (fields.FixedStringMemField.apply_spans_last, True, False, [b'a2', b'b1', b'c3', b'd2']),
-                           (fields.FixedStringMemField.apply_spans_min, None, False, [b'a1', b'b1', b'c1', b'd1']),
-                           (fields.FixedStringMemField.apply_spans_min, None, True, [b'a1', b'b1', b'c1', b'd1']),
-                           (fields.FixedStringMemField.apply_spans_min, True, False, [b'a1', b'b1', b'c1', b'd1']),
-                           (fields.FixedStringMemField.apply_spans_max, None, False, [b'a2', b'b1', b'c3', b'd2']),
-                           (fields.FixedStringMemField.apply_spans_max, None, True, [b'a2', b'b1', b'c3', b'd2']),
-                           (fields.FixedStringMemField.apply_spans_max, True, False, [b'a2', b'b1', b'c3', b'd2'])])
-    def test_fixed_string_mem_field(self,ops, target, inplace, expected):  # target is type field
+    @parameterized.expand([(fields.FixedStringMemField.apply_spans_first, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_first, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_first, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_last, [b'a2', b'b1', b'c3', b'd2']),
+                           (fields.FixedStringMemField.apply_spans_last, [b'a2', b'b1', b'c3', b'd2']),
+                           (fields.FixedStringMemField.apply_spans_last, [b'a2', b'b1', b'c3', b'd2']),
+                           (fields.FixedStringMemField.apply_spans_min, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_min, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_min, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_max, [b'a2', b'b1', b'c3', b'd2']),
+                           (fields.FixedStringMemField.apply_spans_max, [b'a2', b'b1', b'c3', b'd2']),
+                           (fields.FixedStringMemField.apply_spans_max, [b'a2', b'b1', b'c3', b'd2'])])
+    def test_fixed_string_mem_field(self,ops, expected):  # target is type field
         src_data = np.array([b'a1', b'a2', b'b1', b'c1', b'c2', b'c3', b'd1', b'd2'])
         f = fields.FixedStringMemField(self.s, 2)
         f.data.write(src_data)
         spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
-        dest = None
-        if target != None:
-            dest = fields.FixedStringMemField(self.s, 2)
-        output = ops(f, spans, dest, inplace)  # output is a mem field
+
+        output = ops(f, spans, None, False)  # output is a mem field
 
         self.assertListEqual(output.data[:].tolist(), expected)
-        if target != None:
-            self.assertListEqual(dest.data[:].tolist(), expected)
-        if inplace:
-            self.assertListEqual(f.data[:].tolist(), expected)
+        dest = fields.FixedStringMemField(self.s, 2)
+        output = ops(f, spans, dest, False)
+        self.assertListEqual(dest.data[:].tolist(), expected)
+        output = ops(f, spans, None, True)
+        self.assertListEqual(f.data[:].tolist(), expected)
 
     @parameterized.expand([(fields.CategoricalMemField.apply_spans_first, [0, 2, 0, 0]),
                            (fields.CategoricalMemField.apply_spans_last, [1, 2, 2, 1]),
