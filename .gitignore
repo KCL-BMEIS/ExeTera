@@ -121,10 +121,6 @@ temp/
 *.swp
 .DS_Store
 
-# temporary testing data MedNIST
-tests/testing_data/MedNIST*
-tests/testing_data/*Hippocampus*
-
 # clang format tool
 .clang-format-bin/
 

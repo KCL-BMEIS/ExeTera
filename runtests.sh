@@ -3,6 +3,7 @@
 do_coverage=false
 do_report=false
 do_html=false
+do_no_numba=false
 
 # get the directory the script lives in and cd to it, might want this variable for later additions
 homedir="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -16,6 +17,9 @@ do
         --coverage)
             do_coverage=true
         ;;
+        --no-numba)
+            do_no_numba=true
+        ;;
         --report)
             do_report=true
         ;;
@@ -23,7 +27,7 @@ do
             do_html=true
         ;;
         --help)
-            echo "runtests.sh [--coverage] [--report] [--html] [--help] FILES*"
+            echo "runtests.sh [--coverage] [--report] [--html] [--no-numba] [--help] FILES*"
             exit 0
         ;;
         *)
@@ -38,8 +42,17 @@ done
 if [ $do_coverage = true ]
 then
     rm -f .coverage coverage.xml
+    
     coverage run --omit=tests/*.py --branch -m unittest -c $*
     result=$?
+    
+    if [ $do_no_numba = true ]
+    then
+        echo "Running tests again without Numba"
+        USE_NUMBA=false coverage run --append --omit=tests/*.py --branch -m unittest -c $*
+        ((result=$result + $?))
+    fi    
+    
     coverage xml
     
     if [ $do_report = true ]

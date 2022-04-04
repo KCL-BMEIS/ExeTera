@@ -1,7 +1,7 @@
 import csv
 import time
 from xmlrpc.client import boolean
-from numba import njit,jit
+#from numba import njit
 import numpy as np
 from exetera.core import utils
 import time
@@ -10,6 +10,7 @@ from io import StringIO
 from typing import Union
 
 
+from exetera.core.utils import exetera_njit
 
 def get_file_stat(source: Union[str, StringIO], chunk_row_size: int):
     """
@@ -72,85 +73,85 @@ def read_file_using_fast_csv_reader(source: Union[str, StringIO],
 
     column_val_total_count = column_offsets[-1]
 
-    with utils.Timer("read_file_using_fast_csv_reader"):
-        chunk_index = 0
-        hasHeader = True
+    #with utils.Timer("read_file_using_fast_csv_reader"):
+    chunk_index = 0
+    hasHeader = True
 
-        accumulated_written_rows = 0
+    accumulated_written_rows = 0
 
-        # initialize column_inds, column_vals ouside of while-loop
-        column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
-        
-        # column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
-        column_vals = np.zeros(np.int64(column_val_total_count), dtype=np.uint8)
+    # initialize column_inds, column_vals ouside of while-loop
+    column_inds = np.zeros((count_columns, count_rows + 1), dtype=np.int64) # add one more row for initial index 0
+    
+    # column_vals = np.zeros((count_columns, val_row_count), dtype=np.uint8)
+    column_vals = np.zeros(np.int64(column_val_total_count), dtype=np.uint8)
 
-        # make ndarray larger factor
-        larger_factor = 2
-        is_indices_full, is_values_full = False, False
+    # make ndarray larger factor
+    larger_factor = 2
+    is_indices_full, is_values_full = False, False
 
-        content = None
-        start_index = 0
+    content = None
+    start_index = 0
 
-        ch = 0
-        while chunk_index < total_byte_size:
-            if stop_after_rows and accumulated_written_rows >= stop_after_rows:
+    ch = 0
+    while chunk_index < total_byte_size:
+        if stop_after_rows and accumulated_written_rows >= stop_after_rows:
+            break
+
+        # reads chunk size of file content 
+        # when indices or values is full, we need to call fast_csv_reader again, but we don't want to read same content again
+        if not is_indices_full and not is_values_full:
+            content = np.fromfile(source, count=chunk_byte_size, offset=chunk_index, dtype=np.uint8)
+            start_index = 0
+
+            length_content = content.shape[0]
+            if length_content == 0:
                 break
 
-            # reads chunk size of file content 
-            # when indices or values is full, we need to call fast_csv_reader again, but we don't want to read same content again
-            if not is_indices_full and not is_values_full:
-                content = np.fromfile(source, count=chunk_byte_size, offset=chunk_index, dtype=np.uint8)
-                start_index = 0
+            # check if there's newline at EOF in the last chunk. add one if it's missing
+            if chunk_index + length_content == total_byte_size and content[-1] != NEWLINE_VALUE:
+                content = np.append(content, NEWLINE_VALUE)
+        
+        offset_pos, written_row_count, is_indices_full, is_values_full, val_full_col_idx = fast_csv_reader(content, start_index, column_inds, column_vals, column_offsets, hasHeader, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
 
-                length_content = content.shape[0]
-                if length_content == 0:
-                    break
+        # convert and write
+        for ith, i_c in enumerate(index_map):     
+            if field_importer_list and field_importer_list[ith]: 
+                field_importer_list[ith].import_part(column_inds, column_vals, column_offsets, i_c, written_row_count)
 
-                # check if there's newline at EOF in the last chunk. add one if it's missing
-                if chunk_index + length_content == total_byte_size and content[-1] != NEWLINE_VALUE:
-                    content = np.append(content, NEWLINE_VALUE)
+        # make column_inds larger if it gets full before reach the end of chunk
+        if is_indices_full:
+            indices_row_count = column_inds.shape[1] - 1
+            column_inds = np.zeros((count_columns, np.uint32(indices_row_count * larger_factor + 1)), dtype=np.int64)  
+
+        # make column_values larger if it gets full before reach the end of chunk             
+        if is_values_full and val_full_col_idx != -1:
+            col_val_count = column_offsets[val_full_col_idx + 1] - column_offsets[val_full_col_idx]
+            delta = col_val_count * (larger_factor - 1)
+            column_offsets = np.concatenate((column_offsets[:val_full_col_idx + 1], column_offsets[val_full_col_idx + 1:] + np.int64(delta)))
+            column_val_total_count = column_offsets[-1]
+            column_vals = np.zeros(np.int64(column_val_total_count), dtype=np.uint8)
             
-            offset_pos, written_row_count, is_indices_full, is_values_full, val_full_col_idx = fast_csv_reader(content, start_index, column_inds, column_vals, column_offsets, hasHeader, ESCAPE_VALUE, SEPARATOR_VALUE, NEWLINE_VALUE, WHITE_SPACE_VALUE)
+        # reassign
+        if is_indices_full or is_values_full:
+            start_index = offset_pos
+        else:
+            chunk_index += offset_pos
 
-            # convert and write
-            for ith, i_c in enumerate(index_map):     
-                if field_importer_list and field_importer_list[ith]: 
-                    field_importer_list[ith].import_part(column_inds, column_vals, column_offsets, i_c, written_row_count)
-
-            # make column_inds larger if it gets full before reach the end of chunk
-            if is_indices_full:
-                indices_row_count = column_inds.shape[1] - 1
-                column_inds = np.zeros((count_columns, np.uint32(indices_row_count * larger_factor + 1)), dtype=np.int64)  
-
-            # make column_values larger if it gets full before reach the end of chunk             
-            if is_values_full and val_full_col_idx != -1:
-                col_val_count = column_offsets[val_full_col_idx + 1] - column_offsets[val_full_col_idx]
-                delta = col_val_count * (larger_factor - 1)
-                column_offsets = np.concatenate((column_offsets[:val_full_col_idx + 1], column_offsets[val_full_col_idx + 1:] + np.int64(delta)))
-                column_val_total_count = column_offsets[-1]
-                column_vals = np.zeros(np.int64(column_val_total_count), dtype=np.uint8)
-                
-            # reassign
-            if is_indices_full or is_values_full:
-                start_index = offset_pos
-            else:
-                chunk_index += offset_pos
-
-            hasHeader = False
-            accumulated_written_rows += written_row_count
-            ch += 1
-           
-            print(f"{ch} chunks, {accumulated_written_rows} accumulated_written_rows parsed in {time.time() - time0}s")
+        hasHeader = False
+        accumulated_written_rows += written_row_count
+        ch += 1
+       
+        #print(f"{ch} chunks, {accumulated_written_rows} accumulated_written_rows parsed in {time.time() - time0}s")
 
         # complete at the end
         for ith in range(len(index_map)):
             field_importer_list[ith].complete()
 
-    print(f"Total time {time.time() - time0}s")
+    #print(f"Total time {time.time() - time0}s")
     return accumulated_written_rows
 
 
-@njit
+@exetera_njit
 def fast_csv_reader(source: Union[str, StringIO],
                     start_index: int,
                     column_inds: np.ndarray,

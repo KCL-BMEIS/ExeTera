@@ -3541,8 +3541,7 @@ class FieldDataOps:
             raise ValueError("if 'in_place is True, 'target' must be None")
 
         spans_ = val.array_from_field_or_lower('spans', spans)
-        results = np.zeros(len(spans) - 1, dtype=source.data.dtype)
-        predicate(spans_, source.data[:], results)
+        results = predicate(spans_, source.data[:])
 
         if in_place is True:
             if not source._write_enabled:
@@ -3584,8 +3583,7 @@ class FieldDataOps:
         spans_ = val.array_from_field_or_lower('spans', spans)
 
         # step 1: get the indices through the index predicate
-        results = np.zeros(len(spans) - 1, dtype=np.int64)
-        predicate(spans_, source.indices[:], source.values[:], results)
+        results = predicate(spans_, source.indices[:], source.values[:])
 
         # step 2: run apply_index on the source
         return FieldDataOps.apply_index_to_indexed_field(source, results, target, in_place)
@@ -3612,8 +3610,7 @@ class FieldDataOps:
         spans_ = val.array_from_field_or_lower('spans', spans)
 
         # step 1: get the indices through the index predicate
-        results = np.zeros(len(spans) - 1, dtype=np.int64)
-        predicate(spans_, results)
+        results = predicate(spans_)
 
         # step 2: run apply_index on the source
         return FieldDataOps.apply_index_to_indexed_field(source, results, target, in_place)

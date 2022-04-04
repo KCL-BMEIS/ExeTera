@@ -168,7 +168,7 @@ class TestIndexedStringFields(unittest.TestCase):
             df = ds.create_dataframe('src')
             f = df.create_indexed_string('f')
             d = f.data[:]
-            print(d)
+            #print(d)
 
 
     def test_filter_indexed_string(self):
