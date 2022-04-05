@@ -670,7 +670,6 @@ class Session(AbstractSession):
          
          Example::
          
-         
              Index:  a a a b b x a c c d d d
              Result: 3     2   1 1 2   3
          
