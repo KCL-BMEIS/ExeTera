@@ -1,11 +1,11 @@
 exetera.io package
-====================
+==================
 
 Submodules
 ----------
 
 exetera.io.importer module
-----------------------------
+--------------------------
 
 .. automodule:: exetera.io.importer
    :members:
@@ -14,7 +14,7 @@ exetera.io.importer module
 
 
 exetera.io.load_schema module
-----------------------------
+-----------------------------
 
 .. automodule:: exetera.io.load_schema
    :members:
@@ -23,7 +23,7 @@ exetera.io.load_schema module
 
 
 exetera.io.parsers module
-----------------------------
+-------------------------
 
 .. automodule:: exetera.io.parsers
    :members:
