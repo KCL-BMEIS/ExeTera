@@ -1,9 +1,9 @@
 import unittest
-
-import numpy as np
 from io import BytesIO
 
 import h5py
+import numpy as np
+from parameterized import parameterized
 
 from exetera.core import session
 from exetera.core import fields
@@ -11,7 +11,7 @@ from exetera.core import dataframe
 from exetera.core import persistence as per
 from exetera.core import utils
 from exetera.io import field_importers as fi
-
+from .utils import DEFAULT_FIELD_DATA, SessionTestCase
 
 class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
 
@@ -102,6 +102,7 @@ class TestCreateThenLoadBetweenSessionsNew(unittest.TestCase):
 
         with session.Session() as s:
             src = s.open_dataset(bio, 'r', 'src')
+            self.assertTupleEqual(s.list_datasets(),('src',))
             f = s.get(src['df']['foo'])
             self.assertDictEqual({1: b'a', 2: b'b'}, f.keys)
 
@@ -114,6 +115,7 @@ class TestCreateThenLoadBetweenSessionsNew(unittest.TestCase):
 
         with session.Session() as s:
             src = s.open_dataset(bio1, 'r', 'src')
+            self.assertTupleEqual(s.list_datasets(), ('src',))
             df = src['df']
             f = df['foo']
             self.assertIsNotNone(f)
@@ -1173,3 +1175,24 @@ class TestSessionImporters(unittest.TestCase):
 
             expected_date_list = ['2020-05-10', '2020-05-12', '2020-05-12', '2020-05-15']
             self.assertListEqual(hf['foo'].data[:].tolist(), [datetime.strptime(x, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() for x in expected_date_list])
+
+
+class TestSessionCreate_like(SessionTestCase):
+
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_create_like(self, creator, name, kwargs, data):
+        """
+        Tests basic creation of every field type, checking it's contents are actually what was put into them.
+        """
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+
+        # Convert numeric fields and use Numpy's conversion as an oracle to test overflown values in field. If a value
+        # overflows when stored in a field then the field's contents will obviously vary compared to `data`, so change
+        # data to match by using Numpy to handle overflow for us.
+        if "nformat" in kwargs:
+            data = np.asarray(data, dtype=kwargs["nformat"])
+
+        self.assertFieldEqual(data, f)
+
+        nf = self.s.create_like(f, self.df, name+'_')
+        self.assertTrue(isinstance(nf, type(f)))
