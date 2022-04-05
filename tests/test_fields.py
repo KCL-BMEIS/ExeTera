@@ -359,6 +359,110 @@ class TestIsSorted(unittest.TestCase):
             f2.data.write(svals)
             self.assertTrue(f2.is_sorted())
 
+class TestMemFieldsGeneralMethods(SessionTestCase):
+    """
+    Methods tested here: created_like, get_spans, is_sorted, unique
+    """
+    def test_numeric_mem_field(self):
+        raw_data = np.array(shuffle_randstate(list(range(-10, 10)) + HARD_INTS))
+        numeric_mem = fields.NumericMemField('num', 'int64')
+        numeric_mem.data.write(raw_data)
+        self.assertFalse(numeric_mem.is_sorted())
+
+        newfield = numeric_mem.create_like(group=None, name=None)
+        self.assertTrue(isinstance(newfield, fields.NumericMemField))
+
+        newfield.data.write(raw_data)
+        self.assertListEqual(numeric_mem.get_spans().tolist(), newfield.get_spans().tolist())
+        newfield.data.clear()
+        newfield.data.write(np.array(sorted(raw_data)))
+        self.assertTrue(newfield.is_sorted())
+
+        self.assertListEqual(numeric_mem.unique().tolist(), newfield.unique().tolist())
+
+    def test_categorical_mem_field(self):
+        categorical_memfield = fields.CategoricalMemField(self.s, 'int32', {"a": 1, "b": 2, "c": 3})
+
+        memfield_data = RAND_STATE.randint(1, 4, 20)
+        categorical_memfield.data.write(memfield_data)
+        self.assertFalse(categorical_memfield.is_sorted())
+
+        newfield = categorical_memfield.create_like(group=None, name=None)
+        self.assertTrue(isinstance(newfield, fields.CategoricalMemField))
+
+        newfield.data.write(memfield_data)
+        self.assertListEqual(categorical_memfield.get_spans().tolist(), newfield.get_spans().tolist())
+        newfield.data.clear()
+        newfield.data.write(np.array(sorted(memfield_data)))
+        self.assertTrue(newfield.is_sorted())
+
+        self.assertListEqual(categorical_memfield.unique().tolist(), newfield.unique().tolist())
+
+    def test_fixed_string_mem_field(self):
+        memfield = fields.FixedStringMemField(self.s, 3)
+
+        memfield_data = np.array([b"aaa", b"bbb", b"eee", b"ccc", b"ddd", b"   "]*2)
+        memfield.data.write(memfield_data)
+        self.assertFalse(memfield.is_sorted())
+
+        newfield = memfield.create_like(group=None, name=None)
+        self.assertTrue(isinstance(newfield, fields.FixedStringMemField))
+
+        newfield.data.write(memfield_data)
+        self.assertListEqual(memfield.get_spans().tolist(), newfield.get_spans().tolist())
+        newfield.data.clear()
+        newfield.data.write(np.array(sorted(memfield_data)))
+        self.assertTrue(newfield.is_sorted())
+
+        self.assertListEqual(memfield.unique().tolist(), newfield.unique().tolist())
+
+    def test_timestamp_mem_field(self):
+        memfield = fields.TimestampMemField(self.s)
+
+        memfield_data = np.array([
+            utc_timestamp(2020, 1, 1),
+            utc_timestamp(2021, 5, 18),
+            utc_timestamp(2950, 8, 17),
+            utc_timestamp(1840, 10, 11),
+            utc_timestamp(2110, 11, 1),
+            utc_timestamp(2002, 3, 3),
+            utc_timestamp(1963, 6, 7),
+            utc_timestamp(2018, 2, 28),
+            utc_timestamp(2400, 9, 1),
+            utc_timestamp(1, 1, 1),
+        ])
+        memfield.data.write(memfield_data)
+        self.assertFalse(memfield.is_sorted())
+
+        newfield = memfield.create_like(group=None, name=None)
+        self.assertTrue(isinstance(newfield, fields.TimestampMemField))
+
+        newfield.data.write(memfield_data)
+        self.assertListEqual(memfield.get_spans().tolist(), newfield.get_spans().tolist())
+        newfield.data.clear()
+        newfield.data.write(np.array(sorted(memfield_data)))
+        self.assertTrue(newfield.is_sorted())
+
+        self.assertListEqual(memfield.unique().tolist(), newfield.unique().tolist())
+
+    def test_indexed_string_mem_field(self):
+        memfield = fields.IndexedStringMemField(self.s)
+
+        memfield_data = np.array(["a", "bb", "eeeee", "ccc", "dddd","", " ",]*2)
+        memfield.data.write(memfield_data)
+        self.assertFalse(memfield.is_sorted())
+
+        newfield = memfield.create_like(group=None, name=None)
+        self.assertTrue(isinstance(newfield, fields.IndexedStringMemField))
+
+        newfield.data.write(memfield_data)
+        self.assertListEqual(memfield.get_spans(), newfield.get_spans())
+        newfield.data.clear()
+        newfield.data.write(np.array(sorted(memfield_data)))
+        self.assertTrue(newfield.is_sorted())
+
+        self.assertListEqual(memfield.unique().tolist(), newfield.unique().tolist())
+
 
 class TestIndexedStringFields(unittest.TestCase):
 
