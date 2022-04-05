@@ -1241,16 +1241,8 @@ class TestFieldMemApplySpansCount(SessionTestCase):
         super(TestFieldMemApplySpansCount, self).setUp()
 
     @parameterized.expand([(fields.IndexedStringMemField.apply_spans_first, ['a', 'ccc', 'dddd', 'gg']),
-                           (fields.IndexedStringMemField.apply_spans_first, ['a', 'ccc', 'dddd', 'gg']),
-                           (fields.IndexedStringMemField.apply_spans_first, ['a', 'ccc', 'dddd', 'gg']),
-                           (fields.IndexedStringMemField.apply_spans_last, ['bb', 'ccc', 'fff', 'h']),
-                           (fields.IndexedStringMemField.apply_spans_last, ['bb', 'ccc', 'fff', 'h']),
                            (fields.IndexedStringMemField.apply_spans_last, ['bb', 'ccc', 'fff', 'h']),
                            (fields.IndexedStringMemField.apply_spans_min, ['a', 'ccc', 'dddd', 'gg']),
-                           (fields.IndexedStringMemField.apply_spans_min, ['a', 'ccc', 'dddd', 'gg']),
-                           (fields.IndexedStringMemField.apply_spans_min, ['a', 'ccc', 'dddd', 'gg']),
-                           (fields.IndexedStringMemField.apply_spans_max, ['bb', 'ccc', 'fff', 'h']),
-                           (fields.IndexedStringMemField.apply_spans_max, ['bb', 'ccc', 'fff', 'h']),
                            (fields.IndexedStringMemField.apply_spans_max, ['bb', 'ccc', 'fff', 'h'])])
     def test_indexed_string_mem_field(self, ops, expected):  # target is type field
         src_data = ['a', 'bb', 'ccc', 'dddd', 'eeee', 'fff', 'gg', 'h']
@@ -1268,16 +1260,8 @@ class TestFieldMemApplySpansCount(SessionTestCase):
         self.assertListEqual(f.data[:], expected)
 
     @parameterized.expand([(fields.FixedStringMemField.apply_spans_first, [b'a1', b'b1', b'c1', b'd1']),
-                           (fields.FixedStringMemField.apply_spans_first, [b'a1', b'b1', b'c1', b'd1']),
-                           (fields.FixedStringMemField.apply_spans_first, [b'a1', b'b1', b'c1', b'd1']),
-                           (fields.FixedStringMemField.apply_spans_last, [b'a2', b'b1', b'c3', b'd2']),
-                           (fields.FixedStringMemField.apply_spans_last, [b'a2', b'b1', b'c3', b'd2']),
                            (fields.FixedStringMemField.apply_spans_last, [b'a2', b'b1', b'c3', b'd2']),
                            (fields.FixedStringMemField.apply_spans_min, [b'a1', b'b1', b'c1', b'd1']),
-                           (fields.FixedStringMemField.apply_spans_min, [b'a1', b'b1', b'c1', b'd1']),
-                           (fields.FixedStringMemField.apply_spans_min, [b'a1', b'b1', b'c1', b'd1']),
-                           (fields.FixedStringMemField.apply_spans_max, [b'a2', b'b1', b'c3', b'd2']),
-                           (fields.FixedStringMemField.apply_spans_max, [b'a2', b'b1', b'c3', b'd2']),
                            (fields.FixedStringMemField.apply_spans_max, [b'a2', b'b1', b'c3', b'd2'])])
     def test_fixed_string_mem_field(self,ops, expected):  # target is type field
         src_data = np.array([b'a1', b'a2', b'b1', b'c1', b'c2', b'c3', b'd1', b'd2'])
