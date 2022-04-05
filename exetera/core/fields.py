@@ -807,6 +807,14 @@ class IndexedStringMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
+        Example::
+
+            field = ... # field contains data ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+            filter_to_apply = np.array([0, 2, 0, 1, 0, 1, 0, 1, 0])
+
+            field.apply_filter(filter_to_apply, target_field)
+            target_field.data[:]  # prints ['bb', 'dddd', 'eeee', 'gg']
+
         :param filter_to_apply: a Field or numpy array that contains the boolean filter data
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
@@ -822,6 +830,14 @@ class IndexedStringMemField(MemoryField):
         Apply an index to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+            index_to_apply = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
+
+            field.apply_index(index_to_apply, target_field)
+            target_field.data[:]  # ['h', 'a', 'gg', 'bb', 'fff', 'ccc', 'eeee', 'dddd', '']
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
@@ -839,6 +855,14 @@ class IndexedStringMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
+        Example::
+
+            field = ... # field contains data ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+            spans_to_apply = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+
+            field.apply_spans_first(spans_to_apply, target_field)
+            target_field.data[:]  # ['a', 'ccc', 'dddd', 'gg']
+
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
@@ -854,6 +878,14 @@ class IndexedStringMemField(MemoryField):
         Apply spans (last). This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+            spans_to_apply = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+
+            field.apply_spans_last(spans_to_apply, target_field)
+            target_field.data[:]  #  ['bb', 'ccc', 'fff', 'h']
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
@@ -871,6 +903,14 @@ class IndexedStringMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
+        Example::
+
+            field = ... # field contains data ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+            spans_to_apply = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+
+            field.apply_spans_min(spans_to_apply, in_place=True)
+            field.data[:]  # ['a', 'ccc', 'dddd', 'gg']
+
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
@@ -886,6 +926,14 @@ class IndexedStringMemField(MemoryField):
         Apply spans (max). This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+            spans_to_apply = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+
+            field.apply_spans_max(spans_to_apply, in_place=True)
+            field.data[:]  # ['bb', 'ccc', 'fff', 'h']
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
@@ -991,6 +1039,15 @@ class FixedStringMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
+        Example::
+
+            field = ... # field contains data ['a', 'b', 'c', 'd', '', 'e', 'f', 'g', 'h']
+            filter_to_apply = np.array([0, 2, 0, 1, 0, 1, 0, 1, 0])
+
+            field.apply_filter(filter_to_apply, target_field)
+            target_field.data[:]  # prints ['b', 'd', 'e', 'g']
+
+
         :param filter_to_apply: a Field or numpy array that contains the boolean filter data
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
@@ -1006,6 +1063,15 @@ class FixedStringMemField(MemoryField):
         Apply an index to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data ['a', 'b', 'c', 'd', '', 'e', 'f', 'g', 'h']
+            index_to_apply = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
+
+            field.apply_index(index_to_apply, target_field)
+            target_field.data[:]  # ['h', 'a', 'g', 'b', 'f', 'c', 'e', 'd', '']
+
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
@@ -1027,7 +1093,7 @@ class FixedStringMemField(MemoryField):
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
         :param in_place: if True, perform the operation destructively on this field. This field
-            must be writable. If 'in_place' is True, 'target' must be None
+            must be writable. If 'in_place' is True, 'target' must be None.
         :return: The respanned field. This is a new field instance unless 'target' is set, in which
             case it is the target field, or unless 'in_place' is True, in which case it is this field.
         """
@@ -1171,6 +1237,15 @@ class NumericMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
+        Example::
+
+            field = ... # field contains data [1, 22, 333, 444, 0, 5555, 666, 77, 8]
+            filter_to_apply = np.array([0, 2, 0, 1, 0, 1, 0, 1, 0])
+
+            field.apply_filter(filter_to_apply, in_place=True)
+            field.data[:]  # prints [22, 444, 5555, 77]
+
+
         :param filter_to_apply: a Field or numpy array that contains the boolean filter data
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
@@ -1186,6 +1261,14 @@ class NumericMemField(MemoryField):
         Apply an index to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data [1, 22, 333, 444, 0, 5555, 666, 77, 8]
+            index_to_apply = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
+
+            field.apply_index(index_to_apply, target_field)
+            target_field.data[:]  # [8, 1, 77, 22, 666, 333, 5555, 444, 0]
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
@@ -1465,6 +1548,14 @@ class CategoricalMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
+        Example::
+
+            field = ... # field contains data [1, 2, 3, 4, 0, 5, 6, 7, 8]
+            filter_to_apply = np.array([0, 2, 0, 1, 0, 1, 0, 1, 0])
+
+            field.apply_filter(filter_to_apply, in_place=True)
+            field.data[:]  # prints [2, 4, 5, 7]
+
         :param filter_to_apply: a Field or numpy array that contains the boolean filter data
         :param target: if set, this is the field that is written to. This field must be writable. If 'target' is set, 
             'in_place' must be False.
@@ -1480,6 +1571,15 @@ class CategoricalMemField(MemoryField):
         Apply an index to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data [1, 2, 3, 4, 0, 5, 6, 7, 8]
+            index_to_apply = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
+
+            field.apply_index(index_to_apply, target_field)
+            target_field.data[:]  # [8, 1, 7, 2, 6, 3, 5, 4, 0]
+
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
@@ -1658,6 +1758,15 @@ class TimestampMemField(MemoryField):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
+        Example::
+
+            field = ... # field contains data [1, 22, 333, 444, 0, 5555, 666, 77, 8]
+            filter_to_apply = np.array([0, 2, 0, 1, 0, 1, 0, 1, 0])
+
+            field.apply_filter(filter_to_apply, in_place=True)
+            field.data[:]  # prints [22, 444, 5555, 77]
+
+
         :param filter_to_apply: a Field or numpy array that contains the boolean filter data
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
@@ -1673,6 +1782,15 @@ class TimestampMemField(MemoryField):
         Apply an index to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data [1, 22, 333, 444, 0, 5555, 666, 77, 8]
+            index_to_apply = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
+
+            field.apply_index(index_to_apply, target_field)
+            target_field.data[:]  # [8, 1, 77, 22, 666, 333, 5555, 444, 0]
+
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
@@ -2009,6 +2127,14 @@ class IndexedStringField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
+        Example::
+
+            field = ... # field contains data ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+            filter_to_apply = np.array([0, 2, 0, 1, 0, 1, 0, 1, 0])
+
+            field.apply_filter(filter_to_apply, target_field)
+            target_field.data[:]  # prints ['bb', 'dddd', 'eeee', 'gg']
+
         :param filter_to_apply: a Field or numpy array that contains the boolean filter data
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
@@ -2025,6 +2151,14 @@ class IndexedStringField(HDF5Field):
         Apply an index to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+            index_to_apply = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
+
+            field.apply_index(index_to_apply, target_field)
+            target_field.data[:]  # ['h', 'a', 'gg', 'bb', 'fff', 'ccc', 'eeee', 'dddd', '']
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
@@ -2043,6 +2177,14 @@ class IndexedStringField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
+        Example::
+
+            field = ... # field contains data ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+            spans_to_apply = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+
+            field.apply_spans_first(spans_to_apply, target_field)
+            target_field.data[:]  # ['a', 'ccc', 'dddd', 'gg']
+
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
@@ -2059,6 +2201,14 @@ class IndexedStringField(HDF5Field):
         Apply spans (last). This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+            spans_to_apply = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+
+            field.apply_spans_last(spans_to_apply, target_field)
+            target_field.data[:]  #  ['bb', 'ccc', 'fff', 'h']
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
@@ -2077,6 +2227,14 @@ class IndexedStringField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
 
+        Example::
+
+            field = ... # field contains data ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+            spans_to_apply = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+
+            field.apply_spans_min(spans_to_apply, in_place=True)
+            field.data[:]  # ['a', 'ccc', 'dddd', 'gg']
+
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
@@ -2093,6 +2251,14 @@ class IndexedStringField(HDF5Field):
         Apply spans (max). This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data ['a', 'bb', 'ccc', 'dddd', '', 'eeee', 'fff', 'gg', 'h']
+            spans_to_apply = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+
+            field.apply_spans_max(spans_to_apply, in_place=True)
+            field.data[:]  # ['bb', 'ccc', 'fff', 'h']
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
@@ -2204,6 +2370,15 @@ class FixedStringField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
+        Example::
+
+            field = ... # field contains data ['a', 'b', 'c', 'd', '', 'e', 'f', 'g', 'h']
+            filter_to_apply = np.array([0, 2, 0, 1, 0, 1, 0, 1, 0])
+
+            field.apply_filter(filter_to_apply, target_field)
+            target_field.data[:]  # prints ['b', 'd', 'e', 'g']
+
+
         :param filter_to_apply: a Field or numpy array that contains the boolean filter data
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
@@ -2220,6 +2395,15 @@ class FixedStringField(HDF5Field):
         Apply an index to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data ['a', 'b', 'c', 'd', '', 'e', 'f', 'g', 'h']
+            index_to_apply = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
+
+            field.apply_index(index_to_apply, target_field)
+            target_field.data[:]  # ['h', 'a', 'g', 'b', 'f', 'c', 'e', 'd', '']
+
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
@@ -2411,6 +2595,15 @@ class NumericField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
+        Example::
+
+            field = ... # field contains data [1, 22, 333, 444, 0, 5555, 666, 77, 8]
+            filter_to_apply = np.array([0, 2, 0, 1, 0, 1, 0, 1, 0])
+
+            field.apply_filter(filter_to_apply, in_place=True)
+            field.data[:]  # prints [22, 444, 5555, 77]
+
+
         :param filter_to_apply: a Field or numpy array that contains the boolean filter data
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
@@ -2427,6 +2620,15 @@ class NumericField(HDF5Field):
         Apply an index to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data [1, 22, 333, 444, 0, 5555, 666, 77, 8]
+            index_to_apply = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
+
+            field.apply_index(index_to_apply, target_field)
+            target_field.data[:]  # [8, 1, 77, 22, 666, 333, 5555, 444, 0]
+
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
@@ -2766,6 +2968,15 @@ class CategoricalField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
+        Example::
+
+            field = ... # field contains data [1, 2, 3, 4, 0, 5, 6, 7, 8]
+            filter_to_apply = np.array([0, 2, 0, 1, 0, 1, 0, 1, 0])
+
+            field.apply_filter(filter_to_apply, in_place=True)
+            field.data[:]  # prints [2, 4, 5, 7]
+
+
         :param filter_to_apply: a Field or numpy array that contains the boolean filter data
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
@@ -2782,6 +2993,15 @@ class CategoricalField(HDF5Field):
         Apply an index to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data [1, 2, 3, 4, 0, 5, 6, 7, 8]
+            index_to_apply = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
+
+            field.apply_index(index_to_apply, target_field)
+            target_field.data[:]  # [8, 1, 7, 2, 6, 3, 5, 4, 0]
+
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.
@@ -2979,6 +3199,15 @@ class TimestampField(HDF5Field):
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the filtered data is written to.
 
+        Example::
+
+            field = ... # field contains data [1, 22, 333, 444, 0, 5555, 666, 77, 8]
+            filter_to_apply = np.array([0, 2, 0, 1, 0, 1, 0, 1, 0])
+
+            field.apply_filter(filter_to_apply, in_place=True)
+            field.data[:]  # prints [22, 444, 5555, 77]
+
+
         :param filter_to_apply: a Field or numpy array that contains the boolean filter data
         :param target: if set, this is the field that is written to. This field must be writable.
             If 'target' is set, 'in_place' must be False.
@@ -2995,6 +3224,15 @@ class TimestampField(HDF5Field):
         Apply an index to this field. This operation doesn't modify the field on which it
         is called unless 'in_place is set to true'. The user can specify a 'target' field that
         the reindexed data is written to.
+
+        Example::
+
+            field = ... # field contains data [1, 22, 333, 444, 0, 5555, 666, 77, 8]
+            index_to_apply = np.array([8, 0, 7, 1, 6, 2, 5, 3, 4], dtype=np.int32)
+
+            field.apply_index(index_to_apply, target_field)
+            target_field.data[:]  # [8, 1, 77, 22, 666, 333, 5555, 444, 0]
+
 
         :param index_to_apply: a Field or numpy array that contains the indices
         :param target: if set, this is the field that is written to. This field must be writable.

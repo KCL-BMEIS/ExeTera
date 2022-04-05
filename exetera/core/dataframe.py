@@ -790,7 +790,7 @@ class HDF5DataFrame(DataFrame):
 
 
             # Include multiple fields
-            reuslt = df.describe(include=['foo', 'bar', 'baz'])
+            result = df.describe(include=['foo', 'bar', 'baz'])
             # Statistics results displayed
             #
             # fields              foo             bar             baz
