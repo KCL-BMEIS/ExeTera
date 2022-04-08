@@ -3068,8 +3068,12 @@ def indexed_string_unique(indices, values, unique_result, unique_index, unique_i
 
 
 def isin_for_indexed_string_field(test_elements, indices, values):
-    if isinstance(test_elements, set):
-        test_elements = list(test_elements)
+    if test_elements is None or len(test_elements) == 0:
+        return [False] * (len(indices) - 1)
+
+    test_elements = [x for x in test_elements if x is not None and x != 'None']
+    if len(test_elements) == 0:
+        return [False] * (len(indices) - 1)
 
     # sort first
     test_elements = np.sort(test_elements)
