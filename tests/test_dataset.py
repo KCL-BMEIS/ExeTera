@@ -22,6 +22,12 @@ class TestDataSet(unittest.TestCase):
             num.data.write([1, 2, 3, 4])
             self.assertEqual([1, 2, 3, 4], num.data[:].tolist())
 
+            df2 = dst.require_dataframe('df')
+            self.assertEqual(id(df), id(df2))
+
+            df3 = dst.require_dataframe('df3')
+            self.assertTrue(isinstance(df3, DataFrame))
+
             cat = s.create_categorical(df, 'cat', 'int8', {'a': 1, 'b': 2})
             cat.data.write([1 , 1, 2, 2])
             self.assertEqual([1, 1, 2, 2], s.get(df['cat']).data[:].tolist())
@@ -63,16 +69,26 @@ class TestDataSet(unittest.TestCase):
             del dst['df2']
             self.assertTrue(len(dst.keys()) == 1)
             self.assertTrue(len(dst._file.keys()) == 1)
+            with self.assertRaises(ValueError):
+                del dst['df2']
 
             # set dataframe (this is a copy between datasets
             dst['df3'] = df2
             self.assertTrue(isinstance(dst['df3'], DataFrame))
             self.assertEqual([b'a', b'b', b'c', b'd'], dst['df3']['fs'].data[:].tolist())
 
+            with self.assertRaises(TypeError):
+                dst[123] = df2
+                dst['df4'] = 'foo'
+
             # set dataframe within the same dataset (rename)
             dst['df4'] = dst['df3']
             self.assertTrue(isinstance(dst['df4'], DataFrame))
             self.assertEqual([b'a', b'b', b'c', b'd'], dst['df4']['fs'].data[:].tolist())
+
+            df2.name = None
+            with self.assertRaises(ValueError):
+                dst.delete_dataframe(df2)
 
     def test_dataset_static_func(self):
         bio = BytesIO()
@@ -82,11 +98,16 @@ class TestDataSet(unittest.TestCase):
             df = dst.create_dataframe('df')
             num1 = df.create_numeric('num', 'uint32')
             num1.data.write([1, 2, 3, 4])
+            idxs = df.create_indexed_string('idxs')
+            idxs.data.write(['a', 'bb', 'ccc', 'dddd'])
 
             ds2 = s.open_dataset(bio2, 'r+', 'ds2')
             copy(df, ds2, 'df2')
             self.assertTrue(isinstance(ds2['df2'], DataFrame))
             self.assertTrue(isinstance(ds2['df2']['num'], fields.Field))
+
+            with self.assertRaises(ValueError):
+                copy(df, ds2, 'df2')
 
             ds2.drop('df2')
             self.assertTrue(len(ds2) == 0)
@@ -94,6 +115,18 @@ class TestDataSet(unittest.TestCase):
             df2 = ds2.create_dataframe('df2')
             self.assertTrue(ds2.contains_dataframe(df2))
             self.assertFalse(dst.create_dataframe('foo'))
+
+            with self.assertRaises(ValueError):
+                ds2.create_dataframe('df3', 123)
+
+            with self.assertRaises(TypeError):
+                ds2.contains_dataframe('foo')
+
+            with self.assertRaises(TypeError):
+                ds2[123]
+
+            with self.assertRaises(ValueError):
+                ds2['boo']
 
             dst.delete_dataframe(dst['foo'])
             ds2.delete_dataframe(df2)

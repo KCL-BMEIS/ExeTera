@@ -44,6 +44,7 @@ class TestFieldExistence(SessionTestCase):
         """Test every field object is considered True."""
         f = self.setup_field(self.df, creator, name, (), kwargs, data)
         self.assertTrue(bool(f))
+        self.assertTrue(f.valid)
 
 
 class TestFieldDataOps(SessionTestCase):

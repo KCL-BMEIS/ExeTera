@@ -39,9 +39,29 @@ class TestDataFrameCreateFields(unittest.TestCase):
             self.assertEqual(len(df2), 2)
             self.assertEqual(len(df), 2)
 
+            with self.assertRaises(TypeError):
+                df[1] = cat
+            with self.assertRaises(TypeError):
+                df['cat2'] = 'foo'
+
+            num2 = s.create_numeric(df2, 'num2', 'int32')
+            df.add(num2)  # add is hard-copy
+            self.assertTrue('num2' in df)
+
+            with self.assertRaises(TypeError):
+                1 in df
+            with self.assertRaises(TypeError):
+                df.contains_field(1)
+            self.assertTrue(df.contains_field(df['num2']))
+
             # list & get
             self.assertEqual(id(numf), id(df.get_field('numf')))
             self.assertEqual(id(numf), id(df['numf']))
+
+            with self.assertRaises(TypeError):
+                df[1]
+            with self.assertRaises(ValueError):
+                df['foo']
 
             # list & iter
             dfit = iter(df)
@@ -53,7 +73,11 @@ class TestDataFrameCreateFields(unittest.TestCase):
             self.assertFalse('numf' in df)
             with self.assertRaises(ValueError, msg="This field is owned by a different dataframe"):
                 df.delete_field(cat)
+            with self.assertRaises(ValueError):
+                del df['numf']
             self.assertFalse(df.contains_field(cat))
+
+
 
     def test_dataframe_create_numeric(self):
         bio = BytesIO()
@@ -206,15 +230,20 @@ class TestDataFrameCreateFields(unittest.TestCase):
             df = dst.create_dataframe('dst')
             numf = s.create_numeric(df, 'numf', 'int32')
             numf.data.write([5, 4, 3, 2, 1])
+            idxs = s.create_indexed_string(df, 'idxs')
+            idxs.data.write(['aaa', 'b', 'ccc', 'dddd'])
 
             df2 = dst.create_dataframe('df2')
             dataframe.copy(numf, df2,'numf')
+            dataframe.copy(idxs, df2, 'idxs')
             self.assertListEqual([5, 4, 3, 2, 1], df2['numf'].data[:].tolist())
             df.drop('numf')
             self.assertTrue('numf' not in df)
             dataframe.move(df2['numf'], df, 'numf')
             self.assertTrue('numf' not in df2)
             self.assertListEqual([5, 4, 3, 2, 1], df['numf'].data[:].tolist())
+
+
 
     def test_dataframe_ops(self):
         bio = BytesIO()
@@ -232,12 +261,17 @@ class TestDataFrameCreateFields(unittest.TestCase):
             df.apply_index(index, ddf)
             self.assertEqual([1, 2, 3, 4, 5], ddf['numf'].data[:].tolist())
             self.assertEqual([b'a', b'b', b'c', b'd', b'e'], ddf['fst'].data[:].tolist())
+            with self.assertRaises(TypeError):
+                df.apply_index(index, 'foo')
 
             filter_to_apply = np.array([True, True, False, False, True])
             ddf = dst.create_dataframe('dst3')
             df.apply_filter(filter_to_apply, ddf)
             self.assertEqual([5, 4, 1], ddf['numf'].data[:].tolist())
             self.assertEqual([b'e', b'd', b'a'], ddf['fst'].data[:].tolist())
+
+
+
 
 
 class TestDataFrameRename(unittest.TestCase):
@@ -257,6 +291,11 @@ class TestDataFrameRename(unittest.TestCase):
             self.assertFalse('fa' in df)
             self.assertTrue('fb' in df)
             self.assertTrue('fc' in df)
+            with self.assertRaises(ValueError):
+                df.rename(123,456)
+            with self.assertRaises(ValueError):
+                df.rename({'fc': 'fb'}, 'fb')
+                df.rename('fc', None)
 
     def test_rename_should_not_clash(self):
         a = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype='int32')
@@ -367,6 +406,9 @@ class TestDataFrameApplyFilter(unittest.TestCase):
             df.apply_filter(filt)
             self.assertListEqual(expected, df['numf'].data[:].tolist())
 
+            with self.assertRaises(TypeError):
+                df.apply_filter(filt, 123)
+
 
     def test_apply_filter_with_numeric_filter(self):
 
@@ -432,6 +474,69 @@ class TestDataFrameMerge(unittest.TestCase):
                              np.logical_not(ddf['valid_r'].data[:])
             self.assertTrue(np.all(valid_if_equal))
 
+            with self.assertRaises(ValueError):
+                dataframe.merge(123, rdf, ddf, 'l_id', 'r_id')
+                dataframe.merge(ldf, 123, ddf, 'l_id', 'r_id')
+                dataframe.merge(ldf, rdf, ddf, 'l_id', 'r_id', how='foo')
+
+
+
+    def tests_merge_sorted(self):
+        l_id = np.asarray([0, 1, 2, 3, 4, 5, 6, 7], dtype='int32')
+        r_vals = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '', 'ccc2']
+
+        bio = BytesIO()
+        with session.Session() as s:
+            dst = s.open_dataset(bio, 'w', 'dst')
+            ldf = dst.create_dataframe('ldf')
+            rdf = dst.create_dataframe('rdf')
+            ldf.create_numeric('l_id', 'int32').data.write(l_id)
+
+            r_sorted = dst.create_dataframe('r_sorted')
+            r_sorted.create_numeric('r_id', 'int32').data.write(l_id)
+            r_sorted.create_indexed_string('r_vals').data.write(r_vals[0:8])
+            ddf = dst.create_dataframe('ddf2')
+            dataframe.merge(ldf, r_sorted, ddf, 'l_id', 'r_id', how='left', hint_left_keys_ordered=True,
+                            hint_right_keys_ordered=True)
+            expected = ['bb1', 'ccc1', '', 'dddd1', 'ggggggg1', 'ffffff1', 'bb2', '']
+            self.assertEqual(expected, ddf['r_vals'].data[:])
+            valid_if_equal = (ddf['l_id'].data[:] == ddf['r_id'].data[:])
+            self.assertTrue(np.all(valid_if_equal))
+            ddf = dst.create_dataframe('ddf3')
+            # dataframe.merge(ldf, r_sorted, ddf, 'l_id', 'r_id', how='left', hint_left_keys_ordered=True,
+            #                 hint_right_keys_ordered=True, hint_left_keys_unique=True, hint_right_keys_unique=True)
+            # self.assertEqual(expected, ddf['r_vals'].data[:])
+            # valid_if_equal = (ddf['l_id'].data[:] == ddf['r_id'].data[:])
+            # self.assertTrue(np.all(valid_if_equal))
+
+
+            ddf = dst.create_dataframe('ddf4')
+            dataframe.merge(ldf, r_sorted, ddf, 'l_id', 'r_id', how='right', hint_left_keys_ordered=True,
+                            hint_right_keys_ordered=True)
+            self.assertEqual(expected, ddf['r_vals'].data[:])
+            valid_if_equal = (ddf['l_id'].data[:] == ddf['r_id'].data[:])
+            self.assertTrue(np.all(valid_if_equal))
+
+            ddf = dst.create_dataframe('ddf5')
+            # dataframe.merge(ldf, r_sorted, ddf, 'l_id', 'r_id', how='right', hint_left_keys_ordered=True,
+            #                 hint_right_keys_ordered=True, hint_left_keys_unique=True, hint_right_keys_unique=True)
+            # self.assertEqual(expected, ddf['r_vals'].data[:])
+            # valid_if_equal = (ddf['l_id'].data[:] == ddf['r_id'].data[:])
+            # self.assertTrue(np.all(valid_if_equal))
+
+            ddf = dst.create_dataframe('ddf6')
+            dataframe.merge(ldf, r_sorted, ddf, 'l_id', 'r_id', how='inner', hint_left_keys_ordered=True,
+                            hint_right_keys_ordered=True)
+            self.assertEqual(expected, ddf['r_vals'].data[:])
+            valid_if_equal = (ddf['l_id'].data[:] == ddf['r_id'].data[:])
+            self.assertTrue(np.all(valid_if_equal))
+
+            ddf = dst.create_dataframe('ddf7')
+            # dataframe.merge(ldf, r_sorted, ddf, 'l_id', 'r_id', how='inner', hint_left_keys_ordered=True,
+            #                 hint_right_keys_ordered=True, hint_left_keys_unique=True, hint_right_keys_unique=True)
+            # self.assertEqual(expected, ddf['r_vals'].data[:])
+            # valid_if_equal = (ddf['l_id'].data[:] == ddf['r_id'].data[:])
+            # self.assertTrue(np.all(valid_if_equal))
 
     def tests_merge_right(self):
 
