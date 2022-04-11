@@ -24,7 +24,7 @@ from exetera.core.abstract_types import Field, AbstractSession
 from exetera.core import operations
 #from exetera.core import persistence as per
 from exetera.core import fields as fld
-from exetera.core import readerwriter as rw
+# from exetera.core import readerwriter as rw
 from exetera.core import validation as val
 from exetera.core import operations as ops
 from exetera.core import dataset as ds
@@ -764,8 +764,8 @@ class Session(AbstractSession):
             raise ValueError("'destination_pkey' must not be an indexed string field")
         if isinstance(fkey_indices, Field) and fkey_indices.indexed:
             raise ValueError("'fkey_indices' must not be an indexed string field")
-        if isinstance(values_to_join, rw.IndexedStringReader):
-            raise ValueError("Joins on indexed string fields are not supported")
+        # if isinstance(values_to_join, rw.IndexedStringReader):
+        #     raise ValueError("Joins on indexed string fields are not supported")
 
         raw_fkey_indices = val.raw_array_from_parameter(self, "fkey_indices", fkey_indices)
 
@@ -801,51 +801,51 @@ class Session(AbstractSession):
         else:
             return destination_space_values
 
-    def predicate_and_join(self,
-                           predicate, destination_pkey, fkey_indices,
-                           reader=None, writer=None, fkey_index_spans=None):
-        """
-        This method is due for removal and should not be used.
-        Please use the merge or ordered_merge functions instead.
-        """
-        if reader is not None:
-            if not isinstance(reader, rw.Reader):
-                raise ValueError(f"'reader' must be a type of Reader but is {type(reader)}")
-            if isinstance(reader, rw.IndexedStringReader):
-                raise ValueError(f"Joins on indexed string fields are not supported")
-
-        # generate spans for the sorted key indices if not provided
-        if fkey_index_spans is None:
-            fkey_index_spans = self.get_spans(field=fkey_indices)
-
-        # select the foreign keys from the start of each span to get an ordered list
-        # of unique id indices in the destination space that the results of the predicate
-        # execution are mapped to
-        unique_fkey_indices = fkey_indices[:][fkey_index_spans[:-1]]
-
-        # generate a filter to remove invalid foreign key indices (where values in the
-        # foreign key don't map to any values in the destination space
-        invalid_filter = unique_fkey_indices < operations.INVALID_INDEX
-        safe_unique_fkey_indices = unique_fkey_indices[invalid_filter]
-
-        # execute the predicate (note that not every predicate requires a reader)
-        if reader is not None:
-            dtype = reader.dtype()
-        else:
-            dtype = np.uint32
-        results = np.zeros(len(fkey_index_spans) - 1, dtype=dtype)
-        predicate(fkey_index_spans, reader, results)
-
-        # the predicate results are in the same space as the unique_fkey_indices, which
-        # means they may still contain invalid indices, so filter those now
-        safe_results = results[invalid_filter]
-
-        # now get the memory that the results will be mapped to
-        destination_space_values = writer.chunk_factory(len(destination_pkey))
-        # finally, map the results from the source space to the destination space
-        destination_space_values[safe_unique_fkey_indices] = safe_results
-
-        writer.write(destination_space_values)
+    # def predicate_and_join(self,
+    #                        predicate, destination_pkey, fkey_indices,
+    #                        reader=None, writer=None, fkey_index_spans=None):
+    #     """
+    #     This method is due for removal and should not be used.
+    #     Please use the merge or ordered_merge functions instead.
+    #     """
+    #     if reader is not None:
+    #         if not isinstance(reader, rw.Reader):
+    #             raise ValueError(f"'reader' must be a type of Reader but is {type(reader)}")
+    #         if isinstance(reader, rw.IndexedStringReader):
+    #             raise ValueError(f"Joins on indexed string fields are not supported")
+    #
+    #     # generate spans for the sorted key indices if not provided
+    #     if fkey_index_spans is None:
+    #         fkey_index_spans = self.get_spans(field=fkey_indices)
+    #
+    #     # select the foreign keys from the start of each span to get an ordered list
+    #     # of unique id indices in the destination space that the results of the predicate
+    #     # execution are mapped to
+    #     unique_fkey_indices = fkey_indices[:][fkey_index_spans[:-1]]
+    #
+    #     # generate a filter to remove invalid foreign key indices (where values in the
+    #     # foreign key don't map to any values in the destination space
+    #     invalid_filter = unique_fkey_indices < operations.INVALID_INDEX
+    #     safe_unique_fkey_indices = unique_fkey_indices[invalid_filter]
+    #
+    #     # execute the predicate (note that not every predicate requires a reader)
+    #     if reader is not None:
+    #         dtype = reader.dtype()
+    #     else:
+    #         dtype = np.uint32
+    #     results = np.zeros(len(fkey_index_spans) - 1, dtype=dtype)
+    #     predicate(fkey_index_spans, reader, results)
+    #
+    #     # the predicate results are in the same space as the unique_fkey_indices, which
+    #     # means they may still contain invalid indices, so filter those now
+    #     safe_results = results[invalid_filter]
+    #
+    #     # now get the memory that the results will be mapped to
+    #     destination_space_values = writer.chunk_factory(len(destination_pkey))
+    #     # finally, map the results from the source space to the destination space
+    #     destination_space_values[safe_unique_fkey_indices] = safe_results
+    #
+    #     writer.write(destination_space_values)
 
     def get(self,
             field: Union[Field, h5py.Group]):

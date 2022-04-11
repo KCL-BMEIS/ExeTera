@@ -426,10 +426,10 @@ class AbstractSession(ABC):
              writer=None, fkey_index_spans=None):
         raise NotImplementedError()
 
-    @abstractmethod
-    def predicate_and_join(self, predicate, destination_pkey, fkey_indices,
-                           reader=None, writer=None, fkey_index_spans=None):
-        raise NotImplementedError()
+    # @abstractmethod
+    # def predicate_and_join(self, predicate, destination_pkey, fkey_indices,
+    #                        reader=None, writer=None, fkey_index_spans=None):
+    #     raise NotImplementedError()
 
     @abstractmethod
     def get(self, field):
