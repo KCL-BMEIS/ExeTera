@@ -4,7 +4,7 @@ import csv
 import pandas
 
 
-from exetera.core import utils, persistence
+# from exetera.core import utils, persistence
 from exetera.core import readerwriter as rw
 
 def transform_from_reader_type(reader):

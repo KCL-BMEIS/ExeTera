@@ -16,7 +16,7 @@ from datetime import datetime, MAXYEAR
 from itertools import accumulate
 from io import StringIO
 
-from exetera.core import persistence as per
+# from exetera.core import persistence as per
 from exetera.io import load_schema, parsers
 from exetera.core import utils
 

@@ -22,7 +22,7 @@ import h5py
 
 from exetera.core.abstract_types import Field, AbstractSession
 from exetera.core import operations
-from exetera.core import persistence as per
+#from exetera.core import persistence as per
 from exetera.core import fields as fld
 from exetera.core import readerwriter as rw
 from exetera.core import validation as val
@@ -617,11 +617,7 @@ class Session(AbstractSession):
         s = 0
         index_v = 0
         while s < len(spans) - 1:
-            # s, index_i, index_v = per._apply_spans_concat(spans, src_index, src_values,
-            #                                               dest_index, dest_values,
-            #                                               max_index_i, max_value_i, s,
-            #                                               separator, delimiter)
-            s, index_i, index_v = per._apply_spans_concat_2(spans, src_index, src_values,
+            s, index_i, index_v = ops._apply_spans_concat_2(spans, src_index, src_values,
                                                             dest_index, dest_values,
                                                             max_index_i, max_value_i,
                                                             separator, delimiter, s, index_v)
