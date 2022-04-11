@@ -1644,18 +1644,23 @@ class TestFieldIsIn(SessionTestCase):
         """
         f = self.setup_field(self.df, "create_indexed_string", "f", (), {}, data)
 
-        with self.subTest("Test with given data"):
-            expected = isin_oracle(data, isin_data, expected)
-            result = f.isin(isin_data)
+        if isin_data is None:
+            with self.assertRaises(TypeError) as context:
+                f.isin(isin_data)
 
-            self.assertIsInstance(result, list)
-            self.assertEqual(expected, result)
+            self.assertEqual(str(context.exception), "only list-like or dict-like objects are allowed to be passed to field.isin(), you passed a 'NoneType'")
 
-        with self.subTest("Test with duplicate data"):
-            if isin_data is not None:
+        else:
+
+            with self.subTest("Test with given data"):
+                expected = isin_oracle(data, isin_data, expected)
+                result = f.isin(isin_data)
+                self.assertIsInstance(result, np.ndarray)
+                np.testing.assert_array_equal(expected, result)
+
+            with self.subTest("Test with duplicate data"):
                 isin_data = shuffle_randstate(isin_data * 2)  # duplicate the search items and shuffle using a fixed seed
-            # reuse expected data from previous subtest
-            result = f.isin(isin_data)
-
-            self.assertIsInstance(result, list)
-            self.assertEqual(expected, result)
+                # reuse expected data from previous subtest
+                result = f.isin(isin_data)
+                self.assertIsInstance(result, np.ndarray)
+                np.testing.assert_array_equal(expected, result)
