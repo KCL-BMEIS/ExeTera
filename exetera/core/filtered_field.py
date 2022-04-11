@@ -11,20 +11,20 @@
 
 import numpy as np
 
-def filtered_field(field, filter):
-    for f in filter:
-        yield field[f]
-
-
-class FilteredField:
-    def __init__(self, field, filter):
-        self.field = field
-        self.filter = filter
-        self.dtype = self.field.dtype if isinstance(self.field, np.ndarray) else None
-
-    def __getitem__(self, item):
-        return self.field[self.filter[item]]
-
-    def __len__(self):
-        return len(self.filter)
+# def filtered_field(field, filter):
+#     for f in filter:
+#         yield field[f]
+#
+#
+# class FilteredField:
+#     def __init__(self, field, filter):
+#         self.field = field
+#         self.filter = filter
+#         self.dtype = self.field.dtype if isinstance(self.field, np.ndarray) else None
+#
+#     def __getitem__(self, item):
+#         return self.field[self.filter[item]]
+#
+#     def __len__(self):
+#         return len(self.filter)
 

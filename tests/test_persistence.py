@@ -10,7 +10,7 @@ import h5py
 
 from exetera.core import operations # , persistence
 from exetera.core.session import Session
-from exetera.core import readerwriter as rw
+# from exetera.core import readerwriter as rw
 from exetera.core import validation as val
 from exetera.core import utils
 

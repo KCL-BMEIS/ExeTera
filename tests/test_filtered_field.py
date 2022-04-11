@@ -14,26 +14,26 @@ import unittest
 from exetera.core import filtered_field
 
 
-class TestFilteredIndex(unittest.TestCase):
-
-    def test_filtered_field_method(self):
-        field = [x for x in range(10)]
-        field.reverse()
-
-        filter = [1, 3, 4, 7, 8, 9]
-
-        expected = [8, 6, 5, 2, 1, 0]
-        for i, f in enumerate(filtered_field.filtered_field(field, filter)):
-            self.assertEqual(expected[i], f)
-
-    def test_filtered_field_class(self):
-
-        field = [x for x in range(10)]
-        field.reverse()
-
-        filter = [1, 3, 4, 7, 8, 9]
-
-        ff = filtered_field.FilteredField(field, filter)
-        expected = [8, 6, 5, 2, 1, 0]
-        for i in range(len(ff)):
-            self.assertEqual(expected[i], ff[i])
+# class TestFilteredIndex(unittest.TestCase):
+#
+#     def test_filtered_field_method(self):
+#         field = [x for x in range(10)]
+#         field.reverse()
+#
+#         filter = [1, 3, 4, 7, 8, 9]
+#
+#         expected = [8, 6, 5, 2, 1, 0]
+#         for i, f in enumerate(filtered_field.filtered_field(field, filter)):
+#             self.assertEqual(expected[i], f)
+#
+#     def test_filtered_field_class(self):
+#
+#         field = [x for x in range(10)]
+#         field.reverse()
+#
+#         filter = [1, 3, 4, 7, 8, 9]
+#
+#         ff = filtered_field.FilteredField(field, filter)
+#         expected = [8, 6, 5, 2, 1, 0]
+#         for i in range(len(ff)):
+#             self.assertEqual(expected[i], ff[i])
