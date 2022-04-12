@@ -10,7 +10,7 @@ from exetera.core import dataframe
 from exetera.core import persistence as per
 from exetera.core import utils
 from exetera.io import field_importers as fi
-from .utils import DEFAULT_FIELD_DATA, SessionTestCase
+from .utils import DEFAULT_FIELD_DATA, SessionTestCase, NUMERIC_DATA
 
 class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
 
@@ -119,8 +119,23 @@ class TestCreateThenLoadBetweenSessionsNew(unittest.TestCase):
             f = df['foo']
             self.assertIsNotNone(f)
             self.assertEqual('foo', f.name)
-
             f2 = s.get(df['foo'])
+
+            with self.assertRaises(ValueError):
+                s.open_dataset(bio1, 'r', 'src')
+
+        with self.assertRaises(ValueError):
+            session.Session(timestamp=123)
+
+    def test_set_time(self):
+        from datetime import datetime
+        with session.Session() as s:
+            with self.assertRaises(ValueError):
+                s.set_timestamp(123)
+            ts = datetime.now().timestamp()
+            s.set_timestamp(str(ts))
+            self.assertEqual(str(ts), s.timestamp)
+
 
 
 class TestSessionMerge(unittest.TestCase):
@@ -663,16 +678,25 @@ class TestSessionSort(unittest.TestCase):
             self.assertListEqual([10, 30, 50, 40, 20], val_f.data[:].tolist())
             self.assertListEqual(['a', 'bbb', 'ccccc', 'dddd', 'ee'], val2_f.data[:])
 
+            df2 = dst.create_dataframe('ds2')
+            s.sort_on(src, df2, ("idx",), verbose=False)
+            self.assertListEqual([b'a', b'b', b'c', b'd', b'e'], df2['idx'].data[:].tolist())
+            self.assertListEqual([10, 30, 50, 40, 20], df2['val'].data[:].tolist())
+            self.assertListEqual(['a', 'bbb', 'ccccc', 'dddd', 'ee'], df2['val2'].data[:])
 
-class TestSessionFilter(unittest.TestCase):
+
+class TestSessionFilter(SessionTestCase):
 
     def test_apply_filter(self):
 
-        s = session.Session(10)
         vx = np.asarray([1, 2, 3, 4, 5, 6, 7, 8])
         filt = np.asarray([True, True, False, False, True, False, True, False])
 
-        result = s.apply_filter(filt, vx)
+        result = self.s.apply_filter(filt, vx)
+        self.assertListEqual([1, 2, 5, 7], result.tolist())
+
+        self.df.create_numeric('num', 'int32').data.write(vx)
+        result = self.s.apply_filter(filt, self.df['num'])
         self.assertListEqual([1, 2, 5, 7], result.tolist())
 
 
@@ -802,6 +826,10 @@ class TestSessionAggregate(unittest.TestCase):
             s.apply_spans_min(spans, s.get(ds['vals']), dest=s.create_numeric(ds, 'result2', 'int64'))
             self.assertListEqual([0, 2, 4, 1], s.get(ds['result2']).data[:].tolist())
 
+            vals = np.asarray([0, 8, 2, 6, 4, 5, 3, 7, 1], dtype=np.int64)  # wrong length
+            with self.assertRaises(ValueError):
+                s.apply_spans_min(spans, vals)
+
     def test_apply_spans_max(self):
         idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
         vals = np.asarray([0, 8, 2, 6, 4, 5, 3, 7, 1, 9], dtype=np.int64)
@@ -902,6 +930,12 @@ class TestSessionAggregate(unittest.TestCase):
             s.apply_spans_concat(spans, s.get(ds['vals']), dest=s.create_indexed_string(ds, 'result'))
             self.assertListEqual([0, 1, 4, 9, 16], s.get(ds['result']).indices[:].tolist())
             self.assertListEqual(['a', 'b,a', 'b,a,b', 'a,b,a,b'], s.get(ds['result']).data[:])
+
+            with self.assertRaises(ValueError):
+                s.apply_spans_concat(spans, idx, dest=s.create_indexed_string(ds, 'foo'))
+            with self.assertRaises(ValueError):
+                s.apply_spans_concat(spans, s.get(ds['vals']), dest=s.create_numeric(ds, 'foo2', 'int32'))
+
 
     def test_apply_spans_concat_2(self):
         idx = np.asarray([0, 0, 1, 2, 2, 3, 4, 4, 4, 4], dtype=np.int32)
@@ -1011,6 +1045,10 @@ class TestSessionAggregate(unittest.TestCase):
             s.create_numeric(ds, 'vals', 'int64').data.write(vals)
             s.aggregate_first(idx, s.get(ds['vals']), dest=s.create_numeric(ds, 'result2', 'int64'))
             self.assertListEqual([0, 8, 6, 3], s.get(ds['result2']).data[:].tolist())
+
+            with self.assertRaises(ValueError):
+                s.aggregate_first(idx, None, None)
+
 
     def test_aggregate_last(self):
         idx = np.asarray([0, 1, 1, 2, 2, 2, 3, 3, 3, 3], dtype=np.int32)
@@ -1263,3 +1301,36 @@ class TestSessionCreate_like(SessionTestCase):
 
         nf = self.s.create_like(f, self.df, name+'_')
         self.assertTrue(isinstance(nf, type(f)))
+
+class TestSessionGetSharedIndex(SessionTestCase):
+    def test_get_shared_index(self):
+        key_1 = np.array(['a', 'b', 'e', 'g', 'i'])
+        key_2 = np.array(['b', 'b', 'c', 'c', 'e', 'g', 'j'])
+        key_3 = np.array(['a', 'c' 'd', 'e', 'g', 'h', 'h', 'i'])
+        with self.assertRaises(ValueError):
+            self.s.get_shared_index([key_1, key_2, key_3])
+        result = self.s.get_shared_index((key_1, key_2, key_3))
+        self.assertEqual(3, len(result))
+        self.assertListEqual([0, 1, 4, 5, 7], result[0].tolist())
+        self.assertListEqual([1, 1, 2, 2, 4, 5, 8], result[1].tolist())
+        self.assertListEqual([0, 3, 4, 5, 6, 6, 7], result[2].tolist())
+
+
+class TestSessionDistinct(SessionTestCase):
+    def test_session_distinct(self):
+        num1 = self.df.create_numeric('num1', 'int32')
+        num1.data.write(np.array(NUMERIC_DATA))
+        num2 = self.df.create_numeric('num2', 'int32')
+        num2.data.write(np.array(NUMERIC_DATA))
+        with self.assertRaises(ValueError):
+            self.s.distinct(field=None, fields=None)
+        with self.assertRaises(ValueError):
+            self.s.distinct(num1, (num1, num2))
+        output = self.s.distinct(field=num1.data[:]).tolist()
+        result = np.unique(num1.data[:]).tolist()
+        self.assertListEqual(result, output)
+        output = self.s.distinct(fields=(num1.data[:], num2.data[:]))
+        self.assertEqual(2, len(output))
+        self.assertListEqual(output[0].tolist(), result)
+        self.assertListEqual(output[1].tolist(), result)
+

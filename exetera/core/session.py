@@ -148,14 +148,14 @@ class Session(AbstractSession):
         Example::
         
             key_1 = ['a', 'b', 'e', 'g', 'i']
-            key_2 = ['b', 'b', 'c', 'c, 'e', 'g', 'j']
+            key_2 = ['b', 'b', 'c', 'c', 'e', 'g', 'j']
             key_3 = ['a', 'c' 'd', 'e', 'g', 'h', 'h', 'i']
             
             sorted_union = ['a', 'b', 'c', 'd', 'e', 'g', 'h', 'i', 'j']
             
             key_1_index = [0, 1, 4, 5, 7]
             key_2_index = [1, 1, 2, 2, 4, 5, 8]
-            key_3_index = [0, 2, 3, 4, 5, 6, 6, 7]
+            key_3_index = [0, 3, 4, 5, 6, 6, 7]
         """
         if not isinstance(keys, tuple):
             raise ValueError("'keys' must be a tuple")
@@ -334,11 +334,14 @@ class Session(AbstractSession):
             return result
 
     def distinct(self, field=None, fields=None, filter=None):
+        """
+        todo: confirm deprecated.
+        """
 
         if field is None and fields is None:
-            return ValueError("One of 'field' and 'fields' must be set")
+            raise ValueError("One of 'field' and 'fields' must be set")
         if field is not None and fields is not None:
-            return ValueError("Only one of 'field' and 'fields' may be set")
+            raise ValueError("Only one of 'field' and 'fields' may be set")
 
         if field is not None:
             return np.unique(field)
@@ -590,9 +593,9 @@ class Session(AbstractSession):
                            src_chunksize=None,
                            dest_chunksize=None,
                            chunksize_mult=None):
-        if not target.indexed:
+        if not (isinstance(target, fld.IndexedStringField) or isinstance(target, fld.IndexedStringMemField)):
             raise ValueError(f"'target' must be one of 'IndexedStringField' but is {type(target)}")
-        if not dest.indexed:
+        if not (isinstance(dest, fld.IndexedStringField) or isinstance(dest, fld.IndexedStringMemField)):
             raise ValueError(f"'dest' must be one of 'IndexedStringField' but is {type(dest)}")
 
         src_chunksize = target.chunksize if src_chunksize is None else src_chunksize
