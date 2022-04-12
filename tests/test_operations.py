@@ -11,6 +11,8 @@ from exetera.core import persistence as per
 from exetera.core import operations as ops
 from exetera.core import utils
 
+from .utils import slow_test
+
 
 class TestOpsUtils(unittest.TestCase):
 
@@ -1264,6 +1266,29 @@ class TestGetSpans(unittest.TestCase):
 
         spans3= ops._get_spans_for_2_fields_by_spans(spans1,spans2)
         self.assertTrue(list(spans), list(spans3))
+
+    @slow_test
+    def test_get_spans_two_field(self):
+        data1 = np.zeros(utils.INT64_INDEX_LENGTH + 1, 'int8')
+        data2 = np.zeros(utils.INT64_INDEX_LENGTH + 1, 'int8')
+        spans = ops._get_spans_for_2_fields(data1, data2)
+        self.assertEqual(spans.dtype, 'int64')
+
+    def test_get_spans_for_multi_fields(self):
+        data1 = np.array([1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5])
+        data2 = np.array([1, 2, 2, 3, 3, 3, 4, 4, 5, 6, 7, 8, 9, 10])
+        data3 = np.array([1, 2, 1, 2, 2, 1, 2, 3, 3, 1, 2, 3, 4, 10])
+        spans = ops._get_spans_for_multi_fields(np.asarray([data1, data2, data3]))
+        self.assertListEqual(spans.tolist(), [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+        self.assertEqual(spans.dtype, 'int32')
+
+    @slow_test
+    def test_get_spans_for_multi_fields_int64(self):
+        data1 = np.zeros(utils.INT64_INDEX_LENGTH+1, 'int8')
+        data2 = np.zeros(utils.INT64_INDEX_LENGTH + 1, 'int8')
+        data3 = np.zeros(utils.INT64_INDEX_LENGTH + 1, 'int8')
+        spans = ops._get_spans_for_multi_fields(np.asarray([data1, data2, data3]))
+        self.assertEqual(spans.dtype, 'int64')
 
 
 class TestCheckIfSorted(unittest.TestCase):

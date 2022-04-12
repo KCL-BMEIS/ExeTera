@@ -26,6 +26,8 @@ from codecs import BOM_UTF8, BOM_UTF16_BE, BOM_UTF16_LE, BOM_UTF32_BE, BOM_UTF32
 
 SECONDS_PER_DAY = 86400
 PERMITTED_NUMERIC_TYPES = ('float32', 'float64', 'bool', 'int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64')
+INT64_INDEX_LENGTH = 2**31-1
+
 
 # environment variable used to toggle Numba off for testing
 USE_NUMBA_VAR = "USE_NUMBA"
@@ -435,4 +437,4 @@ def guess_encoding(filename):
         return "utf-8-sig"
     else:
         return "utf-8"
-    
+

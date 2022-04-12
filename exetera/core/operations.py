@@ -660,7 +660,10 @@ def get_spans_for_field(ndarray):
 
     results[0] = True
     results[-1] = True
-    return np.nonzero(results)[0]
+    if len(ndarray) < utils.INT64_INDEX_LENGTH:
+        return np.nonzero(results)[0].astype('int32')
+    else:
+        return np.nonzero(results)[0]  # int64 by default
 
 
 @exetera_njit
@@ -680,37 +683,52 @@ def _get_spans_for_2_fields_by_spans(span0, span1):
     return spans
 
 
-@exetera_njit
 def _get_spans_for_2_fields(ndarray0, ndarray1):
+    if len(ndarray0) > utils.INT64_INDEX_LENGTH or len(ndarray1) > utils.INT64_INDEX_LENGTH:
+        spans = np.zeros(len(ndarray0) + 1, dtype=np.int64)
+    else:
+        spans = np.zeros(len(ndarray0) + 1, dtype=np.int32)
+    spans = _get_spans_for_2_fields_njit(ndarray0, ndarray1, spans)
+    return spans
+
+
+@exetera_njit
+def _get_spans_for_2_fields_njit(ndarray0, ndarray1, spans):
     count = 0
-    spans = np.zeros(len(ndarray0)+1, dtype=np.uint32)
     spans[0] = 0
     for i in np.arange(1, len(ndarray0)):
-        if ndarray0[i] != ndarray0[i-1] or ndarray1[i] != ndarray1[i-1]:
+        if ndarray0[i] != ndarray0[i - 1] or ndarray1[i] != ndarray1[i - 1]:
             count += 1
             spans[count] = i
-    spans[count+1] = len(ndarray0)
-    return spans[:count+2]
+    spans[count + 1] = len(ndarray0)
+    return spans[:count + 2]
 
-    
-@exetera_njit
+
 def _get_spans_for_multi_fields(fields_data):
+    length = len(fields_data[0])  # assume all fields are equal length
+    if length > utils.INT64_INDEX_LENGTH:
+        spans = np.zeros(length + 1, dtype=np.int64)
+    else:
+        spans = np.zeros(length + 1, dtype=np.int32)
+    return _get_spans_for_multi_fields_njit(fields_data, spans)  # call the njit func to boost performance
+
+
+@exetera_njit
+def _get_spans_for_multi_fields_njit(fields_data, spans):
     count = 0
     length = len(fields_data[0])
-    spans = np.zeros(length + 1, dtype = np.uint32)
     spans[0] = 0
-
     for i in np.arange(1, length):
         not_equal = False
         for f_d in fields_data:
             if f_d[i] != f_d[i - 1]:
                 not_equal = True
                 break
-        
+
         if not_equal:
             count += 1
             spans[count] = i
-        
+
     spans[count + 1] = length
     return spans[:count + 2]
 
@@ -748,6 +766,11 @@ def check_if_sorted_for_multi_fields(fields_data):
 
 @exetera_njit
 def _get_spans_for_index_string_field(indices,values):
+    """
+    :param indices: Field Array
+    :param values: Field Array
+    :return: Span of indices as List
+    """
     result = []
     result.append(0)
     for i in range(1, len(indices) - 1):
@@ -763,8 +786,10 @@ def _get_spans_for_index_string_field(indices,values):
     return result
 
 
+
 @exetera_njit
-def apply_spans_index_of_min(spans, src_array, dest_array):
+def apply_spans_index_of_min(spans, src_array, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=spans.dtype) if dest_array is None else dest_array
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
@@ -778,7 +803,8 @@ def apply_spans_index_of_min(spans, src_array, dest_array):
 
 
 @exetera_njit
-def apply_spans_index_of_min_indexed(spans, src_indices, src_values, dest_array):
+def apply_spans_index_of_min_indexed(spans, src_indices, src_values, dest_array=None):
+    dest_array = np.zeros(len(spans)-1, dtype=spans.dtype) if dest_array is None else dest_array
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
@@ -817,7 +843,8 @@ def apply_spans_index_of_min_indexed(spans, src_indices, src_values, dest_array)
 
 
 @exetera_njit
-def apply_spans_index_of_max_indexed(spans, src_indices, src_values, dest_array):
+def apply_spans_index_of_max_indexed(spans, src_indices, src_values, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=spans.dtype) if dest_array is None else dest_array
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
@@ -855,8 +882,10 @@ def apply_spans_index_of_max_indexed(spans, src_indices, src_values, dest_array)
     return dest_array
 
 
+
 @exetera_njit
-def apply_spans_index_of_max(spans, src_array, dest_array):
+def apply_spans_index_of_max(spans, src_array, dest_array=None):
+    dest_array = np.zeros(len(spans)-1, dtype=spans.dtype) if dest_array is None else dest_array
     for i in range(len(spans)-1):
         cur = spans[i]
         next = spans[i+1]
@@ -870,13 +899,17 @@ def apply_spans_index_of_max(spans, src_array, dest_array):
 
 
 @exetera_njit
-def apply_spans_index_of_first(spans, dest_array):
+def apply_spans_index_of_first(spans, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=spans.dtype) if dest_array is None else dest_array
     dest_array[:] = spans[:-1]
+    return dest_array
 
 
 @exetera_njit
-def apply_spans_index_of_last(spans, dest_array):
+def apply_spans_index_of_last(spans, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=spans.dtype) if dest_array is None else dest_array
     dest_array[:] = spans[1:] - 1
+    return dest_array
 
 
 @exetera_njit
@@ -941,57 +974,68 @@ def apply_spans_index_of_last_filter(spans, dest_array, filter_array):
     return dest_array, filter_array
 
 
+
 @exetera_njit
-def apply_spans_count(spans, dest_array):
+def apply_spans_count(spans, dest_array=None):
+    if dest_array is None:
+        dest_array = np.zeros(len(spans) - 1, np.int64)
     for i in range(len(spans)-1):
-        dest_array[i] = np.int64(spans[i+1] - spans[i])
+        dest_array[i] = spans[i+1] - spans[i]
+    return dest_array
 
 
 @exetera_njit
-def apply_spans_first(spans, src_array, dest_array):
+def apply_spans_first(spans, src_array, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=src_array.dtype) if dest_array is None else dest_array
     dest_array[:] = src_array[spans[:-1]]
+    return dest_array
 
 
 @exetera_njit
-def apply_spans_last(spans, src_array, dest_array):
+def apply_spans_last(spans, src_array, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=src_array.dtype) if dest_array is None else dest_array
     spans = spans[1:]-1
     dest_array[:] = src_array[spans]
+    return dest_array
 
 
 @exetera_njit
-def apply_spans_max(spans, src_array, dest_array):
-
-    for i in range(len(spans)-1):
+def apply_spans_max(spans, src_array, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=src_array.dtype) if dest_array is None else dest_array
+    for i in range(len(spans) - 1):
         cur = spans[i]
-        next = spans[i+1]
+        next = spans[i + 1]
         if next - cur == 1:
             dest_array[i] = src_array[cur]
         else:
             # dest_array[i] = src_array[cur:next].max()  # doesn't work for fixed strings in Python?
-            max_val=src_array[cur]
-            for idx in range(cur+1,next):
-                if src_array[idx]>max_val:
-                    max_val=src_array[idx]
-                    
-            dest_array[i]=max_val
+            max_val = src_array[cur]
+            for idx in range(cur + 1, next):
+                if src_array[idx] > max_val:
+                    max_val = src_array[idx]
+
+            dest_array[i] = max_val
+    return dest_array
 
 
 @exetera_njit
-def apply_spans_min(spans, src_array, dest_array):
-
-    for i in range(len(spans)-1):
+def apply_spans_min(spans, src_array, dest_array=None):
+    dest_array = np.zeros(len(spans) - 1, dtype=src_array.dtype) if dest_array is None else dest_array
+    for i in range(len(spans) - 1):
         cur = spans[i]
-        next = spans[i+1]
+        next = spans[i + 1]
         if next - cur == 1:
             dest_array[i] = src_array[cur]
         else:
             # dest_array[i] = src_array[cur:next].min()  # doesn't work for fixed strings in Python?
-            min_val=src_array[cur]
-            for idx in range(cur+1,next):
-                if src_array[idx]<min_val:
-                    min_val=src_array[idx]
-                    
-            dest_array[i]=min_val
+            min_val = src_array[cur]
+            for idx in range(cur + 1, next):
+                if src_array[idx] < min_val:
+                    min_val = src_array[idx]
+
+            dest_array[i] = min_val
+    return dest_array
+
 
 
 # def _apply_spans_concat(spans, src_field):
