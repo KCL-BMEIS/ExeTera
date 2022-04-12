@@ -307,7 +307,7 @@ class ReadOnlyIndexedFieldArray:
 
     @property
     def dtype(self):
-        return self._dtype
+        return self._dtype  # todo
 
     def __getitem__(self, item):
         try:
@@ -376,7 +376,7 @@ class WriteableIndexedFieldArray:
 
     @property
     def dtype(self):
-        return self._dtype
+        return self._dtype  # todo
 
     def __getitem__(self, item):
         try:
@@ -864,6 +864,13 @@ class CategoricalMemField(MemoryField):
         :param key_map: The mapping rule of convert the old key into the new key.
         :param new_key: The new key.
         :return: A CategoricalMemField with the new key.
+
+        Example::
+
+            cat_field = df.create_categorical('cat', 'int32', {"a": 1, "b": 2})
+            cat_field.data.write([1,2,1,2])
+            newfield = cat_field.remap([(1, 4), (2, 5)], {"a": 4, "b": 5})
+            print(newfield.data[:])
         """
         # make sure all key values are included in the key_map
         for k in self._keys.values():
@@ -1072,7 +1079,7 @@ class TimestampMemField(MemoryField):
     def __eq__(self, value):
         return FieldDataOps.equal(self._session, self, value)
 
-    def __eq__(self, value):
+    def __ne__(self, value):
         return FieldDataOps.not_equal(self._session, self, value)
 
     def __gt__(self, value):
@@ -1683,6 +1690,13 @@ class CategoricalField(HDF5Field):
         :param key_map: The mapping rule of convert the old key into the new key.
         :param new_key: The new key.
         :return: A CategoricalMemField with the new key.
+
+        Example::
+
+            cat_field = df.create_categorical('cat', 'int32', {"a": 1, "b": 2})
+            cat_field.data.write([1,2,1,2])
+            newfield = cat_field.remap([(1, 4), (2, 5)], {"a": 4, "b": 5})
+            print(newfield.data[:])
         """
         self._ensure_valid()
         # make sure all key values are included in the key_map

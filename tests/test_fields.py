@@ -10,7 +10,7 @@ import h5py
 from datetime import datetime
 from parameterized import parameterized
 
-from .utils import SessionTestCase, shuffle_randstate, allow_slow_tests, RAND_STATE,DEFAULT_FIELD_DATA, HARD_INTS, HARD_FLOATS, utc_timestamp
+from .utils import SessionTestCase, shuffle_randstate, allow_slow_tests, RAND_STATE,DEFAULT_FIELD_DATA, HARD_INTS, HARD_FLOATS, utc_timestamp, NUMERIC_DATA, TIMESTAMP_DATA, FIXED_STRING_DATA, INDEX_STRING_DATA
 
 from exetera.core import session
 from exetera.core import fields
@@ -36,6 +36,10 @@ class TestDefaultData(SessionTestCase):
             data = np.asarray(data, dtype=kwargs["nformat"])
         
         self.assertFieldEqual(data, f)
+        wtb = f.writeable()
+        with self.subTest("writable:"):
+            self.assertFieldEqual(data, wtb)
+
         
 
 class TestFieldExistence(SessionTestCase):
@@ -79,7 +83,7 @@ class TestFieldDataOps(SessionTestCase):
                 self.assertIsInstance(output, fields.NumericMemField)
                 self.assertEqual(output.data.dtype,"bool")
                 
-            with self.subTest(f"Testing value numpy {i}"):
+            with self.subTest(f"Testing value Mem field {i}"):
                 test_field = fields.CategoricalMemField(self.s, 'int32', {"a": 1, "b": 2, "c": 3})        
                 test_field.data.write(result)
                 output=op(categorical_memfield,test_field)
@@ -88,7 +92,7 @@ class TestFieldDataOps(SessionTestCase):
                 self.assertIsInstance(output, fields.NumericMemField)
                 self.assertEqual(output.data.dtype,"bool")
                 
-            with self.subTest(f"Testing value numpy {i}"):
+            with self.subTest(f"Testing value Field {i}"):
                 test_field = self.df.create_categorical(f'name{i}','int32',{"a": 1, "b": 2, "c": 3})        
                 test_field.data.write(result)
                 output=op(categorical_memfield,test_field)
@@ -97,7 +101,48 @@ class TestFieldDataOps(SessionTestCase):
                 self.assertIsInstance(output, fields.NumericMemField)
                 self.assertEqual(output.data.dtype,"bool")
 
-    @parameterized.expand([(operator.eq,),(operator.ge,),(operator.le,),(operator.lt,),(operator.ne,),])
+    @parameterized.expand(
+        [(operator.lt,), (operator.gt,), (operator.le,), (operator.ge,), (operator.ne,), (operator.eq,)])
+    def test_CategoricalField_binary_op(self, op):
+        """
+        Categorical field ops against numpy, categorical memory field, categorical field
+        """
+        field = self.df.create_categorical('catf', 'int32', {"a": 1, "b": 2, "c": 3})
+
+        data = np.array(RAND_STATE.randint(1, 4, 20))
+        field.data.write(data)
+
+        for i in range(0, 5):
+            indata = np.full(data.shape, i)
+            result = op(data, indata)
+
+            with self.subTest(f"Testing value numpy {i}"):
+                output = op(field, indata)
+
+                np.testing.assert_array_equal(result, output)
+
+                self.assertIsInstance(output, fields.NumericMemField)
+                self.assertEqual(output.data.dtype, "bool")
+
+            with self.subTest(f"Testing value Mem field {i}"):
+                test_field = fields.CategoricalMemField(self.s, 'int32', {"a": 1, "b": 2, "c": 3})
+                test_field.data.write(indata)
+                output = op(field, test_field)
+
+                np.testing.assert_array_equal(result, output)
+                self.assertIsInstance(output, fields.NumericMemField)
+                self.assertEqual(output.data.dtype, "bool")
+
+            with self.subTest(f"Testing value Field {i}"):
+                test_field = self.df.create_categorical(f'name{i}', 'int32', {"a": 1, "b": 2, "c": 3})
+                test_field.data.write(indata)
+                output = op(field, test_field)
+
+                np.testing.assert_array_equal(result, output)
+                self.assertIsInstance(output, fields.NumericMemField)
+                self.assertEqual(output.data.dtype, "bool")
+
+    @parameterized.expand([(operator.eq,),(operator.ge,),(operator.gt,),(operator.le,),(operator.lt,),(operator.ne,),])
     def test_NumericField_binary_ops(self, op):
         raw_data = shuffle_randstate(list(range(-10, 10)) + HARD_INTS)
         numeric_field = self.df.create_numeric('num', 'int64')
@@ -121,12 +166,8 @@ class TestFieldDataOps(SessionTestCase):
                            (operator.mod,), (operator.lt,), (operator.le,), (operator.eq,), (operator.ne,),
                            (operator.ge,), (operator.gt,), (divmod,)])
     def test_TimestampField_binary_ops(self, op):
-        raw_data = np.array([utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17), utc_timestamp(1840, 10, 11),
-            utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7), utc_timestamp(2018, 2, 28),
-            utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1) ])
-        target = np.array([utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17), utc_timestamp(1840, 10, 11),
-            utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7), utc_timestamp(2018, 2, 28),
-            utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1) ])
+        raw_data = np.array(TIMESTAMP_DATA)
+        target = np.array(TIMESTAMP_DATA)
         ts_field = self.df.create_timestamp('ts_field')
         ts_field.data.write(raw_data)
         result = op(raw_data, target)  # timestampe field vs list
@@ -158,16 +199,8 @@ class TestFieldDataOps(SessionTestCase):
     @parameterized.expand([(operator.add,), (operator.sub,), (operator.mul,), (operator.truediv,), (operator.floordiv,),
                            (operator.mod,), (divmod,)])
     def test_TimestampField_binary_reverse(self, op):
-        raw_data = np.array([utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17),
-                             utc_timestamp(1840, 10, 11),
-                             utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7),
-                             utc_timestamp(2018, 2, 28),
-                             utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1)])
-        target = [utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17),
-                             utc_timestamp(1840, 10, 11),
-                             utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7),
-                             utc_timestamp(2018, 2, 28),
-                             utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1)]
+        raw_data = TIMESTAMP_DATA
+        target = TIMESTAMP_DATA
 
         ts_field = self.df.create_timestamp('ts_field')
         ts_field.data.write(raw_data)
@@ -184,16 +217,8 @@ class TestFieldDataOps(SessionTestCase):
                            (operator.mod,), (operator.lt,), (operator.le,), (operator.eq,), (operator.ne,),
                            (operator.ge,), (operator.gt,), (divmod,)])
     def test_TimestampMemField_binary_ops(self, op):
-        raw_data = np.array([utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17),
-                             utc_timestamp(1840, 10, 11),
-                             utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7),
-                             utc_timestamp(2018, 2, 28),
-                             utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1)])
-        target = np.array([utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17),
-                           utc_timestamp(1840, 10, 11),
-                           utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7),
-                           utc_timestamp(2018, 2, 28),
-                           utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1)])
+        raw_data = np.array(TIMESTAMP_DATA)
+        target = np.array(TIMESTAMP_DATA)
         ts_field = fields.TimestampMemField(self.s)
         ts_field.data.write(raw_data)
         result = op(raw_data, target)  # timestampe field vs list
@@ -225,16 +250,8 @@ class TestFieldDataOps(SessionTestCase):
     @parameterized.expand([(operator.add,), (operator.sub,), (operator.mul,), (operator.truediv,), (operator.floordiv,),
                            (operator.mod,), (divmod,)])
     def test_TimestampMemField_binary_reverse(self, op):
-        raw_data = np.array([utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17),
-                             utc_timestamp(1840, 10, 11),
-                             utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7),
-                             utc_timestamp(2018, 2, 28),
-                             utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1)])
-        target = [utc_timestamp(2020, 1, 1), utc_timestamp(2021, 5, 18), utc_timestamp(2950, 8, 17),
-                  utc_timestamp(1840, 10, 11),
-                  utc_timestamp(2110, 11, 1), utc_timestamp(2002, 3, 3), utc_timestamp(1963, 6, 7),
-                  utc_timestamp(2018, 2, 28),
-                  utc_timestamp(2400, 9, 1), utc_timestamp(1, 1, 1)]
+        raw_data = np.array(TIMESTAMP_DATA)
+        target = TIMESTAMP_DATA
 
         ts_field = fields.TimestampMemField(self.s)
         ts_field.data.write(raw_data)
@@ -272,6 +289,10 @@ class TestFieldGetSpans(unittest.TestCase):
             cat.data.write([1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 1, 2, 1, 2])
             self.assertListEqual([0,2,4,7,10,11,12,13,14],list(cat.get_spans()))
 
+            timestamp = s.create_timestamp(ds, 'ts')
+            timestamp.data.write(TIMESTAMP_DATA)
+            self.assertListEqual([i for i in range(11)], list(timestamp.get_spans()))
+
 
 class TestIsSorted(unittest.TestCase):
 
@@ -282,6 +303,10 @@ class TestIsSorted(unittest.TestCase):
             df = ds.create_dataframe('foo')
 
             f = df.create_indexed_string('f')
+            f.data.write('a')
+            self.assertTrue(f.is_sorted())
+
+            f.data.clear()
             vals = ['the', 'quick', '', 'brown', 'fox', 'jumps', '', 'over', 'the', 'lazy', '', 'dog']
             f.data.write(vals)
             self.assertFalse(f.is_sorted())
@@ -298,6 +323,10 @@ class TestIsSorted(unittest.TestCase):
             df = ds.create_dataframe('foo')
 
             f = df.create_fixed_string('f', 5)
+            f.data.write('a')
+            self.assertTrue(f.is_sorted())
+
+            f.data.clear()
             vals = ['a', 'ba', 'bb', 'bac', 'de', 'ddddd', 'deff', 'aaaa', 'ccd']
             f.data.write([v.encode() for v in vals])
             self.assertFalse(f.is_sorted())
@@ -314,6 +343,10 @@ class TestIsSorted(unittest.TestCase):
             df = ds.create_dataframe('foo')
 
             f = df.create_numeric('f', 'int32')
+            f.data.write([1])
+            self.assertTrue(f.is_sorted())
+
+            f.data.clear()
             vals = [74, 1897, 298, 0, -100098, 380982340, 8, 6587, 28421, 293878]
             f.data.write(vals)
             self.assertFalse(f.is_sorted())
@@ -330,6 +363,10 @@ class TestIsSorted(unittest.TestCase):
             df = ds.create_dataframe('foo')
 
             f = df.create_categorical('f', 'int8', {'a': 0, 'c': 1, 'd': 2, 'b': 3})
+            f.data.write([1])
+            self.assertTrue(f.is_sorted())
+
+            f.data.clear()
             vals = [0, 1, 3, 2, 3, 2, 2, 0, 0, 1, 2]
             f.data.write(vals)
             self.assertFalse(f.is_sorted())
@@ -349,6 +386,10 @@ class TestIsSorted(unittest.TestCase):
 
             f = df.create_timestamp('f')
             d = D(2020, 5, 10)
+            f.data.write([d.timestamp()])
+            self.assertTrue(f.is_sorted())
+
+            f.data.clear()
             vals = [d + T(seconds=50000), d - T(days=280), d + T(weeks=2), d + T(weeks=250),
                     d - T(weeks=378), d + T(hours=2897), d - T(days=23), d + T(minutes=39873)]
             vals = [v.timestamp() for v in vals]
@@ -362,30 +403,38 @@ class TestIsSorted(unittest.TestCase):
 
 class TestMemFieldsGeneralMethods(SessionTestCase):
     """
-    Methods tested here: created_like, get_spans, is_sorted, unique
+    Methods tested here: created_like, get_spans, is_sorted, unique, writeable
     """
     def test_numeric_mem_field(self):
-        raw_data = np.array(shuffle_randstate(list(range(-10, 10)) + HARD_INTS))
+        raw_data = np.array(shuffle_randstate(NUMERIC_DATA))
         numeric_mem = fields.NumericMemField('num', 'int64')
         numeric_mem.data.write(raw_data)
         self.assertFalse(numeric_mem.is_sorted())
 
         newfield = numeric_mem.create_like(group=None, name=None)
         self.assertTrue(isinstance(newfield, fields.NumericMemField))
-
+        newfield.data.write(np.array([1]))
+        self.assertTrue(newfield.is_sorted())
+        newfield.data.clear()
         newfield.data.write(raw_data)
+        with self.assertRaises(ValueError):
+            newfield.data.write([1,2,3,4,5])
         self.assertListEqual(numeric_mem.get_spans().tolist(), newfield.get_spans().tolist())
         newfield.data.clear()
         newfield.data.write(np.array(sorted(raw_data)))
         self.assertTrue(newfield.is_sorted())
-
         self.assertListEqual(numeric_mem.unique().tolist(), newfield.unique().tolist())
+        self.assertEqual(id(numeric_mem), id(numeric_mem.writeable()))
 
     def test_categorical_mem_field(self):
         categorical_memfield = fields.CategoricalMemField(self.s, 'int32', {"a": 1, "b": 2, "c": 3})
-
+        categorical_memfield.data.write(np.array([1]))
+        self.assertTrue(categorical_memfield.is_sorted())
+        categorical_memfield.data.clear()
         memfield_data = RAND_STATE.randint(1, 4, 20)
         categorical_memfield.data.write(memfield_data)
+        with self.assertRaises(ValueError):
+            categorical_memfield.data.write([])
         self.assertFalse(categorical_memfield.is_sorted())
 
         newfield = categorical_memfield.create_like(group=None, name=None)
@@ -398,12 +447,24 @@ class TestMemFieldsGeneralMethods(SessionTestCase):
         self.assertTrue(newfield.is_sorted())
 
         self.assertListEqual(categorical_memfield.unique().tolist(), newfield.unique().tolist())
+        self.assertEqual(id(categorical_memfield), id(categorical_memfield.writeable()))
+
+        with self.subTest("Test Categorical remap"):
+            newfield = categorical_memfield.remap([(1, 4), (2, 5), (3, 6)], {"a": 4, "b": 5, "c": 6})
+            self.assertEqual(0, np.sum(np.isin(newfield.data[:], [1,2,3])))
+
+            with self.assertRaises(ValueError):
+                categorical_memfield.remap([(1, 4), (2, 5)], {"a": 4, "b": 5, "c": 6})
 
     def test_fixed_string_mem_field(self):
         memfield = fields.FixedStringMemField(self.s, 3)
-
-        memfield_data = np.array([b"aaa", b"bbb", b"eee", b"ccc", b"ddd", b"   "]*2)
+        memfield.data.write(np.array(['a']))
+        self.assertTrue(memfield.is_sorted())
+        memfield.data.clear()
+        memfield_data = np.array(FIXED_STRING_DATA)
         memfield.data.write(memfield_data)
+        with self.assertRaises(ValueError):
+            memfield.data.write([])
         self.assertFalse(memfield.is_sorted())
 
         newfield = memfield.create_like(group=None, name=None)
@@ -416,23 +477,17 @@ class TestMemFieldsGeneralMethods(SessionTestCase):
         self.assertTrue(newfield.is_sorted())
 
         self.assertListEqual(memfield.unique().tolist(), newfield.unique().tolist())
+        self.assertEqual(id(memfield), id(memfield.writeable()))
 
     def test_timestamp_mem_field(self):
         memfield = fields.TimestampMemField(self.s)
-
-        memfield_data = np.array([
-            utc_timestamp(2020, 1, 1),
-            utc_timestamp(2021, 5, 18),
-            utc_timestamp(2950, 8, 17),
-            utc_timestamp(1840, 10, 11),
-            utc_timestamp(2110, 11, 1),
-            utc_timestamp(2002, 3, 3),
-            utc_timestamp(1963, 6, 7),
-            utc_timestamp(2018, 2, 28),
-            utc_timestamp(2400, 9, 1),
-            utc_timestamp(1, 1, 1),
-        ])
+        memfield.data.write(np.array([TIMESTAMP_DATA[0]]))
+        self.assertTrue(memfield.is_sorted())
+        memfield.data.clear()
+        memfield_data = np.array(TIMESTAMP_DATA)
         memfield.data.write(memfield_data)
+        with self.assertRaises(ValueError):
+            memfield.data.write([])
         self.assertFalse(memfield.is_sorted())
 
         newfield = memfield.create_like(group=None, name=None)
@@ -445,11 +500,14 @@ class TestMemFieldsGeneralMethods(SessionTestCase):
         self.assertTrue(newfield.is_sorted())
 
         self.assertListEqual(memfield.unique().tolist(), newfield.unique().tolist())
+        self.assertEqual(id(memfield), id(memfield.writeable()))
 
     def test_indexed_string_mem_field(self):
         memfield = fields.IndexedStringMemField(self.s)
-
-        memfield_data = np.array(["a", "bb", "eeeee", "ccc", "dddd","", " ",]*2)
+        memfield.data.write(np.array([INDEX_STRING_DATA[0]]))
+        self.assertTrue(memfield.is_sorted())
+        memfield.data.clear()
+        memfield_data = np.array(INDEX_STRING_DATA)
         memfield.data.write(memfield_data)
         self.assertFalse(memfield.is_sorted())
 
@@ -463,6 +521,7 @@ class TestMemFieldsGeneralMethods(SessionTestCase):
         self.assertTrue(newfield.is_sorted())
 
         self.assertListEqual(memfield.unique().tolist(), newfield.unique().tolist())
+        self.assertEqual(id(memfield), id(memfield.writeable()))
 
 
 class TestIndexedStringFields(unittest.TestCase):
@@ -473,8 +532,10 @@ class TestIndexedStringFields(unittest.TestCase):
             ds = s.open_dataset(bio, 'w', 'src')
             df = ds.create_dataframe('src')
             f = df.create_indexed_string('f')
-            d = f.data[:]
-            #print(d)
+            f.data.write(INDEX_STRING_DATA)
+            self.assertListEqual(INDEX_STRING_DATA, f.data[:])
+            wtb = f.writeable()
+            self.assertListEqual(INDEX_STRING_DATA, wtb.data[:])
 
 
     def test_filter_indexed_string(self):
@@ -562,6 +623,52 @@ class TestFieldArray(SessionTestCase):
         f.data.write_part(data)
         f.data.clear()
         self.assertFieldEqual([], f)
+
+    def test_indexed_array(self):
+        f = self.df.create_indexed_string('idxs')
+        f.data.write(INDEX_STRING_DATA)
+        self.assertEqual(len(INDEX_STRING_DATA), len(f.data))
+        self.assertListEqual(INDEX_STRING_DATA, f.data[:])
+        with self.assertRaises(ValueError):
+            f.data[len(INDEX_STRING_DATA)]
+
+
+    def test_readonly_array(self):
+        f = self.df.create_numeric('num', 'int32')
+        data = np.array(DEFAULT_FIELD_DATA[1][3], dtype='int32')
+        f.data.write(data)
+        f = fields.NumericField(self.s, self.df._h5group['num'], self.df)
+        self.assertEqual(len(data), len(f.data))
+        self.assertEqual('int32', f.data.dtype)
+        self.assertListEqual(data.tolist(), f.data[:].tolist())
+        with self.assertRaises(PermissionError):
+            f.data[:] = data
+            f.data.clear()
+            f.data.write(data)
+            f.data.write_part(data)
+            f.data.complete()
+
+    def test_readonly_indexed_array(self):
+        f = self.df.create_indexed_string('idx')
+        data = ["a", "bb", "eeeee", "ccc", "dddd","", " ",]*2
+        f.data.write(data)
+        f = fields.IndexedStringField(self.s, self.df._h5group['idx'], self.df)
+        self.assertEqual(len(data), len(f.data))
+        #self.assertEqual(f.data.dtype)
+        self.assertListEqual(data, f.data[:])
+        with self.assertRaises(PermissionError):
+            f.data[:] = data
+        with self.assertRaises(PermissionError):
+            f.data.clear()
+        with self.assertRaises(PermissionError):
+            f.data.write(data)
+        with self.assertRaises(PermissionError):
+            f.data.write_part(data)
+        with self.assertRaises(PermissionError):
+            f.data.complete()
+        self.assertEqual(data[0], f.data[0])
+        with self.assertRaises(AttributeError):
+            f.data[len(data)]
 
 
 class TestMemoryFieldCreateLike(unittest.TestCase):
@@ -1800,20 +1907,16 @@ class TestNumericFieldAsType(unittest.TestCase):
             src = s.open_dataset(bio, 'w', 'src')
             df = src.create_dataframe('df')
             num = df.create_numeric('num', 'int16')
-            num.data.write([1, 2, 3, 4, 5])
+            num.data.write(NUMERIC_DATA)
 
-            num = num.astype('int32')
-            self.assertEqual(num.data[:].dtype.type, np.int32)
-            num = num.astype('int64')
-            self.assertEqual(num.data[:].dtype.type, np.int64)
-            num = num.astype('float32')
-            self.assertEqual(num.data[:].dtype.type, np.float32)
-            num = num.astype('float64')
-            self.assertEqual(num.data[:].dtype.type, np.float64)
-            with self.assertRaises(Exception) as context:
+            for t in ['int32', 'int64', 'float32', 'float64']:
+                with self.subTest('Convert to '+t):
+                    num = num.astype(t)
+                    self.assertEqual(num.data[:].dtype.name, t)
+            with self.assertRaises(TypeError):
                 num.astype('int32', casting='safe')
-            self.assertTrue(isinstance(context.exception,TypeError))
-
+            with self.assertRaises(ValueError):
+                num.astype('str')
 
 class TestFieldUnique(unittest.TestCase):
 
@@ -2037,3 +2140,18 @@ class TestFieldIsIn(unittest.TestCase):
             ts3 = datetime(2022, 2, 1).timestamp()
             df.create_timestamp('ts').data.write([ts2, ts3, ts1])
             self.assertEqual(df['ts'].isin({ts1, ts2}).tolist(), [True, False, True])
+
+class TestFieldModuleFunctions(SessionTestCase):
+
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_argsort(self, creator, name, kwargs, data):
+        """
+        Tests basic creation of every field type, checking it's contents are actually what was put into them.
+        """
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        if 'nformat' in kwargs and kwargs['nformat'] in ['int32', 'int64', 'uint32']:
+            self.assertListEqual(np.argsort(f.data[:]).tolist(), fields.argsort(f, dtype=kwargs['nformat']).data[:].tolist())
+        else:
+            with self.assertRaises(ValueError):
+                fields.argsort(f)
+
