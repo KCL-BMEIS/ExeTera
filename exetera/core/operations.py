@@ -22,61 +22,62 @@ INVALID_INDEX_32 = (1 << 31) - 1
 MAX_DATETIME = datetime(year=3000, month=1, day=1)
 
 
-def dtype_to_str(dtype):
-    if isinstance(dtype, str):
-        return dtype
-
-    if dtype == bool:
-        return 'bool'
-    elif dtype == np.int8:
-        return 'int8'
-    elif dtype == np.int16:
-        return 'int16'
-    elif dtype == np.int32:
-        return 'int32'
-    elif dtype == np.int64:
-        return 'int64'
-    elif dtype == np.uint8:
-        return 'uint8'
-    elif dtype == np.uint16:
-        return 'uint16'
-    elif dtype == np.uint32:
-        return 'uint32'
-    elif dtype == np.uint64:
-        return 'uint64'
-    elif dtype == np.float32:
-        return 'float32'
-    elif dtype == np.float64:
-        return 'float64'
-
-    raise ValueError("Unsupported dtype '{}'".format(dtype))
+# def dtype_to_str(dtype):
+#     if isinstance(dtype, str):
+#         return dtype
+#
+#     if dtype == bool:
+#         return 'bool'
+#     elif dtype == np.int8:
+#         return 'int8'
+#     elif dtype == np.int16:
+#         return 'int16'
+#     elif dtype == np.int32:
+#         return 'int32'
+#     elif dtype == np.int64:
+#         return 'int64'
+#     elif dtype == np.uint8:
+#         return 'uint8'
+#     elif dtype == np.uint16:
+#         return 'uint16'
+#     elif dtype == np.uint32:
+#         return 'uint32'
+#     elif dtype == np.uint64:
+#         return 'uint64'
+#     elif dtype == np.float32:
+#         return 'float32'
+#     elif dtype == np.float64:
+#         return 'float64'
+#
+#     raise ValueError("Unsupported dtype '{}'".format(dtype))
 
 
 def str_to_dtype(str_dtype):
-    if str_dtype == 'bool':
-        return bool
-    elif str_dtype == 'int8':
-        return np.int8
-    elif str_dtype == 'int16':
-        return np.int16
-    elif str_dtype == 'int32':
-        return np.int32
-    elif str_dtype == 'int64':
-        return np.int64
-    elif str_dtype == 'uint8':
-        return np.uint8
-    elif str_dtype == 'uint16':
-        return np.uint16
-    elif str_dtype == 'uint32':
-        return np.uint32
-    elif str_dtype == 'uint64':
-        return np.uint64
-    elif str_dtype == 'float32':
-        return np.float32
-    elif str_dtype == 'float64':
-        return np.float64
-
-    raise ValueError("Unsupported dtype '{}'".format(str_dtype))
+    return np.dtype(str_dtype)
+    # if str_dtype == 'bool':
+    #     return bool
+    # elif str_dtype == 'int8':
+    #     return np.int8
+    # elif str_dtype == 'int16':
+    #     return np.int16
+    # elif str_dtype == 'int32':
+    #     return np.int32
+    # elif str_dtype == 'int64':
+    #     return np.int64
+    # elif str_dtype == 'uint8':
+    #     return np.uint8
+    # elif str_dtype == 'uint16':
+    #     return np.uint16
+    # elif str_dtype == 'uint32':
+    #     return np.uint32
+    # elif str_dtype == 'uint64':
+    #     return np.uint64
+    # elif str_dtype == 'float32':
+    #     return np.float32
+    # elif str_dtype == 'float64':
+    #     return np.float64
+    #
+    # raise ValueError("Unsupported dtype '{}'".format(str_dtype))
 
 
 @exetera_njit
@@ -204,17 +205,19 @@ def get_valid_value_extents(chunk, start, end, invalid=-1):
     return first, last
 
 
-def get_map_datatype_str_based_on_lengths(left_len, right_len):
-    if left_len < (2 << 30) and right_len < (2 << 30):
-        index_dtype = 'int32'
-    else:
-        index_dtype = 'int64'
-    return index_dtype
+# def get_map_datatype_str_based_on_lengths(left_len, right_len):
+#     if left_len < (2 << 30) and right_len < (2 << 30):
+#         index_dtype = 'int32'
+#     else:
+#         index_dtype = 'int64'
+#     return index_dtype
 
 
 def get_map_datatype_based_on_lengths(left_len, right_len):
-    dtype_str = get_map_datatype_str_based_on_lengths(left_len, right_len)
-    return np.int32 if dtype_str == 'int32' else np.int64
+    if left_len < utils.INT64_INDEX_LENGTH and right_len < utils.INT64_INDEX_LENGTH:
+        return np.int32
+    else:
+        return np.int64
 
 
 # def safe_map(field, map_field, map_filter, empty_value=None):
@@ -585,7 +588,7 @@ def chunked_copy(src_field, dest_field, chunksize=1 << 20):
         element_chunked_copy(src_field.data, dest_field.data, chunksize)
 
 
-@exetera_njit
+#@exetera_njit
 def data_iterator(data_field, chunksize=1 << 20):
     cur = np.int64(0)
     chunks_ = chunks(len(data_field.data), chunksize)
@@ -1056,83 +1059,83 @@ def apply_spans_min(spans, src_array, dest_array=None):
 #     return dest_values
 
 
-@exetera_njit
-def apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
-                       max_index_i, max_value_i, s_start):
-    separator = np.frombuffer(b',', dtype=np.uint8)[0]
-    delimiter = np.frombuffer(b'"', dtype=np.uint8)[0]
-    if s_start == 0:
-        index_i = np.uint32(1)
-        index_v = np.int64(0)
-        dest_index[0] = spans[0]
-    else:
-        index_i = np.uint32(0)
-        index_v = np.int64(0)
-
-    s_end = len(spans)-1
-    for s in range(s_start, s_end):
-        cur = spans[s]
-        next = spans[s+1]
-        cur_src_i = src_index[cur]
-        next_src_i = src_index[next]
-
-        dest_index[index_i] = next_src_i
-        index_i += 1
-
-        if next_src_i - cur_src_i > 1:
-            if next - cur == 1:
-                # only one entry to be copied, so commas not required
-                next_index_v = next_src_i - cur_src_i + np.int64(index_v)
-                dest_values[index_v:next_index_v] = src_values[cur_src_i:next_src_i]
-                index_v = next_index_v
-            else:
-                # check to see how many non-zero-length entries there are; >1 means we must
-                # separate them by commas
-                non_empties = 0
-                for e in range(cur, next):
-                   if src_index[e] < src_index[e+1]:
-                       non_empties += 1
-                if non_empties == 1:
-                    # only one non-empty entry to be copied, so commas not required
-                    next_index_v = next_src_i - cur_src_i + np.int64(index_v)
-                    dest_values[index_v:next_index_v] = src_values[cur_src_i:next_src_i]
-                    index_v = next_index_v
-                else:
-                    # the outer conditional already determines that we have a non-empty entry
-                    # so there must be multiple non-empty entries and commas are required
-                    for e in range(cur, next):
-                        src_start = src_index[e]
-                        src_end = src_index[e+1]
-                        comma = False
-                        quotes = False
-                        for i_c in range(src_start, src_end):
-                            if src_values[i_c] == separator:
-                                comma = True
-                            elif src_values[i_c] == delimiter:
-                                quotes = True
-
-                        d_index = np.int64(0)
-                        if comma or quotes:
-                            dest_values[d_index] = delimiter
-                            d_index += 1
-                            for i_c in range(src_start, src_end):
-                                if src_values[i_c] == delimiter:
-                                    dest_values[d_index] = src_values[i_c]
-                                    d_index += 1
-                                dest_values[d_index] = src_values[i_c]
-                                d_index += 1
-                            dest_values[d_index] = delimiter
-                            d_index += 1
-                        else:
-                            s_len = np.int64(src_end - src_start)
-                            dest_values[index_v:index_v + s_len] = src_values[src_start:src_end]
-                            d_index += s_len
-                        index_v += np.int64(d_index)
-
-        # if either the index or values are past the threshold, write them
-        if index_i >= max_index_i or index_v >= max_value_i:
-            break
-    return s+1, index_i, index_v
+# @exetera_njit
+# def apply_spans_concat(spans, src_index, src_values, dest_index, dest_values,
+#                        max_index_i, max_value_i, s_start):
+#     separator = np.frombuffer(b',', dtype=np.uint8)[0]
+#     delimiter = np.frombuffer(b'"', dtype=np.uint8)[0]
+#     if s_start == 0:
+#         index_i = np.uint32(1)
+#         index_v = np.int64(0)
+#         dest_index[0] = spans[0]
+#     else:
+#         index_i = np.uint32(0)
+#         index_v = np.int64(0)
+#
+#     s_end = len(spans)-1
+#     for s in range(s_start, s_end):
+#         cur = spans[s]
+#         next = spans[s+1]
+#         cur_src_i = src_index[cur]
+#         next_src_i = src_index[next]
+#
+#         dest_index[index_i] = next_src_i
+#         index_i += 1
+#
+#         if next_src_i - cur_src_i > 1:
+#             if next - cur == 1:
+#                 # only one entry to be copied, so commas not required
+#                 next_index_v = next_src_i - cur_src_i + np.int64(index_v)
+#                 dest_values[index_v:next_index_v] = src_values[cur_src_i:next_src_i]
+#                 index_v = next_index_v
+#             else:
+#                 # check to see how many non-zero-length entries there are; >1 means we must
+#                 # separate them by commas
+#                 non_empties = 0
+#                 for e in range(cur, next):
+#                    if src_index[e] < src_index[e+1]:
+#                        non_empties += 1
+#                 if non_empties == 1:
+#                     # only one non-empty entry to be copied, so commas not required
+#                     next_index_v = next_src_i - cur_src_i + np.int64(index_v)
+#                     dest_values[index_v:next_index_v] = src_values[cur_src_i:next_src_i]
+#                     index_v = next_index_v
+#                 else:
+#                     # the outer conditional already determines that we have a non-empty entry
+#                     # so there must be multiple non-empty entries and commas are required
+#                     for e in range(cur, next):
+#                         src_start = src_index[e]
+#                         src_end = src_index[e+1]
+#                         comma = False
+#                         quotes = False
+#                         for i_c in range(src_start, src_end):
+#                             if src_values[i_c] == separator:
+#                                 comma = True
+#                             elif src_values[i_c] == delimiter:
+#                                 quotes = True
+#
+#                         d_index = np.int64(0)
+#                         if comma or quotes:
+#                             dest_values[d_index] = delimiter
+#                             d_index += 1
+#                             for i_c in range(src_start, src_end):
+#                                 if src_values[i_c] == delimiter:
+#                                     dest_values[d_index] = src_values[i_c]
+#                                     d_index += 1
+#                                 dest_values[d_index] = src_values[i_c]
+#                                 d_index += 1
+#                             dest_values[d_index] = delimiter
+#                             d_index += 1
+#                         else:
+#                             s_len = np.int64(src_end - src_start)
+#                             dest_values[index_v:index_v + s_len] = src_values[src_start:src_end]
+#                             d_index += s_len
+#                         index_v += np.int64(d_index)
+#
+#         # if either the index or values are past the threshold, write them
+#         if index_i >= max_index_i or index_v >= max_value_i:
+#             break
+#     return s+1, index_i, index_v
 
 
 # ordered map to left functionality: streaming
@@ -2113,7 +2116,8 @@ def ordered_left_map_result_size(left, right):
         return result_size
 
     if i < len(left):
-        result_size += left - i
+        result_size = result_size + len(left) - i
+    return result_size
 
 
 @exetera_njit

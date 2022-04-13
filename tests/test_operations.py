@@ -1,17 +1,16 @@
 import unittest
-
-import numpy as np
 from io import BytesIO
 
+import numpy as np
 import h5py
+from parameterized import parameterized
 
 from exetera.core import session
 from exetera.core import fields
 from exetera.core import persistence as per
 from exetera.core import operations as ops
 from exetera.core import utils
-
-from .utils import slow_test
+from .utils import slow_test, SessionTestCase, DEFAULT_FIELD_DATA
 
 
 class TestOpsUtils(unittest.TestCase):
@@ -779,6 +778,14 @@ class TestOrderedMap(unittest.TestCase):
         self.assertListEqual(l_result.data[:].tolist(), l_expected)
         self.assertListEqual(r_result.data[:].tolist(), r_expected)
 
+    # left map
+    # ===========================
+    def test_ordered_left_map_result_size(self):
+        a_ids = np.asarray([1, 1, 2, 2, 3, 5, 5, 5, 6, 8], dtype=np.int64)
+        b_ids = np.asarray([1, 1, 2, 3, 5, 5, 6, 7, 8, 8, 8], dtype=np.int64)
+        result_size = ops.ordered_left_map_result_size(a_ids, b_ids)
+        self.assertEqual(4, result_size)
+
 
     # old inner / outer map functionality
     # ===========================
@@ -1240,6 +1247,20 @@ class TestJournalling(unittest.TestCase):
             self.assertTrue(np.array_equal(tgt_v_f.data[:], np.sort(src_values[:])))
             self.assertTrue(np.array_equal(tgt_i_f.data[:], np.argsort(src_values)))
 
+    def test_merge_entries_segment(self):
+        old = np.asarray([0, 0, 0, 1, 1, 2, 3, 3, 5, 5, 5], dtype=np.int32)
+        new = np.asarray([0, 2, 3, 4, 5, 6], dtype=np.int32)
+        old_i, new_i = ops.ordered_generate_journalling_indices(old, new)
+
+        old_data = np.asarray([0, 1, 2, 10, 11, 20, 30, 31, 50, 51, 52])
+        new_data = np.asarray([2, 20, 31, 40, 52, 60])
+        to_keep = np.zeros(len(new_i), dtype=bool)
+        dest = np.zeros(len(old) + to_keep.sum(), dtype=old.dtype)
+
+        i, cur_old = ops.merge_entries_segment(0, 0, old_i, new_i, to_keep, old_data, new_data, dest)
+        self.assertEqual(5, i)
+        self.assertEqual(11, cur_old)
+
 
     def test_is_ordered(self):
         arr = np.asarray([1, 2, 3, 4, 5])
@@ -1264,7 +1285,7 @@ class TestGetSpans(unittest.TestCase):
         spans1=ops.get_spans_for_field(np.array([1, 2, 2, 3, 3, 3, 4, 4, 5, 6, 7, 8, 9, 10]))
         spans2=ops.get_spans_for_field(np.array([1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5]))
 
-        spans3= ops._get_spans_for_2_fields_by_spans(spans1,spans2)
+        spans3= ops._get_spans_for_2_fields_by_spans(spans1, spans2)
         self.assertTrue(list(spans), list(spans3))
 
     @slow_test
@@ -1411,3 +1432,13 @@ class TestFieldImporter(unittest.TestCase):
         byte_data_1 = [x.tobytes() for x in data_1]
         expected_byte_data_1 = [b'Yes', b'No', b'No', b'Yes']
         self.assertEqual(byte_data_1, expected_byte_data_1)
+
+
+class TestDataIterator(SessionTestCase):
+
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_data_iterator(self, creator, name, kwargs, data):
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        output = [i for i in ops.data_iterator(f)]
+        result = f.data[:] if isinstance(f, fields.IndexedStringField) else f.data[:].tolist()
+        self.assertListEqual(output, result)

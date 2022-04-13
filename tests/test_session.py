@@ -18,10 +18,16 @@ class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
         bio = BytesIO()
         contents = ['a', 'bb', 'ccc', 'dddd', 'eeeee']
         with session.Session() as s:
-            with h5py.File(bio, 'w') as src:
-                df = src.create_group('df')
-                f = s.create_indexed_string(df, 'foo')
-                f.data.write(contents)
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_group('df')
+            f = s.create_indexed_string(df, 'foo')
+            f.data.write(contents)
+
+            with self.assertRaises(ValueError):
+                s.create_indexed_string(src, 'bar')
+
+            with self.assertRaises(ValueError):
+                s.create_indexed_string("abc", 'bar')
 
         with session.Session() as s:
             with h5py.File(bio, 'r') as src:
@@ -32,10 +38,17 @@ class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
         bio = BytesIO()
         contents = [s.encode() for s in ['a', 'bb', 'ccc', 'dddd', 'eeeee']]
         with session.Session() as s:
-            with h5py.File(bio, 'w') as src:
-                df = src.create_group('df')
-                f = s.create_fixed_string(df, 'foo', 5)
-                f.data.write(contents)
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_group('df')
+            f = s.create_fixed_string(df, 'foo', 5)
+            f.data.write(contents)
+
+            with self.assertRaises(ValueError):
+                s.create_fixed_string(src, 'bar', 3)
+
+            with self.assertRaises(ValueError):
+                s.create_fixed_string("abc", 'bar', 3)
+
 
         with session.Session() as s:
             with h5py.File(bio, 'r') as src:
@@ -46,10 +59,18 @@ class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
         bio = BytesIO()
         contents = [1, 2, 1, 2]
         with session.Session() as s:
-            with h5py.File(bio, 'w') as src:
-                df = src.create_group('df')
-                f = s.create_categorical(df, 'foo', 'int8', {b'a': 1, b'b': 2})
-                f.data.write(np.array(contents))
+            src = s.open_dataset(bio, 'w', 'src')
+
+            df = src.create_group('df')
+            f = s.create_categorical(df, 'foo', 'int8', {b'a': 1, b'b': 2})
+            f.data.write(np.array(contents))
+
+            with self.assertRaises(ValueError):
+                s.create_categorical(src, 'bar', 'int32', {})
+
+            with self.assertRaises(ValueError):
+                s.create_categorical("abc", 'bar', 'int32', {})
+
 
         with session.Session() as s:
             with h5py.File(bio, 'r') as src:
@@ -61,10 +82,17 @@ class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
         bio = BytesIO()
         contents = [1, 2, 1, 2]
         with session.Session() as s:
-            with h5py.File(bio, 'w') as src:
-                df = src.create_group('df')
-                f = s.create_numeric(df, 'foo', 'int8')
-                f.data.write(np.array(contents))
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_group('df')
+            f = s.create_numeric(df, 'foo', 'int8')
+            f.data.write(np.array(contents))
+
+            with self.assertRaises(ValueError):
+                s.create_numeric(src, 'bar', 'int32')
+
+            with self.assertRaises(ValueError):
+                s.create_numeric("abc", 'bar', 'int32')
+
 
         with session.Session() as s:
             with h5py.File(bio, 'r') as src:
@@ -79,10 +107,18 @@ class TestCreateThenLoadBetweenSessionsOld(unittest.TestCase):
         contents = [c.timestamp() for c in contents]
 
         with session.Session() as s:
-            with h5py.File(bio, 'w') as src:
-                df = src.create_group('df')
-                f = s.create_timestamp(df, 'foo')
-                f.data.write(np.array(contents))
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_group('df')
+            f = s.create_timestamp(df, 'foo')
+            f.data.write(np.array(contents))
+
+            with self.assertRaises(ValueError):
+                s.create_timestamp(src, 'bar')
+
+            with self.assertRaises(ValueError):
+                s.create_timestamp("abc", 'bar')
+
+
 
         with session.Session() as s:
             with h5py.File(bio, 'r') as src:
@@ -135,6 +171,27 @@ class TestCreateThenLoadBetweenSessionsNew(unittest.TestCase):
             ts = datetime.now().timestamp()
             s.set_timestamp(str(ts))
             self.assertEqual(str(ts), s.timestamp)
+
+    def test_session_get(self):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            with self.assertRaises(AttributeError):
+                s.get('abc')
+            num = df.create_numeric('num', 'int32')
+            num.data.write([1,2,3,4])
+            num = s.get(df._h5group['num'])
+            self.assertListEqual([1,2,3,4], num.data[:].tolist())
+
+            with self.assertRaises(ValueError):
+                s.create_like("abc", df, 'num2')
+
+            s.create_like(df._h5group['num'], df, 'num2')
+            self.assertTrue(isinstance(df['num2'], fields.NumericField))
+
+
+
 
 
 
