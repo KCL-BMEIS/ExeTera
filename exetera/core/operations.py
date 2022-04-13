@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Union
+from typing import Optional, Type, Union
 
 import numpy as np
 import math
@@ -3068,8 +3068,12 @@ def indexed_string_unique(indices, values, unique_result, unique_index, unique_i
 
 
 def isin_for_indexed_string_field(test_elements, indices, values):
-    if isinstance(test_elements, set):
-        test_elements = list(test_elements)
+    if test_elements is None:
+        raise TypeError("only list-like or dict-like objects are allowed to be passed to field.isin(), you passed a 'NoneType'")
+
+    test_elements = [x for x in test_elements if x is not None]
+    if len(test_elements) == 0:
+        return np.asarray([False] * (len(indices) - 1), dtype='bool')
 
     # sort first
     test_elements = np.sort(test_elements)
@@ -3080,7 +3084,7 @@ def isin_for_indexed_string_field(test_elements, indices, values):
 
 @exetera_njit
 def isin_indexed_string_speedup(test_elements, indices, values):
-    result = [False] * (len(indices) - 1)
+    result = np.asarray([False] * (len(indices) - 1), dtype='bool')
     len_test_eles = len(test_elements)
     for i in range(len(indices)-1):
         v = values[indices[i] : indices[i+1]]
