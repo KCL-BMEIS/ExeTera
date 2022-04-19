@@ -801,52 +801,6 @@ class Session(AbstractSession):
         else:
             return destination_space_values
 
-    # def predicate_and_join(self,
-    #                        predicate, destination_pkey, fkey_indices,
-    #                        reader=None, writer=None, fkey_index_spans=None):
-    #     """
-    #     This method is due for removal and should not be used.
-    #     Please use the merge or ordered_merge functions instead.
-    #     """
-    #     if reader is not None:
-    #         if not isinstance(reader, rw.Reader):
-    #             raise ValueError(f"'reader' must be a type of Reader but is {type(reader)}")
-    #         if isinstance(reader, rw.IndexedStringReader):
-    #             raise ValueError(f"Joins on indexed string fields are not supported")
-    #
-    #     # generate spans for the sorted key indices if not provided
-    #     if fkey_index_spans is None:
-    #         fkey_index_spans = self.get_spans(field=fkey_indices)
-    #
-    #     # select the foreign keys from the start of each span to get an ordered list
-    #     # of unique id indices in the destination space that the results of the predicate
-    #     # execution are mapped to
-    #     unique_fkey_indices = fkey_indices[:][fkey_index_spans[:-1]]
-    #
-    #     # generate a filter to remove invalid foreign key indices (where values in the
-    #     # foreign key don't map to any values in the destination space
-    #     invalid_filter = unique_fkey_indices < operations.INVALID_INDEX
-    #     safe_unique_fkey_indices = unique_fkey_indices[invalid_filter]
-    #
-    #     # execute the predicate (note that not every predicate requires a reader)
-    #     if reader is not None:
-    #         dtype = reader.dtype()
-    #     else:
-    #         dtype = np.uint32
-    #     results = np.zeros(len(fkey_index_spans) - 1, dtype=dtype)
-    #     predicate(fkey_index_spans, reader, results)
-    #
-    #     # the predicate results are in the same space as the unique_fkey_indices, which
-    #     # means they may still contain invalid indices, so filter those now
-    #     safe_results = results[invalid_filter]
-    #
-    #     # now get the memory that the results will be mapped to
-    #     destination_space_values = writer.chunk_factory(len(destination_pkey))
-    #     # finally, map the results from the source space to the destination space
-    #     destination_space_values[safe_unique_fkey_indices] = safe_results
-    #
-    #     writer.write(destination_space_values)
-
     def get(self,
             field: Union[Field, h5py.Group]):
         """
@@ -1076,53 +1030,6 @@ class Session(AbstractSession):
             next = min(length, cur + chunksize)
             yield cur, next
             cur = next
-
-    # def process(self,
-    #             inputs,
-    #             outputs,
-    #             predicate):
-    #     """
-    #     Note: this function is deprecated, and provided only for compatibility with existing scripts.
-    #     It will be removed in a future version.
-    #     """
-    #
-    #     # TODO: modifying the dictionaries in place is not great
-    #     input_readers = dict()
-    #     for k, v in inputs.items():
-    #         if isinstance(v, fld.Field):
-    #             input_readers[k] = v
-    #         else:
-    #             input_readers[k] = self.get(v)
-    #     output_writers = dict()
-    #     output_arrays = dict()
-    #     for k, v in outputs.items():
-    #         if isinstance(v, fld.Field):
-    #             output_writers[k] = v
-    #         else:
-    #             raise ValueError("'outputs': all values must be 'Writers'")
-    #
-    #     reader = next(iter(input_readers.values()))
-    #     input_length = len(reader)
-    #     writer = next(iter(output_writers.values()))
-    #     chunksize = writer.chunksize
-    #     required_chunksize = min(input_length, chunksize)
-    #     for k, v in outputs.items():
-    #         output_arrays[k] = output_writers[k].chunk_factory(required_chunksize)
-    #
-    #     for c in self.chunks(input_length, chunksize):
-    #         kwargs = dict()
-    #
-    #         for k, v in inputs.items():
-    #             kwargs[k] = v.data[c[0]:c[1]]
-    #         for k, v in output_arrays.items():
-    #             kwargs[k] = v.data[:c[1] - c[0]]
-    #         predicate(**kwargs)
-    #
-    #         # TODO: write back to the writer
-    #         for k in output_arrays.keys():
-    #             output_writers[k].data.write_part(kwargs[k])
-    #     for k, v in output_writers.items():
-    #         output_writers[k].data.complete()
 
     def get_index(self, target, foreign_key, destination=None):
         """

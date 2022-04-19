@@ -1037,25 +1037,6 @@ def apply_spans_min(spans, src_array, dest_array=None):
     return dest_array
 
 
-
-# def _apply_spans_concat(spans, src_field):
-#     dest_values = [None] * (len(spans)-1)
-#     for i in range(len(spans)-1):
-#         cur = spans[i]
-#         next = spans[i+1]
-#         if next - cur == 1:
-#             dest_values[i] = src_field[cur]
-#         else:
-#             src = [s for s in src_field[cur:next] if len(s) > 0]
-#             if len(src) > 0:
-#                 dest_values[i] = ','.join(utils.to_escaped(src))
-#             else:
-#                 dest_values[i] = ''
-#             # if len(dest_values[i]) > 0:
-#             #     print(dest_values[i])
-#     return dest_values
-
-
 @exetera_njit
 def _apply_spans_concat_2(spans, src_index, src_values, dest_index, dest_values,
                           max_index_i, max_value_i, separator, delimiter, sp_start, dest_start_v):
@@ -2535,13 +2516,6 @@ def merge_journalled_entries(old_map, new_map, to_keep, old_src, new_src, dest):
         if to_keep[i] == True:
             dest[cur_dest] = new_src[new_map[i]]
             cur_dest += 1
-
-# def merge_journalled_entries(old_map, new_map, to_keep, old_src, new_src, dest):
-#     for om, im, tk in zip(old_map, new_map, to_keep):
-#         for omi in old_map:
-#             dest.add_to(next(old_src))
-#         if tk:
-#             dest.add_to(next(new_src))
 
 
 @exetera_njit
