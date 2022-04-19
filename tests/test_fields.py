@@ -7,6 +7,7 @@ from io import BytesIO
 import h5py
 from datetime import datetime
 from parameterized import parameterized
+import math
 
 from .utils import SessionTestCase, shuffle_randstate, allow_slow_tests, DEFAULT_FIELD_DATA
 
@@ -18,6 +19,7 @@ from exetera.core import utils
 import itertools
 
 NUMERIC_ONLY = [d for d in DEFAULT_FIELD_DATA if d[0] == "create_numeric"]
+REALLY_LARGE_LIST = list(range(1_000_000))
 
 
 class TestDefaultData(SessionTestCase):
@@ -1388,152 +1390,194 @@ class TestNumericFieldAsType(unittest.TestCase):
             self.assertTrue(isinstance(context.exception,TypeError))
 
 
-class TestFieldUnique(unittest.TestCase):
+# class TestFieldUnique(unittest.TestCase):
 
-    def test_unique_numeric_with_input_in_order(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            df.create_numeric('f', 'int16').data.write([1, 2, 3, 1, 2])
+#     def test_unique_numeric_with_input_in_order(self):
+#         bio = BytesIO()
+#         with session.Session() as s:
+#             src = s.open_dataset(bio, 'w', 'src')
+#             df = src.create_dataframe('df')
+#             df.create_numeric('f', 'int16').data.write([1, 2, 3, 1, 2])
 
-            self.assertEqual(df['f'].unique().tolist(), [1,2,3])
-
-
-    def test_unique_numeric_with_input_out_of_order(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            df.create_numeric('f', 'int16').data.write([3, 2, 1, 2, 1])
-
-            self.assertEqual(df['f'].unique().tolist(), [1,2,3])
+#             self.assertEqual(df['f'].unique().tolist(), [1,2,3])
 
 
-    def test_unique_indexed_string_with_input_in_order(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            df.create_indexed_string('foo').data.write(['a','bb','bb', 'ccc', 'a', 'bb'])
+#     def test_unique_numeric_with_input_out_of_order(self):
+#         bio = BytesIO()
+#         with session.Session() as s:
+#             src = s.open_dataset(bio, 'w', 'src')
+#             df = src.create_dataframe('df')
+#             df.create_numeric('f', 'int16').data.write([3, 2, 1, 2, 1])
 
-            self.assertEqual(df['foo'].unique().tolist(), ['a', 'bb', 'ccc'])
+#             self.assertEqual(df['f'].unique().tolist(), [1,2,3])
 
 
-    def test_unique_indexed_string_with_input_out_of_order(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            df.create_indexed_string('foo').data.write(['ccc','bb','a','bb'])
+#     def test_unique_indexed_string_with_input_in_order(self):
+#         bio = BytesIO()
+#         with session.Session() as s:
+#             src = s.open_dataset(bio, 'w', 'src')
+#             df = src.create_dataframe('df')
+#             df.create_indexed_string('foo').data.write(['a','bb','bb', 'ccc', 'a', 'bb'])
 
-            self.assertEqual(df['foo'].unique().tolist(), ['a', 'bb', 'ccc'])
+#             self.assertEqual(df['foo'].unique().tolist(), ['a', 'bb', 'ccc'])
+
+
+#     def test_unique_indexed_string_with_input_out_of_order(self):
+#         bio = BytesIO()
+#         with session.Session() as s:
+#             src = s.open_dataset(bio, 'w', 'src')
+#             df = src.create_dataframe('df')
+#             df.create_indexed_string('foo').data.write(['ccc','bb','a','bb'])
+
+#             self.assertEqual(df['foo'].unique().tolist(), ['a', 'bb', 'ccc'])
 
             
-    def test_unique_indexed_string_return_index(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            df.create_indexed_string('foo').data.write(['ccc','bb','a','bb'])
+#     def test_unique_indexed_string_return_index(self):
+#         bio = BytesIO()
+#         with session.Session() as s:
+#             src = s.open_dataset(bio, 'w', 'src')
+#             df = src.create_dataframe('df')
+#             df.create_indexed_string('foo').data.write(['ccc','bb','a','bb'])
 
-            val, indices = df['foo'].unique(return_index=True)
-            self.assertEqual(val.tolist(), ['a', 'bb', 'ccc'])
-            self.assertEqual(indices.tolist(), [2,1,0])
-
-
-    def test_unique_indexed_string_return_inverse(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            df.create_indexed_string('foo').data.write(['ccc','bb','a','bb','a'])
-
-            val, indices = df['foo'].unique(return_inverse=True)
-            self.assertEqual(val.tolist(), ['a', 'bb', 'ccc'])
-            self.assertEqual(indices.tolist(), [2,1,0,1,0])
+#             val, indices = df['foo'].unique(return_index=True)
+#             self.assertEqual(val.tolist(), ['a', 'bb', 'ccc'])
+#             self.assertEqual(indices.tolist(), [2,1,0])
 
 
-    def test_unique_indexed_string_return_counts(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            df.create_indexed_string('foo').data.write(['ccc','bb','a','bb'])
+#     def test_unique_indexed_string_return_inverse(self):
+#         bio = BytesIO()
+#         with session.Session() as s:
+#             src = s.open_dataset(bio, 'w', 'src')
+#             df = src.create_dataframe('df')
+#             df.create_indexed_string('foo').data.write(['ccc','bb','a','bb','a'])
 
-            val, counts = df['foo'].unique(return_counts=True)
-            self.assertEqual(val.tolist(), ['a', 'bb', 'ccc'])
-            self.assertEqual(counts.tolist(), [1,2,1])
-
-
-    def test_unique_fixed_stringwith_with_input_in_order(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            df.create_fixed_string('foo', 2).data.write(['aa','aa','bb','cc', 'bb'])
-
-            self.assertEqual(df['foo'].unique().tolist(), [b'aa', b'bb', b'cc'])
+#             val, indices = df['foo'].unique(return_inverse=True)
+#             self.assertEqual(val.tolist(), ['a', 'bb', 'ccc'])
+#             self.assertEqual(indices.tolist(), [2,1,0,1,0])
 
 
-    def test_unique_fixed_stringwith_with_input_out_of_order(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            df.create_fixed_string('foo', 2).data.write(['bb','aa','cc','aa'])
+#     def test_unique_indexed_string_return_counts(self):
+#         bio = BytesIO()
+#         with session.Session() as s:
+#             src = s.open_dataset(bio, 'w', 'src')
+#             df = src.create_dataframe('df')
+#             df.create_indexed_string('foo').data.write(['ccc','bb','a','bb'])
 
-            self.assertEqual(df['foo'].unique().tolist(), [b'aa', b'bb', b'cc'])
-
-
-    def test_unique_categorical_field_with_input_in_order(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            f = df.create_categorical('f', 'int8', {'a': 0, 'c': 1, 'd': 2, 'b': 3})
-            f.data.write([0, 1, 2, 2, 3, 3, 0, 2, 2, 3])
-            self.assertEqual(df['f'].unique().tolist(), [0, 1, 2, 3])
-
-
-    def test_unique_categorical_field_with_input_out_of_order(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            f = df.create_categorical('f', 'int8', {'a': 0, 'c': 1, 'd': 2, 'b': 3})
-            f.data.write([0, 1, 3, 2, 3, 2, 0, 1, 0])
-            self.assertEqual(df['f'].unique().tolist(), [0, 1, 2, 3])
-        
-
-    def test_unique_timestamp_field_with_input_in_order(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-
-            ts1 = datetime(2021, 12, 1).timestamp()
-            ts2 = datetime(2022, 1, 1).timestamp()
-            df.create_timestamp('ts').data.write([ts1, ts2, ts1])
-
-            self.assertEqual(df['ts'].unique().tolist(), [ts1, ts2])
-
-
-    def test_unique_timestamp_field_with_input_out_of_order(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-
-            ts1 = datetime(2021, 12, 1).timestamp()
-            ts2 = datetime(2022, 1, 1).timestamp()
-            df.create_timestamp('ts').data.write([ts2, ts2, ts1])
-
-            self.assertEqual(df['ts'].unique().tolist(), [ts1, ts2])
+#             val, counts = df['foo'].unique(return_counts=True)
+#             self.assertEqual(val.tolist(), ['a', 'bb', 'ccc'])
+#             self.assertEqual(counts.tolist(), [1,2,1])
 
 
 
-REALLY_LARGE_LIST = list(range(1_000_000))
+
+
+
+NUMERIC_UNIQUE_TESTS = [
+    ("int16", [1, 2, 6, 4, 2, 3, 2], [1, 2, 3, 4, 6], [0, 1, 5, 3, 2], [0, 1, 4, 3, 1, 2, 1], [1, 3, 1, 1, 1]),
+
+    # ("int16", [1, 2, 3, 4, 5], None),
+    # ("int16", [1, 2, 3, 4, 5], None),
+    # ("int16", [1, 2, 3, 4, 5], None),
+    # ("int16", [1, 2, 3, 4, 5], None),
+    # ("int16", [3, 1, 5, 4, 2], None),
+    # ("int16", [1, 2, 3, 4, 5], None),
+    # ("int16", [3, 1, 5, 4, 2], None),
+    # # really large inputs can take a long time to run through oracle to pre-compute result
+    # ("int32", REALLY_LARGE_LIST, [True] * len(REALLY_LARGE_LIST)),
+    # ("int32", REALLY_LARGE_LIST, [True] * len(REALLY_LARGE_LIST)),
+]
+
+INDEX_STR_UNIQUE_TESTS = [
+    (['a', 'bb','eeeee', 'dddd', 'bb', 'ccc', 'bb'], ['a', 'bb', 'ccc', 'dddd', 'eeeee'], [0, 1, 5, 3, 2], [0, 1, 4, 3, 1, 2, 1], [1, 3, 1, 1, 1]),
+]
+
+
+class TestFieldUnique(SessionTestCase):
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_unique_default_fields(self, creator, name, kwargs, data):
+        """
+        Tests `unqiue` for the default fields.
+        """
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        if "nformat" in kwargs:
+            data = np.asarray(data, dtype=kwargs["nformat"])
+
+        with self.subTest("Test unique with default data"):
+            expected = sorted(list(set(data)))
+            result = f.unique()
+            # sort doesn't work for nan, filter out nan
+            if creator == 'create_numeric' and "nformat" in kwargs and kwargs["nformat"].startswith('float'):
+                expected = [e for e in expected if not math.isnan(e)]
+                result = [r for r in result if not math.isnan(r)]
+            np.testing.assert_array_equal(expected, result)
+
+
+    @parameterized.expand(NUMERIC_UNIQUE_TESTS)
+    def test_numeric_unique(self, dtype, data, expected_result, expected_indices, expected_inverse_indices, expected_counts):
+        """
+        Test `unique` for the numeric fields with return_index, return_inverse, return_counts.
+        """
+        f = self.setup_field(self.df, "create_numeric", "f", (dtype,), {}, data)
+        with self.subTest("Test unique for numeric field"):
+            result = f.unique()
+            np.testing.assert_array_equal(expected_result, result)
+
+        with self.subTest("Test unique for numeric data with return_index=True"):
+            result, indices = f.unique(return_index=True)
+            np.testing.assert_array_equal(expected_result, result)
+            np.testing.assert_array_equal(expected_indices, indices)
+
+        with self.subTest("Test unique for numeric data with return_inverse=True"):
+            result, inverse_indices = f.unique(return_inverse=True)
+            np.testing.assert_array_equal(expected_result, result)
+            np.testing.assert_array_equal(expected_inverse_indices, inverse_indices)
+
+        with self.subTest("Test unique for numeric data with return_counts=True"):
+            result, counts = f.unique(return_counts=True)
+            np.testing.assert_array_equal(expected_result, result)
+            np.testing.assert_array_equal(expected_counts, counts)
+
+        with self.subTest("Test unique for numeric data with return_index=True, return_inverse=True, return_counts=True"):
+            result, indices, inverse_indices, counts = f.unique(return_index=True, return_inverse=True, return_counts=True)
+            np.testing.assert_array_equal(expected_result, result)
+            np.testing.assert_array_equal(expected_indices, indices)
+            np.testing.assert_array_equal(expected_inverse_indices, inverse_indices)
+            np.testing.assert_array_equal(expected_counts, counts)
+
+
+    @parameterized.expand(INDEX_STR_UNIQUE_TESTS)
+    def test_indexed_string_unique(self, data, expected_result, expected_indices, expected_inverse_indices, expected_counts):
+        """
+        Test `unique` for the indexed string fields with return_index, return_inverse, return_counts.
+        """
+        f = self.setup_field(self.df, "create_indexed_string", "f", (), {}, data)
+        with self.subTest("Test unique for indexed string field"):
+            result = f.unique()
+            np.testing.assert_array_equal(expected_result, result)
+
+        with self.subTest("Test unique for indexed string field with return_index=True"):
+            result, indices = f.unique(return_index=True)
+            np.testing.assert_array_equal(expected_result, result)
+            np.testing.assert_array_equal(expected_indices, indices)
+
+        # with self.subTest("Test unique for indexed string field with return_inverse=True"):
+        #     result, inverse_indices = f.unique(return_inverse=True)
+        #     np.testing.assert_array_equal(expected_result, result)
+        #     np.testing.assert_array_equal(expected_inverse_indices, inverse_indices)
+
+        # with self.subTest("Test unique for indexed string field with return_counts=True"):
+        #     result, counts = f.unique(return_counts=True)
+        #     np.testing.assert_array_equal(expected_result, result)
+        #     np.testing.assert_array_equal(expected_counts, counts)
+
+        # with self.subTest("Test unique for numeric data with return_index=True, return_inverse=True, return_counts=True"):
+        #     result, indices, inverse_indices, counts = f.unique(return_index=True, return_inverse=True, return_counts=True)
+        #     np.testing.assert_array_equal(expected_result, result)
+        #     np.testing.assert_array_equal(expected_indices, indices)
+        #     np.testing.assert_array_equal(expected_inverse_indices, inverse_indices)
+        #     np.testing.assert_array_equal(expected_counts, counts)
+
+
 NUMERIC_ISIN_TESTS = [
     ("int16", [1, 2, 3, 4, 5], [], None),
     ("int16", [1, 2, 3, 4, 5], [6, 7], None),
