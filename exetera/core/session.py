@@ -1334,6 +1334,11 @@ class Session(AbstractSession):
     def ordered_merge_left(self, left_on, right_on, right_field_sources=tuple(), left_field_sinks=None,
                            left_to_right_map=None, left_unique=False, right_unique=False):
         """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+        Please use DataFrame.merge instead.
+
         Generate the results of a left join and apply it to the fields described in the tuple
         'left_field_sources'. If 'left_field_sinks' is set, the mapped values are written
         to the fields / arrays set there.
@@ -1411,6 +1416,11 @@ class Session(AbstractSession):
                             left_field_sources=tuple(), right_field_sinks=None,
                             right_to_left_map=None, left_unique=False, right_unique=False):
         """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+        Please use DataFrame.merge instead.
+
         Generate the results of a right join and apply it to the fields described in the tuple
         'right_field_sources'. If 'right_field_sinks' is set, the mapped values are written
         to the fields / arrays set there.
@@ -1439,6 +1449,11 @@ class Session(AbstractSession):
                             right_field_sources=tuple(), right_field_sinks=None,
                             left_unique=False, right_unique=False):
         """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+        Please use DataFrame.merge instead.
+
         Generate the results of an inner join and apply it to the fields described in the tuple
         'right_field_sources'. If 'right_field_sinks' is set, the mapped values are written
         to the fields / arrays set there.

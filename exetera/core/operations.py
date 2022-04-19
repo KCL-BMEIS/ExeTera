@@ -217,17 +217,6 @@ def get_map_datatype_based_on_lengths(left_len, right_len):
     return np.int32 if dtype_str == 'int32' else np.int64
 
 
-# def safe_map(field, map_field, map_filter, empty_value=None):
-#     if isinstance(field, Field):
-#         if field.indexed:
-#             return safe_map_indexed_values(
-#                 field.indices[:], field.values[:], map_field, map_filter, empty_value)
-#         else:
-#             return safe_map_values(field.data[:], map_field, map_filter, empty_value)
-#     elif isinstance(field, np.ndarray):
-#         return safe_map_values(field, map_field, map_filter, empty_value)
-
-
 @exetera_njit
 def safe_map_indexed_values(data_indices, data_values, map_field, map_filter, empty_value=None):
     empty_value_len = 0 if empty_value is None else len(empty_value)
