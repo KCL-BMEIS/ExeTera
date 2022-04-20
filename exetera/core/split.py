@@ -11,7 +11,7 @@
 
 import csv
 
-from exetera.core import csvdataset, utils
+# from exetera.core import csvdataset, utils
 
 
 # read patients in batches of n
