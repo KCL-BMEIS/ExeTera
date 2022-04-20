@@ -44,14 +44,6 @@ exetera.core.fields module
    :undoc-members:
    :show-inheritance:
 
-exetera.core.filtered\_field module
------------------------------------
-
-.. automodule:: exetera.core.filtered_field
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 exetera.core.indexed\_array module
 ----------------------------------
 
