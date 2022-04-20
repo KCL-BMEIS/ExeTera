@@ -1207,37 +1207,37 @@ class TestJournalling(unittest.TestCase):
         # self.assertTrue(np.array_equal(dest, expected))
 
 
-    def test_streaming_sort_merge(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            dst = s.open_dataset(bio, 'r+', 'dst')
-            hf = dst.create_dataframe('hf')
-            rs = np.random.RandomState(12345678)
-            length = 105
-            segment_length = 25
-            chunk_length = 8
-            src_values = np.arange(length, dtype=np.int32)
-            src_values += 1000
-            rs.shuffle(src_values)
-            src_v_f = s.create_numeric(hf, 'src_values', 'int32')
-            src_v_f.data.write(src_values)
-            src_i_f = s.create_numeric(hf, 'src_indices', 'int64')
-            src_i_f.data.write(np.arange(length, dtype=np.int64))
-
-            for c in utils.chunks(length, segment_length):
-                sorted_index = np.argsort(src_v_f.data[c[0]:c[1]])
-                src_v_f.data[c[0]:c[1]] =\
-                    s.apply_index(sorted_index, src_v_f.data[c[0]:c[1]])
-                src_i_f.data[c[0]:c[1]] =\
-                    s.apply_index(sorted_index, src_i_f.data[c[0]:c[1]])
-
-            tgt_i_f = s.create_numeric(hf, 'tgt_values', 'int32')
-            tgt_v_f = s.create_numeric(hf, 'tgt_indices', 'int64')
-            ops.streaming_sort_merge(src_i_f, src_v_f, tgt_i_f, tgt_v_f,
-                                     segment_length, chunk_length)
-
-            self.assertTrue(np.array_equal(tgt_v_f.data[:], np.sort(src_values[:])))
-            self.assertTrue(np.array_equal(tgt_i_f.data[:], np.argsort(src_values)))
+    # def test_streaming_sort_merge(self):
+    #     bio = BytesIO()
+    #     with session.Session() as s:
+    #         dst = s.open_dataset(bio, 'r+', 'dst')
+    #         hf = dst.create_dataframe('hf')
+    #         rs = np.random.RandomState(12345678)
+    #         length = 105
+    #         segment_length = 25
+    #         chunk_length = 8
+    #         src_values = np.arange(length, dtype=np.int32)
+    #         src_values += 1000
+    #         rs.shuffle(src_values)
+    #         src_v_f = s.create_numeric(hf, 'src_values', 'int32')
+    #         src_v_f.data.write(src_values)
+    #         src_i_f = s.create_numeric(hf, 'src_indices', 'int64')
+    #         src_i_f.data.write(np.arange(length, dtype=np.int64))
+    #
+    #         for c in utils.chunks(length, segment_length):
+    #             sorted_index = np.argsort(src_v_f.data[c[0]:c[1]])
+    #             src_v_f.data[c[0]:c[1]] =\
+    #                 s.apply_index(sorted_index, src_v_f.data[c[0]:c[1]])
+    #             src_i_f.data[c[0]:c[1]] =\
+    #                 s.apply_index(sorted_index, src_i_f.data[c[0]:c[1]])
+    #
+    #         tgt_i_f = s.create_numeric(hf, 'tgt_values', 'int32')
+    #         tgt_v_f = s.create_numeric(hf, 'tgt_indices', 'int64')
+    #         ops.streaming_sort_merge(src_i_f, src_v_f, tgt_i_f, tgt_v_f,
+    #                                  segment_length, chunk_length)
+    #
+    #         self.assertTrue(np.array_equal(tgt_v_f.data[:], np.sort(src_values[:])))
+    #         self.assertTrue(np.array_equal(tgt_i_f.data[:], np.argsort(src_values)))
 
 
     def test_is_ordered(self):
