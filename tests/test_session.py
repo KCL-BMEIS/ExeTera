@@ -989,7 +989,7 @@ class TestSessionAggregate(unittest.TestCase):
             self.assertListEqual(['a', 'b,a', 'b,a,b', 'a,b,a,b'], s.get(ds['result']).data[:])
 
             with self.assertRaises(ValueError):
-                s.apply_spans_concat(spans, idx, dest=s.create_indexed_string(ds, 'foo'))
+                s.apply_spans_concat(spans, s.create_numeric(ds, 'foo3', 'int32'), dest=s.create_indexed_string(ds, 'foo'))
             with self.assertRaises(ValueError):
                 s.apply_spans_concat(spans, s.get(ds['vals']), dest=s.create_numeric(ds, 'foo2', 'int32'))
 

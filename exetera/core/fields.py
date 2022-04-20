@@ -479,9 +479,13 @@ class ReadOnlyIndexedFieldArray:
     @property
     def dtype(self):
         """
-        Get datatype of field.
+        Get datatype of field. Please note construct a numpy array from IndexedString data can be very memory expensive.
         """
-        return self._dtype  # todo
+        if len(self._indices) > 0:
+            max_len = np.max(self._indices[1:] - self._indices[:-1])
+        else:
+            max_len = 0
+        return np.dtype('S'+str(max_len))
 
     def __getitem__(self, item):
         """
@@ -579,10 +583,14 @@ class WriteableIndexedFieldArray:
     @property
     def dtype(self):
         """
-        Returns datatype of field
+        Returns datatype of field. Please note construct a numpy array from IndexedString data can be very memory expensive.
         :return: dtype
         """
-        return self._dtype  # todo
+        if len(self._indices) > 0:
+            max_len = np.max(self._indices[1:] - self._indices[:-1])
+        else:
+            max_len = 0
+        return np.dtype('S' + str(max_len))
 
     def __getitem__(self, item):
         """

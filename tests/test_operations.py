@@ -1442,3 +1442,12 @@ class TestDataIterator(SessionTestCase):
         output = [i for i in ops.data_iterator(f)]
         result = f.data[:] if isinstance(f, fields.IndexedStringField) else f.data[:].tolist()
         self.assertListEqual(output, result)
+
+class TestStr_to_dtype(SessionTestCase):
+
+    def test_str_to_dtype(self):
+        for i in ['bool', 'int8', 'int16', 'int32', 'uint8', 'uint16', 'uint32', 'uint64', 'float32', 'float64']:
+            with self.subTest(i):
+                self.assertEqual(np.dtype(i), ops.str_to_dtype(i))
+        with self.assertRaises(ValueError):
+            ops.str_to_dtype('str')

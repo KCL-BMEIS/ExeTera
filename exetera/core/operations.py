@@ -53,7 +53,10 @@ MAX_DATETIME = datetime(year=3000, month=1, day=1)
 
 
 def str_to_dtype(str_dtype):
-    return np.dtype(str_dtype)
+    if str_dtype in ['bool', 'int8', 'int16', 'int32', 'uint8', 'uint16', 'uint32', 'uint64', 'float32', 'float64']:
+        return np.dtype(str_dtype)
+    else:
+        raise ValueError("Unsupported dtype '{}'".format(str_dtype))
     # if str_dtype == 'bool':
     #     return bool
     # elif str_dtype == 'int8':
@@ -588,7 +591,7 @@ def chunked_copy(src_field, dest_field, chunksize=1 << 20):
         element_chunked_copy(src_field.data, dest_field.data, chunksize)
 
 
-#@exetera_njit
+@exetera_njit
 def data_iterator(data_field, chunksize=1 << 20):
     cur = np.int64(0)
     chunks_ = chunks(len(data_field.data), chunksize)

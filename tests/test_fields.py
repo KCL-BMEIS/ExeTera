@@ -534,10 +534,12 @@ class TestIndexedStringFields(unittest.TestCase):
             df = ds.create_dataframe('src')
             f = df.create_indexed_string('f')
             f.data.write(INDEX_STRING_DATA)
+            result = np.array([bytes(i, 'utf-8') for i in INDEX_STRING_DATA])
+            self.assertEqual(result.dtype, f.data.dtype)
             self.assertListEqual(INDEX_STRING_DATA, f.data[:])
             wtb = f.writeable()
             self.assertListEqual(INDEX_STRING_DATA, wtb.data[:])
-
+            self.assertEqual(result.dtype, wtb.data.dtype)
 
     def test_filter_indexed_string(self):
         bio = BytesIO()
@@ -654,6 +656,8 @@ class TestFieldArray(SessionTestCase):
         data = ["a", "bb", "eeeee", "ccc", "dddd","", " ",]*2
         f.data.write(data)
         f = fields.IndexedStringField(self.s, self.df._h5group['idx'], self.df)
+        output = np.array([bytes(i, 'utf-8') for i in data])
+        self.assertEqual(output.dtype, f.data.dtype)
         self.assertEqual(len(data), len(f.data))
         #self.assertEqual(f.data.dtype)
         self.assertListEqual(data, f.data[:])

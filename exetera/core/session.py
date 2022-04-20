@@ -593,9 +593,9 @@ class Session(AbstractSession):
                            src_chunksize=None,
                            dest_chunksize=None,
                            chunksize_mult=None):
-        if not (isinstance(target, fld.IndexedStringField) or isinstance(target, fld.IndexedStringMemField)):
+        if not target.indexed:
             raise ValueError(f"'target' must be one of 'IndexedStringField' but is {type(target)}")
-        if not (isinstance(dest, fld.IndexedStringField) or isinstance(dest, fld.IndexedStringMemField)):
+        if not dest.indexed:
             raise ValueError(f"'dest' must be one of 'IndexedStringField' but is {type(dest)}")
 
         src_chunksize = target.chunksize if src_chunksize is None else src_chunksize

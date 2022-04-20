@@ -330,10 +330,7 @@ class HDF5DataFrame(DataFrame):
         if field.dataframe != self:
             raise ValueError("This field is owned by a different dataframe")
         name = field.name
-        if name not in self._columns:
-            raise ValueError("This dataframe does not contain the field to delete.")
-        else:
-            self.__delitem__(name)
+        self.__delitem__(name)
 
     def keys(self):
         """
