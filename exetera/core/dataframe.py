@@ -13,7 +13,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from exetera.core.abstract_types import Dataset, DataFrame, DataFrameGroupBy, Field
+from exetera.core.abstract_types import Dataset, DataFrame, DataFrameGroupBy
 from exetera.core import fields as fld
 from exetera.core import operations as ops
 from exetera.core import validation as val

@@ -3,8 +3,6 @@ import unittest
 import numpy as np
 from io import BytesIO
 
-import h5py
-
 from exetera.core import session
 from exetera.core import fields
 from exetera.core import operations as ops
@@ -1196,49 +1194,6 @@ class TestJournalling(unittest.TestCase):
                           b'daa', b'dab', b'dac', b'ea' b'faa', b'fab', b'fac', b'fad', b'ga']),
                 dtype='S1')
         self.assertTrue(np.array_equal(dest_vals, expected_vals))
-        # old_data = np.asarray([0, 1, 2, 10, 11, 20, 30, 31, 50, 51, 52])
-        # new_data = np.asarray([3, 21, 32, 40, 53, 60])
-        # to_keep = np.zeros(len(new_i), dtype=np.bool)
-        # ops.compare_rows_for_journalling(old_i, new_i, old_data, new_data, to_keep)
-        #
-        # dest = np.zeros(len(old_data) + to_keep.sum(), dtype=old.dtype)
-        # ops.merge_journalled_entries(old_i, new_i, to_keep, old_data, new_data, dest)
-        # expected = np.asarray([0, 1, 2, 3, 10, 11, 20, 21, 30, 31, 32, 40, 50, 51, 52, 53, 60], dtype=np.int32)
-        # self.assertTrue(np.array_equal(dest, expected))
-
-
-    # def test_streaming_sort_merge(self):
-    #     bio = BytesIO()
-    #     with session.Session() as s:
-    #         dst = s.open_dataset(bio, 'r+', 'dst')
-    #         hf = dst.create_dataframe('hf')
-    #         rs = np.random.RandomState(12345678)
-    #         length = 105
-    #         segment_length = 25
-    #         chunk_length = 8
-    #         src_values = np.arange(length, dtype=np.int32)
-    #         src_values += 1000
-    #         rs.shuffle(src_values)
-    #         src_v_f = s.create_numeric(hf, 'src_values', 'int32')
-    #         src_v_f.data.write(src_values)
-    #         src_i_f = s.create_numeric(hf, 'src_indices', 'int64')
-    #         src_i_f.data.write(np.arange(length, dtype=np.int64))
-    #
-    #         for c in utils.chunks(length, segment_length):
-    #             sorted_index = np.argsort(src_v_f.data[c[0]:c[1]])
-    #             src_v_f.data[c[0]:c[1]] =\
-    #                 s.apply_index(sorted_index, src_v_f.data[c[0]:c[1]])
-    #             src_i_f.data[c[0]:c[1]] =\
-    #                 s.apply_index(sorted_index, src_i_f.data[c[0]:c[1]])
-    #
-    #         tgt_i_f = s.create_numeric(hf, 'tgt_values', 'int32')
-    #         tgt_v_f = s.create_numeric(hf, 'tgt_indices', 'int64')
-    #         ops.streaming_sort_merge(src_i_f, src_v_f, tgt_i_f, tgt_v_f,
-    #                                  segment_length, chunk_length)
-    #
-    #         self.assertTrue(np.array_equal(tgt_v_f.data[:], np.sort(src_values[:])))
-    #         self.assertTrue(np.array_equal(tgt_i_f.data[:], np.argsort(src_values)))
-
 
     def test_is_ordered(self):
         arr = np.asarray([1, 2, 3, 4, 5])

@@ -3,7 +3,6 @@ from typing import Optional, Union
 
 import numpy as np
 import math
-#from numba import njit
 import numba
 import numba.typed as nt
 import numba.core.types as nct
@@ -751,7 +750,6 @@ def check_if_sorted_for_multi_fields(fields_data):
 
     return True
 
-    
 
 @exetera_njit
 def _get_spans_for_index_string_field(indices,values):
@@ -773,7 +771,6 @@ def _get_spans_for_index_string_field(indices,values):
             result.append(i)
     result.append(len(indices) - 1)  # total number of elements
     return result
-
 
 
 @exetera_njit
@@ -871,7 +868,6 @@ def apply_spans_index_of_max_indexed(spans, src_indices, src_values, dest_array=
     return dest_array
 
 
-
 @exetera_njit
 def apply_spans_index_of_max(spans, src_array, dest_array=None):
     dest_array = np.zeros(len(spans)-1, dtype=spans.dtype) if dest_array is None else dest_array
@@ -961,7 +957,6 @@ def apply_spans_index_of_last_filter(spans, dest_array, filter_array):
             dest_array[i] = spans[i+1]-1
 
     return dest_array, filter_array
-
 
 
 @exetera_njit
@@ -2582,89 +2577,6 @@ def merge_entries_segment(i_start, cur_old_start,
             cur_dest += 1
             if cur_dest == len(dest):
                 return i, cur_old
-
-
-# def streaming_sort_merge(src_index_f, src_value_f, tgt_index_f, tgt_value_f,
-#                          segment_length, chunk_length):
-#
-#     # get the number of segments
-#     segment_count = len(src_index_f.data) // segment_length
-#     if len(src_index_f.data) % segment_length != 0:
-#         segment_count += 1
-#
-#     segment_starts = np.zeros(segment_count, dtype=np.int64)
-#     segment_lengths = np.zeros(segment_count, dtype=np.int64)
-#     for i, s in enumerate(utils.chunks(len(src_index_f.data), segment_length)):
-#         segment_starts[i] = s[0]
-#         segment_lengths[i] = s[1] - s[0]
-#
-#     # original segment indices for debugging
-#     segment_indices = np.zeros(segment_count, dtype=np.int32)
-#
-#     # the index of the chunk within a given segment
-#     chunk_indices = np.zeros(segment_count, dtype=np.int64)
-#
-#     # the (chunk_local) index for each segment
-#     in_chunk_indices = np.zeros(segment_count, dtype=np.int64)
-#
-#     # the (chunk_local) length for each segment
-#     in_chunk_lengths = np.zeros(segment_count, dtype=np.int64)
-#
-#     src_value_chunks = nt.List()
-#     src_index_chunks = nt.List()
-#
-#     # get the first chunk for each segment
-#     for i in range(segment_count):
-#         index_start = segment_starts[i] + chunk_indices[i] * chunk_length
-#         src_value_chunks.append(src_value_f.data[index_start:index_start+chunk_length])
-#         src_index_chunks.append(src_index_f.data[index_start:index_start+chunk_length])
-#         in_chunk_lengths[i] = len(src_value_chunks[i])
-#
-#     dest_indices = np.zeros(segment_count * chunk_length, dtype=src_index_f.data.dtype)
-#     dest_values = np.zeros(segment_count * chunk_length, dtype=src_value_f.data.dtype)
-#
-#     target_index = 0
-#     while target_index < len(src_index_f.data):
-#         index_delta = streaming_sort_partial(in_chunk_indices, in_chunk_lengths,
-#                                              src_value_chunks, src_index_chunks,
-#                                              dest_values, dest_indices)
-#         tgt_index_f.data.write(dest_indices[:index_delta])
-#         tgt_value_f.data.write(dest_values[:index_delta])
-#         target_index += index_delta
-#
-#         chunk_filter = np.ones(segment_count, dtype=bool)
-#         for i in range(segment_count):
-#             if in_chunk_indices[i] == in_chunk_lengths[i]:
-#                 chunk_indices[i] += 1
-#                 index_start = segment_starts[i] + chunk_indices[i] * chunk_length
-#                 remaining = segment_starts[i] + segment_lengths[i] - index_start
-#                 remaining = min(remaining, chunk_length)
-#                 if remaining > 0:
-#                     src_value_chunks[i] = src_value_f.data[index_start:index_start+remaining]
-#                     src_index_chunks[i] = src_index_f.data[index_start:index_start+remaining]
-#                     in_chunk_lengths[i] = len(src_value_chunks[i])
-#                     in_chunk_indices[i] = 0
-#                 else:
-#                     # can't clear list contents because we are using numba list, but they
-#                     # get filtered out in the following section
-#                     chunk_filter[i] = 0
-#
-#         if chunk_filter.sum() < len(chunk_filter):
-#             segment_count = chunk_filter.sum()
-#             segment_indices = segment_indices[chunk_filter]
-#             segment_starts = segment_starts[chunk_filter]
-#             segment_lengths = segment_lengths[chunk_filter]
-#             chunk_indices = chunk_indices[chunk_filter]
-#             in_chunk_indices = in_chunk_indices[chunk_filter]
-#             in_chunk_lengths = in_chunk_lengths[chunk_filter]
-#             filtered_value_chunks = nt.List()
-#             filtered_index_chunks = nt.List()
-#             for i in range(len(src_value_chunks)):
-#                 if chunk_filter[i]:
-#                     filtered_value_chunks.append(src_value_chunks[i])
-#                     filtered_index_chunks.append(src_index_chunks[i])
-#             src_value_chunks = filtered_value_chunks
-#             src_index_chunks = filtered_index_chunks
 
 
 @exetera_njit
