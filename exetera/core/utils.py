@@ -210,7 +210,7 @@ def is_int(value):
     try:
         int(float(value))
         return True
-    except:
+    except ValueError:
         return False
 
 
@@ -218,7 +218,7 @@ def is_float(value):
     try:
         float(value)
         return True
-    except:
+    except ValueError:
         return False
 
 
@@ -346,6 +346,7 @@ def clear_set_flag(values, to_clear):
 
 def sort_mixed_list(values, check_fn, sort_fn):
     # pass to find the single entry that fails check_fn
+    found_checked_item = False
     for iv in range(len(values)):
         checked_item = None
         if not check_fn(values[iv]):

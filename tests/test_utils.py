@@ -15,6 +15,7 @@ import numpy as np
 
 from exetera.core import utils
 from exetera.core.utils import find_longest_sequence_of, to_escaped, bytearray_to_escaped, get_min_max, validate_file_exists
+from .utils import HARD_INTS, HARD_FLOATS
 
 class TestUtils(unittest.TestCase):
 
@@ -127,5 +128,35 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(datetime.strptime(ts_s, '%Y-%m-%d %H:%M:%S.%f%z'), ts)
         with self.assertRaises(ValueError):
             utils.string_to_datetime("foo-boo")
+
+    def test_build_histogram(self):
+        data = np.array([np.random.randint(0, 50) for i in range(1000)])
+        output = utils.build_histogram(data)
+        a, b = np.unique(data, return_counts=True)
+        result = [(a[i], b[i]) for i in range(len(a))]
+        self.assertListEqual(sorted(result), sorted(output))
+
+    def test_convert_to_int(self):
+        for i in HARD_INTS:
+            with self.subTest(i):
+                self.assertTrue(utils.is_int(i))
+                self.assertTrue(i-1 <= utils.to_int(i) <= i+1)
+
+    def test_convert_to_float(self):
+        for i in HARD_FLOATS:
+            with self.subTest(i):
+                self.assertTrue(utils.is_float(i))
+                if not np.isnan(i):
+                    self.assertTrue(i == utils.to_float(i))
+
+    def test_sort_mixed_list(self):
+        data = [np.random.randint(0,50) for i in range(1000)]
+        check_fn = utils.is_int
+        sort_func = lambda x: x
+        output = utils.sort_mixed_list(data, check_fn, sort_func)
+        self.assertTrue(np.all(np.array(output[:-1] < output[1:])))
+
+    #def test_guess_encoding(self):
+
 
 
