@@ -7,7 +7,6 @@ import h5py
 
 from exetera.core import session
 from exetera.core import fields
-from exetera.core import persistence as per
 from exetera.core import operations as ops
 from exetera.core import utils
 

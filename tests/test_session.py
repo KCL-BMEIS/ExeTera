@@ -7,7 +7,6 @@ import h5py
 from exetera.core import session
 from exetera.core import fields
 from exetera.core import dataframe
-from exetera.core import persistence as per
 from exetera.core import utils
 from exetera.io import field_importers as fi
 

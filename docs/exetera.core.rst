@@ -76,22 +76,6 @@ exetera.core.operations module
    :undoc-members:
    :show-inheritance:
 
-exetera.core.persistence module
--------------------------------
-
-.. automodule:: exetera.core.persistence
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-exetera.core.readerwriter module
---------------------------------
-
-.. automodule:: exetera.core.readerwriter
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 exetera.core.regression module
 ------------------------------
 
@@ -104,14 +88,6 @@ exetera.core.session module
 ---------------------------
 
 .. automodule:: exetera.core.session
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-exetera.core.split module
--------------------------
-
-.. automodule:: exetera.core.split
    :members:
    :undoc-members:
    :show-inheritance:
