@@ -579,7 +579,6 @@ def chunked_copy(src_field, dest_field, chunksize=1 << 20):
         element_chunked_copy(src_field.data, dest_field.data, chunksize)
 
 
-@exetera_njit
 def data_iterator(data_field, chunksize=1 << 20):
     cur = np.int64(0)
     chunks_ = chunks(len(data_field.data), chunksize)
