@@ -7,7 +7,6 @@ from parameterized import parameterized
 from exetera.core import session
 from exetera.core import fields
 from exetera.core import dataframe
-from exetera.core import persistence as per
 from exetera.core import utils
 from exetera.io import field_importers as fi
 from .utils import DEFAULT_FIELD_DATA, SessionTestCase, NUMERIC_DATA
