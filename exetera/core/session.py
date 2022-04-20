@@ -414,7 +414,7 @@ class Session(AbstractSession):
             return result
 
     def _apply_spans_no_src(self,
-                            predicate: Callable[[np.ndarray, np.ndarray], None],
+                            predicate: Callable[[np.ndarray, np.ndarray], np.ndarray],
                             spans: np.ndarray,
                             dest: Field = None) -> np.ndarray:
         """
@@ -430,7 +430,7 @@ class Session(AbstractSession):
 
         results = predicate(spans)
         if dest is not None:  # dest is a field
-            assert (results.dtype.type == dest.data.dtype.type, 'The field dtype does not match with the data type.')
+            # assert (results.dtype.type == dest.data.dtype.type, 'The field dtype does not match with the data type.')
             dest.data.write(results)
         return results
 
@@ -459,7 +459,7 @@ class Session(AbstractSession):
         results = predicate(spans, target_)
 
         if dest is not None:  # dest is a field
-            assert (results.dtype.type == dest.data.dtype.type, 'The field dtype does not match with the data type.')
+            # assert (results.dtype.type == dest.data.dtype.type, 'The field dtype does not match with the data type.')
             dest.data.write(results)
         return results
 

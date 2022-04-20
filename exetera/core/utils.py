@@ -144,231 +144,231 @@ def map_between_categories(first_map, second_map):
     return result_map
 
 
-def to_categorical(field, transform):
-    results = np.zeros_like(field, dtype=field.dtype)
-    for ir, r in enumerate(field):
-        results[ir] = transform[r]
-    return results
+# def to_categorical(field, transform):
+#     results = np.zeros_like(field, dtype=field.dtype)
+#     for ir, r in enumerate(field):
+#         results[ir] = transform[r]
+#     return results
 
 
-def print_diagnostic_row(preamble, ds, ir, keys, fns=None):
-    if fns is None:
-        fns = dict()
-    # indices = [ds.field_to_index(k) for k in keys]
-    # indexed_fns = [None if k not in fns else fns[k] for k in keys]
-    values = [None] * len(keys)
-    # for ii, i in enumerate(indices):
-    for i, k in enumerate(keys):
-        if not fns or k not in fns:
-            values[i] = ds.value_from_fieldname(ir, k)
-        else:
-            # values[i] = fns[k](ds.value_from_fieldname(ir, k))
-            values[i] = ds.value_from_fieldname(ir, k)
-        # if indexed_fns[ii] is None:
-        #     values[ii] = fields[ir][i]
-        # else:
-        #     values[ii] = indexed_fns[ii](fields[ir][i])
-    print(f'{preamble}: {values}')
+# def print_diagnostic_row(preamble, ds, ir, keys, fns=None):
+#     if fns is None:
+#         fns = dict()
+#     # indices = [ds.field_to_index(k) for k in keys]
+#     # indexed_fns = [None if k not in fns else fns[k] for k in keys]
+#     values = [None] * len(keys)
+#     # for ii, i in enumerate(indices):
+#     for i, k in enumerate(keys):
+#         if not fns or k not in fns:
+#             values[i] = ds.value_from_fieldname(ir, k)
+#         else:
+#             # values[i] = fns[k](ds.value_from_fieldname(ir, k))
+#             values[i] = ds.value_from_fieldname(ir, k)
+#         # if indexed_fns[ii] is None:
+#         #     values[ii] = fields[ir][i]
+#         # else:
+#         #     values[ii] = indexed_fns[ii](fields[ir][i])
+#     print(f'{preamble}: {values}')
 
 
-def check_input_lengths(names, fields):
-    assert(len(names) == len(fields))
-    assert(isinstance(names, tuple))
-    assert(isinstance(fields, tuple))
-
-    length = None
-    error = False
-    for f in fields:
-        if not length:
-            length = len(f)
-        elif length != len(f):
-            error = True
-
-    if error:
-        field_name_str = ','.join([f"'{n}'" for n in names])
-        length_str = ','.join([len(f) for f in fields])
-        raise ValueError(f"Collections {field_name_str} have inconsistent lengths: ({length_str})")
-
-
-def valid_range_fac(f_min, f_max, default_value=''):
-    def inner_(x):
-        return x == default_value or x > f_min and x < f_max
-    return inner_
+# def check_input_lengths(names, fields):
+#     assert(len(names) == len(fields))
+#     assert(isinstance(names, tuple))
+#     assert(isinstance(fields, tuple))
+#
+#     length = None
+#     error = False
+#     for f in fields:
+#         if not length:
+#             length = len(f)
+#         elif length != len(f):
+#             error = True
+#
+#     if error:
+#         field_name_str = ','.join([f"'{n}'" for n in names])
+#         length_str = ','.join([len(f) for f in fields])
+#         raise ValueError(f"Collections {field_name_str} have inconsistent lengths: ({length_str})")
 
 
-def valid_range_fac_inc(f_min, f_max, default_value=''):
-    def inner_(x):
-        return x == default_value or x >= f_min and x <= f_max
-    return inner_
+# def valid_range_fac(f_min, f_max, default_value=''):
+#     def inner_(x):
+#         return x == default_value or x > f_min and x < f_max
+#     return inner_
+
+
+# def valid_range_fac_inc(f_min, f_max, default_value=''):
+#     def inner_(x):
+#         return x == default_value or x >= f_min and x <= f_max
+#     return inner_
 
 
 def datetime_to_seconds(dt):
     return f'{dt[0:4]}-{dt[5:7]}-{dt[8:10]} {dt[11:13]}:{dt[14:16]}:{dt[17:19]}'
 
 
-def is_int(value):
-    try:
-        int(float(value))
-        return True
-    except:
-        return False
+# def is_int(value):
+#     try:
+#         int(float(value))
+#         return True
+#     except:
+#         return False
 
 
-def is_float(value):
-    try:
-        float(value)
-        return True
-    except:
-        return False
+# def is_float(value):
+#     try:
+#         float(value)
+#         return True
+#     except:
+#         return False
 
 
-def to_int(value):
-    try:
-        fvalue = float(value)
-    except ValueError as e:
-        raise ValueError(f'{value} cannot be converted to float')
-
-    try:
-        ivalue = int(fvalue)
-    except ValueError as e:
-        raise ValueError(f'{fvalue} cannot be converted to int')
-
-    return ivalue
-
-
-def to_float(value):
-    try:
-        fvalue = float(value)
-    except ValueError as e:
-        raise ValueError(f'{value} cannot be converted to float')
-
-    return fvalue
+# def to_int(value):
+#     try:
+#         fvalue = float(value)
+#     except ValueError as e:
+#         raise ValueError(f'{value} cannot be converted to float')
+#
+#     try:
+#         ivalue = int(fvalue)
+#     except ValueError as e:
+#         raise ValueError(f'{fvalue} cannot be converted to int')
+#
+#     return ivalue
 
 
-def list_to_escaped(strings):
-    s = StringIO()
-    w = csv.writer(s)
-    w.writerow(strings)
-    return s.getvalue()
+# def to_float(value):
+#     try:
+#         fvalue = float(value)
+#     except ValueError as e:
+#         raise ValueError(f'{value} cannot be converted to float')
+#
+#     return fvalue
 
 
-def to_escaped(string, separator=',', delimiter='"'):
-    comma = False
-    quotes = False
-    for c in string:
-        if c == separator:
-            comma = True
-        elif c == delimiter:
-            quotes = True
-
-    if comma or quotes:
-        s = StringIO()
-        s.write(delimiter)
-        for c in string:
-            if c == delimiter:
-                s.write(c)
-            s.write(c)
-        s.write(delimiter)
-        return s.getvalue()
-    else:
-        return string
-
-@exetera_njit
-def bytearray_to_escaped(srcbytearray, destbytearray,
-                         src_start=np.int64(0), src_end=None, dest_start=np.int64(0),
-                         separator=b',', delimiter=b'"'):
-    if src_end is None:
-        src_end = np.int64(len(srcbytearray))
-
-    comma = False
-    quotes = False
-    for i_c in range(src_start, src_end):
-        c = srcbytearray[i_c]
-        if c == separator:
-            comma = True
-        elif c == delimiter:
-            quotes = True
-
-    d_index = 0
-    if comma or quotes:
-        destbytearray[d_index] = delimiter
-        d_index += 1
-        for i_c in range(src_start, src_end):
-            c = srcbytearray[i_c]
-            if c == delimiter:
-                destbytearray[d_index] = c
-                d_index += 1
-            destbytearray[d_index] = c
-            d_index += 1
-        destbytearray[d_index] = delimiter
-        d_index += 1
-        return d_index
-    else:
-        s_len = np.int64(src_end - src_start)
-        destbytearray[dest_start:dest_start + s_len] = srcbytearray[src_start:src_end]
-        d_index += s_len
-        return d_index
+# def list_to_escaped(strings):
+#     s = StringIO()
+#     w = csv.writer(s)
+#     w.writerow(strings)
+#     return s.getvalue()
 
 
-def from_escaped(string):
-    s = StringIO(string)
-    r = csv.reader(s)
-    return next(r)
+# def to_escaped(string, separator=',', delimiter='"'):
+#     comma = False
+#     quotes = False
+#     for c in string:
+#         if c == separator:
+#             comma = True
+#         elif c == delimiter:
+#             quotes = True
+#
+#     if comma or quotes:
+#         s = StringIO()
+#         s.write(delimiter)
+#         for c in string:
+#             if c == delimiter:
+#                 s.write(c)
+#             s.write(c)
+#         s.write(delimiter)
+#         return s.getvalue()
+#     else:
+#         return string
+
+# @exetera_njit
+# def bytearray_to_escaped(srcbytearray, destbytearray,
+#                          src_start=np.int64(0), src_end=None, dest_start=np.int64(0),
+#                          separator=b',', delimiter=b'"'):
+#     if src_end is None:
+#         src_end = np.int64(len(srcbytearray))
+#
+#     comma = False
+#     quotes = False
+#     for i_c in range(src_start, src_end):
+#         c = srcbytearray[i_c]
+#         if c == separator:
+#             comma = True
+#         elif c == delimiter:
+#             quotes = True
+#
+#     d_index = 0
+#     if comma or quotes:
+#         destbytearray[d_index] = delimiter
+#         d_index += 1
+#         for i_c in range(src_start, src_end):
+#             c = srcbytearray[i_c]
+#             if c == delimiter:
+#                 destbytearray[d_index] = c
+#                 d_index += 1
+#             destbytearray[d_index] = c
+#             d_index += 1
+#         destbytearray[d_index] = delimiter
+#         d_index += 1
+#         return d_index
+#     else:
+#         s_len = np.int64(src_end - src_start)
+#         destbytearray[dest_start:dest_start + s_len] = srcbytearray[src_start:src_end]
+#         d_index += s_len
+#         return d_index
 
 
-def concatenate_maybe_strs(sequence, value, separator=',', delimiter='"'):
-    if sequence in (None, '', 'NA'):
-        if value in (None, '', 'NA'):
-            return ''
-        else:
-            return to_escaped(value)
-    else:
-        if value in (None, '', 'NA'):
-            return sequence
-        else:
-            return f"{sequence}{separator}{to_escaped(value)}"
+# def from_escaped(string):
+#     s = StringIO(string)
+#     r = csv.reader(s)
+#     return next(r)
 
 
-def replace_if_invalid(replacement):
-    def inner_(value):
-        if value == '':
-            return replacement
-        else:
-            return float(value)
-    return inner_
+# def concatenate_maybe_strs(sequence, value, separator=',', delimiter='"'):
+#     if sequence in (None, '', 'NA'):
+#         if value in (None, '', 'NA'):
+#             return ''
+#         else:
+#             return to_escaped(value)
+#     else:
+#         if value in (None, '', 'NA'):
+#             return sequence
+#         else:
+#             return f"{sequence}{separator}{to_escaped(value)}"
 
 
-def clear_set_flag(values, to_clear):
-    for v in range(len(values)):
-        values[v] &= ~to_clear
-    return values
+# def replace_if_invalid(replacement):
+#     def inner_(value):
+#         if value == '':
+#             return replacement
+#         else:
+#             return float(value)
+#     return inner_
 
 
-def sort_mixed_list(values, check_fn, sort_fn):
-    # pass to find the single entry that fails check_fn
-    for iv in range(len(values)):
-        checked_item = None
-        if not check_fn(values[iv]):
-            #swap the current item with the last if it isn't last
-            found_checked_item = True
-            if iv != len(values) - 1:
-                values[iv], values[-1] = values[-1], values[iv]
-                checked_item = values.pop()
-        break
-
-    list.sort(values, key=sort_fn)
-    if found_checked_item:
-        values.append(checked_item)
-
-    return values
+# def clear_set_flag(values, to_clear):
+#     for v in range(len(values)):
+#         values[v] &= ~to_clear
+#     return values
 
 
-def chunks(length, chunksize):
-    cur = 0
-    while cur < length:
-        next = min(length, cur + chunksize)
-        yield cur, next
-        cur = next
+# def sort_mixed_list(values, check_fn, sort_fn):
+#     # pass to find the single entry that fails check_fn
+#     for iv in range(len(values)):
+#         checked_item = None
+#         if not check_fn(values[iv]):
+#             #swap the current item with the last if it isn't last
+#             found_checked_item = True
+#             if iv != len(values) - 1:
+#                 values[iv], values[-1] = values[-1], values[iv]
+#                 checked_item = values.pop()
+#         break
+#
+#     list.sort(values, key=sort_fn)
+#     if found_checked_item:
+#         values.append(checked_item)
+#
+#     return values
+
+
+# def chunks(length, chunksize):
+#     cur = 0
+#     while cur < length:
+#         next = min(length, cur + chunksize)
+#         yield cur, next
+#         cur = next
 
 
 class Timer:
