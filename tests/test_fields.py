@@ -12,7 +12,6 @@ from .utils import SessionTestCase, shuffle_randstate, allow_slow_tests, DEFAULT
 
 from exetera.core import session
 from exetera.core import fields
-from exetera.core import persistence as per
 from exetera.io import field_importers as fi
 from exetera.core import utils
 import itertools
