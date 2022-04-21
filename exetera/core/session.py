@@ -22,13 +22,14 @@ import h5py
 
 from exetera.core.abstract_types import Field, AbstractSession
 from exetera.core import operations
-from exetera.core import persistence as per
+#from exetera.core import persistence as per
 from exetera.core import fields as fld
-from exetera.core import readerwriter as rw
+# from exetera.core import readerwriter as rw
 from exetera.core import validation as val
 from exetera.core import operations as ops
 from exetera.core import dataset as ds
 from exetera.core import dataframe as df
+from exetera.core import utils
 
 
 class Session(AbstractSession):
@@ -147,14 +148,14 @@ class Session(AbstractSession):
         Example::
         
             key_1 = ['a', 'b', 'e', 'g', 'i']
-            key_2 = ['b', 'b', 'c', 'c, 'e', 'g', 'j']
+            key_2 = ['b', 'b', 'c', 'c', 'e', 'g', 'j']
             key_3 = ['a', 'c' 'd', 'e', 'g', 'h', 'h', 'i']
             
             sorted_union = ['a', 'b', 'c', 'd', 'e', 'g', 'h', 'i', 'j']
             
             key_1_index = [0, 1, 4, 5, 7]
             key_2_index = [1, 1, 2, 2, 4, 5, 8]
-            key_3_index = [0, 2, 3, 4, 5, 6, 6, 7]
+            key_3_index = [0, 3, 4, 5, 6, 6, 7]
         """
         if not isinstance(keys, tuple):
             raise ValueError("'keys' must be a tuple")
@@ -333,11 +334,14 @@ class Session(AbstractSession):
             return result
 
     def distinct(self, field=None, fields=None, filter=None):
+        """
+        todo: confirm deprecated.
+        """
 
         if field is None and fields is None:
-            return ValueError("One of 'field' and 'fields' must be set")
+            raise ValueError("One of 'field' and 'fields' must be set")
         if field is not None and fields is not None:
-            return ValueError("Only one of 'field' and 'fields' may be set")
+            raise ValueError("Only one of 'field' and 'fields' may be set")
 
         if field is not None:
             return np.unique(field)
@@ -413,7 +417,7 @@ class Session(AbstractSession):
             return result
 
     def _apply_spans_no_src(self,
-                            predicate: Callable[[np.ndarray, np.ndarray], None],
+                            predicate: Callable[[np.ndarray, np.ndarray], np.ndarray],
                             spans: np.ndarray,
                             dest: Field = None) -> np.ndarray:
         """
@@ -425,18 +429,13 @@ class Session(AbstractSession):
         :param dest: if set, the field to which the results are written
         :returns: A numpy array containing the resulting values
         """
-        assert (dest is None or isinstance(dest, Field))
+        assert (dest is None or isinstance(dest, Field))  # dest is None or field
 
-        if dest is not None:
-            dest_f = val.field_from_parameter(self, 'dest', dest)
-            results = np.zeros(len(spans) - 1, dtype=dest_f.data.dtype)
-            predicate(spans, results)
-            dest_f.data.write(results)
-            return results
-        else:
-            results = np.zeros(len(spans) - 1, dtype='int64')
-            predicate(spans, results)
-            return results
+        results = predicate(spans)
+        if dest is not None:  # dest is a field
+            # assert (results.dtype.type == dest.data.dtype.type, 'The field dtype does not match with the data type.')
+            dest.data.write(results)
+        return results
 
     def _apply_spans_src(self,
                          predicate: Callable[[np.ndarray, np.ndarray, np.ndarray], None],
@@ -453,24 +452,19 @@ class Session(AbstractSession):
         :param dest: if set, the field to which the results are written
         :returns: A numpy array containing the resulting values
         """
-        assert (dest is None or isinstance(dest, Field))
+        assert (dest is None or isinstance(dest, Field))  # dest is None or a field
         target_ = val.array_from_parameter(self, 'target', target)
         if len(target) != spans[-1]:
             error_msg = ("'target' (length {}) must be one element shorter than 'spans' "
                          "(length {})")
             raise ValueError(error_msg.format(len(target_), len(spans)))
 
-        if dest is not None:
-            dest_f = val.field_from_parameter(self, 'dest', dest)
-            results = np.zeros(len(spans) - 1, dtype=dest_f.data.dtype)
-            predicate(spans, target_, results)
-            dest_f.data.write(results)
-            return results
-        else:
-            data_type = 'int32' if len(spans) < 2000000000 else 'int64'
-            results = np.zeros(len(spans) - 1, dtype=data_type)
-            predicate(spans, target_, results)
-            return results
+        results = predicate(spans, target_)
+
+        if dest is not None:  # dest is a field
+            # assert (results.dtype.type == dest.data.dtype.type, 'The field dtype does not match with the data type.')
+            dest.data.write(results)
+        return results
 
     def apply_spans_index_of_min(self,
                                  spans: np.ndarray,
@@ -626,11 +620,7 @@ class Session(AbstractSession):
         s = 0
         index_v = 0
         while s < len(spans) - 1:
-            # s, index_i, index_v = per._apply_spans_concat(spans, src_index, src_values,
-            #                                               dest_index, dest_values,
-            #                                               max_index_i, max_value_i, s,
-            #                                               separator, delimiter)
-            s, index_i, index_v = per._apply_spans_concat_2(spans, src_index, src_values,
+            s, index_i, index_v = ops._apply_spans_concat_2(spans, src_index, src_values,
                                                             dest_index, dest_values,
                                                             max_index_i, max_value_i,
                                                             separator, delimiter, s, index_v)
@@ -678,7 +668,6 @@ class Session(AbstractSession):
          Finds the number of entries within each sub-group of index.
          
          Example::
-         
          
              Index:  a a a b b x a c c d d d
              Result: 3     2   1 1 2   3
@@ -778,8 +767,8 @@ class Session(AbstractSession):
             raise ValueError("'destination_pkey' must not be an indexed string field")
         if isinstance(fkey_indices, Field) and fkey_indices.indexed:
             raise ValueError("'fkey_indices' must not be an indexed string field")
-        if isinstance(values_to_join, rw.IndexedStringReader):
-            raise ValueError("Joins on indexed string fields are not supported")
+        # if isinstance(values_to_join, rw.IndexedStringReader):
+        #     raise ValueError("Joins on indexed string fields are not supported")
 
         raw_fkey_indices = val.raw_array_from_parameter(self, "fkey_indices", fkey_indices)
 
@@ -814,52 +803,6 @@ class Session(AbstractSession):
             writer.data.write(destination_space_values)
         else:
             return destination_space_values
-
-    def predicate_and_join(self,
-                           predicate, destination_pkey, fkey_indices,
-                           reader=None, writer=None, fkey_index_spans=None):
-        """
-        This method is due for removal and should not be used.
-        Please use the merge or ordered_merge functions instead.
-        """
-        if reader is not None:
-            if not isinstance(reader, rw.Reader):
-                raise ValueError(f"'reader' must be a type of Reader but is {type(reader)}")
-            if isinstance(reader, rw.IndexedStringReader):
-                raise ValueError(f"Joins on indexed string fields are not supported")
-
-        # generate spans for the sorted key indices if not provided
-        if fkey_index_spans is None:
-            fkey_index_spans = self.get_spans(field=fkey_indices)
-
-        # select the foreign keys from the start of each span to get an ordered list
-        # of unique id indices in the destination space that the results of the predicate
-        # execution are mapped to
-        unique_fkey_indices = fkey_indices[:][fkey_index_spans[:-1]]
-
-        # generate a filter to remove invalid foreign key indices (where values in the
-        # foreign key don't map to any values in the destination space
-        invalid_filter = unique_fkey_indices < operations.INVALID_INDEX
-        safe_unique_fkey_indices = unique_fkey_indices[invalid_filter]
-
-        # execute the predicate (note that not every predicate requires a reader)
-        if reader is not None:
-            dtype = reader.dtype()
-        else:
-            dtype = np.uint32
-        results = np.zeros(len(fkey_index_spans) - 1, dtype=dtype)
-        predicate(fkey_index_spans, reader, results)
-
-        # the predicate results are in the same space as the unique_fkey_indices, which
-        # means they may still contain invalid indices, so filter those now
-        safe_results = results[invalid_filter]
-
-        # now get the memory that the results will be mapped to
-        destination_space_values = writer.chunk_factory(len(destination_pkey))
-        # finally, map the results from the source space to the destination space
-        destination_space_values[safe_unique_fkey_indices] = safe_results
-
-        writer.write(destination_space_values)
 
     def get(self,
             field: Union[Field, h5py.Group]):
@@ -1091,53 +1034,6 @@ class Session(AbstractSession):
             yield cur, next
             cur = next
 
-    # def process(self,
-    #             inputs,
-    #             outputs,
-    #             predicate):
-    #     """
-    #     Note: this function is deprecated, and provided only for compatibility with existing scripts.
-    #     It will be removed in a future version.
-    #     """
-    #
-    #     # TODO: modifying the dictionaries in place is not great
-    #     input_readers = dict()
-    #     for k, v in inputs.items():
-    #         if isinstance(v, fld.Field):
-    #             input_readers[k] = v
-    #         else:
-    #             input_readers[k] = self.get(v)
-    #     output_writers = dict()
-    #     output_arrays = dict()
-    #     for k, v in outputs.items():
-    #         if isinstance(v, fld.Field):
-    #             output_writers[k] = v
-    #         else:
-    #             raise ValueError("'outputs': all values must be 'Writers'")
-    #
-    #     reader = next(iter(input_readers.values()))
-    #     input_length = len(reader)
-    #     writer = next(iter(output_writers.values()))
-    #     chunksize = writer.chunksize
-    #     required_chunksize = min(input_length, chunksize)
-    #     for k, v in outputs.items():
-    #         output_arrays[k] = output_writers[k].chunk_factory(required_chunksize)
-    #
-    #     for c in self.chunks(input_length, chunksize):
-    #         kwargs = dict()
-    #
-    #         for k, v in inputs.items():
-    #             kwargs[k] = v.data[c[0]:c[1]]
-    #         for k, v in output_arrays.items():
-    #             kwargs[k] = v.data[:c[1] - c[0]]
-    #         predicate(**kwargs)
-    #
-    #         # TODO: write back to the writer
-    #         for k in output_arrays.keys():
-    #             output_writers[k].data.write_part(kwargs[k])
-    #     for k, v in output_writers.items():
-    #         output_writers[k].data.complete()
-
     def get_index(self, target, foreign_key, destination=None):
         """
         Note: this function is deprecated, and provided only for compatibility with existing scripts.
@@ -1149,15 +1045,15 @@ class Session(AbstractSession):
 
         'get_index' maps a primary key ('target') into the space of a foreign key ('foreign_key').
         """
-        print('  building patient_id index')
+        #print('  building patient_id index')
         t0 = time.time()
         target_lookup = dict()
         target_ = val.raw_array_from_parameter(self, "target", target)
         for i, v in enumerate(target_):
             target_lookup[v] = i
-        print(f'  target lookup built in {time.time() - t0}s')
+        #print(f'  target lookup built in {time.time() - t0}s')
 
-        print('  perform initial index')
+        #print('  perform initial index')
         t0 = time.time()
         foreign_key_elems = val.raw_array_from_parameter(self, "foreign_key", foreign_key)
         # foreign_key_index = np.asarray([target_lookup.get(i, -1) for i in foreign_key_elems],
@@ -1171,7 +1067,7 @@ class Session(AbstractSession):
                 current_invalid += 1
                 target_lookup[k] = index
             foreign_key_index[i_k] = index
-        print(f'  initial index performed in {time.time() - t0}s')
+        #print(f'  initial index performed in {time.time() - t0}s')
 
         if destination is not None:
             if val.is_field_parameter(destination):
@@ -1441,6 +1337,11 @@ class Session(AbstractSession):
     def ordered_merge_left(self, left_on, right_on, right_field_sources=tuple(), left_field_sinks=None,
                            left_to_right_map=None, left_unique=False, right_unique=False):
         """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+        Please use DataFrame.merge instead.
+
         Generate the results of a left join and apply it to the fields described in the tuple
         'left_field_sources'. If 'left_field_sinks' is set, the mapped values are written
         to the fields / arrays set there.
@@ -1518,6 +1419,11 @@ class Session(AbstractSession):
                             left_field_sources=tuple(), right_field_sinks=None,
                             right_to_left_map=None, left_unique=False, right_unique=False):
         """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+        Please use DataFrame.merge instead.
+
         Generate the results of a right join and apply it to the fields described in the tuple
         'right_field_sources'. If 'right_field_sinks' is set, the mapped values are written
         to the fields / arrays set there.
@@ -1546,6 +1452,11 @@ class Session(AbstractSession):
                             right_field_sources=tuple(), right_field_sinks=None,
                             left_unique=False, right_unique=False):
         """
+        Note: this function is deprecated, and provided only for compatibility with existing scripts.
+        It will be removed in a future version.
+
+        Please use DataFrame.merge instead.
+
         Generate the results of an inner join and apply it to the fields described in the tuple
         'right_field_sources'. If 'right_field_sinks' is set, the mapped values are written
         to the fields / arrays set there.

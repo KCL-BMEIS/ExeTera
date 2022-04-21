@@ -235,7 +235,7 @@ class TestImporter(unittest.TestCase):
             self.assertEqual(df['updated_at_day'].data[:].tolist(), expected_updated_at_date_list )
 
         with h5py.File(bio, 'r') as hf:
-            print(hf['schema_key']['updated_at']['values'][:])
+            #print(hf['schema_key']['updated_at']['values'][:])
             self.assertAlmostEqual(hf['schema_key']['updated_at']['values'][:].tolist(), [datetime.strptime(x, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp() for x in expected_updated_at_list])
             self.assertEqual(hf['schema_key']['updated_at_day']['values'][:].tolist(), expected_updated_at_date_list)
 

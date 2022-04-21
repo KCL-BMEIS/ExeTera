@@ -1,15 +1,15 @@
 import unittest
-
-import numpy as np
 from io import BytesIO
 
+import numpy as np
 import h5py
+from parameterized import parameterized
 
 from exetera.core import session
 from exetera.core import fields
-from exetera.core import persistence as per
 from exetera.core import operations as ops
 from exetera.core import utils
+from .utils import slow_test, SessionTestCase, DEFAULT_FIELD_DATA
 
 
 class TestOpsUtils(unittest.TestCase):
@@ -777,6 +777,14 @@ class TestOrderedMap(unittest.TestCase):
         self.assertListEqual(l_result.data[:].tolist(), l_expected)
         self.assertListEqual(r_result.data[:].tolist(), r_expected)
 
+    # left map
+    # ===========================
+    def test_ordered_left_map_result_size(self):
+        a_ids = np.asarray([1, 1, 2, 2, 3, 5, 5, 5, 6, 8], dtype=np.int64)
+        b_ids = np.asarray([1, 1, 2, 3, 5, 5, 6, 7, 8, 8, 8], dtype=np.int64)
+        result_size = ops.ordered_left_map_result_size(a_ids, b_ids)
+        self.assertEqual(4, result_size)
+
 
     # old inner / outer map functionality
     # ===========================
@@ -1195,49 +1203,6 @@ class TestJournalling(unittest.TestCase):
                           b'daa', b'dab', b'dac', b'ea' b'faa', b'fab', b'fac', b'fad', b'ga']),
                 dtype='S1')
         self.assertTrue(np.array_equal(dest_vals, expected_vals))
-        # old_data = np.asarray([0, 1, 2, 10, 11, 20, 30, 31, 50, 51, 52])
-        # new_data = np.asarray([3, 21, 32, 40, 53, 60])
-        # to_keep = np.zeros(len(new_i), dtype=np.bool)
-        # ops.compare_rows_for_journalling(old_i, new_i, old_data, new_data, to_keep)
-        #
-        # dest = np.zeros(len(old_data) + to_keep.sum(), dtype=old.dtype)
-        # ops.merge_journalled_entries(old_i, new_i, to_keep, old_data, new_data, dest)
-        # expected = np.asarray([0, 1, 2, 3, 10, 11, 20, 21, 30, 31, 32, 40, 50, 51, 52, 53, 60], dtype=np.int32)
-        # self.assertTrue(np.array_equal(dest, expected))
-
-
-    def test_streaming_sort_merge(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            dst = s.open_dataset(bio, 'r+', 'dst')
-            hf = dst.create_dataframe('hf')
-            rs = np.random.RandomState(12345678)
-            length = 105
-            segment_length = 25
-            chunk_length = 8
-            src_values = np.arange(length, dtype=np.int32)
-            src_values += 1000
-            rs.shuffle(src_values)
-            src_v_f = s.create_numeric(hf, 'src_values', 'int32')
-            src_v_f.data.write(src_values)
-            src_i_f = s.create_numeric(hf, 'src_indices', 'int64')
-            src_i_f.data.write(np.arange(length, dtype=np.int64))
-
-            for c in utils.chunks(length, segment_length):
-                sorted_index = np.argsort(src_v_f.data[c[0]:c[1]])
-                src_v_f.data[c[0]:c[1]] =\
-                    s.apply_index(sorted_index, src_v_f.data[c[0]:c[1]])
-                src_i_f.data[c[0]:c[1]] =\
-                    s.apply_index(sorted_index, src_i_f.data[c[0]:c[1]])
-
-            tgt_i_f = s.create_numeric(hf, 'tgt_values', 'int32')
-            tgt_v_f = s.create_numeric(hf, 'tgt_indices', 'int64')
-            ops.streaming_sort_merge(src_i_f, src_v_f, tgt_i_f, tgt_v_f,
-                                     segment_length, chunk_length)
-
-            self.assertTrue(np.array_equal(tgt_v_f.data[:], np.sort(src_values[:])))
-            self.assertTrue(np.array_equal(tgt_i_f.data[:], np.argsort(src_values)))
-
 
     def test_is_ordered(self):
         arr = np.asarray([1, 2, 3, 4, 5])
@@ -1262,8 +1227,31 @@ class TestGetSpans(unittest.TestCase):
         spans1=ops.get_spans_for_field(np.array([1, 2, 2, 3, 3, 3, 4, 4, 5, 6, 7, 8, 9, 10]))
         spans2=ops.get_spans_for_field(np.array([1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5]))
 
-        spans3= ops._get_spans_for_2_fields_by_spans(spans1,spans2)
+        spans3= ops._get_spans_for_2_fields_by_spans(spans1, spans2)
         self.assertTrue(list(spans), list(spans3))
+
+    @slow_test
+    def test_get_spans_two_field(self):
+        data1 = np.zeros(utils.INT64_INDEX_LENGTH + 1, 'int8')
+        data2 = np.zeros(utils.INT64_INDEX_LENGTH + 1, 'int8')
+        spans = ops._get_spans_for_2_fields(data1, data2)
+        self.assertEqual(spans.dtype, 'int64')
+
+    def test_get_spans_for_multi_fields(self):
+        data1 = np.array([1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5])
+        data2 = np.array([1, 2, 2, 3, 3, 3, 4, 4, 5, 6, 7, 8, 9, 10])
+        data3 = np.array([1, 2, 1, 2, 2, 1, 2, 3, 3, 1, 2, 3, 4, 10])
+        spans = ops._get_spans_for_multi_fields(np.asarray([data1, data2, data3]))
+        self.assertListEqual(spans.tolist(), [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+        self.assertEqual(spans.dtype, 'int32')
+
+    @slow_test
+    def test_get_spans_for_multi_fields_int64(self):
+        data1 = np.zeros(utils.INT64_INDEX_LENGTH+1, 'int8')
+        data2 = np.zeros(utils.INT64_INDEX_LENGTH + 1, 'int8')
+        data3 = np.zeros(utils.INT64_INDEX_LENGTH + 1, 'int8')
+        spans = ops._get_spans_for_multi_fields(np.asarray([data1, data2, data3]))
+        self.assertEqual(spans.dtype, 'int64')
 
 
 class TestCheckIfSorted(unittest.TestCase):
@@ -1386,3 +1374,22 @@ class TestFieldImporter(unittest.TestCase):
         byte_data_1 = [x.tobytes() for x in data_1]
         expected_byte_data_1 = [b'Yes', b'No', b'No', b'Yes']
         self.assertEqual(byte_data_1, expected_byte_data_1)
+
+
+class TestDataIterator(SessionTestCase):
+
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_data_iterator(self, creator, name, kwargs, data):
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        output = [i for i in ops.data_iterator(f)]
+        result = f.data[:] if isinstance(f, fields.IndexedStringField) else f.data[:].tolist()
+        self.assertListEqual(output, result)
+
+class TestStr_to_dtype(SessionTestCase):
+
+    def test_str_to_dtype(self):
+        for i in ['bool', 'int8', 'int16', 'int32', 'uint8', 'uint16', 'uint32', 'uint64', 'float32', 'float64']:
+            with self.subTest(i):
+                self.assertEqual(np.dtype(i), ops.str_to_dtype(i))
+        with self.assertRaises(ValueError):
+            ops.str_to_dtype('str')

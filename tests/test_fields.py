@@ -1,20 +1,22 @@
 from pickle import FALSE
 import unittest
+import operator
 
 import numpy as np
+import numpy.testing
 from io import BytesIO
 
 import h5py
 from datetime import datetime
 from parameterized import parameterized
 
-from .utils import SessionTestCase, shuffle_randstate, allow_slow_tests, DEFAULT_FIELD_DATA
+from .utils import SessionTestCase, shuffle_randstate, allow_slow_tests, RAND_STATE,DEFAULT_FIELD_DATA, HARD_INTS, HARD_FLOATS, utc_timestamp, NUMERIC_DATA, TIMESTAMP_DATA, FIXED_STRING_DATA, INDEX_STRING_DATA
 
 from exetera.core import session
 from exetera.core import fields
-from exetera.core import persistence as per
 from exetera.io import field_importers as fi
 from exetera.core import utils
+import itertools
 
 NUMERIC_ONLY = [d for d in DEFAULT_FIELD_DATA if d[0] == "create_numeric"]
 
@@ -34,6 +36,10 @@ class TestDefaultData(SessionTestCase):
             data = np.asarray(data, dtype=kwargs["nformat"])
         
         self.assertFieldEqual(data, f)
+        wtb = f.writeable()
+        with self.subTest("writable:"):
+            self.assertFieldEqual(data, wtb)
+
         
 
 class TestFieldExistence(SessionTestCase):
@@ -42,7 +48,220 @@ class TestFieldExistence(SessionTestCase):
         """Test every field object is considered True."""
         f = self.setup_field(self.df, creator, name, (), kwargs, data)
         self.assertTrue(bool(f))
+        self.assertTrue(f.valid)
 
+
+class TestFieldDataOps(SessionTestCase):
+    """
+    Test data operations for each different field.
+    1, compare the result of operations on field against operations on raw numpy data.
+    """
+
+    def setUp(self):
+        super(TestFieldDataOps, self).setUp()
+
+        
+    @parameterized.expand([(operator.lt,),(operator.gt,),(operator.le,),(operator.ge,),(operator.ne,),(operator.eq,)])
+    def test_CategoricalMemField_binary_op(self,op):
+        """
+        Categorical mem field ops against numpy, categorical memory field, categorical field
+        """
+        categorical_memfield = fields.CategoricalMemField(self.s, 'int32', {"a": 1, "b": 2, "c": 3})
+
+        memfield_data = RAND_STATE.randint(1, 4, 20)
+        categorical_memfield.data.write(memfield_data)
+
+        for i in range(0,5):
+            indata=np.full(memfield_data.shape,i)
+            result=op(memfield_data,indata)
+            
+            with self.subTest(f"Testing value numpy {i}"):
+                output=op(categorical_memfield,indata)
+                
+                np.testing.assert_array_equal(result,output)
+                
+                self.assertIsInstance(output, fields.NumericMemField)
+                self.assertEqual(output.data.dtype,"bool")
+                
+            with self.subTest(f"Testing value Mem field {i}"):
+                test_field = fields.CategoricalMemField(self.s, 'int32', {"a": 1, "b": 2, "c": 3})        
+                test_field.data.write(result)
+                output=op(categorical_memfield,test_field)
+                
+                np.testing.assert_array_equal(result,output)
+                self.assertIsInstance(output, fields.NumericMemField)
+                self.assertEqual(output.data.dtype,"bool")
+                
+            with self.subTest(f"Testing value Field {i}"):
+                test_field = self.df.create_categorical(f'name{i}','int32',{"a": 1, "b": 2, "c": 3})        
+                test_field.data.write(result)
+                output=op(categorical_memfield,test_field)
+                
+                np.testing.assert_array_equal(result,output)
+                self.assertIsInstance(output, fields.NumericMemField)
+                self.assertEqual(output.data.dtype,"bool")
+
+    @parameterized.expand(
+        [(operator.lt,), (operator.gt,), (operator.le,), (operator.ge,), (operator.ne,), (operator.eq,)])
+    def test_CategoricalField_binary_op(self, op):
+        """
+        Categorical field ops against numpy, categorical memory field, categorical field
+        """
+        field = self.df.create_categorical('catf', 'int32', {"a": 1, "b": 2, "c": 3})
+
+        data = np.array(RAND_STATE.randint(1, 4, 20))
+        field.data.write(data)
+
+        for i in range(0, 5):
+            indata = np.full(data.shape, i)
+            result = op(data, indata)
+
+            with self.subTest(f"Testing value numpy {i}"):
+                output = op(field, indata)
+
+                np.testing.assert_array_equal(result, output)
+
+                self.assertIsInstance(output, fields.NumericMemField)
+                self.assertEqual(output.data.dtype, "bool")
+
+            with self.subTest(f"Testing value Mem field {i}"):
+                test_field = fields.CategoricalMemField(self.s, 'int32', {"a": 1, "b": 2, "c": 3})
+                test_field.data.write(indata)
+                output = op(field, test_field)
+
+                np.testing.assert_array_equal(result, output)
+                self.assertIsInstance(output, fields.NumericMemField)
+                self.assertEqual(output.data.dtype, "bool")
+
+            with self.subTest(f"Testing value Field {i}"):
+                test_field = self.df.create_categorical(f'name{i}', 'int32', {"a": 1, "b": 2, "c": 3})
+                test_field.data.write(indata)
+                output = op(field, test_field)
+
+                np.testing.assert_array_equal(result, output)
+                self.assertIsInstance(output, fields.NumericMemField)
+                self.assertEqual(output.data.dtype, "bool")
+
+    @parameterized.expand([(operator.eq,),(operator.ge,),(operator.gt,),(operator.le,),(operator.lt,),(operator.ne,),])
+    def test_NumericField_binary_ops(self, op):
+        raw_data = shuffle_randstate(list(range(-10, 10)) + HARD_INTS)
+        numeric_field = self.df.create_numeric('num', 'int64')
+        numeric_field.data.write(raw_data)
+        target = shuffle_randstate(list(range(-10, 10)) + HARD_INTS)  # against numpy
+        result = op(raw_data, target)
+        output = op(numeric_field, target)
+        numpy.testing.assert_array_equal(result, output)
+
+        field2 = self.df.create_numeric('num2', 'int64')
+        field2.data.write(target)
+        output = op(numeric_field, field2)  # against numeric field
+        numpy.testing.assert_array_equal(result, output)
+
+        memfield = fields.NumericMemField(self.s, 'int64')
+        memfield.data.write(np.array(target))
+        output = op(numeric_field, field2)  # against memory numeric field
+        numpy.testing.assert_array_equal(result, output)
+
+    @parameterized.expand([(operator.add,), (operator.sub,), (operator.mul,), (operator.truediv,), (operator.floordiv,),
+                           (operator.mod,), (operator.lt,), (operator.le,), (operator.eq,), (operator.ne,),
+                           (operator.ge,), (operator.gt,), (divmod,)])
+    def test_TimestampField_binary_ops(self, op):
+        raw_data = np.array(TIMESTAMP_DATA)
+        target = np.array(TIMESTAMP_DATA)
+        ts_field = self.df.create_timestamp('ts_field')
+        ts_field.data.write(raw_data)
+        result = op(raw_data, target)  # timestampe field vs list
+        output = op(ts_field, target)
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
+
+        ts_field2 = self.df.create_timestamp('ts_field2')
+        ts_field2.data.write(target)
+        output = op(ts_field, ts_field2)  # timestamp field vs timestamp field
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
+
+        ts_field3 = fields.TimestampMemField(self.s)
+        ts_field3.data.write(target)
+        output = op(ts_field, ts_field3)  # timestamp field vs timestamp mem field
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
+
+    @parameterized.expand([(operator.add,), (operator.sub,), (operator.mul,), (operator.truediv,), (operator.floordiv,),
+                           (operator.mod,), (divmod,)])
+    def test_TimestampField_binary_reverse(self, op):
+        raw_data = TIMESTAMP_DATA
+        target = TIMESTAMP_DATA
+
+        ts_field = self.df.create_timestamp('ts_field')
+        ts_field.data.write(raw_data)
+        output = op(target, ts_field)  # list + field is not implemented, hence will call field.__radd__
+        result = op(raw_data, np.array(target))
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
+
+
+    @parameterized.expand([(operator.add,), (operator.sub,), (operator.mul,), (operator.truediv,), (operator.floordiv,),
+                           (operator.mod,), (operator.lt,), (operator.le,), (operator.eq,), (operator.ne,),
+                           (operator.ge,), (operator.gt,), (divmod,)])
+    def test_TimestampMemField_binary_ops(self, op):
+        raw_data = np.array(TIMESTAMP_DATA)
+        target = np.array(TIMESTAMP_DATA)
+        ts_field = fields.TimestampMemField(self.s)
+        ts_field.data.write(raw_data)
+        result = op(raw_data, target)  # timestampe field vs list
+        output = op(ts_field, target)
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
+
+        ts_field2 = self.df.create_timestamp('ts_field2')
+        ts_field2.data.write(target)
+        output = op(ts_field, ts_field2)  # timestamp field vs timestamp field
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
+
+        ts_field3 = fields.TimestampMemField(self.s)
+        ts_field3.data.write(target)
+        output = op(ts_field, ts_field3)  # timestamp field vs timestamp mem field
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
+
+    @parameterized.expand([(operator.add,), (operator.sub,), (operator.mul,), (operator.truediv,), (operator.floordiv,),
+                           (operator.mod,), (divmod,)])
+    def test_TimestampMemField_binary_reverse(self, op):
+        raw_data = np.array(TIMESTAMP_DATA)
+        target = TIMESTAMP_DATA
+
+        ts_field = fields.TimestampMemField(self.s)
+        ts_field.data.write(raw_data)
+        output = op(target, ts_field)  # list + field is not implemented, hence will call field.__radd__
+        result = op(raw_data, np.array(target))
+        if op == divmod:
+            numpy.testing.assert_array_equal(result[0], output[0].data[:])
+            numpy.testing.assert_array_equal(result[1], output[1].data[:])
+        else:
+            numpy.testing.assert_array_equal(result, output)
 
 class TestFieldGetSpans(unittest.TestCase):
 
@@ -70,6 +289,10 @@ class TestFieldGetSpans(unittest.TestCase):
             cat.data.write([1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 1, 2, 1, 2])
             self.assertListEqual([0,2,4,7,10,11,12,13,14],list(cat.get_spans()))
 
+            timestamp = s.create_timestamp(ds, 'ts')
+            timestamp.data.write(TIMESTAMP_DATA)
+            self.assertListEqual([i for i in range(11)], list(timestamp.get_spans()))
+
 
 class TestIsSorted(unittest.TestCase):
 
@@ -80,6 +303,10 @@ class TestIsSorted(unittest.TestCase):
             df = ds.create_dataframe('foo')
 
             f = df.create_indexed_string('f')
+            f.data.write('a')
+            self.assertTrue(f.is_sorted())
+
+            f.data.clear()
             vals = ['the', 'quick', '', 'brown', 'fox', 'jumps', '', 'over', 'the', 'lazy', '', 'dog']
             f.data.write(vals)
             self.assertFalse(f.is_sorted())
@@ -96,6 +323,10 @@ class TestIsSorted(unittest.TestCase):
             df = ds.create_dataframe('foo')
 
             f = df.create_fixed_string('f', 5)
+            f.data.write('a')
+            self.assertTrue(f.is_sorted())
+
+            f.data.clear()
             vals = ['a', 'ba', 'bb', 'bac', 'de', 'ddddd', 'deff', 'aaaa', 'ccd']
             f.data.write([v.encode() for v in vals])
             self.assertFalse(f.is_sorted())
@@ -112,6 +343,10 @@ class TestIsSorted(unittest.TestCase):
             df = ds.create_dataframe('foo')
 
             f = df.create_numeric('f', 'int32')
+            f.data.write([1])
+            self.assertTrue(f.is_sorted())
+
+            f.data.clear()
             vals = [74, 1897, 298, 0, -100098, 380982340, 8, 6587, 28421, 293878]
             f.data.write(vals)
             self.assertFalse(f.is_sorted())
@@ -128,6 +363,10 @@ class TestIsSorted(unittest.TestCase):
             df = ds.create_dataframe('foo')
 
             f = df.create_categorical('f', 'int8', {'a': 0, 'c': 1, 'd': 2, 'b': 3})
+            f.data.write([1])
+            self.assertTrue(f.is_sorted())
+
+            f.data.clear()
             vals = [0, 1, 3, 2, 3, 2, 2, 0, 0, 1, 2]
             f.data.write(vals)
             self.assertFalse(f.is_sorted())
@@ -147,6 +386,10 @@ class TestIsSorted(unittest.TestCase):
 
             f = df.create_timestamp('f')
             d = D(2020, 5, 10)
+            f.data.write([d.timestamp()])
+            self.assertTrue(f.is_sorted())
+
+            f.data.clear()
             vals = [d + T(seconds=50000), d - T(days=280), d + T(weeks=2), d + T(weeks=250),
                     d - T(weeks=378), d + T(hours=2897), d - T(days=23), d + T(minutes=39873)]
             vals = [v.timestamp() for v in vals]
@@ -158,6 +401,128 @@ class TestIsSorted(unittest.TestCase):
             f2.data.write(svals)
             self.assertTrue(f2.is_sorted())
 
+class TestMemFieldsGeneralMethods(SessionTestCase):
+    """
+    Methods tested here: created_like, get_spans, is_sorted, unique, writeable
+    """
+    def test_numeric_mem_field(self):
+        raw_data = np.array(shuffle_randstate(NUMERIC_DATA))
+        numeric_mem = fields.NumericMemField('num', 'int64')
+        numeric_mem.data.write(raw_data)
+        self.assertFalse(numeric_mem.is_sorted())
+
+        newfield = numeric_mem.create_like(group=None, name=None)
+        self.assertTrue(isinstance(newfield, fields.NumericMemField))
+        newfield.data.write(np.array([1]))
+        self.assertTrue(newfield.is_sorted())
+        newfield.data.clear()
+        newfield.data.write(raw_data)
+        with self.assertRaises(ValueError):
+            newfield.data.write([1,2,3,4,5])
+        self.assertListEqual(numeric_mem.get_spans().tolist(), newfield.get_spans().tolist())
+        newfield.data.clear()
+        newfield.data.write(np.array(sorted(raw_data)))
+        self.assertTrue(newfield.is_sorted())
+        self.assertListEqual(numeric_mem.unique().tolist(), newfield.unique().tolist())
+        self.assertEqual(id(numeric_mem), id(numeric_mem.writeable()))
+
+    def test_categorical_mem_field(self):
+        categorical_memfield = fields.CategoricalMemField(self.s, 'int32', {"a": 1, "b": 2, "c": 3})
+        categorical_memfield.data.write(np.array([1]))
+        self.assertTrue(categorical_memfield.is_sorted())
+        categorical_memfield.data.clear()
+        memfield_data = RAND_STATE.randint(1, 4, 20)
+        categorical_memfield.data.write(memfield_data)
+        with self.assertRaises(ValueError):
+            categorical_memfield.data.write([])
+        self.assertFalse(categorical_memfield.is_sorted())
+
+        newfield = categorical_memfield.create_like(group=None, name=None)
+        self.assertTrue(isinstance(newfield, fields.CategoricalMemField))
+
+        newfield.data.write(memfield_data)
+        self.assertListEqual(categorical_memfield.get_spans().tolist(), newfield.get_spans().tolist())
+        newfield.data.clear()
+        newfield.data.write(np.array(sorted(memfield_data)))
+        self.assertTrue(newfield.is_sorted())
+
+        self.assertListEqual(categorical_memfield.unique().tolist(), newfield.unique().tolist())
+        self.assertEqual(id(categorical_memfield), id(categorical_memfield.writeable()))
+
+        with self.subTest("Test Categorical remap"):
+            newfield = categorical_memfield.remap([(1, 4), (2, 5), (3, 6)], {"a": 4, "b": 5, "c": 6})
+            self.assertEqual(0, np.sum(np.isin(newfield.data[:], [1,2,3])))
+
+            with self.assertRaises(ValueError):
+                categorical_memfield.remap([(1, 4), (2, 5)], {"a": 4, "b": 5, "c": 6})
+
+    def test_fixed_string_mem_field(self):
+        memfield = fields.FixedStringMemField(self.s, 3)
+        memfield.data.write(np.array(['a']))
+        self.assertTrue(memfield.is_sorted())
+        memfield.data.clear()
+        memfield_data = np.array(FIXED_STRING_DATA)
+        memfield.data.write(memfield_data)
+        with self.assertRaises(ValueError):
+            memfield.data.write([])
+        self.assertFalse(memfield.is_sorted())
+
+        newfield = memfield.create_like(group=None, name=None)
+        self.assertTrue(isinstance(newfield, fields.FixedStringMemField))
+
+        newfield.data.write(memfield_data)
+        self.assertListEqual(memfield.get_spans().tolist(), newfield.get_spans().tolist())
+        newfield.data.clear()
+        newfield.data.write(np.array(sorted(memfield_data)))
+        self.assertTrue(newfield.is_sorted())
+
+        self.assertListEqual(memfield.unique().tolist(), newfield.unique().tolist())
+        self.assertEqual(id(memfield), id(memfield.writeable()))
+
+    def test_timestamp_mem_field(self):
+        memfield = fields.TimestampMemField(self.s)
+        memfield.data.write(np.array([TIMESTAMP_DATA[0]]))
+        self.assertTrue(memfield.is_sorted())
+        memfield.data.clear()
+        memfield_data = np.array(TIMESTAMP_DATA)
+        memfield.data.write(memfield_data)
+        with self.assertRaises(ValueError):
+            memfield.data.write([])
+        self.assertFalse(memfield.is_sorted())
+
+        newfield = memfield.create_like(group=None, name=None)
+        self.assertTrue(isinstance(newfield, fields.TimestampMemField))
+
+        newfield.data.write(memfield_data)
+        self.assertListEqual(memfield.get_spans().tolist(), newfield.get_spans().tolist())
+        newfield.data.clear()
+        newfield.data.write(np.array(sorted(memfield_data)))
+        self.assertTrue(newfield.is_sorted())
+
+        self.assertListEqual(memfield.unique().tolist(), newfield.unique().tolist())
+        self.assertEqual(id(memfield), id(memfield.writeable()))
+
+    def test_indexed_string_mem_field(self):
+        memfield = fields.IndexedStringMemField(self.s)
+        memfield.data.write(np.array([INDEX_STRING_DATA[0]]))
+        self.assertTrue(memfield.is_sorted())
+        memfield.data.clear()
+        memfield_data = np.array(INDEX_STRING_DATA)
+        memfield.data.write(memfield_data)
+        self.assertFalse(memfield.is_sorted())
+
+        newfield = memfield.create_like(group=None, name=None)
+        self.assertTrue(isinstance(newfield, fields.IndexedStringMemField))
+
+        newfield.data.write(memfield_data)
+        self.assertListEqual(memfield.get_spans(), newfield.get_spans())
+        newfield.data.clear()
+        newfield.data.write(np.array(sorted(memfield_data)))
+        self.assertTrue(newfield.is_sorted())
+
+        self.assertListEqual(memfield.unique().tolist(), newfield.unique().tolist())
+        self.assertEqual(id(memfield), id(memfield.writeable()))
+
 
 class TestIndexedStringFields(unittest.TestCase):
 
@@ -167,9 +532,13 @@ class TestIndexedStringFields(unittest.TestCase):
             ds = s.open_dataset(bio, 'w', 'src')
             df = ds.create_dataframe('src')
             f = df.create_indexed_string('f')
-            d = f.data[:]
-            print(d)
-
+            f.data.write(INDEX_STRING_DATA)
+            result = np.array([bytes(i, 'utf-8') for i in INDEX_STRING_DATA])
+            self.assertEqual(result.dtype, f.data.dtype)
+            self.assertListEqual(INDEX_STRING_DATA, f.data[:])
+            wtb = f.writeable()
+            self.assertListEqual(INDEX_STRING_DATA, wtb.data[:])
+            self.assertEqual(result.dtype, wtb.data.dtype)
 
     def test_filter_indexed_string(self):
         bio = BytesIO()
@@ -256,6 +625,54 @@ class TestFieldArray(SessionTestCase):
         f.data.write_part(data)
         f.data.clear()
         self.assertFieldEqual([], f)
+
+    def test_indexed_array(self):
+        f = self.df.create_indexed_string('idxs')
+        f.data.write(INDEX_STRING_DATA)
+        self.assertEqual(len(INDEX_STRING_DATA), len(f.data))
+        self.assertListEqual(INDEX_STRING_DATA, f.data[:])
+        with self.assertRaises(ValueError):
+            f.data[len(INDEX_STRING_DATA)]
+
+
+    def test_readonly_array(self):
+        f = self.df.create_numeric('num', 'int32')
+        data = np.array(DEFAULT_FIELD_DATA[1][3], dtype='int32')
+        f.data.write(data)
+        f = fields.NumericField(self.s, self.df._h5group['num'], self.df)
+        self.assertEqual(len(data), len(f.data))
+        self.assertEqual('int32', f.data.dtype)
+        self.assertListEqual(data.tolist(), f.data[:].tolist())
+        with self.assertRaises(PermissionError):
+            f.data[:] = data
+            f.data.clear()
+            f.data.write(data)
+            f.data.write_part(data)
+            f.data.complete()
+
+    def test_readonly_indexed_array(self):
+        f = self.df.create_indexed_string('idx')
+        data = ["a", "bb", "eeeee", "ccc", "dddd","", " ",]*2
+        f.data.write(data)
+        f = fields.IndexedStringField(self.s, self.df._h5group['idx'], self.df)
+        output = np.array([bytes(i, 'utf-8') for i in data])
+        self.assertEqual(output.dtype, f.data.dtype)
+        self.assertEqual(len(data), len(f.data))
+        #self.assertEqual(f.data.dtype)
+        self.assertListEqual(data, f.data[:])
+        with self.assertRaises(PermissionError):
+            f.data[:] = data
+        with self.assertRaises(PermissionError):
+            f.data.clear()
+        with self.assertRaises(PermissionError):
+            f.data.write(data)
+        with self.assertRaises(PermissionError):
+            f.data.write_part(data)
+        with self.assertRaises(PermissionError):
+            f.data.complete()
+        self.assertEqual(data[0], f.data[0])
+        with self.assertRaises(AttributeError):
+            f.data[len(data)]
 
 
 class TestMemoryFieldCreateLike(unittest.TestCase):
@@ -1035,6 +1452,128 @@ class TestFieldApplyIndex(unittest.TestCase):
             mb = b.apply_index(indices)
             self.assertListEqual(expected, mb.data[:].tolist())
 
+class TestFieldMemApplySpansCount(SessionTestCase):
+    def setUp(self):
+        super(TestFieldMemApplySpansCount, self).setUp()
+
+    @parameterized.expand([(fields.IndexedStringMemField.apply_spans_first, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_last, ['bb', 'ccc', 'fff', 'h']),
+                           (fields.IndexedStringMemField.apply_spans_min, ['a', 'ccc', 'dddd', 'gg']),
+                           (fields.IndexedStringMemField.apply_spans_max, ['bb', 'ccc', 'fff', 'h'])])
+    def test_indexed_string_mem_field(self, ops, expected):  # target is type field
+        src_data = ['a', 'bb', 'ccc', 'dddd', 'eeee', 'fff', 'gg', 'h']
+        f = fields.IndexedStringMemField(self.s)
+        f.data.write(src_data)
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+
+        output = ops(f, spans, None, False)  # output is a mem field
+
+        self.assertListEqual(output.data[:], expected)
+        dest = fields.IndexedStringMemField(self.s)
+        output = ops(f, spans, dest, False)
+        self.assertListEqual(dest.data[:], expected)
+        output = ops(f, spans, None, True)
+        self.assertListEqual(f.data[:], expected)
+
+    @parameterized.expand([(fields.FixedStringMemField.apply_spans_first, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_last, [b'a2', b'b1', b'c3', b'd2']),
+                           (fields.FixedStringMemField.apply_spans_min, [b'a1', b'b1', b'c1', b'd1']),
+                           (fields.FixedStringMemField.apply_spans_max, [b'a2', b'b1', b'c3', b'd2'])])
+    def test_fixed_string_mem_field(self,ops, expected):  # target is type field
+        src_data = np.array([b'a1', b'a2', b'b1', b'c1', b'c2', b'c3', b'd1', b'd2'])
+        f = fields.FixedStringMemField(self.s, 2)
+        f.data.write(src_data)
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+
+        output = ops(f, spans, None, False)  # output is a mem field
+
+        self.assertListEqual(output.data[:].tolist(), expected)
+        dest = fields.FixedStringMemField(self.s, 2)
+        output = ops(f, spans, dest, False)
+        self.assertListEqual(dest.data[:].tolist(), expected)
+        output = ops(f, spans, None, True)
+        self.assertListEqual(f.data[:].tolist(), expected)
+
+    @parameterized.expand([(fields.CategoricalMemField.apply_spans_first, [0, 2, 0, 0]),
+                           (fields.CategoricalMemField.apply_spans_last, [1, 2, 2, 1]),
+                           (fields.CategoricalMemField.apply_spans_min, [0, 2, 0, 0]),
+                           (fields.CategoricalMemField.apply_spans_max, [1, 2, 2, 1])])
+    def test_categorical_mem_field(self, ops, expected):  # target is type field
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+        src_data = np.array([0, 1, 2, 0, 1, 2, 0, 1])
+        keys = {b'a': 0, b'b': 1, b'c': 2}
+
+        f = fields.CategoricalMemField(self.s, 'int32', keys)
+        f.data.write(src_data)
+
+        #no dest
+        output = ops(f, spans, None, False)  # output is a mem field
+        self.assertListEqual(output.data[:].tolist(), expected)
+
+        #dest
+        dest = fields.CategoricalMemField(self.s, 'int32', keys)
+        output = ops(f, spans, dest, False)  # output is a mem field
+        self.assertListEqual(dest.data[:].tolist(), expected)
+
+        #inplace
+        output = ops(f, spans, None, True)  # output is a mem field
+        self.assertListEqual(f.data[:].tolist(), expected)
+
+    @parameterized.expand([(fields.NumericMemField.apply_spans_first, [1, 11, 21, 31]),
+                           (fields.NumericMemField.apply_spans_last, [2, 11, 23, 32]),
+                           (fields.NumericMemField.apply_spans_min, [1, 11, 21, 31]),
+                           (fields.NumericMemField.apply_spans_max, [2, 11, 23, 32])])
+    def test_numeric_mem_field(self, ops, expected):  # target is type field
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+        src_data = np.array([1, 2, 11, 21, 22, 23, 31, 32])
+
+        f = fields.NumericMemField(self.s, 'int32')
+        f.data.write(src_data)
+
+        # no dest
+        output = ops(f, spans, None, False)  # output is a mem field
+        self.assertListEqual(output.data[:].tolist(), expected)
+
+        # dest
+        dest = fields.NumericMemField(self.s, 'int32')
+        output = ops(f, spans, dest, False)  # output is a mem field
+        self.assertListEqual(dest.data[:].tolist(), expected)
+
+        # inplace
+        output = ops(f, spans, None, True)  # output is a mem field
+        self.assertListEqual(f.data[:].tolist(), expected)
+
+    @parameterized.expand([(fields.TimestampMemField.apply_spans_first, [0, 2, 3, 6]),
+                           (fields.TimestampMemField.apply_spans_last, [1, 2, 5, 7]),
+                           (fields.TimestampMemField.apply_spans_min, [0, 2, 3, 7]),
+                           (fields.TimestampMemField.apply_spans_max, [1, 2, 5, 6])])
+    def test_timestamp_mem_field(self, ops, expected):  # target is type field
+        from datetime import datetime as D
+        from datetime import timezone
+        src_data = [D(2020, 1, 1, tzinfo=timezone.utc), D(2021, 5, 1, tzinfo=timezone.utc),
+                    D(2950, 8, 17, tzinfo=timezone.utc), D(1840, 10, 11, tzinfo=timezone.utc),
+                    D(2021, 1, 1, tzinfo=timezone.utc), D(2022, 5, 18, tzinfo=timezone.utc),
+                    D(2951, 8, 17, tzinfo=timezone.utc), D(1841, 10, 11, tzinfo=timezone.utc)]
+        src_data = np.asarray([d.timestamp() for d in src_data], dtype=np.float64)
+        spans = np.array([0, 2, 3, 6, 8], dtype=np.int32)
+
+        f = fields.TimestampMemField(self.s)
+        f.data.write(src_data)
+
+        # no dest
+        output = ops(f, spans, None, False)  # output is a mem field
+        self.assertListEqual(output.data[:].tolist(), src_data[expected].tolist())
+
+        # dest
+        dest = fields.TimestampMemField(self.s)
+        output = ops(f, spans, dest, False)  # output is a mem field
+        self.assertListEqual(dest.data[:].tolist(), src_data[expected].tolist())
+
+        # inplace
+        output = ops(f, spans, None, True)  # output is a mem field
+        self.assertListEqual(f.data[:].tolist(), src_data[expected].tolist())
+
+
 
 class TestFieldApplySpansCount(unittest.TestCase):
 
@@ -1372,20 +1911,16 @@ class TestNumericFieldAsType(unittest.TestCase):
             src = s.open_dataset(bio, 'w', 'src')
             df = src.create_dataframe('df')
             num = df.create_numeric('num', 'int16')
-            num.data.write([1, 2, 3, 4, 5])
+            num.data.write(NUMERIC_DATA)
 
-            num = num.astype('int32')
-            self.assertEqual(num.data[:].dtype.type, np.int32)
-            num = num.astype('int64')
-            self.assertEqual(num.data[:].dtype.type, np.int64)
-            num = num.astype('float32')
-            self.assertEqual(num.data[:].dtype.type, np.float32)
-            num = num.astype('float64')
-            self.assertEqual(num.data[:].dtype.type, np.float64)
-            with self.assertRaises(Exception) as context:
+            for t in ['int32', 'int64', 'float32', 'float64']:
+                with self.subTest('Convert to '+t):
+                    num = num.astype(t)
+                    self.assertEqual(num.data[:].dtype.name, t)
+            with self.assertRaises(TypeError):
                 num.astype('int32', casting='safe')
-            self.assertTrue(isinstance(context.exception,TypeError))
-
+            with self.assertRaises(ValueError):
+                num.astype('str')
 
 class TestFieldUnique(unittest.TestCase):
 
@@ -1530,82 +2065,152 @@ class TestFieldUnique(unittest.TestCase):
 
             self.assertEqual(df['ts'].unique().tolist(), [ts1, ts2])
 
-class TestFieldIsIn(unittest.TestCase):
-    def test_module_field_isin(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            f = df.create_numeric('f', 'int16')
-            f.data.write([1, 2, 3, 4, 5])
-
-            r1 = fields.isin(f, [1,2,3]) # test_element is list
-            self.assertIsInstance(r1, fields.NumericMemField)
-            self.assertEqual(r1.data[:].tolist(), [True, True, True, False, False])
-
-            r2 = fields.isin(f, 3) # single test_element
-            self.assertIsInstance(r2, fields.NumericMemField)
-            self.assertEqual(r2.data[:].tolist(), [False, False, True, False, False])
-
-    def test_isin_on_numeric_field(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            df.create_numeric('f', 'int16').data.write([1, 2, 3, 4, 5])
-
-            # test_element is list
-            self.assertEqual(df['f'].isin([1,2,3]).tolist(), [True, True, True, False, False])
-            # single test_element
-            self.assertEqual(df['f'].isin(3).tolist(), [False, False, True, False, False])
-            self.assertEqual(df['f'].isin(8).tolist(), [False, False, False, False, False])
 
 
-    def test_isin_on_indexed_string_field_with_testelements_all_unique(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            df.create_indexed_string('foo').data.write(['a', '', 'apple','app', 'APPLE', 'APP', 'app/', 'apple12', 'ip'])
+REALLY_LARGE_LIST = list(range(1_000_000))
+NUMERIC_ISIN_TESTS = [
+    ("int16", [1, 2, 3, 4, 5], [], None),
+    ("int16", [1, 2, 3, 4, 5], [6, 7], None),
+    ("int16", [1, 2, 3, 4, 5], [1, 2, 3], None),
+    ("int16", [1, 2, 3, 4, 5], [1, 2, 3, 6, 7], None),
+    ("int16", [1, 2, 3, 4, 5], [4, 1, 3], None),
+    ("int16", [3, 1, 5, 4, 2], [4, 1, 3], None),
+    ("int16", [1, 2, 3, 4, 5], 3, None),
+    ("int16", [3, 1, 5, 4, 2], 4, None),
+    # really large inputs can take a long time to run through oracle to pre-compute result
+    ("int32", REALLY_LARGE_LIST, REALLY_LARGE_LIST, [True] * len(REALLY_LARGE_LIST)),
+    ("int32", REALLY_LARGE_LIST, shuffle_randstate(REALLY_LARGE_LIST), [True] * len(REALLY_LARGE_LIST)),
+]
 
-            self.assertEqual(df['foo'].isin(['APPLE', '']), [False, True, False, False, True, False, False, False, False])
-            self.assertEqual(df['foo'].isin(['app','APP']), [False, False, False, True, False, True, False, False, False])
-            self.assertEqual(df['foo'].isin(['app/','app//']), [False, False, False, False, False, False, True, False, False])
-            self.assertEqual(df['foo'].isin(['apple12','APPLE12', 'apple13']), [False, False, False, False, False, False, False, True, False])
-            self.assertEqual(df['foo'].isin(['ip','ipd']), [False, False, False, False, False, False, False, False, True])
+# test data for index string field, test conditions these define are covered to a degree already by DEFAULT_FIELD_DATA
+INDEX_STR_DATA = ["a", "", "apple", "app", "APPLE", "APP", "aaaa", "app/", "apple12", "ip"]
+INDEX_STR_ISIN_TESTS = [
+    (INDEX_STR_DATA,[],None),
+    (INDEX_STR_DATA,None,None),
+    (INDEX_STR_DATA,[None],None),
+    (INDEX_STR_DATA, ["None"], None),
+    (INDEX_STR_DATA, ["a", "APPLE"], None),
+    (INDEX_STR_DATA, ["app", "APP"], None),
+    (INDEX_STR_DATA, ["app/", "app//"], None),
+    (INDEX_STR_DATA, ["apple12", "APPLE12", "apple13"], None),
+    (INDEX_STR_DATA, ["ip", "ipd", "id"], None),
+    (INDEX_STR_DATA, [""], None),
+    (INDEX_STR_DATA, INDEX_STR_DATA, [True] * len(INDEX_STR_DATA)),
+]
 
 
-    def test_isin_on_indexed_string_field_with_duplicate_in_testelements(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            df.create_indexed_string('foo').data.write(['a', '', 'apple','app', 'APPLE', 'APP', 'app/', 'apple12', 'ip'])
+def isin_oracle(data, isin_values, expected=None):
+    """
+    Generates the expected membership list of boolean values that should be returned by `f.isin(isin_values)` where `f`
+    contains `data`. If `expected` is not None this is returned instead, this allows pre-defined expected values to be
+    given for only some test cases so to avoid long running calls to this function.
+    """
+    if expected is not None:
+        return expected
 
-            self.assertEqual(df['foo'].isin(['APPLE', '', '', 'APPLE']), [False, True, False, False, True, False, False, False, False])
-            self.assertEqual(df['foo'].isin(['app','APP', 'app', 'APP']), [False, False, False, True, False, True, False, False, False])
-            self.assertEqual(df['foo'].isin(['app/','app//', 'app//']), [False, False, False, False, False, False, True, False, False])
-            self.assertEqual(df['foo'].isin(['APPLE12', 'apple12', 'apple12', 'APPLE12', 'apple13']), [False, False, False, False, False, False, False, True, False])
-            self.assertEqual(df['foo'].isin(['ip','ipd', 'id']), [False, False, False, False, False, False, False, False, True])
+    if isinstance(isin_values, type(data)) and isin_values == data:
+        return [True] * len(data)
+
+    if isinstance(isin_values, (tuple, list)):
+        return [d in isin_values for d in data]
+
+    return [d == isin_values for d in data]
 
 
-    def test_isin_on_fixed_string_field(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
-            df.create_fixed_string('foo', 2).data.write([b'aa', b'bb', b'cc'])
+class TestFieldIsIn(SessionTestCase):
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_isin_default_fields(self, creator, name, kwargs, data):
+        """
+        Tests `isin` for the default fields by checking with an empty input list and lists containing every value
+        and every pair of values from the field data.
+        """
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        if "nformat" in kwargs:
+            data = np.asarray(data, dtype=kwargs["nformat"])
 
-            self.assertEqual(df['foo'].isin([b'aa', b'zz']).tolist(), [True, False, False])
+        with self.subTest("Test empty isin parameter"):
+            expected = [False] * len(data)
+            result = f.isin([])
+            np.testing.assert_array_equal(expected, result)
 
-    def test_isin_on_timestamp_field(self):
-        bio = BytesIO()
-        with session.Session() as s:
-            src = s.open_dataset(bio, 'w', 'src')
-            df = src.create_dataframe('df')
+        with self.subTest("Test 1 isin values"):
+            for idx in range(len(data)):
+                isin_data=[data[idx]]
+                expected = isin_oracle(data, isin_data)
+                result = f.isin(isin_data)
+                np.testing.assert_array_equal(expected, result)
 
-            ts1 = datetime(2021, 12, 1).timestamp()
-            ts2 = datetime(2022, 1, 1).timestamp()
-            ts3 = datetime(2022, 2, 1).timestamp()
-            df.create_timestamp('ts').data.write([ts2, ts3, ts1])
-            self.assertEqual(df['ts'].isin({ts1, ts2}).tolist(), [True, False, True])
+        with self.subTest("Test 2 isin values"):
+            for idx1,idx2 in itertools.product(range(len(data)),repeat=2):
+                isin_data=[data[idx1],data[idx2]]
+                expected = isin_oracle(data, isin_data)
+                result = f.isin(isin_data)
+                np.testing.assert_array_equal(expected, result)
+
+
+    @parameterized.expand(NUMERIC_ISIN_TESTS)
+    def test_module_field_isin(self, dtype, data, isin_data, expected):
+        """
+        Test `isin` for the numeric fields using `fields.isin` function and the object's method.
+        """
+        f = self.setup_field(self.df, "create_numeric", "f", (dtype,), {}, data)
+
+        with self.subTest("Test module function"):
+            result = fields.isin(f, isin_data)
+            expected = isin_oracle(data, isin_data, expected)
+
+            self.assertIsInstance(result, fields.NumericMemField)
+            self.assertFieldEqual(expected, result)
+
+        with self.subTest("Test field method"):
+            result = f.isin(isin_data)
+            expected = isin_oracle(data, isin_data, expected)
+
+            self.assertIsInstance(result, np.ndarray)
+            self.assertIsInstance(expected, list)
+            np.testing.assert_array_equal(expected, result)
+
+    @parameterized.expand(INDEX_STR_ISIN_TESTS)
+    def test_indexed_string_isin(self, data, isin_data, expected):
+        """
+        Test `isin` for the fixed string fields using `fields.isin` function and the object's method.
+        """
+        f = self.setup_field(self.df, "create_indexed_string", "f", (), {}, data)
+
+        if isin_data is None:
+            with self.assertRaises(TypeError) as context:
+                f.isin(isin_data)
+
+            self.assertEqual(str(context.exception),
+                             "only list-like or dict-like objects are allowed to be passed to field.isin(), you passed a 'NoneType'")
+
+        else:
+
+            with self.subTest("Test with given data"):
+                expected = isin_oracle(data, isin_data, expected)
+                result = f.isin(isin_data)
+                self.assertIsInstance(result, np.ndarray)
+                np.testing.assert_array_equal(expected, result)
+
+            with self.subTest("Test with duplicate data"):
+                isin_data = shuffle_randstate(
+                    isin_data * 2)  # duplicate the search items and shuffle using a fixed seed
+                # reuse expected data from previous subtest
+                result = f.isin(isin_data)
+                self.assertIsInstance(result, np.ndarray)
+                np.testing.assert_array_equal(expected, result)
+
+
+class TestFieldModuleFunctions(SessionTestCase):
+
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_argsort(self, creator, name, kwargs, data):
+        """
+        Tests basic creation of every field type, checking it's contents are actually what was put into them.
+        """
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        if 'nformat' in kwargs and kwargs['nformat'] in ['int32', 'int64', 'uint32']:
+            self.assertListEqual(np.argsort(f.data[:]).tolist(), fields.argsort(f, dtype=kwargs['nformat']).data[:].tolist())
+        else:
+            with self.assertRaises(ValueError):
+                fields.argsort(f)

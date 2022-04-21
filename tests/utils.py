@@ -72,35 +72,8 @@ def shuffle_randstate(arr: ArrayLike, seed=DEFAULT_SEED) -> ArrayLike:
 
 # default field initialization values for every field type, format is:
 # (creator method, field name, args for method, kwargs for method, data)
-DEFAULT_FIELD_DATA = [
-    ("create_numeric", "f_i8", {"nformat": "int8"}, shuffle_randstate(list(range(-10, 10)) + HARD_INTS)),
-    (
-        "create_numeric",
-        "f_i32",
-        {"nformat": "int32"},
-        shuffle_randstate(list(range(-10, 10)) + HARD_INTS),
-    ),
-    (
-        "create_numeric",
-        "f_i64",
-        {"nformat": "int64"},
-        shuffle_randstate(list(range(-10, 10)) + HARD_INTS),
-    ),
-    ("create_numeric", "f_f32", {"nformat": "float32"}, shuffle_randstate(list(range(-10, 10)) + HARD_FLOATS)),
-    ("create_numeric", "f_f64", {"nformat": "float64"}, shuffle_randstate(list(range(-10, 10)) + HARD_FLOATS)),
-    (
-        "create_categorical",
-        "f_cat123",
-        {"nformat": "int8", "key": {"a": 1, "b": 2, "c": 3}},
-        RAND_STATE.randint(1, 4, 20).tolist(),
-    ),
-    ("create_indexed_string", "f_istr", {}, ["a", "bb", "eeeee", "ccc", "dddd","", " ",]*2),
-    ("create_fixed_string", "f_fstr", {"length": 3}, [b"aaa", b"bbb", b"eee", b"ccc", b"ddd", b"   "]*2),
-    (
-        "create_timestamp",
-        "f_ts",
-        {},
-        [
+NUMERIC_DATA = list(range(-10, 10)) + HARD_INTS
+TIMESTAMP_DATA = [
             utc_timestamp(2020, 1, 1),
             utc_timestamp(2021, 5, 18),
             utc_timestamp(2950, 8, 17),
@@ -111,7 +84,28 @@ DEFAULT_FIELD_DATA = [
             utc_timestamp(2018, 2, 28),
             utc_timestamp(2400, 9, 1),
             utc_timestamp(1, 1, 1),
-        ],
+        ]
+FIXED_STRING_DATA = [b"aaa", b"bbb", b"eee", b"ccc", b"ddd", b"   "]*2
+INDEX_STRING_DATA = ["a", "bb", "eeeee", "ccc", "dddd","", " ",]*2
+DEFAULT_FIELD_DATA = [
+    ("create_numeric", "f_i8", {"nformat": "int8"}, shuffle_randstate(NUMERIC_DATA)),
+    ("create_numeric", "f_i32", {"nformat": "int32"}, shuffle_randstate(NUMERIC_DATA)),
+    ("create_numeric", "f_i64", {"nformat": "int64"}, shuffle_randstate(NUMERIC_DATA)),
+    ("create_numeric", "f_f32", {"nformat": "float32"}, shuffle_randstate(NUMERIC_DATA)),
+    ("create_numeric", "f_f64", {"nformat": "float64"}, shuffle_randstate(NUMERIC_DATA)),
+    (
+        "create_categorical",
+        "f_cat123",
+        {"nformat": "int8", "key": {"a": 1, "b": 2, "c": 3}},
+        RAND_STATE.randint(1, 4, 20).tolist(),
+    ),
+    ("create_indexed_string", "f_istr", {}, INDEX_STRING_DATA),
+    ("create_fixed_string", "f_fstr", {"length": 3}, FIXED_STRING_DATA),
+    (
+        "create_timestamp",
+        "f_ts",
+        {},
+        TIMESTAMP_DATA,
     ),
 ]
 

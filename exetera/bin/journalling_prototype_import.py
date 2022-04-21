@@ -1,11 +1,14 @@
+import argparse
 import os
 import sys
 
 import h5py
 
-from exetera.core.importer import DatasetImporter
-from exetera.core.persistence import DataStore
-from exetera.covidspecific import data_schemas
+from exetera.io import importer
+# from exetera.core.importer import DatasetImporter
+# from exetera.core.persistence import DataStore
+from exetera.core.session import Session
+# from exetera.covidspecific import data_schemas
 
 
 def consolidate(datastore, existing_group, new_group):
@@ -41,17 +44,27 @@ def import_and_consolidate(datastore, dataset, source_file, data_schema, timesta
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 4:
-        print("Usage: check_for_duplicates.py <datastore> <directory> <pattern>")
-        exit(1)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--schema', help='The path and name of the schema file')
+    parser.add_argument('--source_dir', help='The directory containing the source files')
+    parser.add_argument('--pattern', help="The pattern that identifies files of interest in '--source_dir'")
+    parser.add_argument('--dest', help='The path and name of the datatset to be created or appended to')
+
+    # if len(sys.argv) != 4:
+    #     print("Usage: check_for_duplicates.py <datastore> <directory> <pattern>")
+    #     exit(1)
+
+    args = parser.parse_args()
+
 
     show_progress_every = 500000
 
     filenames = sorted(fn for fn in os.listdir(sys.argv[2]) if sys.argv[3] in fn)
 
-    with h5py.File(sys.argv[1], 'w') as dataset:
-        datastore = DataStore()
-        data_schema = data_schemas.DataSchema(1)
+    with Session() as s:
+        dataset = s.open_dataset(sys.argv[1], 'w', 'dataset')
+
         for fn in filenames:
             with open(fn) as src:
-                import_and_consolidate(datastore, dataset, src, data_schema)
+                import_and_consolidate(s, dataset, src, data_schema)

@@ -1,6 +1,7 @@
 from io import StringIO
 from typing import Mapping, List, Union
 import csv
+import warnings
 import numpy as np
 from datetime import datetime, timezone
 
@@ -103,7 +104,8 @@ def read_csv_with_schema_dict(csv_file: str,
         missing_names = set(csvf_fieldnames).difference(set(fields))
         if len(missing_names) > 0:
             msg = "Warning: The following fields are present in file '{}' but not part of the 'schema_dictionary': {}"
-            print(msg.format(csv_file, missing_names))    
+            #print(msg.format(csv_file, missing_names))
+            warnings.warn(msg.format(csv_file, missing_names))
 
         # check if included fields are in the file
         if include is not None and len(include) > 0:
