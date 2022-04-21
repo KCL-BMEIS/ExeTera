@@ -92,7 +92,7 @@ class HDF5DataFrame(DataFrame):
 
         :param field: field to add to this dataframe, copy the underlying dataset
         """
-        dname = field.name[field.name.index('/', 1)+1:]
+        dname = field.name if '/' not in field.name else field.name[field.name.index('/', 1)+1:]
         nfield = field.create_like(self, dname)
         if field.indexed:
             nfield.indices.write(field.indices[:])
@@ -330,10 +330,7 @@ class HDF5DataFrame(DataFrame):
         if field.dataframe != self:
             raise ValueError("This field is owned by a different dataframe")
         name = field.name
-        if name is None:
-            raise ValueError("This dataframe does not contain the field to delete.")
-        else:
-            self.__delitem__(name)
+        self.__delitem__(name)
 
     def keys(self):
         """
@@ -390,7 +387,7 @@ class HDF5DataFrame(DataFrame):
         """
 
         if not isinstance(field, (str, dict)):
-            raise ValueError("'field' must be of type str or dict but is {}").format(type(field))
+            raise ValueError("'field' must be of type str or dict but is {}".format(type(field)))
 
         dict_ = None
         if isinstance(field, dict):
@@ -518,8 +515,6 @@ class HDF5DataFrame(DataFrame):
         :returns: a dataframe contains all the fields re-indexed, self if ddf is not set
         """
         if ddf is not None:
-            val.validate_all_field_length_in_df(ddf)
-
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             for name, field in self._columns.items():
@@ -1589,7 +1584,7 @@ def _ordered_merge(left: DataFrame,
                 ops.generate_ordered_map_to_left_left_unique_streamed(
                     a_on[0], b_on[0], a_result, b_result, invalid, rdtype=npdtype)
         else:
-            if right_keys_unique:
+            if b_unique:
                 b_result = dest.create_numeric('_b_map', strdtype)
                 ops.generate_ordered_map_to_left_right_unique_streamed(
                     a_on[0], b_on[0], b_result, invalid, rdtype=npdtype)
@@ -1600,12 +1595,14 @@ def _ordered_merge(left: DataFrame,
                     a_on[0], b_on[0], a_result, b_result, invalid, rdtype=npdtype)
 
         if how == 'right':
-            dest.rename('_a_map', '_right_map')
+            if "_a_map" in dest:
+                dest.rename('_a_map', '_right_map')
             dest.rename('_b_map', '_left_map')
         else:
-            dest.rename('_a_map', '_left_map')
+            if "_a_map" in dest:
+                dest.rename('_a_map', '_left_map')
             dest.rename('_b_map', '_right_map')
-    else:
+    else:  # how = inner
         left_result = dest.create_numeric('_left_map', strdtype)
         right_result = dest.create_numeric('_right_map', strdtype)
         if left_keys_unique:

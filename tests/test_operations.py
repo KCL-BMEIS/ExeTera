@@ -1,14 +1,15 @@
 import unittest
+from io import BytesIO
 
 import numpy as np
-from io import BytesIO
+import h5py
+from parameterized import parameterized
 
 from exetera.core import session
 from exetera.core import fields
 from exetera.core import operations as ops
 from exetera.core import utils
-
-from .utils import slow_test
+from .utils import slow_test, SessionTestCase, DEFAULT_FIELD_DATA
 
 
 class TestOpsUtils(unittest.TestCase):
@@ -776,6 +777,14 @@ class TestOrderedMap(unittest.TestCase):
         self.assertListEqual(l_result.data[:].tolist(), l_expected)
         self.assertListEqual(r_result.data[:].tolist(), r_expected)
 
+    # left map
+    # ===========================
+    def test_ordered_left_map_result_size(self):
+        a_ids = np.asarray([1, 1, 2, 2, 3, 5, 5, 5, 6, 8], dtype=np.int64)
+        b_ids = np.asarray([1, 1, 2, 3, 5, 5, 6, 7, 8, 8, 8], dtype=np.int64)
+        result_size = ops.ordered_left_map_result_size(a_ids, b_ids)
+        self.assertEqual(4, result_size)
+
 
     # old inner / outer map functionality
     # ===========================
@@ -1218,7 +1227,7 @@ class TestGetSpans(unittest.TestCase):
         spans1=ops.get_spans_for_field(np.array([1, 2, 2, 3, 3, 3, 4, 4, 5, 6, 7, 8, 9, 10]))
         spans2=ops.get_spans_for_field(np.array([1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5]))
 
-        spans3= ops._get_spans_for_2_fields_by_spans(spans1,spans2)
+        spans3= ops._get_spans_for_2_fields_by_spans(spans1, spans2)
         self.assertTrue(list(spans), list(spans3))
 
     @slow_test
@@ -1365,3 +1374,22 @@ class TestFieldImporter(unittest.TestCase):
         byte_data_1 = [x.tobytes() for x in data_1]
         expected_byte_data_1 = [b'Yes', b'No', b'No', b'Yes']
         self.assertEqual(byte_data_1, expected_byte_data_1)
+
+
+class TestDataIterator(SessionTestCase):
+
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_data_iterator(self, creator, name, kwargs, data):
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        output = [i for i in ops.data_iterator(f)]
+        result = f.data[:] if isinstance(f, fields.IndexedStringField) else f.data[:].tolist()
+        self.assertListEqual(output, result)
+
+class TestStr_to_dtype(SessionTestCase):
+
+    def test_str_to_dtype(self):
+        for i in ['bool', 'int8', 'int16', 'int32', 'uint8', 'uint16', 'uint32', 'uint64', 'float32', 'float64']:
+            with self.subTest(i):
+                self.assertEqual(np.dtype(i), ops.str_to_dtype(i))
+        with self.assertRaises(ValueError):
+            ops.str_to_dtype('str')

@@ -11,7 +11,12 @@
 
 import unittest
 
+import numpy as np
+
 from exetera.core.utils import find_longest_sequence_of, get_min_max
+from exetera.core import utils
+from exetera.core.utils import find_longest_sequence_of, get_min_max, validate_file_exists
+from .utils import HARD_INTS, HARD_FLOATS
 
 
 class TestUtils(unittest.TestCase):
@@ -59,3 +64,35 @@ class TestUtils(unittest.TestCase):
             self.assertEqual(min_value, expected_min_max_values[value_type][0])
             self.assertEqual(max_value, expected_min_max_values[value_type][1])
 
+    def test_validate_file_exists(self):
+        import os
+        with self.assertRaises(FileExistsError):
+            validate_file_exists('./tempfile')
+        os.mkdir('./tempfile')
+        with self.assertRaises(FileNotFoundError):
+            validate_file_exists('./tempfile')
+        os.rmdir('./tempfile')
+
+    def test_count_flag(self):
+        flag = np.array([True if i%2 == 0 else False for i in range(100)])
+        output = utils.count_flag_empty(flag)
+        self.assertEqual(np.sum(flag == False), output)
+        output = utils.count_flag_set(flag, True)
+        self.assertEqual(np.sum(flag == False), output)
+        output = utils.count_flag_not_set(flag, True)
+        self.assertEqual(np.sum(flag != True), output)
+
+    def test_string_to_date(self):
+        from datetime import datetime
+        ts_s = '2021-11-22 11:22:33.000-0500'
+        ts = utils.string_to_datetime(ts_s)
+        self.assertEqual(datetime.strptime(ts_s, '%Y-%m-%d %H:%M:%S.%f%z'), ts)
+        with self.assertRaises(ValueError):
+            utils.string_to_datetime("foo-boo")
+
+    def test_build_histogram(self):
+        data = np.array([np.random.randint(0, 50) for i in range(1000)])
+        output = utils.build_histogram(data)
+        a, b = np.unique(data, return_counts=True)
+        result = [(a[i], b[i]) for i in range(len(a))]
+        self.assertListEqual(sorted(result), sorted(output))
