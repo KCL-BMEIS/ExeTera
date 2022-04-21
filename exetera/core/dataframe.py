@@ -1595,10 +1595,12 @@ def _ordered_merge(left: DataFrame,
                     a_on[0], b_on[0], a_result, b_result, invalid, rdtype=npdtype)
 
         if how == 'right':
-            dest.rename('_a_map', '_right_map') if '_a_map' in dest else None
+            if "_a_map" in dest:
+                dest.rename('_a_map', '_right_map')
             dest.rename('_b_map', '_left_map')
         else:
-            dest.rename('_a_map', '_left_map') if '_a_map' in dest else None
+            if "_a_map" in dest:
+                dest.rename('_a_map', '_left_map')
             dest.rename('_b_map', '_right_map')
     else:  # how = inner
         left_result = dest.create_numeric('_left_map', strdtype)

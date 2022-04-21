@@ -479,7 +479,7 @@ class ReadOnlyIndexedFieldArray:
     @property
     def dtype(self):
         """
-        Get datatype of field. Please note construct a numpy array from IndexedString data can be very memory expensive.
+        Get datatype of field. Please note constructing a numpy array from IndexedString data can be very memory expensive.
         """
         if len(self._indices) > 0:
             max_len = np.max(self._indices[1:] - self._indices[:-1])
@@ -583,7 +583,7 @@ class WriteableIndexedFieldArray:
     @property
     def dtype(self):
         """
-        Returns datatype of field. Please note construct a numpy array from IndexedString data can be very memory expensive.
+        Returns datatype of field. Please note constructing a numpy array from IndexedString data can be very memory expensive.
         :return: dtype
         """
         if len(self._indices) > 0:
@@ -1542,7 +1542,7 @@ class CategoricalMemField(MemoryField):
             cat_field = df.create_categorical('cat', 'int32', {"a": 1, "b": 2})
             cat_field.data.write([1,2,1,2])
             newfield = cat_field.remap([(1, 4), (2, 5)], {"a": 4, "b": 5})
-            print(newfield.data[:])
+            print(newfield.data[:])  # [4,5,4,5]
         """
         # make sure all key values are included in the key_map
         for k in self._keys.values():
