@@ -1426,12 +1426,8 @@ class TestFieldUnique(SessionTestCase):
             data = np.asarray(data, dtype=kwargs["nformat"])
 
         with self.subTest("Test unique with default data"):
-            expected = sorted(list(set(data)))
+            expected, _, _, _ = unique_oracle(data)
             result = f.unique()
-            # sort doesn't work for nan, filter out nan
-            if creator == 'create_numeric' and "nformat" in kwargs and kwargs["nformat"].startswith('float'):
-                expected = [e for e in expected if not math.isnan(e)]
-                result = [r for r in result if not math.isnan(r)]
             np.testing.assert_array_equal(expected, result)
 
 
