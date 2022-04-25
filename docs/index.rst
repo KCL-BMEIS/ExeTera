@@ -23,7 +23,7 @@ Getting started
 
 .. toctree::
    :maxdepth: 1
-   :caption: What is ExeTeta
+   :caption: What is ExeTera
 
    whatisexetera.md
    basic_concepts.md
