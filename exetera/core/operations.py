@@ -2990,7 +2990,7 @@ def unique_for_indexed_string(indices, values, return_index, return_inverse, ret
     if return_inverse:
         unique_inverse = nt.List.empty_list(item_type=nct.int64)
 
-    indexed_string_unique(indices, values, unique_result, unique_index, unique_inverse, unique_counts)
+    get_indexed_string_unique(indices, values, unique_result, unique_index, unique_inverse, unique_counts)
 
     sorted_unique_result = np.sort([x.tobytes().decode() for x in unique_result])
 
@@ -3010,11 +3010,11 @@ def unique_for_indexed_string(indices, values, return_index, return_inverse, ret
     if return_counts:
         combined_result.append(np.array(unique_counts)[indices_sort])
 
-    return combined_result
+    return tuple(combined_result)
      
   
 @exetera_njit
-def indexed_string_unique(indices, values, unique_result, unique_index, unique_inverse, unique_counts):
+def get_indexed_string_unique(indices, values, unique_result, unique_index, unique_inverse, unique_counts):
     """
     Find the unique elements for indexed string field using njit function.
     """
@@ -3032,7 +3032,7 @@ def indexed_string_unique(indices, values, unique_result, unique_index, unique_i
                 unique_index.append(i)
 
             if unique_inverse is not None:
-                unique_inverse.append(i)
+                unique_inverse.append(len(unique_result) - 1)  # append the k-th unique element, instead of i index from original data
 
             if unique_counts is not None:
                 unique_counts.append(1)
@@ -3061,7 +3061,7 @@ def indexed_string_unique(indices, values, unique_result, unique_index, unique_i
                 unique_index.append(i)
 
             if unique_inverse is not None:
-                unique_inverse.append(i)
+                unique_inverse.append(len(unique_result) - 1)  # append the k-th unique element, instead of i index from original data
 
             if unique_counts is not None:
                 unique_counts.append(1)
