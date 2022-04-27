@@ -1657,3 +1657,130 @@ def _ordered_merge(left: DataFrame,
             ops.ordered_map_valid_indexed_stream(right[k], right_map, dest_f, invalid)
         else:
             ops.ordered_map_valid_stream(right[k], right_map, dest_f, invalid)
+
+class View(DataFrame):
+    """
+    Similar to the HDF5 dataframe, the view contains a list of fields. But the fields in view is reference (from other HDF5DataFrame fields)
+    and filter index by default. Unless necessary, the view won't interact with HDF5 storage.
+    """
+
+    def __init__(self, mapping, readwrite=True):
+        """
+        Initiate a view.
+
+        :param mapping: The dictionary of field and coordinate filter.
+        :param readwrite: Read-write privilege of the fields. If False, view will create a separate storage copy when modifing the field.
+
+        """
+        self._dataset = None
+        self._columns = OrderedDict()  # to support multiple filters of one field
+        self._filters = OrderedDict()
+        for field in mapping.keys():
+            self._columns[field.name] = field
+            self._filters[field.name] = mapping[field]
+        self._readwrite = readwrite
+
+    @property
+    def columns(self):
+        return OrderedDict(self._columns)
+
+    @property
+    def dataset(self):
+        if self._dataset is None:
+            raise ValueError('This view contains field reference only. Please call to_hdf5_dataframe to write the content to dataset first.')
+        else:
+            return self._dataset
+
+    def add(self, field, filter, name=None):
+        pass
+
+    def drop(self, name: str):
+        pass
+
+    def __contains__(self, name):
+        pass
+
+    def contains_field(self, field):
+        pass
+
+    def __getitem__(self, name):
+        """
+
+        Example:
+
+            >>> view['num']
+            [1,2,3,4,5]
+        """
+        pass
+
+    def get_field(self, name):
+        """
+        Get the field data.
+
+        Example:
+
+            >>> view.get_field('num')
+            <exetera.core.fields.NumericField object at ...>
+        """
+        pass
+
+    def __setitem__(self, name, value):
+        """
+
+        Example:
+
+            view['num'] = 'num2'  # rename
+            view['num'] = df.create_numeric('num','int32')  # change the reference field
+            view['num'] = [True, True, False, False]  # set a filter
+            view['num'] = np.array([1,2,3,4,5,6])  # set the data in field
+        """
+        pass
+
+    def __delitem__(self, name):
+        """
+
+        Example:
+
+            del view['num']
+        """
+        pass
+
+    def delete_field(self, field):
+        """
+
+        Example:
+            >>> num = df.create_numeric('num', 'int32')
+            >>> view.add(num, [True, True, False, False])
+            >>> view.delete_field(num)
+        """
+        pass
+
+    def keys(self):
+        pass
+
+    def values(self):
+        pass
+
+    def items(self):
+        pass
+
+    def __iter__(self):
+        pass
+
+    def __next__(self):
+        pass
+
+    def __len__(self):
+        pass
+
+    def apply_filter(self, filter_to_apply, field):
+        pass
+
+    def apply_index(self, index_to_apply, field):
+        pass
+
+    def to_hdf5_dataframe(self, dataset, name):
+        """
+        Convert this view to a HDF5 dataframe which write all fields in this view onto the dataset.
+        """
+        self.dataset = dataset
