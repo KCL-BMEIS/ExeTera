@@ -494,32 +494,28 @@ class ReadOnlyIndexedFieldArray:
         :param item: Index
         :return: Item value from dataset
         """
-        try:
-            if isinstance(item, slice):
-                start = item.start if item.start is not None else 0
-                stop = item.stop if item.stop is not None else len(self._indices) - 1
-                step = item.step
-                # TODO: validate slice
-                index = self._indices[start:stop + 1]
-                bytestr = self._values[index[0]:index[-1]]
-                results = [None] * (len(index) - 1)
-                startindex = self._indices[start]
-                for ir in range(len(results)):
-                    results[ir] = \
-                        bytestr[index[ir] - np.int64(startindex):
-                                index[ir + 1] - np.int64(startindex)].tobytes().decode()
-                return results
-            elif isinstance(item, int):
-                if item >= len(self._indices) - 1:
-                    raise ValueError("index is out of range")
-                start, stop = self._indices[item:item + 2]
-                if start == stop:
-                    return ''
-                value = self._values[start:stop].tobytes().decode()
-                return value
-        except Exception as e:
-            print("{}: unexpected exception {}".format(self._field.name, e))
-            raise
+        if isinstance(item, slice):
+            start = item.start if item.start is not None else 0
+            stop = item.stop if item.stop is not None else len(self._indices) - 1
+            step = item.step
+            # TODO: validate slice
+            index = self._indices[start:stop + 1]
+            bytestr = self._values[index[0]:index[-1]]
+            results = [None] * (len(index) - 1)
+            startindex = self._indices[start]
+            for ir in range(len(results)):
+                results[ir] = \
+                    bytestr[index[ir] - np.int64(startindex):
+                            index[ir + 1] - np.int64(startindex)].tobytes().decode()
+            return results
+        elif isinstance(item, int):
+            if item >= len(self._indices) - 1:
+                raise ValueError(f"Index is out of range, item ({item}) >= len(self._indices) - 1 ({len(self._indices) - 1})")
+            start, stop = self._indices[item:item + 2]
+            if start == stop:
+                return ''
+            value = self._values[start:stop].tobytes().decode()
+            return value
 
     def __setitem__(self, key, value):
         raise PermissionError("This field was created read-only; call <field>.writeable() "
@@ -598,37 +594,33 @@ class WriteableIndexedFieldArray:
         :param item: int or slice
         :return: Item value from dataset
         """
-        try:
-            if isinstance(item, slice):
-                start = item.start if item.start is not None else 0
-                stop = item.stop if item.stop is not None else len(self._indices) - 1
-                step = item.step
-                # TODO: validate slice
+        if isinstance(item, slice):
+            start = item.start if item.start is not None else 0
+            stop = item.stop if item.stop is not None else len(self._indices) - 1
+            step = item.step
+            # TODO: validate slice
 
-                index = self._indices[start:stop + 1]
-                if len(index) == 0:
-                    return []
-                bytestr = self._values[index[0]:index[-1]]
-                results = [None] * (len(index) - 1)
-                startindex = self._indices[start]
-                rmax = min(len(results), stop - start)
-                for ir in range(rmax):
-                    rbytes = bytestr[index[ir] - np.int64(startindex):
-                                     index[ir + 1] - np.int64(startindex)].tobytes()
-                    rstr = rbytes.decode()
-                    results[ir] = rstr
-                return results
-            elif isinstance(item, int):
-                if item >= len(self._indices) - 1:
-                    raise ValueError("index is out of range")
-                start, stop = self._indices[item:item + 2]
-                if start == stop:
-                    return ''
-                value = self._values[start:stop].tobytes().decode()
-                return value
-        except Exception as e:
-            print(e)
-            raise
+            index = self._indices[start:stop + 1]
+            if len(index) == 0:
+                return []
+            bytestr = self._values[index[0]:index[-1]]
+            results = [None] * (len(index) - 1)
+            startindex = self._indices[start]
+            rmax = min(len(results), stop - start)
+            for ir in range(rmax):
+                rbytes = bytestr[index[ir] - np.int64(startindex):
+                                 index[ir + 1] - np.int64(startindex)].tobytes()
+                rstr = rbytes.decode()
+                results[ir] = rstr
+            return results
+        elif isinstance(item, int):
+            if item >= len(self._indices) - 1:
+                raise ValueError(f"Index is out of range, item ({item}) >= len(self._indices) - 1 ({len(self._indices) - 1})")
+            start, stop = self._indices[item:item + 2]
+            if start == stop:
+                return ''
+            value = self._values[start:stop].tobytes().decode()
+            return value
 
     def __setitem__(self, key, value):
         raise PermissionError("IndexedStringField instances cannot be edited via array syntax;"
