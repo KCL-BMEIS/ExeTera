@@ -673,7 +673,8 @@ class TestFieldArray(SessionTestCase):
         with self.assertRaises(PermissionError):
             f.data.complete()
         self.assertEqual(data[0], f.data[0])
-        with self.assertRaises(AttributeError):
+        
+        with self.assertRaises(ValueError):
             f.data[len(data)]
 
 
