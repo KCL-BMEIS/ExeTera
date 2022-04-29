@@ -14,7 +14,7 @@ Please take a moment to read this page, and also take a look at the [Wiki](https
 [![PyPI Version](https://img.shields.io/pypi/v/exetera?label=PyPI%20version&logo=python&logoColor=white)](https://pypi.org/project/exetera/)
 [![Downloads](https://pepy.tech/badge/exetera)](https://pepy.tech/project/exetera)
 
-Requires python 3.7+
+Requires python 3.7+ and third-party packages, see `pyproject.toml` file.
 
 ---
 # Usage
