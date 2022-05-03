@@ -64,7 +64,7 @@ class TestFieldDataOps(SessionTestCase):
 
         
     @parameterized.expand([(operator.lt,),(operator.gt,),(operator.le,),(operator.ge,),(operator.ne,),(operator.eq,)])
-    def test_CategoricalMemField_binary_op(self,op):
+    def test_CategoricalMemField_compare_binary_op(self,op):
         """
         Categorical mem field ops against numpy, categorical memory field, categorical field
         """
@@ -105,7 +105,7 @@ class TestFieldDataOps(SessionTestCase):
 
     @parameterized.expand(
         [(operator.lt,), (operator.gt,), (operator.le,), (operator.ge,), (operator.ne,), (operator.eq,)])
-    def test_CategoricalField_binary_op(self, op):
+    def test_CategoricalField_compare_binary_op(self, op):
         """
         Categorical field ops against numpy, categorical memory field, categorical field
         """
@@ -143,6 +143,100 @@ class TestFieldDataOps(SessionTestCase):
                 np.testing.assert_array_equal(result, output)
                 self.assertIsInstance(output, fields.NumericMemField)
                 self.assertEqual(output.data.dtype, "bool")
+
+
+    @parameterized.expand(
+        [(operator.add, 'int32', [1, 2, 3], 'int32', [4, 5, 0], 'int32'),
+         (operator.add, 'int32', [2, 3, 1], 'int64', [6, 2, 1], 'int64'),
+         (operator.add, 'float32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float32'),
+         (operator.add, 'float32', [1, 3, 2], 'float64', [3.0, 4.0, 6.0], 'float64'),
+
+         (operator.sub, 'int32', [1, 2, 3], 'int32', [4, 5, 0], 'int32'),
+         (operator.sub, 'int32', [2, 3, 1], 'int64', [6, 2, 1], 'int64'),
+         (operator.sub, 'float32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float32'),
+         (operator.sub, 'float32', [1, 3, 2], 'float64', [3.0, 4.0, 6.0], 'float64'),
+
+         (operator.mul, 'int32', [1, 2, 3], 'int32', [4, 5, 0], 'int32'),
+         (operator.mul, 'int32', [2, 3, 1], 'int64', [6, 2, 1], 'int64'),
+         (operator.mul, 'float32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float32'),
+         (operator.mul, 'float32', [1, 3, 2], 'float64', [3.0, 4.0, 6.0], 'float64'),
+
+         (operator.truediv, 'int32', [1, 2, 3], 'int32', [4, 5, 1], 'float64'),
+         (operator.truediv, 'int32', [2, 3, 1], 'int64', [6, 2, 1], 'float64'),
+         (operator.truediv, 'float32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float32'),
+         (operator.truediv, 'float32', [1, 3, 2], 'float64', [3.0, 4.0, 6.0], 'float64'),
+
+         (operator.floordiv, 'int32', [1, 2, 3], 'int32', [4, 5, 1], 'int32'),
+         (operator.floordiv, 'int32', [2, 3, 1], 'int64', [6, 2, 1], 'int64'),
+         (operator.floordiv, 'float32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float32'),
+         (operator.floordiv, 'float32', [1, 3, 2], 'float64', [3.0, 4.0, 6.0], 'float64'),
+         ])
+    def test_CategoricalField_numeric_binary_op(self, op, first_datatype, first_data, second_datatype, second_data, expected_datatype):
+        """
+        Categorical field ops against numpy, categorical memory field, categorical field
+        """
+        first_field = self.df.create_categorical('catf_1', first_datatype, {"a": 1, "b": 2, "c": 3})
+        first_ndarray = np.array(first_data, dtype=first_datatype)
+        first_field.data.write(first_ndarray)
+
+        second_field = self.df.create_categorical('catf_2', second_datatype, {"x": 0, "y": 1, "z": 6})
+        second_mem_field = fields.CategoricalMemField(self.s, second_datatype, {"x": 0, "y": 1, "z": 6})
+        second_ndarray = np.array(second_data, dtype=second_datatype)
+        second_field.data.write(second_ndarray)
+        second_mem_field.data.write(second_ndarray)
+
+        expected_result = op(first_ndarray, second_ndarray)
+
+
+        with self.subTest("Testing numeric operation: first is CategorialField, second is ndarray"):
+            first, second = first_field, second_ndarray
+            output = op(first, second)
+            np.testing.assert_array_equal(output, expected_result)
+            self.assertEqual(output.data.dtype, expected_datatype)
+
+
+        
+        # with self.subTest("Testing numeric operation to be commutative: first is ndarray, second is CategorialField"):
+        #     first, second = second_ndarray, first_field
+        #     output = op(first, second)
+        #     self.assertIsInstance(output, fields.NumericMemField)
+        #     np.testing.assert_array_equal(output, expected_result)
+
+        #     self.assertEqual(output.data.dtype, expected_datatype)
+
+
+
+        with self.subTest("Testing with numeric operation: first is CategorialField, second is CategoricalMemField"):
+            first, second = first_field, second_mem_field
+            output = op(first, second)
+            self.assertIsInstance(output, fields.NumericMemField)
+            np.testing.assert_array_equal(output, expected_result)
+            self.assertEqual(output.data.dtype, expected_datatype)
+
+
+        with self.subTest("Testing with numeric operation to be commutative: first is CategoricalMemField, second is CategorialField"):
+            first, second = second_mem_field, first_field
+            output = op(first, second)
+            self.assertIsInstance(output, fields.NumericMemField)
+            np.testing.assert_array_equal(output, expected_result)
+            self.assertEqual(output.data.dtype, expected_datatype)
+
+
+        with self.subTest("Testing with numeric operation: first is CategorialField, second also is CategorialField"):
+            first, second = first_field, second_field
+            output = op(first, second)
+            self.assertIsInstance(output, fields.NumericMemField)
+            np.testing.assert_array_equal(output, expected_result)
+            self.assertEqual(output.data.dtype, expected_datatype)
+
+            
+        with self.subTest("Testing with numeric operationto be commutative: first is CategorialField, second also is CategorialField"):
+            first, second = second_field, first_field
+            output = op(first, second)
+            self.assertIsInstance(output, fields.NumericMemField)
+            np.testing.assert_array_equal(output, expected_result)
+            self.assertEqual(output.data.dtype, expected_datatype)
+
 
     @parameterized.expand([(operator.eq,),(operator.ge,),(operator.gt,),(operator.le,),(operator.lt,),(operator.ne,),])
     def test_NumericField_binary_ops(self, op):
