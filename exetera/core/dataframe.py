@@ -58,7 +58,7 @@ class HDF5DataFrame(DataFrame):
         self.name = name
         self._columns = OrderedDict()
         self._dataset = dataset
-        self._h5group = h5group
+        self._h5group = h5group  # the HDF5 group to store all fields
 
         for subg in h5group.keys():
             self._columns[subg] = dataset.session.get(h5group[subg])
@@ -263,6 +263,80 @@ class HDF5DataFrame(DataFrame):
                 if id(field) == id(v):
                     return True
             return False
+
+    def get_filter(self, field: Union[str, fld.Field]):
+        """
+        Get a filter array specified by the field or field name.
+        """
+        pass
+
+    def set_filter(self, field: Union[str, fld.Field], filter):
+        """
+        Add or modify a filter of the field.
+
+        :param field: The target field.
+        :param filter: The filter, as list or np.ndarray of indices.
+        """
+        if not isinstance(field, str) and not isinstance(field, fld.Field):
+            raise TypeError("The target field should be type field or string (name of the field in this dataframe).")
+
+        name = field if isinstance(field, str) else field.name
+        if name not in self._columns:
+            raise ValueError("The target field is not in this dataframe.")
+
+        dtype = 'int32' if filter[-1] < 2**31 - 1 else 'int64'
+        if name in self.filters.keys():
+            self.filters[name].data.clear()
+            self.filters[name].data.write(filter)
+        else:
+            self.filters.create_numeric(name, dtype).data.write(filter)
+
+    def delete_filter(self, field: Union[str, fld.Field]):
+        """
+        Delete a filter from this dataframe specified by the field or field name.
+        """
+        if not isinstance(field, str) and not isinstance(field, fld.Field):
+            raise TypeError("The target field should be type field or string (name of the field in this dataframe).")
+
+        name = field if isinstance(field, str) else field.name
+        if name not in self._columns:
+            raise ValueError("The target field is not in this dataframe.")
+        else:
+            del self.filters[name]
+
+    def get_data(self, field: Union[str, fld.Field]):
+        """
+        Get the data from a field. The data returned is masked by the filter.
+
+        """
+        if not isinstance(field, str) and not isinstance(field, fld.Field):
+            raise TypeError("The target field should be type field or string (name of the field in this dataframe).")
+
+        name = field if isinstance(field, str) else field.name
+        if name not in self.columns.keys():
+            raise ValueError("Can not found the field name from this dataframe.")
+        else:
+            if name in self.filters.keys():
+                d_filter = self.filters[name].data[:]
+                return self.columns[name].data[d_filter]
+            else:
+                return self.columns[name].data[:]
+
+    def __getattr__(self, item):
+        """
+        Rewrite the getattr method so that dataframe will return the data of a field directly.
+
+        """
+        fields = object.__getattribute__(self, 'columns')
+        if item not in fields.keys():
+            raise ValueError("Can not found the field name from this dataframe.")
+        else:
+            filters = object.__getattribute__(self, 'filters')
+            if item in filters.keys():  # has a filter
+                data_filter = filters[item].data[:]
+                return fields[item].data[data_filter]
+            else:
+                return fields[item].data[:]
 
     def __getitem__(self, name):
         """
@@ -1657,130 +1731,3 @@ def _ordered_merge(left: DataFrame,
             ops.ordered_map_valid_indexed_stream(right[k], right_map, dest_f, invalid)
         else:
             ops.ordered_map_valid_stream(right[k], right_map, dest_f, invalid)
-
-class View(DataFrame):
-    """
-    Similar to the HDF5 dataframe, the view contains a list of fields. But the fields in view is reference (from other HDF5DataFrame fields)
-    and filter index by default. Unless necessary, the view won't interact with HDF5 storage.
-    """
-
-    def __init__(self, mapping, readwrite=True):
-        """
-        Initiate a view.
-
-        :param mapping: The dictionary of field and coordinate filter.
-        :param readwrite: Read-write privilege of the fields. If False, view will create a separate storage copy when modifing the field.
-
-        """
-        self._dataset = None
-        self._columns = OrderedDict()  # to support multiple filters of one field
-        self._filters = OrderedDict()
-        for field in mapping.keys():
-            self._columns[field.name] = field
-            self._filters[field.name] = mapping[field]
-        self._readwrite = readwrite
-
-    @property
-    def columns(self):
-        return OrderedDict(self._columns)
-
-    @property
-    def dataset(self):
-        if self._dataset is None:
-            raise ValueError('This view contains field reference only. Please call to_hdf5_dataframe to write the content to dataset first.')
-        else:
-            return self._dataset
-
-    def add(self, field, filter, name=None):
-        pass
-
-    def drop(self, name: str):
-        pass
-
-    def __contains__(self, name):
-        pass
-
-    def contains_field(self, field):
-        pass
-
-    def __getitem__(self, name):
-        """
-
-        Example:
-
-            >>> view['num']
-            [1,2,3,4,5]
-        """
-        pass
-
-    def get_field(self, name):
-        """
-        Get the field data.
-
-        Example:
-
-            >>> view.get_field('num')
-            <exetera.core.fields.NumericField object at ...>
-        """
-        pass
-
-    def __setitem__(self, name, value):
-        """
-
-        Example:
-
-            view['num'] = 'num2'  # rename
-            view['num'] = df.create_numeric('num','int32')  # change the reference field
-            view['num'] = [True, True, False, False]  # set a filter
-            view['num'] = np.array([1,2,3,4,5,6])  # set the data in field
-        """
-        pass
-
-    def __delitem__(self, name):
-        """
-
-        Example:
-
-            del view['num']
-        """
-        pass
-
-    def delete_field(self, field):
-        """
-
-        Example:
-            >>> num = df.create_numeric('num', 'int32')
-            >>> view.add(num, [True, True, False, False])
-            >>> view.delete_field(num)
-        """
-        pass
-
-    def keys(self):
-        pass
-
-    def values(self):
-        pass
-
-    def items(self):
-        pass
-
-    def __iter__(self):
-        pass
-
-    def __next__(self):
-        pass
-
-    def __len__(self):
-        pass
-
-    def apply_filter(self, filter_to_apply, field):
-        pass
-
-    def apply_index(self, index_to_apply, field):
-        pass
-
-    def to_hdf5_dataframe(self, dataset, name):
-        """
-        Convert this view to a HDF5 dataframe which write all fields in this view onto the dataset.
-        """
-        self.dataset = dataset

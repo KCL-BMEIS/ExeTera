@@ -1,6 +1,7 @@
 import pandas as pd
 from exetera.core.operations import INVALID_INDEX
 import unittest
+from parameterized import parameterized
 from io import BytesIO
 import numpy as np
 import tempfile
@@ -8,7 +9,7 @@ import os
 
 from exetera.core import session
 from exetera.core import dataframe
-
+from .utils import SessionTestCase, DEFAULT_FIELD_DATA
 
 class TestDataFrameCreateFields(unittest.TestCase):
 
@@ -1327,3 +1328,21 @@ class TestDataFrameDescribe(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 df.describe(exclude=['num', 'num2', 'ts1'])
             self.assertTrue(isinstance(context.exception, ValueError))
+
+class TestDataFrameFilter(SessionTestCase):
+
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_set_filter(self, creator, name, kwargs, data):
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+
+        if "nformat" in kwargs:
+            data = np.asarray(data, dtype=kwargs["nformat"])
+
+        f_data = self.df.__getattr__(name)  # or self.df.field_name
+        f_data = f_data.tolist() if hasattr(f_data, "tolist") else f_data
+        data = data.tolist() if hasattr(data, "tolist") else data
+        self.assertListEqual(f_data, data)
+
+
+    def test_remove_filter(self):
+        pass
