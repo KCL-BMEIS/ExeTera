@@ -55,6 +55,8 @@ class HDF5Field(Field):
         self._value_wrapper = None
         self._valid_reference = True
 
+        self._filter = None
+
     @property
     def valid(self):
         """
@@ -113,6 +115,10 @@ class HDF5Field(Field):
         self._ensure_valid()
         return False
 
+    @property
+    def filter(self):
+        return self._filter
+
     def __bool__(self):
         # this method is required to prevent __len__ being called on derived methods when fields are queried as
         #   if f:
@@ -142,6 +148,7 @@ class HDF5Field(Field):
     def _ensure_valid(self):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
+
 
 
 class MemoryField(Field):
@@ -300,7 +307,13 @@ class WriteableFieldArray:
         return self._dataset.dtype
 
     def __getitem__(self, item):
-        return self._dataset[item]
+        df_name = self._field.name[0: self._field.name.rfind('/')]
+        field_name =self._field.name[self._field.name.rfind('/')+1:]
+        if field_name in self._field.get(df_name+'/_filters').keys():
+            filter_data = self._field.get(df_name+'/_filters')[field_name][self._name][:]
+            return self._dataset[item][filter_data]
+        else:
+            return self._dataset[item]
 
     def __setitem__(self, key, value):
         self._dataset[key] = value

@@ -61,7 +61,13 @@ class HDF5DataFrame(DataFrame):
         self._h5group = h5group  # the HDF5 group to store all fields
 
         for subg in h5group.keys():
-            self._columns[subg] = dataset.session.get(h5group[subg])
+            if subg[0] != '_':  # stores metadata, for example filters
+                self._columns[subg] = dataset.session.get(h5group[subg])
+
+        if '_filters' not in h5group.keys():
+            self._filters_grp = self._h5group.create_group('_filters')
+        else:
+            self._filters_grp = h5group['_filters']
 
     @property
     def columns(self):
@@ -284,12 +290,22 @@ class HDF5DataFrame(DataFrame):
         if name not in self._columns:
             raise ValueError("The target field is not in this dataframe.")
 
-        dtype = 'int32' if filter[-1] < 2**31 - 1 else 'int64'
-        if name in self.filters.keys():
-            self.filters[name].data.clear()
-            self.filters[name].data.write(filter)
+        nformat = 'int32' if filter[-1] < 2 ** 31 - 1 else 'int64'
+        if name in self._filters_grp.keys():
+            filter_field = fld.NumericField(self._dataset.session, self._filters_grp[name], self,
+                                            write_enabled=True)
+            if nformat not in filter_field._fieldtype:
+                filter_field = filter_field.astype(nformat)
+            filter_field.data.clear()
+            filter_field.data.write(filter)
         else:
-            self.filters.create_numeric(name, dtype).data.write(filter)
+            fld.numeric_field_constructor(self._dataset.session, self._filters_grp, name, nformat)
+            filter_field = fld.NumericField(self._dataset.session, self._filters_grp[name], self,
+                                     write_enabled=True)
+            filter_field.data.write(filter)
+
+        self._columns[name]._filter = filter_field
+        return filter_field
 
     def delete_filter(self, field: Union[str, fld.Field]):
         """
@@ -302,7 +318,7 @@ class HDF5DataFrame(DataFrame):
         if name not in self._columns:
             raise ValueError("The target field is not in this dataframe.")
         else:
-            del self.filters[name]
+            del self._filters_grp[name]
 
     def get_data(self, field: Union[str, fld.Field]):
         """
@@ -321,22 +337,6 @@ class HDF5DataFrame(DataFrame):
                 return self.columns[name].data[d_filter]
             else:
                 return self.columns[name].data[:]
-
-    def __getattr__(self, item):
-        """
-        Rewrite the getattr method so that dataframe will return the data of a field directly.
-
-        """
-        fields = object.__getattribute__(self, 'columns')
-        if item not in fields.keys():
-            raise ValueError("Can not found the field name from this dataframe.")
-        else:
-            filters = object.__getattribute__(self, 'filters')
-            if item in filters.keys():  # has a filter
-                data_filter = filters[item].data[:]
-                return fields[item].data[data_filter]
-            else:
-                return fields[item].data[:]
 
     def __getitem__(self, name):
         """

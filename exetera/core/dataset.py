@@ -101,12 +101,6 @@ class HDF5Dataset(Dataset):
 
         self._dataframes[name] = _dataframe
 
-        # filters
-        filter_name = '_'+name+'_filters'
-        self._file.create_group(filter_name)
-        filters = edf.HDF5DataFrame(self, filter_name, self._file[filter_name])
-        _dataframe.filters = filters
-
         return _dataframe
 
     def require_dataframe(self, name):
