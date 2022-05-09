@@ -100,7 +100,6 @@ class HDF5Dataset(Dataset):
                     f.data.write(v.data[:])
 
         self._dataframes[name] = _dataframe
-
         return _dataframe
 
     def require_dataframe(self, name):
