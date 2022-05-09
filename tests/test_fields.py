@@ -194,6 +194,8 @@ class TestFieldDataOps(SessionTestCase):
         second_cat_mem_field.data.write(second_ndarray)
         second_numeric_field.data.write(second_ndarray)
 
+        expected_result = op(first_ndarray, second_ndarray)
+
         combinations = [
             (first_cat_field, second_ndarray),
             (second_ndarray, first_cat_field),
@@ -205,8 +207,6 @@ class TestFieldDataOps(SessionTestCase):
             (second_cat_field, first_cat_field),
         ]
 
-        # expected_result = op(first_ndarray, second_ndarray)
-        expected_result = []
         for first, second in combinations:
             with self.subTest(f"Testing numeric operation: first is {type(first)} , second is {type(second)}"):
                 output = op(first, second)
@@ -243,8 +243,6 @@ class TestFieldDataOps(SessionTestCase):
             (first_cat_mem_field, second_cat_mem_field),
         ]
 
-        # expected_result = op(first_ndarray, second_ndarray)
-        expected_result = []
         for first, second in combinations:
             with self.subTest(f"Testing numeric operation: first is {type(first)}, second is {type(second)}"):
                 output = op(first, second)
