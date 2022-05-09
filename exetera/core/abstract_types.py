@@ -65,6 +65,11 @@ class Field(ABC):
     def data(self):
         raise NotImplementedError()
 
+    @property
+    @abstractmethod
+    def filter(self):
+        raise NotImplementedError()
+
     @abstractmethod
     def __bool__(self):
         raise NotImplementedError()

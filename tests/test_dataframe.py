@@ -1331,17 +1331,25 @@ class TestDataFrameDescribe(unittest.TestCase):
 
 class TestDataFrameFilter(SessionTestCase):
 
-    @parameterized.expand(DEFAULT_FIELD_DATA)
+    @parameterized.expand([('','num','',[1,2,3,4,5,6,7,8,9,10])])
     def test_set_filter(self, creator, name, kwargs, data):
-        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        #f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        f = self.df.create_numeric(name, 'int32')
+        f.data.write(data)
 
-        if "nformat" in kwargs:
-            data = np.asarray(data, dtype=kwargs["nformat"])
+        data = np.asarray(data, 'int32')
 
-        f_data = self.df.__getattr__(name)  # or self.df.field_name
-        f_data = f_data.tolist() if hasattr(f_data, "tolist") else f_data
-        data = data.tolist() if hasattr(data, "tolist") else data
-        self.assertListEqual(f_data, data)
+        d_filter = np.array([1,3,5,7])
+        self.df.set_filter(name, d_filter)
+        self.assertListEqual(f.data[:].tolist(), data.tolist()) # unfiltered data
+        self.assertListEqual(f[:].tolist(), data[d_filter].tolist())  # filtered data
+
+        df2 = self.ds.create_dataframe('df2')
+        df2.add_reference(f)
+        f2 = df2[name]
+        self.assertEqual(f._field.name, f2._field.name)
+        self.assertListEqual(f2.data[:].tolist(), data.tolist())  # unfiltered data
+        self.assertListEqual(f2[:].tolist(), data.tolist())  # unfiltered data
 
 
     def test_remove_filter(self):

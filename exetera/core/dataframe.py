@@ -107,6 +107,17 @@ class HDF5DataFrame(DataFrame):
             nfield.data.write(field.data[:])
         self._columns[dname] = nfield
 
+    def add_reference(self, field: fld.Field):
+        """
+        Add a field without coping the data over the HDF5 group.
+        :param field: field to be constructed in this dataframe.
+        """
+        if isinstance(field, fld.NumericField):
+            fld.numeric_field_constructor(self._dataset.session, self, field.name, field._nformat)
+            nfield = fld.NumericField(self._dataset.session, field._field, self, write_enabled=True)
+            self._columns[field.name] = nfield
+            return self._columns[field.name]
+
     def drop(self,
              name: str):
         """
@@ -304,7 +315,7 @@ class HDF5DataFrame(DataFrame):
                                      write_enabled=True)
             filter_field.data.write(filter)
 
-        self._columns[name]._filter = filter_field
+        self._columns[name].filter = self._filters_grp[name]
         return filter_field
 
     def delete_filter(self, field: Union[str, fld.Field]):

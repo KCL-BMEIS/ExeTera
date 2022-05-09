@@ -55,7 +55,7 @@ class HDF5Field(Field):
         self._value_wrapper = None
         self._valid_reference = True
 
-        self._filter = None
+        self._filter_wrapper = None
 
     @property
     def valid(self):
@@ -114,10 +114,6 @@ class HDF5Field(Field):
         """
         self._ensure_valid()
         return False
-
-    @property
-    def filter(self):
-        return self._filter
 
     def __bool__(self):
         # this method is required to prevent __len__ being called on derived methods when fields are queried as
@@ -307,13 +303,7 @@ class WriteableFieldArray:
         return self._dataset.dtype
 
     def __getitem__(self, item):
-        df_name = self._field.name[0: self._field.name.rfind('/')]
-        field_name =self._field.name[self._field.name.rfind('/')+1:]
-        if field_name in self._field.get(df_name+'/_filters').keys():
-            filter_data = self._field.get(df_name+'/_filters')[field_name][self._name][:]
-            return self._dataset[item][filter_data]
-        else:
-            return self._dataset[item]
+        return self._dataset[item]
 
     def __setitem__(self, key, value):
         self._dataset[key] = value
@@ -2576,6 +2566,26 @@ class NumericField(HDF5Field):
             else:
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
+
+
+    @property
+    def filter(self):
+        if self._filter_wrapper is None:
+            return None
+        else:
+            return self._filter_wrapper[:]
+        return self._filter
+
+    @filter.setter
+    def filter(self, filter_h5group):
+        self._filter_wrapper = WriteableFieldArray(filter_h5group, 'values')
+
+    def __getitem__(self, item):
+        if self._filter_wrapper != None:
+            data_filter = self._filter_wrapper[:]
+            return self.data[item][data_filter]
+        else:
+            return self.data[item]
 
     def is_sorted(self):
         """
