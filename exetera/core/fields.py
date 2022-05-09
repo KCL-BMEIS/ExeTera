@@ -1457,6 +1457,7 @@ class NumericMemField(MemoryField):
 
 
 class CategoricalMemField(MemoryField):
+    __array_ufunc__ = None
     def __init__(self, session, nformat, keys):
         super().__init__(session)
         self._nformat = nformat
@@ -1683,7 +1684,6 @@ class CategoricalMemField(MemoryField):
     def __add__(self, second):
         return FieldDataOps.numeric_add(self._session, self, second)
 
-    __array_ufunc__ = None
     def __radd__(self, first):
         return FieldDataOps.numeric_add(self._session, first, self)
 
@@ -2887,6 +2887,8 @@ class NumericField(HDF5Field):
 
 
 class CategoricalField(HDF5Field):
+    __array_ufunc__ = None
+
     def __init__(self, session, group, dataframe, write_enabled=False):
         super().__init__(session, group, dataframe, write_enabled=write_enabled)
         self._nformat = self._field.attrs['nformat'] if 'nformat' in self._field.attrs else 'int8'
@@ -3154,7 +3156,6 @@ class CategoricalField(HDF5Field):
     def __add__(self, second):
         return FieldDataOps.numeric_add(self._session, self, second)
 
-    __array_ufunc__ = None
     def __radd__(self, first):
         return FieldDataOps.numeric_add(self._session, first, self)
 
