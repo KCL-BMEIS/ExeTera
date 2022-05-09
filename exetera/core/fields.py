@@ -1680,6 +1680,37 @@ class CategoricalMemField(MemoryField):
     def __ge__(self, value):
         return FieldDataOps.greater_than_equal(self._session, self, value)
 
+    def __add__(self, second):
+        return FieldDataOps.numeric_add(self._session, self, second)
+
+    __array_ufunc__ = None
+    def __radd__(self, first):
+        return FieldDataOps.numeric_add(self._session, first, self)
+
+    def __sub__(self, second):
+        return FieldDataOps.numeric_sub(self._session, self, second)
+
+    def __rsub__(self, first):
+        return FieldDataOps.numeric_sub(self._session, first, self)
+
+    def __mul__(self, second):
+        return FieldDataOps.numeric_mul(self._session, self, second)
+
+    def __rmul__(self, first):
+        return FieldDataOps.numeric_mul(self._session, first, self)
+
+    def __truediv__(self, second):
+        return FieldDataOps.numeric_truediv(self._session, self, second)
+
+    def __rtruediv__(self, first):
+        return FieldDataOps.numeric_truediv(self._session, first, self)
+
+    def __floordiv__(self, second):
+        return FieldDataOps.numeric_floordiv(self._session, self, second)
+
+    def __rfloordiv__(self, first):
+        return FieldDataOps.numeric_floordiv(self._session, first, self)
+
     def isin(self, test_elements:Union[list, set, np.ndarray]):
         """
         Returns a boolean array of the same length as field 
@@ -3123,6 +3154,7 @@ class CategoricalField(HDF5Field):
     def __add__(self, second):
         return FieldDataOps.numeric_add(self._session, self, second)
 
+    __array_ufunc__ = None
     def __radd__(self, first):
         return FieldDataOps.numeric_add(self._session, first, self)
 
