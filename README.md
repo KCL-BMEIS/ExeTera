@@ -19,8 +19,8 @@ Requires python 3.7+ and third-party packages, see `pyproject.toml` file.
 ---
 # Usage
 
-The ExeTera allows you to import data from CSV sources into HDF5, a columnar data
-format more suited to performing analytics. This is done through `exetera import`.
+ExeTera allows you to import data from CSV sources into HDF5, a columnar data
+format more suited to performing analytics. This is done through the `exetera import` command line operation.
 
 
 ### `exetera import`
