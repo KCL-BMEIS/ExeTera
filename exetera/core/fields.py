@@ -286,6 +286,7 @@ class WriteableFieldArray:
         self._field = field
         self._name = dataset_name
         self._dataset = field[dataset_name]
+        self._references = list()
 
     def __len__(self):
         """
@@ -301,6 +302,25 @@ class WriteableFieldArray:
         :return: dtype
         """
         return self._dataset.dtype
+
+    def register_reference(self, field: Field):
+        """
+
+        """
+        self._references.append(field)
+
+    def detach_reference(self, field: Field):
+        """
+
+        """
+        self._references.remove(field)
+
+    def concreate_all_fields(self):
+        """
+
+        """
+        for field in self._references:
+            field.concrete_reference()
 
     def __getitem__(self, item):
         return self._dataset[item]
@@ -2533,6 +2553,8 @@ class NumericField(HDF5Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
         super().__init__(session, group, dataframe, write_enabled=write_enabled)
         self._nformat = self._field.attrs['nformat']
+        if self.is_view():
+            self.data.register_reference(self)
 
     def writeable(self):
         """
@@ -2580,12 +2602,31 @@ class NumericField(HDF5Field):
     def filter(self, filter_h5group):
         self._filter_wrapper = WriteableFieldArray(filter_h5group, 'values')
 
+    def is_view(self):
+        """
+        Return if the dataframe's name matches the field h5group path; if not, means this field is a view.
+        """
+        if self._field.name[1:self._field.name.rfind('/')] == self.dataframe.name:
+            return False
+        else:
+            return True
+
     def __getitem__(self, item):
         if self._filter_wrapper != None:
             data_filter = self._filter_wrapper[:]
             return self.data[item][data_filter]
         else:
             return self.data[item]
+
+    def concrete_reference(self):
+        if not self.is_view():
+            raise ValueError("This field is already a concreted field.")
+
+        self.data.detach_reference(self)  # notice field array
+        del self.dataframe[self.name]  # notice dataframe
+        concrete_field = self.create_like(self.dataframe, self.name)  # create
+        concrete_field.data.write(self[:])  # write data
+        return concrete_field
 
     def is_sorted(self):
         """
@@ -4118,7 +4159,6 @@ class FieldDataOps:
             return TimestampField(source._session, group[name], None, write_enabled=True)
         else:
             return group.create_timestamp(name, ts)
-
 
     @staticmethod
     def apply_isin(source: Field, test_elements: Union[list, set, np.ndarray]):
