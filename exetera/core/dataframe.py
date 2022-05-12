@@ -113,6 +113,7 @@ class HDF5DataFrame(DataFrame):
         """
         if isinstance(field, fld.NumericField):
             view = fld.NumericField(field._session, field._field, self, write_enabled=True)
+            view.data = field.data
 
         self._columns[view.name] = view
         return self._columns[view.name]
@@ -1122,9 +1123,7 @@ class HDF5DataFrame(DataFrame):
     def view(self):
         dfv = self.dataset.create_dataframe(self.name + '_view')
         for f in self.columns.values():
-            #fld.numeric_field_constructor(self._dataset.session, dfv, f.name, f._nformat)
-            nfield = fld.NumericField(self._dataset.session, f._field, dfv, write_enabled=True)
-            dfv._columns[f.name] = nfield
+            dfv.add_view(f)
         return dfv
 
 

@@ -1331,26 +1331,48 @@ class TestDataFrameDescribe(unittest.TestCase):
 
 class TestDataFrameFilter(SessionTestCase):
 
-    @parameterized.expand([('','num','',[1,2,3,4,5,6,7,8,9,10])])
-    def test_set_filter(self, creator, name, kwargs, data):
-        #f = self.setup_field(self.df, creator, name, (), kwargs, data)
-        f = self.df.create_numeric(name, 'int32')
-        f.data.write(data)
+    @parameterized.expand([("create_numeric", "f_i8", {"nformat": "int8"}, [i for i in range(20)] ),])
+    def test_apply_filter(self, creator, name, kwargs, data):
+        data = np.asarray(data)
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        view_df = self.ds.create_dataframe('view_df')
+        filter_to_apply = np.asarray([i%2 == 0 for i in data])
+        self.df.apply_filter(filter_to_apply, ddf= view_df)
+        for field in view_df.values():
+            self.assertTrue(field.is_view())  # field is a view
+            self.assertListEqual(data[filter_to_apply].tolist(), field[:].tolist() )  # filtered
 
-        data = np.asarray(data, 'int32')
-
-        d_filter = np.array([1,3,5,7])
-        self.df.set_filter(name, d_filter)
-        self.assertListEqual(f.data[:].tolist(), data.tolist()) # unfiltered data
-        self.assertListEqual(f[:].tolist(), data[d_filter].tolist())  # filtered data
-
-        df2 = self.ds.create_dataframe('df2')
-        df2.add_reference(f)
-        f2 = df2[name]
-        self.assertEqual(f._field.name, f2._field.name)
-        self.assertListEqual(f2.data[:].tolist(), data.tolist())  # unfiltered data
-        self.assertListEqual(f2[:].tolist(), data.tolist())  # unfiltered data
-
+        #
+        view_df2 = self.ds.create_dataframe('view_df2')
+        filter_to_apply &= np.asarray([i < 10 for i in data])
+        self.df.apply_filter(filter_to_apply, ddf=view_df2)
+        for field in view_df2.values():
+            self.assertTrue(field.is_view())  # field is a view
+            self.assertListEqual(data[filter_to_apply].tolist(), field[:].tolist())  # filtered
 
     def test_remove_filter(self):
         pass
+
+    @parameterized.expand([("create_numeric", "f_i8", {"nformat": "int8"}, [i for i in range(20)]), ])
+    def test_concrete_field(self, creator, name, kwargs, data):
+        data = np.asarray(data)
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        view_df = self.ds.create_dataframe('view_df')
+        filter_to_apply = np.asarray([i % 2 == 0 for i in data])
+        self.df.apply_filter(filter_to_apply, ddf=view_df)
+        print('a',view_df.keys())
+        for field in view_df.values():
+            self.assertTrue(field.is_view())  # field is a view
+            self.assertListEqual(data[filter_to_apply].tolist(), field[:].tolist())  # filtered
+
+        new_data = data + 1
+        f.data.clear()
+        f.data.write(new_data)  # data changed, view should be concreate automatically
+
+        for field in view_df.values():
+            self.assertFalse(field.is_view())
+            self.assertListEqual(data[filter_to_apply].tolist(), field[:].tolist())  # filtered
+
+
+
+

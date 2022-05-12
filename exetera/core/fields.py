@@ -333,6 +333,8 @@ class WriteableFieldArray:
         Replaces current dataset with empty dataset.
         :return: None
         """
+        if len(self._references) > 0:
+            self.concreate_all_fields()
         nformat = self._dataset.dtype
         DataWriter._clear_dataset(self._field, self._name)
         DataWriter.write(self._field, self._name, [], 0, nformat)
@@ -363,6 +365,8 @@ class WriteableFieldArray:
         :param part: numpy array to write to field
         :return: None
         """
+        if len(self._references) > 0:
+            self.concreate_all_fields()
         if isinstance(part, Field):
             part = part.data[:]
         DataWriter.write(self._field, self._name, part, len(part), dtype=self._dataset.dtype)
@@ -2553,8 +2557,6 @@ class NumericField(HDF5Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
         super().__init__(session, group, dataframe, write_enabled=write_enabled)
         self._nformat = self._field.attrs['nformat']
-        if self.is_view():
-            self.data.register_reference(self)
 
     def writeable(self):
         """
@@ -2589,6 +2591,14 @@ class NumericField(HDF5Field):
                 self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
         return self._value_wrapper
 
+    @data.setter
+    def data(self, FieldArray):
+        """
+        Setting the Field Array (data interface) directly. This can also associate field with an existing field array to enable a view.
+        """
+        self._value_wrapper = FieldArray
+        if self.is_view():
+            self.data.register_reference(self)
 
     @property
     def filter(self):
@@ -2606,10 +2616,10 @@ class NumericField(HDF5Field):
         """
         Return if the dataframe's name matches the field h5group path; if not, means this field is a view.
         """
-        if self._field.name[1:self._field.name.rfind('/')] == self.dataframe.name:
-            return False
-        else:
+        if self._field.name[1:1+len(self.dataframe.name)] != self.dataframe.name:
             return True
+        else:
+            return False
 
     def __getitem__(self, item):
         if self._filter_wrapper != None:
@@ -2623,6 +2633,7 @@ class NumericField(HDF5Field):
             raise ValueError("This field is already a concreted field.")
 
         self.data.detach_reference(self)  # notice field array
+        print(self.name)
         del self.dataframe[self.name]  # notice dataframe
         concrete_field = self.create_like(self.dataframe, self.name)  # create
         concrete_field.data.write(self[:])  # write data
