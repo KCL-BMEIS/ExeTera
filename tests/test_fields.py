@@ -102,7 +102,7 @@ class TestFieldDataOps(SessionTestCase):
                 np.testing.assert_array_equal(result,output)
                 self.assertIsInstance(output, fields.NumericMemField)
                 self.assertEqual(output.data.dtype,"bool")
-
+   
     @parameterized.expand(
         [(operator.lt,), (operator.gt,), (operator.le,), (operator.ge,), (operator.ne,), (operator.eq,)])
     def test_CategoricalField_binary_op(self, op):
@@ -1906,6 +1906,186 @@ class TestFieldCreateLikeWithGroups(unittest.TestCase):
                 self.assertEqual(0, len(g.data))
 
 
+class TestFieldWhereFunctions(unittest.TestCase):
+
+    def _test_module_where(self, create_field_fn, predicate, if_true, if_false, expected):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = create_field_fn(df, 'foo')
+
+            with self.subTest("testing module where"):
+                r = fields.where(predicate(f), if_true, if_false)
+                self.assertEqual(r.tolist(), expected)
+
+    def _test_instance_where(self, create_field_fn, predicate, if_false, expected):
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = create_field_fn(df, 'foo')
+
+            with self.subTest("testing field where"):
+                r = f.where(predicate(f), if_false)
+                self.assertEqual(r.tolist(), expected)
+            with self.subTest("testing field where with predicate"):
+                r = f.where(lambda f2: predicate(f2), if_false)
+                self.assertEqual(r.tolist(), expected)
+            with self.subTest("testing inplace field where"):
+                r = f.where(predicate(f), if_false, inplace=True)
+                self.assertEqual(list(f.data[:]), expected)
+
+    def test_field_where_numeric_int32(self):
+        def create_numeric(df, name):
+            f = df.create_numeric(name, 'int32')
+            f.data.write(np.asarray([-1, 2, 3, 5, 9, 5, 8, 6, 4, 7, 0], dtype=np.int32))
+            return f
+
+        self._test_module_where(create_numeric, lambda f: f > 5, 1, 0,
+                                [0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0])
+        self._test_module_where(create_numeric, lambda f: f > 5, 1, 9,
+                                [9, 9, 9, 9, 1, 9, 1, 1, 9, 1, 9])
+        self._test_module_where(create_numeric, lambda f: f > 5, 1, -1,
+                                [-1, -1, -1, -1, 1, -1, 1, 1, -1, 1, -1])
+
+        self._test_instance_where(create_numeric, lambda f: f > 5, 0,
+                                  [0, 0, 0, 0, 9, 0, 8, 6, 0, 7, 0])
+        self._test_instance_where(create_numeric, lambda f: f > 5, 9,
+                                  [9, 9, 9, 9, 9, 9, 8, 6, 9, 7, 9])
+        self._test_instance_where(create_numeric, lambda f: f > 5, -1,
+                                  [-1, -1, -1, -1, 9, -1, 8, 6, -1, 7, -1])
+
+    def test_field_where_numeric_float32(self):
+        def create_numeric(df, name):
+            f = df.create_numeric(name, 'float32')
+            f.data.write(np.asarray([1e-7, 0.24, 1873.0, -0.0088, 227819.38457, np.nan, 0.0],
+                                    dtype=np.float32))
+            return f
+
+        self._test_module_where(create_numeric, lambda f: np.isnan(f.data[:]), 1, 0,
+                                [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0])
+        # self._test_module_where(create_numeric, lambda f: f > 5, 1, 9,
+        #                         [9, 9, 9, 9, 1, 9, 1, 1, 9, 1, 9])
+        # self._test_module_where(create_numeric, lambda f: f > 5, 1, -1,
+        #                         [-1, -1, -1, -1, 1, -1, 1, 1, -1, 1, -1])
+        #
+        # self._test_instance_where(create_numeric, lambda f: f > 5, 0,
+        #                           [0, 0, 0, 0, 9, 0, 8, 6, 0, 7, 0])
+        # self._test_instance_where(create_numeric, lambda f: f > 5, 9,
+        #                           [9, 9, 9, 9, 9, 9, 8, 6, 9, 7, 9])
+        # self._test_instance_where(create_numeric, lambda f: f > 5, -1,
+        #                           [-1, -1, -1, -1, 9, -1, 8, 6, -1, 7, -1])
+
+    def test_field_where_categorical(self):
+        def create_categorical(df, name):
+            f = df.create_categorical(name, nformat='int8', key={'x': 0, 'y': 1, 'xy': 2})
+            f.data.write(np.asarray([0, 2, 1, 2, 0, 1, 1, 2, 1]))
+            return f
+
+        self._test_module_where(create_categorical, lambda f: f == 2, 1, 0,
+                                [0, 1, 0, 1, 0, 0, 0, 1, 0])
+
+        self._test_instance_where(create_categorical, lambda f: f != 2, -1,
+                                  [0, -1, 1, -1, 0, 1, 1, -1, 1])
+
+    def test_field_where_fixed_string(self):
+        def create_fixed_string(df, name):
+            f = df.create_fixed_string(name, 6)
+            f.data.write(np.asarray(['foo', '"foo"', '', 'bar', 'barn', 'bat'], dtype='S6'))
+            return f
+
+        self._test_module_where(create_fixed_string, lambda f: np.char.str_len(f.data[:]) > 3,
+                                'boo', '_far',
+                                ['_far', 'boo', '_far', '_far', 'boo', '_far'])
+                                # [b'_far', b'boo', b'_far', b'_far', b'boo', b'_far'])
+
+        self._test_instance_where(create_fixed_string, lambda f: np.char.str_len(f.data[:]) > 3,
+                                  'foobar',
+                                  [b'foobar', b'"foo"', b'foobar', b'foobar', b'barn', b'foobar'])
+
+
+    def test_field_where_indexed_string(self):
+        def create_indexed_string(df, name):
+            f = df.create_indexed_string(name)
+            f.data.write(['foo', '"foo"', '', 'bar', 'barn', 'bat'])
+            return f
+
+        self._test_module_where(create_indexed_string, lambda f: np.char.str_len(f.data[:]) > 3,
+                                'boo', '_far', ['_far', 'boo', '_far', '_far', 'boo', '_far'])
+
+        self._test_module_where(create_indexed_string, lambda f: (f.indices[1:] - f.indices[:-1]) > 3,
+                                'boo', '_far', ['_far', 'boo', '_far', '_far', 'boo', '_far'])
+
+
+    # def test_module_where_numeric(self):
+    #     input_data = [1, 2, 3, 5, 9, 8, 6, 4, 7, 0]
+    #     data = np.asarray(input_data, dtype=np.int32)
+    #     bio = BytesIO()
+    #     with session.Session() as s:
+    #         src = s.open_dataset(bio, 'w', 'src')
+    #         df = src.create_dataframe('df')
+    #         f = df.create_numeric('foo', 'int32')
+    #         f.data.write(data)
+    #
+    #         r = fields.where(f > 5, 1, 0)
+    #         self.assertEqual(r.tolist(), [0,0,0,0,1,1,1,0,1,0])
+    #
+    # def test_instance_where_numeric(self):
+    #     input_data = [1,2,3,5,9,8,6,4,7,0]
+    #     data = np.asarray(input_data, dtype=np.int32)
+    #     bio = BytesIO()
+    #     with session.Session() as s:
+    #         src = s.open_dataset(bio, 'w', 'src')
+    #         df = src.create_dataframe('df')
+    #         f = df.create_numeric('foo', 'int32')
+    #         f.data.write(data)
+    #         r = f.where(f > 5, 0)
+    #         self.assertEqual(r.tolist(), [0,0,0,0,9,8,6,0,7,0])
+    #
+    # def test_instance_where_numeric_inplace(self):
+    #     input_data = [1,2,3,5,9,8,6,4,7,0]
+    #     data = np.asarray(input_data, dtype=np.int32)
+    #     bio = BytesIO()
+    #     with session.Session() as s:
+    #         src = s.open_dataset(bio, 'w', 'src')
+    #         df = src.create_dataframe('df')
+    #         f = df.create_numeric('foo', 'int32')
+    #         f.data.write(data)
+    #
+    #         r = f.where(f > 5, 0)
+    #         self.assertEqual(list(f.data[:]), [1,2,3,5,9,8,6,4,7,0])
+    #         r = f.where(f > 5, 0, inplace=True)
+    #         self.assertEqual(list(f.data[:]), [0,0,0,0,9,8,6,0,7,0])
+    #
+    # def test_instance_where_with_callable(self):
+    #     input_data = [1,2,3,5,9,8,6,4,7,0]
+    #     data = np.asarray(input_data, dtype=np.int32)
+    #     bio = BytesIO()
+    #     with session.Session() as s:
+    #         src = s.open_dataset(bio, 'w', 'src')
+    #         df = src.create_dataframe('df')
+    #         f = df.create_numeric('foo', 'int32')
+    #         f.data.write(data)
+    #
+    #         r = f.where(lambda x: x > 5, 0)
+    #         self.assertEqual(r.tolist(), [0,0,0,0,9,8,6,0,7,0])
+
+    def test_where_bool_condition(self):
+        input_data = [1,2,3,5,9,8,6,4,7,0]
+        data = np.asarray(input_data, dtype=np.int32)
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+            f = df.create_numeric('foo', 'int32')
+            f.data.write(data)
+
+            cond = np.array([False,False,True,True, False, True, True, False, False, True])
+            r = f.where(cond, 0)
+            self.assertEqual(r.tolist(), [0,0,3,5,0,8,6,0,0,0])
+
+
 class TestNumericFieldAsType(unittest.TestCase):
 
     def test_numeric_field_astype(self):
@@ -2182,3 +2362,5 @@ class TestFieldModuleFunctions(SessionTestCase):
         else:
             with self.assertRaises(ValueError):
                 fields.argsort(f)
+
+

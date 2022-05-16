@@ -85,7 +85,6 @@ class Field(ABC):
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         raise NotImplementedError()
 
-
 class Dataset(ABC):
     """
     DataSet is a container of dataframes
@@ -269,6 +268,10 @@ class DataFrame(ABC):
 
     @abstractmethod
     def apply_index(self, index_to_apply, ddf=None):
+        raise NotImplementedError()
+
+    @staticmethod
+    def where(cond, a, b):
         raise NotImplementedError()
 
 

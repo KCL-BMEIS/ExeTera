@@ -16,7 +16,7 @@ import operator
 import numpy as np
 import h5py
 
-from exetera.core.abstract_types import Field
+from exetera.core.abstract_types import Field, AbstractSession
 from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
 from exetera.core import validation as val
@@ -37,6 +37,36 @@ def isin(field:Field, test_elements:Union[list, set, np.ndarray]):
     ret = NumericMemField(field._session, 'bool')
     ret.data.write(FieldDataOps.apply_isin(field, test_elements))
     return ret
+
+    
+# def where(cond, a, b):
+#     if isinstance(cond, np.ndarray) and cond.dtype == 'bool':
+#         cond = cond
+#     elif isinstance(cond, NumericMemField):
+#         cond = cond.data[:]
+#     else:
+#         raise Exception("'cond' parameter needs to be either boolean ndarray, or NumericMemField")
+#
+#     if isinstance(a, Field):
+#         a = a.data[:]
+#     if isinstance(b, Field):
+#         b = b.data[:]
+#     return np.where(cond, a, b)
+
+
+def where(cond, a, b):
+    if isinstance(cond, np.ndarray) and cond.dtype == 'bool':
+        cond = cond
+    elif isinstance(cond, Field):
+        if cond.indexed:
+            raise NotImplementedError("Where does not support indexed string fields at present")
+        cond = cond.data[:]
+
+    if isinstance(a, Field):
+        a = a.data[:]
+    if isinstance(b, Field):
+        b = b.data[:]
+    return np.where(cond, a, b)
 
 
 class HDF5Field(Field):
@@ -143,6 +173,27 @@ class HDF5Field(Field):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
 
+    def where(self, cond, b, inplace=False):
+
+        if callable(cond):
+            cond = cond(self.data[:])
+        elif isinstance(cond, np.ndarray) and cond.dtype == 'bool':
+            cond = cond
+        elif isinstance(cond, NumericMemField):
+            cond = cond.data[:]
+        else:
+            raise TypeError("'cond' parameter needs to be either callable lambda function, or boolean ndarray, or NumericMemField")
+
+        if isinstance(b, str):
+            b = b.encode()
+
+        result = np.where(cond, self.data[:], b)
+
+        if inplace:
+            self.data.clear()
+            self.data.write(result)
+        return result
+
 
 class MemoryField(Field):
 
@@ -221,6 +272,24 @@ class MemoryField(Field):
         Apply index on the field.
         """
         raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
+
+    def where(self, cond, b, inplace=False):
+
+        if callable(cond):
+            cond = cond(self.data[:])
+        elif isinstance(cond, np.ndarray) and cond.dtype == 'bool':
+            cond = cond
+        elif isinstance(cond, NumericMemField):
+            cond = cond.data[:]
+        else:
+            raise Exception("'cond' parameter needs to be either callable lambda function, or boolean ndarray, or NumericMemField")
+
+        result = np.where(cond, self.data[:], b)
+
+        if inplace:
+            self.data.clear()
+            self.data.write(result)
+        return result
 
 
 class ReadOnlyFieldArray:
@@ -3493,6 +3562,8 @@ def dtype_to_str(dtype):
         return 'float32'
     elif dtype == np.float64:
         return 'float64'
+    elif FieldDataOps.valid_fixed_string_dtype(dtype):
+        return dtype
 
     raise ValueError("Unsupported dtype '{}'".format(dtype))
 
@@ -4088,7 +4159,6 @@ class FieldDataOps:
         else:
             return group.create_timestamp(name, ts)
 
-
     @staticmethod
     def apply_isin(source: Field, test_elements: Union[list, set, np.ndarray]):
         """
@@ -4126,3 +4196,42 @@ class FieldDataOps:
             return ops.unique_for_indexed_string(src.indices[:], src.values[:], return_index, return_inverse, return_counts) 
         else:
             return np.unique(src.data[:], return_index=return_index, return_inverse=return_inverse, return_counts=return_counts)
+
+    @staticmethod
+    def valid_fixed_string_dtype(dtype):
+        if len(dtype) < 2:
+            return False
+        return dtype[0] in ('S', 's') and dtype[1:].isnumeric() and int(dtype[1:]) > 0
+
+    @staticmethod
+    def field_from_dtype(session, dtype, keys=None):
+        if session is None:
+            raise ValueError("'session' must not be None")
+        if not isinstance(session, AbstractSession):
+            raise TypeError("'session' must be of type {}".format(type(session)))
+        if dtype in ('bool', 'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32'):
+            return NumericMemField(session, dtype)
+        elif FieldDataOps.valid_fixed_string_dtype(dtype):
+            return FixedStringMemField(session, dtype[1:])
+        elif dtype == 'indexed':
+            return IndexedStringMemField(session)
+        elif dtype == 'categorical':
+            return CategoricalMemField(session, 'int8', keys)
+        else:
+            raise ValueError("'dtype' is not a valid field datatype")
+
+    @staticmethod
+    def field_from_nparray(session, array, hint=None, keys=None):
+        if hint is not None:
+            if hint == 'categorical' and keys is None:
+                raise ValueError("'hint' is {} but 'keys' are not set".format(hint))
+            elif keys is not None:
+                raise ValueError("'hint' is not {} but 'keys' are set".format(hint))
+
+            f = FieldDataOps.field_from_dtype(session, hint, keys)
+        else:
+            sdtype = dtype_to_str(array.dtype)
+            f = FieldDataOps.field_from_dtype(session, sdtype)
+
+        f.data.write(array)
+        return f

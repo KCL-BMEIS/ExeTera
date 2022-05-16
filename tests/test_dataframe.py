@@ -1327,3 +1327,30 @@ class TestDataFrameDescribe(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 df.describe(exclude=['num', 'num2', 'ts1'])
             self.assertTrue(isinstance(context.exception, ValueError))
+
+
+class TestDataFrameWhere(unittest.TestCase):
+
+    def test_df_where_default(self):
+        input_data_1 = [1,2,3,4]
+        input_data_2 = [3,4,5,6]
+        data1 = np.asarray(input_data_1, dtype=np.int32)
+        data2 = np.asarray(input_data_2, dtype=np.int32)
+        bio = BytesIO()
+        with session.Session() as s:
+            src = s.open_dataset(bio, 'w', 'src')
+            df = src.create_dataframe('df')
+
+            #df = ds.create_dataframe('df')
+            f1 = df.create_numeric('foo_field_1', 'int32')
+            f1.data.write(data1)
+            f2 = df.create_numeric('foo_field_2', 'int32')
+            f2.data.write(data2)
+
+            # res = dataframe.DataFrame.where(df > 3, 1, 0)
+
+            # print(res)
+
+                #cond = np.array([False,False,True,True])
+                #r = f.where(cond, 0)
+                #self.assertEqual(list(r), [0, 0, 3, 4])
