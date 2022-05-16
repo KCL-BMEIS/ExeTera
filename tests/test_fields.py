@@ -53,6 +53,38 @@ class TestFieldExistence(SessionTestCase):
         self.assertTrue(f.valid)
 
 
+CATEGORY_NUMERIC_OPERATION_TEST = [
+         (operator.add, 'int32', [1, 2, 3], 'int32', [4, 5, 0], 'int32'),
+         (operator.add, 'int32', [2, 3, 1], 'int64', [6, 2, 1], 'int64'),
+         (operator.add, 'int32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float64'),
+         (operator.add, 'float32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float32'),
+         (operator.add, 'float32', [1, 3, 2], 'float64', [3.0, 4.0, 6.0], 'float64'),
+
+         (operator.sub, 'int32', [1, 2, 3], 'int32', [4, 5, 0], 'int32'),
+         (operator.sub, 'int32', [2, 3, 1], 'int64', [6, 2, 1], 'int64'),
+         (operator.sub, 'int32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float64'),
+         (operator.sub, 'float32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float32'),
+         (operator.sub, 'float32', [1, 3, 2], 'float64', [3.0, 4.0, 6.0], 'float64'),
+
+         (operator.mul, 'int32', [1, 2, 3], 'int32', [4, 5, 0], 'int32'),
+         (operator.mul, 'int32', [2, 3, 1], 'int64', [6, 2, 1], 'int64'),
+         (operator.mul, 'int32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float64'),
+         (operator.mul, 'float32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float32'),
+         (operator.mul, 'float32', [1, 3, 2], 'float64', [3.0, 4.0, 6.0], 'float64'),
+
+         (operator.truediv, 'int32', [1, 2, 3], 'int32', [4, 5, 1], 'float64'),
+         (operator.truediv, 'int32', [2, 3, 1], 'int64', [6, 2, 1], 'float64'),
+         (operator.truediv, 'int32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float64'),
+         (operator.truediv, 'float32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float32'),
+         (operator.truediv, 'float32', [1, 3, 2], 'float64', [3.0, 4.0, 6.0], 'float64'),
+
+         (operator.floordiv, 'int32', [1, 2, 3], 'int32', [4, 5, 1], 'int32'),
+         (operator.floordiv, 'int32', [2, 3, 1], 'int64', [6, 2, 1], 'int64'),
+         (operator.floordiv, 'int32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float64'),
+         (operator.floordiv, 'float32', [1, 3, 2], 'float32', [3.0, 5.0, 6.0], 'float32'),
+         (operator.floordiv, 'float32', [1, 3, 2], 'float64', [3.0, 4.0, 6.0], 'float64'),
+    ]
+
 class TestFieldDataOps(SessionTestCase):
     """
     Test data operations for each different field.
@@ -64,7 +96,7 @@ class TestFieldDataOps(SessionTestCase):
 
         
     @parameterized.expand([(operator.lt,),(operator.gt,),(operator.le,),(operator.ge,),(operator.ne,),(operator.eq,)])
-    def test_CategoricalMemField_binary_op(self,op):
+    def test_CategoricalMemField_compare_binary_op(self,op):
         """
         Categorical mem field ops against numpy, categorical memory field, categorical field
         """
@@ -105,7 +137,7 @@ class TestFieldDataOps(SessionTestCase):
 
     @parameterized.expand(
         [(operator.lt,), (operator.gt,), (operator.le,), (operator.ge,), (operator.ne,), (operator.eq,)])
-    def test_CategoricalField_binary_op(self, op):
+    def test_CategoricalField_compare_binary_op(self, op):
         """
         Categorical field ops against numpy, categorical memory field, categorical field
         """
@@ -143,6 +175,80 @@ class TestFieldDataOps(SessionTestCase):
                 np.testing.assert_array_equal(result, output)
                 self.assertIsInstance(output, fields.NumericMemField)
                 self.assertEqual(output.data.dtype, "bool")
+
+
+    @parameterized.expand(CATEGORY_NUMERIC_OPERATION_TEST)
+    def test_CategoricalField_numeric_binary_op(self, op, first_datatype, first_data, second_datatype, second_data, expected_datatype):
+        """
+        Categorical field ops against numpy, categorical memory field, categorical field
+        """
+        first_cat_field = self.df.create_categorical('catf_1', first_datatype, {"a": 1, "b": 2, "c": 3})
+        first_ndarray = np.array(first_data, dtype=first_datatype)
+        first_cat_field.data.write(first_ndarray)
+
+        second_cat_field = self.df.create_categorical('catf_2', second_datatype, {"x": 0, "y": 1, "z": 6})
+        second_cat_mem_field = fields.CategoricalMemField(self.s, second_datatype, {"x": 0, "y": 1, "z": 6})
+        second_numeric_field = self.df.create_numeric('num', second_datatype)
+        second_ndarray = np.array(second_data, dtype=second_datatype)
+        second_cat_field.data.write(second_ndarray)
+        second_cat_mem_field.data.write(second_ndarray)
+        second_numeric_field.data.write(second_ndarray)
+
+        expected_result = op(first_ndarray, second_ndarray)
+
+        combinations = [
+            (first_cat_field, second_ndarray),
+            (second_ndarray, first_cat_field),
+            (first_cat_field, second_numeric_field),
+            (second_numeric_field, first_cat_field),
+            (first_cat_field, second_cat_mem_field),
+            (second_cat_mem_field, first_cat_field),
+            (first_cat_field, second_cat_field),
+            (second_cat_field, first_cat_field),
+        ]
+
+        for first, second in combinations:
+            with self.subTest(f"Testing numeric operation: first is {type(first)} , second is {type(second)}"):
+                output = op(first, second)
+                np.testing.assert_array_equal(output, expected_result)
+                self.assertEqual(output.data.dtype, expected_datatype)
+
+
+    @parameterized.expand(CATEGORY_NUMERIC_OPERATION_TEST)
+    def test_CategoricalMemField_numeric_binary_op(self, op, first_datatype, first_data, second_datatype, second_data, expected_datatype):
+        """
+        Categorical field ops against numpy, categorical memory field, categorical field
+        """
+        first_cat_mem_field = fields.CategoricalMemField(self.s, second_datatype, {"a": 1, "b": 2, "c": 3})
+        first_ndarray = np.array(first_data, dtype=first_datatype)
+        first_cat_mem_field.data.write(first_ndarray)
+
+        second_cat_field = self.df.create_categorical('catf_2', second_datatype, {"x": 0, "y": 1, "z": 6})
+        second_cat_mem_field = fields.CategoricalMemField(self.s, second_datatype, {"x": 0, "y": 1, "z": 6})
+        second_numeric_field = self.df.create_numeric('num', second_datatype)
+        second_ndarray = np.array(second_data, dtype=second_datatype)
+        second_cat_field.data.write(second_ndarray)
+        second_cat_mem_field.data.write(second_ndarray)
+        second_numeric_field.data.write(second_ndarray)
+
+        expected_result = op(first_ndarray, second_ndarray)
+
+        combinations = [
+            (first_cat_mem_field, second_ndarray),
+            (second_ndarray, first_cat_mem_field),
+            (first_cat_mem_field, second_numeric_field),
+            (second_numeric_field, first_cat_mem_field),
+            (first_cat_mem_field, second_cat_field),
+            (second_cat_field, first_cat_mem_field),
+            (first_cat_mem_field, second_cat_mem_field),
+        ]
+
+        for first, second in combinations:
+            with self.subTest(f"Testing numeric operation: first is {type(first)}, second is {type(second)}"):
+                output = op(first, second)
+                np.testing.assert_array_equal(output, expected_result)
+                self.assertEqual(output.data.dtype, expected_datatype)
+
 
     @parameterized.expand([(operator.eq,),(operator.ge,),(operator.gt,),(operator.le,),(operator.lt,),(operator.ne,),])
     def test_NumericField_binary_ops(self, op):
