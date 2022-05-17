@@ -39,6 +39,23 @@ def isin(field:Field, test_elements:Union[list, set, np.ndarray]):
     return ret
 
 
+def where(cond, a, b):
+    if isinstance(cond, list) or (isinstance(cond, np.ndarray) and cond.dtype == 'bool'):
+        cond = cond
+    elif isinstance(cond, Field):
+        if cond.indexed:
+            raise NotImplementedError("Where does not support indexed string fields at present")
+        cond = cond.data[:]
+    elif callable(cond):
+        raise NotImplementedError("fields.where doesn't support callable cond")
+
+    if isinstance(a, Field):
+        a = a.data[:]
+    if isinstance(b, Field):
+        b = b.data[:]
+    return np.where(cond, a, b)
+
+
 class HDF5Field(Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
         super().__init__()
@@ -142,6 +159,31 @@ class HDF5Field(Field):
     def _ensure_valid(self):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
+
+    def where(self, cond, b, inplace=False):
+
+        if callable(cond):
+            cond = cond(self.data[:])
+        elif isinstance(cond, list) or (isinstance(cond, np.ndarray) and cond.dtype == 'bool'):
+            cond = cond
+        elif isinstance(cond, Field):
+            if cond.indexed:
+                raise NotImplementedError("Where does not support indexed string fields at present")
+            cond = cond.data[:]
+        else:
+            raise TypeError("'cond' parameter needs to be either callable lambda function, or boolean ndarray, or NumericMemField")
+
+        if isinstance(b, str):
+            b = b.encode()
+        if isinstance(b, Field):
+            b = b.data[:]
+
+        result = np.where(cond, self.data[:], b)
+
+        if inplace:
+            self.data.clear()
+            self.data.write(result)
+        return result
 
 
 class MemoryField(Field):
