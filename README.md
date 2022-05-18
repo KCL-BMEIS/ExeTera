@@ -9,17 +9,18 @@ Please take a moment to read this page, and also take a look at the [Wiki](https
 # Current release and requirements
 
 [![Documentation Status](https://readthedocs.org/projects/exetera/badge/?version=latest)](https://exetera.readthedocs.io/en/latest/?badge=latest)
-[![PyPI Version](https://img.shields.io/pypi/v/exetera?label=PyPI%20version&logo=python&logoColor=white)](https://pypi.org/project/exetera/)
 [![Testing](https://github.com/KCL-BMEIS/ExeTera/workflows/Unittests/badge.svg)](https://github.com/KCL-BMEIS/ExeTera/actions)
 [![codecov](https://codecov.io/gh/KCL-BMEIS/ExeTera/branch/master/graph/badge.svg)](https://codecov.io/gh/KCL-BMEIS/ExeTera)
+[![PyPI Version](https://img.shields.io/pypi/v/exetera?label=PyPI%20version&logo=python&logoColor=white)](https://pypi.org/project/exetera/)
+[![Downloads](https://pepy.tech/badge/exetera)](https://pepy.tech/project/exetera)
 
-Requires python 3.7+
+Requires python 3.7+ and third-party packages, see `pyproject.toml` file.
 
 ---
 # Usage
 
-The ExeTera allows you to import data from CSV sources into HDF5, a columnar data
-format more suited to performing analytics. This is done through `exetera import`.
+ExeTera allows you to import data from CSV sources into HDF5, a columnar data
+format more suited to performing analytics. This is done through the `exetera import` command line operation.
 
 
 ### `exetera import`

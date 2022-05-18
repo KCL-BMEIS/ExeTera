@@ -533,54 +533,49 @@ class ReadOnlyIndexedFieldArray:
         :param item: Index
         :return: Item value from dataset
         """
-        try:
-            if isinstance(item, slice):
-                if self._field_instance.filter is None:
-                    start = item.start if item.start is not None else 0
-                    stop = item.stop if item.stop is not None else len(self._indices) - 1
-                    step = item.step
-                    # TODO: validate slice
-                    index = self._indices[start:stop + 1]
-                    bytestr = self._values[index[0]:index[-1]]
-                    results = [None] * (len(index) - 1)
-                    startindex = self._indices[start]
-                    for ir in range(len(results)):
-                        results[ir] = \
-                            bytestr[index[ir] - np.int64(startindex):
-                                    index[ir + 1] - np.int64(startindex)].tobytes().decode()
-                    return results
-                else:
-                    mask = self._field_instance.filter[:]
-                    index_s = self._indices[mask]
-                    index_e = self._indices[mask+1]
-                    results = [None] * len(mask)
-                    for ir in range(len(results)):
-                        results[ir] = self._values[index_s[ir]: index_e[ir]]
-                    return results[item]
+        if isinstance(item, slice):
+            if self._field_instance.filter is None:
+                start = item.start if item.start is not None else 0
+                stop = item.stop if item.stop is not None else len(self._indices) - 1
+                step = item.step
+                # TODO: validate slice
+                index = self._indices[start:stop + 1]
+                bytestr = self._values[index[0]:index[-1]]
+                results = [None] * (len(index) - 1)
+                startindex = self._indices[start]
+                for ir in range(len(results)):
+                    results[ir] = \
+                        bytestr[index[ir] - np.int64(startindex):
+                                index[ir + 1] - np.int64(startindex)].tobytes().decode()
+                return results
+            else:
+                mask = self._field_instance.filter[:]
+                index_s = self._indices[mask]
+                index_e = self._indices[mask + 1]
+                results = [None] * len(mask)
+                for ir in range(len(results)):
+                    results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
+                return results[item]
 
-            elif isinstance(item, int):
-                if self._field_instance.filter is None:
-                    if item >= len(self._indices) - 1:
-                        raise ValueError("index is out of range")
-                    start, stop = self._indices[item:item + 2]
-                    if start == stop:
-                        return ''
-                    value = self._values[start:stop].tobytes().decode()
-                    return value
-                else:
-                    mask = self._field_instance.filter[:]
-                    if item >= len(mask) - 1:
-                        raise ValueError("index is out of range")
-                    index_s = self._indices[mask]
-                    index_e = self._indices[mask + 1]
-                    results = [None] * len(mask)
-                    for ir in range(len(results)):
-                        results[ir] = self._values[index_s[ir]: index_e[ir]]
-                    return results[item]
-
-        except Exception as e:
-            print("{}: unexpected exception {}".format(self._field.name, e))
-            raise
+        elif isinstance(item, int):
+            if self._field_instance.filter is None:
+                if item >= len(self._indices) - 1:
+                    raise ValueError("index is out of range")
+                start, stop = self._indices[item:item + 2]
+                if start == stop:
+                    return ''
+                value = self._values[start:stop].tobytes().decode()
+                return value
+            else:
+                mask = self._field_instance.filter[:]
+                if item >= len(mask) - 1:
+                    raise ValueError("index is out of range")
+                index_s = self._indices[mask]
+                index_e = self._indices[mask + 1]
+                results = [None] * len(mask)
+                for ir in range(len(results)):
+                    results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
+                return results[item]
 
     def __setitem__(self, key, value):
         raise PermissionError("This field was created read-only; call <field>.writeable() "
@@ -663,53 +658,49 @@ class WriteableIndexedFieldArray:
         :param item: int or slice
         :return: Item value from dataset
         """
-        try:
-            if isinstance(item, slice):
-                if self._field_instance.filter is None:
-                    start = item.start if item.start is not None else 0
-                    stop = item.stop if item.stop is not None else len(self._indices) - 1
-                    step = item.step
-                    # TODO: validate slice
-                    index = self._indices[start:stop + 1]
-                    bytestr = self._values[index[0]:index[-1]]
-                    results = [None] * (len(index) - 1)
-                    startindex = self._indices[start]
-                    for ir in range(len(results)):
-                        results[ir] = \
-                            bytestr[index[ir] - np.int64(startindex):
-                                    index[ir + 1] - np.int64(startindex)].tobytes().decode()
-                    return results
-                else:
-                    mask = self._field_instance.filter[:]
-                    index_s = self._indices[mask]
-                    index_e = self._indices[mask + 1]
-                    results = [None] * len(mask)
-                    for ir in range(len(results)):
-                        results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
-                    return results[item]
+        if isinstance(item, slice):
+            if self._field_instance.filter is None:
+                start = item.start if item.start is not None else 0
+                stop = item.stop if item.stop is not None else len(self._indices) - 1
+                step = item.step
+                # TODO: validate slice
+                index = self._indices[start:stop + 1]
+                bytestr = self._values[index[0]:index[-1]]
+                results = [None] * (len(index) - 1)
+                startindex = self._indices[start]
+                for ir in range(len(results)):
+                    results[ir] = \
+                        bytestr[index[ir] - np.int64(startindex):
+                                index[ir + 1] - np.int64(startindex)].tobytes().decode()
+                return results
+            else:
+                mask = self._field_instance.filter[:]
+                index_s = self._indices[mask]
+                index_e = self._indices[mask + 1]
+                results = [None] * len(mask)
+                for ir in range(len(results)):
+                    results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
+                return results[item]
 
-            elif isinstance(item, int):
-                if self._field_instance.filter is None:
-                    if item >= len(self._indices) - 1:
-                        raise ValueError("index is out of range")
-                    start, stop = self._indices[item:item + 2]
-                    if start == stop:
-                        return ''
-                    value = self._values[start:stop].tobytes().decode()
-                    return value
-                else:
-                    mask = self._field_instance.filter[:]
-                    if item >= len(mask) - 1:
-                        raise ValueError("index is out of range")
-                    index_s = self._indices[mask]
-                    index_e = self._indices[mask + 1]
-                    results = [None] * len(mask)
-                    for ir in range(len(results)):
-                        results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
-                    return results[item]
-        except Exception as e:
-            print(e)
-            raise
+        elif isinstance(item, int):
+            if self._field_instance.filter is None:
+                if item >= len(self._indices) - 1:
+                    raise ValueError("index is out of range")
+                start, stop = self._indices[item:item + 2]
+                if start == stop:
+                    return ''
+                value = self._values[start:stop].tobytes().decode()
+                return value
+            else:
+                mask = self._field_instance.filter[:]
+                if item >= len(mask) - 1:
+                    raise ValueError("index is out of range")
+                index_s = self._indices[mask]
+                index_e = self._indices[mask + 1]
+                results = [None] * len(mask)
+                for ir in range(len(results)):
+                    results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
+                return results[item]
 
     def __setitem__(self, key, value):
         raise PermissionError("IndexedStringField instances cannot be edited via array syntax;"
@@ -1546,6 +1537,7 @@ class NumericMemField(MemoryField):
 
 
 class CategoricalMemField(MemoryField):
+    __array_ufunc__ = None
     def __init__(self, session, nformat, keys):
         super().__init__(session)
         self._nformat = nformat
@@ -1768,6 +1760,36 @@ class CategoricalMemField(MemoryField):
 
     def __ge__(self, value):
         return FieldDataOps.greater_than_equal(self._session, self, value)
+
+    def __add__(self, second):
+        return FieldDataOps.numeric_add(self._session, self, second)
+
+    def __radd__(self, first):
+        return FieldDataOps.numeric_add(self._session, first, self)
+
+    def __sub__(self, second):
+        return FieldDataOps.numeric_sub(self._session, self, second)
+
+    def __rsub__(self, first):
+        return FieldDataOps.numeric_sub(self._session, first, self)
+
+    def __mul__(self, second):
+        return FieldDataOps.numeric_mul(self._session, self, second)
+
+    def __rmul__(self, first):
+        return FieldDataOps.numeric_mul(self._session, first, self)
+
+    def __truediv__(self, second):
+        return FieldDataOps.numeric_truediv(self._session, self, second)
+
+    def __rtruediv__(self, first):
+        return FieldDataOps.numeric_truediv(self._session, first, self)
+
+    def __floordiv__(self, second):
+        return FieldDataOps.numeric_floordiv(self._session, self, second)
+
+    def __rfloordiv__(self, first):
+        return FieldDataOps.numeric_floordiv(self._session, first, self)
 
     def isin(self, test_elements:Union[list, set, np.ndarray]):
         """
@@ -3020,6 +3042,8 @@ class NumericField(HDF5Field):
 
 
 class CategoricalField(HDF5Field):
+    __array_ufunc__ = None
+
     def __init__(self, session, group, dataframe, write_enabled=False):
         super().__init__(session, group, dataframe, write_enabled=write_enabled)
         self._nformat = self._field.attrs['nformat'] if 'nformat' in self._field.attrs else 'int8'
@@ -3308,6 +3332,36 @@ class CategoricalField(HDF5Field):
     def __ge__(self, value):
         self._ensure_valid()
         return FieldDataOps.greater_than_equal(self._session, self, value)
+
+    def __add__(self, second):
+        return FieldDataOps.numeric_add(self._session, self, second)
+
+    def __radd__(self, first):
+        return FieldDataOps.numeric_add(self._session, first, self)
+
+    def __sub__(self, second):
+        return FieldDataOps.numeric_sub(self._session, self, second)
+
+    def __rsub__(self, first):
+        return FieldDataOps.numeric_sub(self._session, first, self)
+
+    def __mul__(self, second):
+        return FieldDataOps.numeric_mul(self._session, self, second)
+
+    def __rmul__(self, first):
+        return FieldDataOps.numeric_mul(self._session, first, self)
+
+    def __truediv__(self, second):
+        return FieldDataOps.numeric_truediv(self._session, self, second)
+
+    def __rtruediv__(self, first):
+        return FieldDataOps.numeric_truediv(self._session, first, self)
+
+    def __floordiv__(self, second):
+        return FieldDataOps.numeric_floordiv(self._session, self, second)
+
+    def __rfloordiv__(self, first):
+        return FieldDataOps.numeric_floordiv(self._session, first, self)
     
     def isin(self, test_elements:Union[list, set, np.ndarray]):
         """
