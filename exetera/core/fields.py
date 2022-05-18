@@ -58,6 +58,7 @@ class HDF5Field(Field, SubjectObserver):
         self._filter_wrapper = None
         self._view_refs = list()
 
+
     @property
     def valid(self):
         """
@@ -116,6 +117,13 @@ class HDF5Field(Field, SubjectObserver):
         self._ensure_valid()
         return False
 
+    @property
+    def filter(self):
+        if self._filter_wrapper is None:  # poential returns: raise error or return a full-index array
+            return None
+        else:
+            return self._filter_wrapper
+
     def __bool__(self):
         # this method is required to prevent __len__ being called on derived methods when fields are queried as
         #   if f:
@@ -146,7 +154,14 @@ class HDF5Field(Field, SubjectObserver):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
 
-
+    def is_view(self):
+        """
+        Return if the dataframe's name matches the field h5group path; if not, means this field is a view.
+        """
+        if self._field.name[1:1+len(self.dataframe.name)] != self.dataframe.name:
+            return True
+        else:
+            return False
 
 class MemoryField(Field):
 
@@ -206,6 +221,10 @@ class MemoryField(Field):
         property.
         """
         return False
+
+    @property
+    def filter(self):
+        return None
 
     def __bool__(self):
         # this method is required to prevent __len__ being called on derived methods when fields are queried as
@@ -293,7 +312,6 @@ class WriteableFieldArray:
         self._field = field._field  # HDF5 group instance
         self._name = dataset_name
         self._dataset = self._field[dataset_name]
-        self._references = list()
 
     def __len__(self):
         """
@@ -311,11 +329,12 @@ class WriteableFieldArray:
         return self._dataset.dtype
 
     def __getitem__(self, item):
-        if self._field_instance.filter is not None:
+        if self._field_instance.filter is not None and not isinstance(self._field_instance, IndexedStringField):
             mask = self._field_instance.filter[:]
-            return self._dataset[mask][item]  # note: mask before item
+            data = self._dataset[:][mask]  # as HDF5 does not support unordered mask
+            return data[item]
         else:
-            return self._dataset[item]
+            return self._dataset[:][item]  # as HDF5 does not support unordered mask, not efficient
 
     def __setitem__(self, key, value):
         self._dataset[key] = value
@@ -475,16 +494,17 @@ class MemoryFieldArray:
 
 
 class ReadOnlyIndexedFieldArray:
-    def __init__(self, field, indices, values):
+    def __init__(self, chunksize, indices, values, field):
         """
         :param field: Field to use
         :param indices: Indices for numpy array
         :param values: Values for numpy array
         :return: None
         """
-        self._field = field
+        self._chunksize = chunksize
         self._indices = indices
         self._values = values
+        self._field_instance = field
 
     def __len__(self):
         """
@@ -515,27 +535,49 @@ class ReadOnlyIndexedFieldArray:
         """
         try:
             if isinstance(item, slice):
-                start = item.start if item.start is not None else 0
-                stop = item.stop if item.stop is not None else len(self._indices) - 1
-                step = item.step
-                # TODO: validate slice
-                index = self._indices[start:stop + 1]
-                bytestr = self._values[index[0]:index[-1]]
-                results = [None] * (len(index) - 1)
-                startindex = self._indices[start]
-                for ir in range(len(results)):
-                    results[ir] = \
-                        bytestr[index[ir] - np.int64(startindex):
-                                index[ir + 1] - np.int64(startindex)].tobytes().decode()
-                return results
+                if self._field_instance.filter is None:
+                    start = item.start if item.start is not None else 0
+                    stop = item.stop if item.stop is not None else len(self._indices) - 1
+                    step = item.step
+                    # TODO: validate slice
+                    index = self._indices[start:stop + 1]
+                    bytestr = self._values[index[0]:index[-1]]
+                    results = [None] * (len(index) - 1)
+                    startindex = self._indices[start]
+                    for ir in range(len(results)):
+                        results[ir] = \
+                            bytestr[index[ir] - np.int64(startindex):
+                                    index[ir + 1] - np.int64(startindex)].tobytes().decode()
+                    return results
+                else:
+                    mask = self._field_instance.filter[:]
+                    index_s = self._indices[mask]
+                    index_e = self._indices[mask+1]
+                    results = [None] * len(mask)
+                    for ir in range(len(results)):
+                        results[ir] = self._values[index_s[ir]: index_e[ir]]
+                    return results[item]
+
             elif isinstance(item, int):
-                if item >= len(self._indices) - 1:
-                    raise ValueError("index is out of range")
-                start, stop = self._indices[item:item + 2]
-                if start == stop:
-                    return ''
-                value = self._values[start:stop].tobytes().decode()
-                return value
+                if self._field_instance.filter is None:
+                    if item >= len(self._indices) - 1:
+                        raise ValueError("index is out of range")
+                    start, stop = self._indices[item:item + 2]
+                    if start == stop:
+                        return ''
+                    value = self._values[start:stop].tobytes().decode()
+                    return value
+                else:
+                    mask = self._field_instance.filter[:]
+                    if item >= len(mask) - 1:
+                        raise ValueError("index is out of range")
+                    index_s = self._indices[mask]
+                    index_e = self._indices[mask + 1]
+                    results = [None] * len(mask)
+                    for ir in range(len(results)):
+                        results[ir] = self._values[index_s[ir]: index_e[ir]]
+                    return results[item]
+
         except Exception as e:
             print("{}: unexpected exception {}".format(self._field.name, e))
             raise
@@ -574,7 +616,7 @@ class ReadOnlyIndexedFieldArray:
 
 
 class WriteableIndexedFieldArray:
-    def __init__(self, chunksize, indices, values):
+    def __init__(self, chunksize, indices, values, field):
         """
         :param: chunksize: Size of each chunk
         :param indices: Numpy array of indices
@@ -591,6 +633,10 @@ class WriteableIndexedFieldArray:
         self._accumulated = self._indices[-1] if len(self._indices) > 0 else 0
         self._index_index = 0
         self._value_index = 0
+
+        self._field_instance = field
+
+
 
     def __len__(self):
         """
@@ -619,32 +665,48 @@ class WriteableIndexedFieldArray:
         """
         try:
             if isinstance(item, slice):
-                start = item.start if item.start is not None else 0
-                stop = item.stop if item.stop is not None else len(self._indices) - 1
-                step = item.step
-                # TODO: validate slice
+                if self._field_instance.filter is None:
+                    start = item.start if item.start is not None else 0
+                    stop = item.stop if item.stop is not None else len(self._indices) - 1
+                    step = item.step
+                    # TODO: validate slice
+                    index = self._indices[start:stop + 1]
+                    bytestr = self._values[index[0]:index[-1]]
+                    results = [None] * (len(index) - 1)
+                    startindex = self._indices[start]
+                    for ir in range(len(results)):
+                        results[ir] = \
+                            bytestr[index[ir] - np.int64(startindex):
+                                    index[ir + 1] - np.int64(startindex)].tobytes().decode()
+                    return results
+                else:
+                    mask = self._field_instance.filter[:]
+                    index_s = self._indices[mask]
+                    index_e = self._indices[mask + 1]
+                    results = [None] * len(mask)
+                    for ir in range(len(results)):
+                        results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
+                    return results[item]
 
-                index = self._indices[start:stop + 1]
-                if len(index) == 0:
-                    return []
-                bytestr = self._values[index[0]:index[-1]]
-                results = [None] * (len(index) - 1)
-                startindex = self._indices[start]
-                rmax = min(len(results), stop - start)
-                for ir in range(rmax):
-                    rbytes = bytestr[index[ir] - np.int64(startindex):
-                                     index[ir + 1] - np.int64(startindex)].tobytes()
-                    rstr = rbytes.decode()
-                    results[ir] = rstr
-                return results
             elif isinstance(item, int):
-                if item >= len(self._indices) - 1:
-                    raise ValueError("index is out of range")
-                start, stop = self._indices[item:item + 2]
-                if start == stop:
-                    return ''
-                value = self._values[start:stop].tobytes().decode()
-                return value
+                if self._field_instance.filter is None:
+                    if item >= len(self._indices) - 1:
+                        raise ValueError("index is out of range")
+                    start, stop = self._indices[item:item + 2]
+                    if start == stop:
+                        return ''
+                    value = self._values[start:stop].tobytes().decode()
+                    return value
+                else:
+                    mask = self._field_instance.filter[:]
+                    if item >= len(mask) - 1:
+                        raise ValueError("index is out of range")
+                    index_s = self._indices[mask]
+                    index_e = self._indices[mask + 1]
+                    results = [None] * len(mask)
+                    for ir in range(len(results)):
+                        results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
+                    return results[item]
         except Exception as e:
             print(e)
             raise
@@ -774,7 +836,7 @@ class IndexedStringMemField(MemoryField):
         :return: WriteableIndexedFieldArray
         """
         if self._data_wrapper is None:
-            self._data_wrapper = WriteableIndexedFieldArray(self._chunksize, self.indices, self.values)
+            self._data_wrapper = WriteableIndexedFieldArray(self._chunksize, self.indices, self.values, self)
         return self._data_wrapper
 
     def is_sorted(self):
@@ -2100,8 +2162,33 @@ class IndexedStringField(HDF5Field):
         if self._data_wrapper is None:
             wrapper = \
                 WriteableIndexedFieldArray if self._write_enabled else ReadOnlyIndexedFieldArray
-            self._data_wrapper = wrapper(self.chunksize, self.indices, self.values)
+            self._data_wrapper = wrapper(self.chunksize, self.indices, self.values, self)
         return self._data_wrapper
+
+    def attach(self, view):
+        self._view_refs.append(view)
+
+    def detach(self, view=None):
+        if view is None:  # detach all
+            self._view_refs.clear()
+        else:
+            self._view_refs.remove(view)
+
+    def notify(self, msg=None):
+        for view in self._view_refs:
+            view.update(self, msg)
+
+    def update(self, subject, msg=None):
+        if isinstance(subject, (WriteableFieldArray, WriteableIndexedFieldArray)):
+            self.notify(msg)
+            self.detach()
+
+        if isinstance(subject, HDF5Field):
+            if msg == 'write' or msg == 'clear':
+                if self.is_view():
+                    del self.dataframe[self.name]  # notice dataframe
+                    concrete_field = self.create_like(self.dataframe, self.name)  # create
+                    concrete_field.data.write(self.data[:])  # write data
 
     def is_sorted(self):
         """
@@ -2376,6 +2463,31 @@ class FixedStringField(HDF5Field):
                 self._value_wrapper = ReadOnlyFieldArray(self, 'values')
         return self._value_wrapper
 
+    def attach(self, view):
+        self._view_refs.append(view)
+
+    def detach(self, view=None):
+        if view is None:  # detach all
+            self._view_refs.clear()
+        else:
+            self._view_refs.remove(view)
+
+    def notify(self, msg=None):
+        for view in self._view_refs:
+            view.update(self, msg)
+
+    def update(self, subject, msg=None):
+        if isinstance(subject, (WriteableFieldArray, WriteableIndexedFieldArray)):
+            self.notify(msg)
+            self.detach()
+
+        if isinstance(subject, HDF5Field):
+            if msg == 'write' or msg == 'clear':
+                if self.is_view():
+                    del self.dataframe[self.name]  # notice dataframe
+                    concrete_field = self.create_like(self.dataframe, self.name)  # create
+                    concrete_field.data.write(self.data[:])  # write data
+
     def is_sorted(self):
         """
         Returns if data in field is sorted
@@ -2582,22 +2694,6 @@ class NumericField(HDF5Field):
             else:
                 self._value_wrapper = ReadOnlyFieldArray(self, 'values')
         return self._value_wrapper
-
-    @property
-    def filter(self):
-        if self._filter_wrapper is None:  # poential returns: raise error or return a full-index array
-            return None
-        else:
-            return self._filter_wrapper
-
-    def is_view(self):
-        """
-        Return if the dataframe's name matches the field h5group path; if not, means this field is a view.
-        """
-        if self._field.name[1:1+len(self.dataframe.name)] != self.dataframe.name:
-            return True
-        else:
-            return False
 
     def attach(self, view):
         self._view_refs.append(view)
@@ -2962,6 +3058,31 @@ class CategoricalField(HDF5Field):
                 self._value_wrapper = ReadOnlyFieldArray(self, 'values')
         return self._value_wrapper
 
+    def attach(self, view):
+        self._view_refs.append(view)
+
+    def detach(self, view=None):
+        if view is None:  # detach all
+            self._view_refs.clear()
+        else:
+            self._view_refs.remove(view)
+
+    def notify(self, msg=None):
+        for view in self._view_refs:
+            view.update(self, msg)
+
+    def update(self, subject, msg=None):
+        if isinstance(subject, (WriteableFieldArray, WriteableIndexedFieldArray)):
+            self.notify(msg)
+            self.detach()
+
+        if isinstance(subject, HDF5Field):
+            if msg == 'write' or msg == 'clear':
+                if self.is_view():
+                    del self.dataframe[self.name]  # notice dataframe
+                    concrete_field = self.create_like(self.dataframe, self.name)  # create
+                    concrete_field.data.write(self.data[:])  # write data
+
     def is_sorted(self):
         """
         Returns if data in field is sorted
@@ -3252,6 +3373,31 @@ class TimestampField(HDF5Field):
             else:
                 self._value_wrapper = ReadOnlyFieldArray(self, 'values')
         return self._value_wrapper
+
+    def attach(self, view):
+        self._view_refs.append(view)
+
+    def detach(self, view=None):
+        if view is None:  # detach all
+            self._view_refs.clear()
+        else:
+            self._view_refs.remove(view)
+
+    def notify(self, msg=None):
+        for view in self._view_refs:
+            view.update(self, msg)
+
+    def update(self, subject, msg=None):
+        if isinstance(subject, (WriteableFieldArray, WriteableIndexedFieldArray)):
+            self.notify(msg)
+            self.detach()
+
+        if isinstance(subject, HDF5Field):
+            if msg == 'write' or msg == 'clear':
+                if self.is_view():
+                    del self.dataframe[self.name]  # notice dataframe
+                    concrete_field = self.create_like(self.dataframe, self.name)  # create
+                    concrete_field.data.write(self.data[:])  # write data
 
     def is_sorted(self):
         """

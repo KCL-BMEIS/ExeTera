@@ -119,7 +119,16 @@ class HDF5DataFrame(DataFrame):
         # add view
         if isinstance(field, fld.NumericField):
             view = fld.NumericField(field._session, field._field, self, write_enabled=True)
+        elif isinstance(field, fld.CategoricalField):
+            view = fld.CategoricalField(field._session, field._field, self, write_enabled=True)
+        elif isinstance(field, fld.TimestampField):
+            view = fld.TimestampField(field._session, field._field, self, write_enabled=True)
+        elif isinstance(field, fld.FixedStringField):
+            view = fld.FixedStringField(field._session, field._field, self, write_enabled=True)
+        elif isinstance(field, fld.IndexedStringField):
+            view = fld.IndexedStringField(field._session, field._field, self, write_enabled=True)
 
+        field.attach(view)
         self._columns[view.name] = view
 
         # add filter
@@ -138,6 +147,7 @@ class HDF5DataFrame(DataFrame):
                     filter_field = filter_field.astype(nformat)
                 filter_field.data.clear()
                 filter_field.data.write(filter)
+
             view._filter_wrapper = filter_field.data
 
         return self._columns[view.name]
@@ -552,7 +562,7 @@ class HDF5DataFrame(DataFrame):
         :returns: a dataframe contains all the fields filterd, self if ddf is not set
         """
         filter_to_apply_ = val.validate_filter(filter_to_apply)
-        if ddf is not None:
+        if ddf is not None and ddf is not self:
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
             filter_to_apply_ = filter_to_apply_.nonzero()[0]
@@ -587,34 +597,20 @@ class HDF5DataFrame(DataFrame):
         :param ddf: optional- the destination data frame
         :returns: a dataframe contains all the fields re-indexed, self if ddf is not set
         """
-        if ddf is not None:
+        if ddf is not None and ddf is not self:
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
-            if ddf == self:
-                val.validate_all_field_length_in_df(self)
-            for field in self._columns.values():
+            for name, field in self._columns.items():
+                # newfld = field.create_like(ddf, name)
+                # field.apply_index(index_to_apply, target=newfld)
+                ddf._add_view(field, index_to_apply)
+            return ddf
+        else:
+            val.validate_all_field_length_in_df(self)
 
-                if ddf == self:
-                    field.apply_index(index_to_apply, in_place=True)
-                else:
-                    newfld = field.create_like(ddf, field.name)
-                    field.apply_index(index_to_apply, target=newfld)
-        else:  #
-            nformat = 'int32' if index_to_apply[-1] < 2 ** 31 - 1 else 'int64'
             for field in self._columns.values():
-                if field.name in self._filters_grp.keys():
-                    flt_fld = fld.NumericField(self._dataset.session, self._filters_grp[field.name], self,
-                                               write_enabled=True)
-                    if nformat not in flt_fld._fieldtype:
-                        flt_fld = flt_fld.astype(nformat)
-                    flt_fld.data.clear()
-                    flt_fld.data.write(index_to_apply)
-                else:
-                    fld.numeric_field_constructor(self._dataset.session, self._filters_grp, field.name, nformat)
-                    flt_fld = fld.NumericField(self._dataset.session, self._filters_grp[field.name], self,
-                                               write_enabled=True)
-                    flt_fld.data.write(index_to_apply)
-                field.filter = flt_fld._field
+                field.apply_index(index_to_apply, in_place=True)
+            return self
 
 
     def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):

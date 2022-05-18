@@ -1340,7 +1340,7 @@ class TestDataFrameFilter(SessionTestCase):
         self.df.apply_filter(filter_to_apply, ddf= view_df)
         for field in view_df.values():
             self.assertTrue(field.is_view())  # field is a view
-            self.assertListEqual(data[filter_to_apply].tolist(), field[:].tolist() )  # filtered
+            self.assertListEqual(data[filter_to_apply].tolist(), field.data[:].tolist() )  # filtered
 
         #
         view_df2 = self.ds.create_dataframe('view_df2')
@@ -1348,7 +1348,7 @@ class TestDataFrameFilter(SessionTestCase):
         self.df.apply_filter(filter_to_apply, ddf=view_df2)
         for field in view_df2.values():
             self.assertTrue(field.is_view())  # field is a view
-            self.assertListEqual(data[filter_to_apply].tolist(), field[:].tolist())  # filtered
+            self.assertListEqual(data[filter_to_apply].tolist(), field.data[:].tolist())  # filtered
 
     def test_remove_filter(self):
         pass
@@ -1360,10 +1360,9 @@ class TestDataFrameFilter(SessionTestCase):
         view_df = self.ds.create_dataframe('view_df')
         filter_to_apply = np.asarray([i % 2 == 0 for i in data])
         self.df.apply_filter(filter_to_apply, ddf=view_df)
-        print('a',view_df.keys())
         for field in view_df.values():
             self.assertTrue(field.is_view())  # field is a view
-            self.assertListEqual(data[filter_to_apply].tolist(), field[:].tolist())  # filtered
+            self.assertListEqual(data[filter_to_apply].tolist(), field.data[:].tolist())  # filtered
 
         new_data = data + 1
         f.data.clear()
@@ -1371,7 +1370,7 @@ class TestDataFrameFilter(SessionTestCase):
 
         for field in view_df.values():
             self.assertFalse(field.is_view())
-            self.assertListEqual(data[filter_to_apply].tolist(), field[:].tolist())  # filtered
+            self.assertListEqual(data[filter_to_apply].tolist(), field.data[:].tolist())  # filtered
 
 
 
