@@ -496,3 +496,18 @@ class AbstractSession(ABC):
                             left_field_sources=tuple(), right_field_sinks=None,
                             right_to_left_map=None, right_unique=False, left_unique=False):
         raise NotImplementedError()
+
+
+class SubjectObserver(ABC):
+    def attach(self, observer):
+        raise NotImplementedError()
+
+    def detach(self, observer):
+        raise NotImplementedError()
+
+    def notify(self, msg=None):
+        raise NotImplementedError()
+
+    def update(self, subject, msg=None):
+        raise NotImplementedError()
+

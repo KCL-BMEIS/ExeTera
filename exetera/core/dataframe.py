@@ -107,27 +107,62 @@ class HDF5DataFrame(DataFrame):
             nfield.data.write(field.data[:])
         self._columns[dname] = nfield
 
-    def add_view(self, field: fld.Field):
+    def _add_view(self, field: fld.Field, filter: np.ndarray = None):
         """
+        Internal function called by apply_filter to add a field view into the dataframe.
+
+        :param field: The field to apply filter to.
+        :param filter: The filter to apply.
+        :return: The field view.
 
         """
+        # add view
         if isinstance(field, fld.NumericField):
             view = fld.NumericField(field._session, field._field, self, write_enabled=True)
-            view.data = field.data
 
         self._columns[view.name] = view
+
+        # add filter
+        if filter is not None:
+            nformat = 'int32' if filter[-1] < 2 ** 31 - 1 else 'int64'
+            filter_name = view.name
+            if filter_name not in self._filters_grp.keys():
+                fld.numeric_field_constructor(self._dataset.session, self._filters_grp, filter_name, nformat)
+                filter_field = fld.NumericField(self._dataset.session, self._filters_grp[filter_name], self,
+                                                write_enabled=True)
+                filter_field.data.write(filter)
+            else:
+                filter_field = fld.NumericField(self._dataset.session, self._filters_grp[filter_name], self,
+                                                write_enabled=True)
+                if nformat not in filter_field._fieldtype:
+                    filter_field = filter_field.astype(nformat)
+                filter_field.data.clear()
+                filter_field.data.write(filter)
+            view._filter_wrapper = filter_field.data
+
         return self._columns[view.name]
 
-    # def add_reference(self, field: fld.Field):
+    # def change_filter(self, field: fld.Field, filter: np.ndarray):
     #     """
-    #     Add a field without coping the data over the HDF5 group.
-    #     :param field: field to be constructed in this dataframe.
+    #
+    #     :param field:
+    #     :param filter:
+    #     :return:
     #     """
-    #     if isinstance(field, fld.NumericField):
-    #         fld.numeric_field_constructor(self._dataset.session, self, field.name, field._nformat)
-    #         nfield = fld.NumericField(self._dataset.session, field._field, self, write_enabled=True)
-    #         self._columns[field.name] = nfield
-    #         return self._columns[field.name]
+    #     pass
+    #
+    # def remove_filter(self, field: Union[str, fld.Field]):
+    #     """
+    #     Remove filter from this dataframe specified by the field or field name.
+    #     """
+    #     if not isinstance(field, str) and not isinstance(field, fld.Field):
+    #         raise TypeError("The target field should be type field or string (name of the field in this dataframe).")
+    #
+    #     name = field if isinstance(field, str) else field.name
+    #     if name not in self._columns:
+    #         raise ValueError("The target field is not in this dataframe.")
+    #     else:
+    #         del self._filters_grp[name]
 
     def drop(self,
              name: str):
@@ -136,10 +171,9 @@ class HDF5DataFrame(DataFrame):
 
         :param name: name of field to be dropped
         """
-        if name in self._h5group.keys():
+        del self._columns[name]  # should always be
+        if name in self._h5group.keys():  # in case of reference only
             del self._h5group[name]
-        if name in self._columns.keys():
-            del self._columns[name]
 
     def create_group(self,
                      name: str):
@@ -294,22 +328,6 @@ class HDF5DataFrame(DataFrame):
                     return True
             return False
 
-    def _write_filter(self, filter):
-        """
-
-        """
-        nformat = 'int32' if filter[-1] < 2 ** 31 - 1 else 'int64'
-        filter_name = '_filter'
-        if filter_name not in self._filters_grp.keys():
-            fld.numeric_field_constructor(self._dataset.session, self._filters_grp, filter_name, nformat)
-            filter_field = fld.NumericField(self._dataset.session, self._filters_grp[filter_name], self, write_enabled=True)
-            filter_field.data.write(filter)
-        else:
-            filter_field = fld.NumericField(self._dataset.session, self._filters_grp[filter_name], self, write_enabled=True)
-            if nformat not in filter_field._fieldtype:
-                filter_field = filter_field.astype(nformat)
-            filter_field.data.clear()
-            filter_field.data.write(filter)
 
     def _get_filter_grp(self, field: Union[str, fld.Field]=None):
         """
@@ -317,68 +335,6 @@ class HDF5DataFrame(DataFrame):
         """
         filter_name = '_filter'
         return self._filters_grp[filter_name]
-
-    # def set_filter(self, field: Union[str, fld.Field], filter):
-    #     """
-    #     Add or modify a filter of the field.
-    #
-    #     :param field: The target field.
-    #     :param filter: The filter, as list or np.ndarray of indices.
-    #     """
-    #     if not isinstance(field, str) and not isinstance(field, fld.Field):
-    #         raise TypeError("The target field should be type field or string (name of the field in this dataframe).")
-    #
-    #     name = field if isinstance(field, str) else field.name
-    #     if name not in self._columns:
-    #         raise ValueError("The target field is not in this dataframe.")
-    #
-    #     nformat = 'int32' if filter[-1] < 2 ** 31 - 1 else 'int64'
-    #     if name in self._filters_grp.keys():
-    #         filter_field = fld.NumericField(self._dataset.session, self._filters_grp[name], self,
-    #                                         write_enabled=True)
-    #         if nformat not in filter_field._fieldtype:
-    #             filter_field = filter_field.astype(nformat)
-    #         filter_field.data.clear()
-    #         filter_field.data.write(filter)
-    #     else:
-    #         fld.numeric_field_constructor(self._dataset.session, self._filters_grp, name, nformat)
-    #         filter_field = fld.NumericField(self._dataset.session, self._filters_grp[name], self,
-    #                                  write_enabled=True)
-    #         filter_field.data.write(filter)
-    #
-    #     self._columns[name].filter = self._filters_grp[name]
-    #     return filter_field
-
-    def remove_filter(self, field: Union[str, fld.Field]):
-        """
-        Remove filter from this dataframe specified by the field or field name.
-        """
-        if not isinstance(field, str) and not isinstance(field, fld.Field):
-            raise TypeError("The target field should be type field or string (name of the field in this dataframe).")
-
-        name = field if isinstance(field, str) else field.name
-        if name not in self._columns:
-            raise ValueError("The target field is not in this dataframe.")
-        else:
-            del self._filters_grp[name]
-
-    # def get_data(self, field: Union[str, fld.Field]):
-    #     """
-    #     Get the data from a field. The data returned is masked by the filter.
-    #
-    #     """
-    #     if not isinstance(field, str) and not isinstance(field, fld.Field):
-    #         raise TypeError("The target field should be type field or string (name of the field in this dataframe).")
-    #
-    #     name = field if isinstance(field, str) else field.name
-    #     if name not in self.columns.keys():
-    #         raise ValueError("Can not found the field name from this dataframe.")
-    #     else:
-    #         if name in self.filters.keys():
-    #             d_filter = self.filters[name].data[:]
-    #             return self.columns[name].data[d_filter]
-    #         else:
-    #             return self.columns[name].data[:]
 
     def __getitem__(self, name):
         """
@@ -433,10 +389,10 @@ class HDF5DataFrame(DataFrame):
         if not self.__contains__(name=name):
             raise ValueError("There is no field named '{}' in this dataframe".format(name))
         else:
-            if name in self._h5group.keys():
+            del self._columns[name]  # should always be
+            if name in self._h5group.keys():  # in case of reference only
                 del self._h5group[name]
-            if name in self._columns.keys():
-                del self._columns[name]
+
 
     def delete_field(self, field):
         """
@@ -599,21 +555,14 @@ class HDF5DataFrame(DataFrame):
         if ddf is not None:
             if not isinstance(ddf, DataFrame):
                 raise TypeError("The destination object must be an instance of DataFrame.")
-            ddf._write_filter(np.where(filter_to_apply_ == True)[0])
+            filter_to_apply_ = filter_to_apply_.nonzero()[0]
             for name, field in self._columns.items():
-                # hard copy
-                # newfld = field.create_like(ddf, name)
-                # field.apply_filter(filter_to_apply_, target=newfld)
-                # soft copy - view
-                newfld = ddf.add_view(field)
-                newfld.filter = ddf._get_filter_grp()
-
+                ddf._add_view(field, filter_to_apply_)
             return ddf
         else:
             for field in self._columns.values():
                 field.apply_filter(filter_to_apply_, in_place=True)
             return self
-
 
     def apply_index(self, index_to_apply, ddf=None):
         """
@@ -1123,7 +1072,7 @@ class HDF5DataFrame(DataFrame):
     def view(self):
         dfv = self.dataset.create_dataframe(self.name + '_view')
         for f in self.columns.values():
-            dfv.add_view(f)
+            dfv._add_view(f)
         return dfv
 
 

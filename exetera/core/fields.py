@@ -16,7 +16,7 @@ import operator
 import numpy as np
 import h5py
 
-from exetera.core.abstract_types import Field
+from exetera.core.abstract_types import Field, SubjectObserver
 from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
 from exetera.core import validation as val
@@ -39,7 +39,7 @@ def isin(field:Field, test_elements:Union[list, set, np.ndarray]):
     return ret
 
 
-class HDF5Field(Field):
+class HDF5Field(Field, SubjectObserver):
     def __init__(self, session, group, dataframe, write_enabled=False):
         super().__init__()
 
@@ -56,6 +56,7 @@ class HDF5Field(Field):
         self._valid_reference = True
 
         self._filter_wrapper = None
+        self._view_refs = list()
 
     @property
     def valid(self):
@@ -228,9 +229,10 @@ class MemoryField(Field):
 
 class ReadOnlyFieldArray:
     def __init__(self, field, dataset_name):
-        self._field = field
+        self._field_instance = field
+        self._field = field._field
         self._name = dataset_name
-        self._dataset = field[dataset_name]
+        self._dataset = self._field[dataset_name]
 
     def __len__(self):
         return len(self._dataset)
@@ -243,7 +245,11 @@ class ReadOnlyFieldArray:
         return self._dataset.dtype
 
     def __getitem__(self, item):
-        return self._dataset[item]
+        if self._field_instance.filter is not None:
+            mask = self._field_instance.filter[:]
+            return self._dataset[mask][item]  # note: mask before item
+        else:
+            return self._dataset[item]
 
     def __setitem__(self, key, value):
         raise PermissionError("This field was created read-only; call <field>.writeable() "
@@ -283,9 +289,10 @@ class ReadOnlyFieldArray:
 
 class WriteableFieldArray:
     def __init__(self, field, dataset_name):
-        self._field = field
+        self._field_instance = field
+        self._field = field._field  # HDF5 group instance
         self._name = dataset_name
-        self._dataset = field[dataset_name]
+        self._dataset = self._field[dataset_name]
         self._references = list()
 
     def __len__(self):
@@ -303,27 +310,12 @@ class WriteableFieldArray:
         """
         return self._dataset.dtype
 
-    def register_reference(self, field: Field):
-        """
-
-        """
-        self._references.append(field)
-
-    def detach_reference(self, field: Field):
-        """
-
-        """
-        self._references.remove(field)
-
-    def concreate_all_fields(self):
-        """
-
-        """
-        for field in self._references:
-            field.concrete_reference()
-
     def __getitem__(self, item):
-        return self._dataset[item]
+        if self._field_instance.filter is not None:
+            mask = self._field_instance.filter[:]
+            return self._dataset[mask][item]  # note: mask before item
+        else:
+            return self._dataset[item]
 
     def __setitem__(self, key, value):
         self._dataset[key] = value
@@ -333,8 +325,8 @@ class WriteableFieldArray:
         Replaces current dataset with empty dataset.
         :return: None
         """
-        if len(self._references) > 0:
-            self.concreate_all_fields()
+        self._field_instance.update(self, msg=WriteableFieldArray.clear.__name__)
+
         nformat = self._dataset.dtype
         DataWriter._clear_dataset(self._field, self._name)
         DataWriter.write(self._field, self._name, [], 0, nformat)
@@ -365,8 +357,8 @@ class WriteableFieldArray:
         :param part: numpy array to write to field
         :return: None
         """
-        if len(self._references) > 0:
-            self.concreate_all_fields()
+        self._field_instance.update(self, msg=WriteableFieldArray.write.__name__)
+
         if isinstance(part, Field):
             part = part.data[:]
         DataWriter.write(self._field, self._name, part, len(part), dtype=self._dataset.dtype)
@@ -2138,7 +2130,7 @@ class IndexedStringField(HDF5Field):
         self._ensure_valid()
         if self._index_wrapper is None:
             wrapper = WriteableFieldArray if self._write_enabled else ReadOnlyFieldArray
-            self._index_wrapper = wrapper(self._field, 'index')
+            self._index_wrapper = wrapper(self, 'index')
         return self._index_wrapper
 
     @property
@@ -2149,7 +2141,7 @@ class IndexedStringField(HDF5Field):
         self._ensure_valid()
         if self._value_wrapper is None:
             wrapper = WriteableFieldArray if self._write_enabled else ReadOnlyFieldArray
-            self._value_wrapper = wrapper(self._field, 'values')
+            self._value_wrapper = wrapper(self, 'values')
         return self._value_wrapper
 
     def __len__(self):
@@ -2379,9 +2371,9 @@ class FixedStringField(HDF5Field):
         self._ensure_valid()
         if self._value_wrapper is None:
             if self._write_enabled:
-                self._value_wrapper = WriteableFieldArray(self._field, 'values')
+                self._value_wrapper = WriteableFieldArray(self, 'values')
             else:
-                self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
+                self._value_wrapper = ReadOnlyFieldArray(self, 'values')
         return self._value_wrapper
 
     def is_sorted(self):
@@ -2586,31 +2578,17 @@ class NumericField(HDF5Field):
         self._ensure_valid()
         if self._value_wrapper is None:
             if self._write_enabled:
-                self._value_wrapper = WriteableFieldArray(self._field, 'values')
+                self._value_wrapper = WriteableFieldArray(self, 'values')
             else:
-                self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
+                self._value_wrapper = ReadOnlyFieldArray(self, 'values')
         return self._value_wrapper
-
-    @data.setter
-    def data(self, FieldArray):
-        """
-        Setting the Field Array (data interface) directly. This can also associate field with an existing field array to enable a view.
-        """
-        self._value_wrapper = FieldArray
-        if self.is_view():
-            self.data.register_reference(self)
 
     @property
     def filter(self):
-        if self._filter_wrapper is None:
+        if self._filter_wrapper is None:  # poential returns: raise error or return a full-index array
             return None
         else:
-            return self._filter_wrapper[:]
-        return self._filter
-
-    @filter.setter
-    def filter(self, filter_h5group):
-        self._filter_wrapper = WriteableFieldArray(filter_h5group, 'values')
+            return self._filter_wrapper
 
     def is_view(self):
         """
@@ -2621,23 +2599,30 @@ class NumericField(HDF5Field):
         else:
             return False
 
-    def __getitem__(self, item):
-        if self._filter_wrapper != None:
-            data_filter = self._filter_wrapper[:]
-            return self.data[item][data_filter]
+    def attach(self, view):
+        self._view_refs.append(view)
+
+    def detach(self, view=None):
+        if view is None:  # detach all
+            self._view_refs.clear()
         else:
-            return self.data[item]
+            self._view_refs.remove(view)
 
-    def concrete_reference(self):
-        if not self.is_view():
-            raise ValueError("This field is already a concreted field.")
+    def notify(self, msg=None):
+        for view in self._view_refs:
+            view.update(self, msg)
 
-        self.data.detach_reference(self)  # notice field array
-        print(self.name)
-        del self.dataframe[self.name]  # notice dataframe
-        concrete_field = self.create_like(self.dataframe, self.name)  # create
-        concrete_field.data.write(self[:])  # write data
-        return concrete_field
+    def update(self, subject, msg=None):
+        if isinstance(subject, (WriteableFieldArray, WriteableIndexedFieldArray)):
+            self.notify(msg)
+            self.detach()
+
+        if isinstance(subject, HDF5Field):
+            if msg == 'write' or msg == 'clear':
+                if self.is_view():
+                    del self.dataframe[self.name]  # notice dataframe
+                    concrete_field = self.create_like(self.dataframe, self.name)  # create
+                    concrete_field.data.write(self.data[:])  # write data
 
     def is_sorted(self):
         """
@@ -2972,9 +2957,9 @@ class CategoricalField(HDF5Field):
         self._ensure_valid()
         if self._value_wrapper is None:
             if self._write_enabled:
-                self._value_wrapper = WriteableFieldArray(self._field, 'values')
+                self._value_wrapper = WriteableFieldArray(self, 'values')
             else:
-                self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
+                self._value_wrapper = ReadOnlyFieldArray(self, 'values')
         return self._value_wrapper
 
     def is_sorted(self):
@@ -3263,9 +3248,9 @@ class TimestampField(HDF5Field):
         self._ensure_valid()
         if self._value_wrapper is None:
             if self._write_enabled:
-                self._value_wrapper = WriteableFieldArray(self._field, 'values')
+                self._value_wrapper = WriteableFieldArray(self, 'values')
             else:
-                self._value_wrapper = ReadOnlyFieldArray(self._field, 'values')
+                self._value_wrapper = ReadOnlyFieldArray(self, 'values')
         return self._value_wrapper
 
     def is_sorted(self):
