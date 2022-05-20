@@ -20,6 +20,7 @@ from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
 from exetera.core import validation as val
+from exetera.core import utils
 
 
 def isin(field:Field, test_elements:Union[list, set, np.ndarray]):
@@ -39,15 +40,15 @@ def isin(field:Field, test_elements:Union[list, set, np.ndarray]):
     return ret
 
 
-def where(cond, a, b):
-    if isinstance(cond, list) or (isinstance(cond, np.ndarray) and cond.dtype == 'bool'):
+def where(cond: Union[list, tuple, np.ndarray, Field], a, b):
+    if isinstance(cond, (list, tuple, np.ndarray)):
         cond = cond
     elif isinstance(cond, Field):
         if cond.indexed:
-            raise NotImplementedError("Where does not support indexed string fields at present")
+            raise NotImplementedError("Where does not support condition on indexed string fields at present")
         cond = cond.data[:]
     elif callable(cond):
-        raise NotImplementedError("fields.where doesn't support callable cond")
+        raise NotImplementedError("module method `fields.where` doesn't support callable cond, please use instance mehthod `where` for callable cond.")
 
     if isinstance(a, Field):
         a = a.data[:]
@@ -160,30 +161,40 @@ class HDF5Field(Field):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
 
-    def where(self, cond, b, inplace=False):
-
-        if callable(cond):
-            cond = cond(self.data[:])
-        elif isinstance(cond, list) or (isinstance(cond, np.ndarray) and cond.dtype == 'bool'):
+    def where(self, cond:Union[list, tuple, np.ndarray, Field], b, inplace=False):
+        if isinstance(cond, (list, tuple, np.ndarray)):
             cond = cond
         elif isinstance(cond, Field):
             if cond.indexed:
                 raise NotImplementedError("Where does not support indexed string fields at present")
             cond = cond.data[:]
+        elif callable(cond):
+            cond = cond(self.data[:])
         else:
-            raise TypeError("'cond' parameter needs to be either callable lambda function, or boolean ndarray, or NumericMemField")
+            raise TypeError("'cond' parameter needs to be either callable lambda function, or array like, or NumericMemField")
 
-        if isinstance(b, str):
-            b = b.encode()
+        # if isinstance(b, str):
+        #     b = b.encode()
         if isinstance(b, Field):
             b = b.data[:]
 
-        result = np.where(cond, self.data[:], b)
+        result_ndarray = np.where(cond, self.data[:], b)
+        result_mem_field = None
+        if str(result_ndarray.dtype) in utils.PERMITTED_NUMERIC_TYPES:
+            result_mem_field = NumericMemField(self._session, str(result_ndarray.dtype))
+            result_mem_field.data.write(result_ndarray)
 
-        if inplace:
-            self.data.clear()
-            self.data.write(result)
-        return result
+        elif isinstance(self, (IndexedStringField, FixedStringField)) or isinstance(b, (IndexedStringField, FixedStringField)):
+            result_mem_field = IndexedStringMemField(self._session)
+            result_mem_field.data.write(result_ndarray)
+        else:
+            raise NotImplementedError(f"instance method where doesn't support the current input type")
+
+        # if inplace:
+        #     self.data.clear()
+        #     self.data.write(result)
+
+        return result_mem_field
 
 
 class MemoryField(Field):
