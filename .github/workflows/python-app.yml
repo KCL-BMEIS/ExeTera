@@ -12,7 +12,7 @@ on:
 jobs:
   unittests:
 
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, gpu]
     #runs-on: ${{ matrix.os }}
     #strategy:
     #  matrix:
