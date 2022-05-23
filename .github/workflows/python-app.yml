@@ -12,8 +12,8 @@ on:
 jobs:
   unittests:
 
+    runs-on: [self-hosted, linux, x64]
     #runs-on: ${{ matrix.os }}
-    runs-on: [self-hosted, linux, x64, cme01]
     #strategy:
     #  matrix:
     #    os: [macos-latest, windows-latest, ubuntu-latest]
