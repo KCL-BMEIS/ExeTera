@@ -579,10 +579,9 @@ class ReadOnlyIndexedFieldArray:
                 value = self._values[start:stop].tobytes().decode()
                 return value
             else:
-                mask = self._field_instance.filter[:]
-                if item >= len(mask) - 1:
+                if item >= len(self._field_instance.filter) - 1:
                     raise ValueError("index is out of range")
-                mask = mask[item]
+                mask = self._field_instance.filter[item]
                 index_s = self._indices[mask]
                 index_e = self._indices[mask + 1]
                 results = self._values[index_s: index_e].tobytes().decode()
@@ -712,10 +711,9 @@ class WriteableIndexedFieldArray:
                 value = self._values[start:stop].tobytes().decode()
                 return value
             else:
-                mask = self._field_instance.filter[:]
-                if item >= len(mask) - 1:
+                if item >= len(self._field_instance.filter) - 1:
                     raise ValueError("index is out of range")
-                mask = mask[item]
+                mask = self._field_instance.filter[item]
                 index_s = self._indices[mask]
                 index_e = self._indices[mask + 1]
                 results = self._values[index_s: index_e].tobytes().decode()
