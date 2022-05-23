@@ -14,9 +14,9 @@ jobs:
 
     #runs-on: ${{ matrix.os }}
     runs-on: [self-hosted, Linux, X64, cme01]
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+    #strategy:
+    #  matrix:
+    #    os: [macos-latest, windows-latest, ubuntu-latest]
 
     steps:
     - uses: actions/checkout@v2
@@ -43,22 +43,22 @@ jobs:
       with:
         file: ./coverage.xml
         
-  install_test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
-
-    steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python 3.7
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.7
-    - name: Install using pip
-      run: |
-        python -m pip install --upgrade pip
-        pip install .
-        exetera --help
+#  install_test:
+#    runs-on: ${{ matrix.os }}
+#    strategy:
+#      matrix:
+#        os: [macos-latest, windows-latest, ubuntu-latest]
+#
+#    steps:
+#    - uses: actions/checkout@v2
+#    - name: Set up Python 3.7
+#      uses: actions/setup-python@v2
+#      with:
+#        python-version: 3.7
+#    - name: Install using pip
+#      run: |
+#        python -m pip install --upgrade pip
+#        pip install .
+#        exetera --help
         
         
