@@ -20,6 +20,7 @@ from exetera.core.abstract_types import Field, SubjectObserver
 from exetera.core.data_writer import DataWriter
 from exetera.core import operations as ops
 from exetera.core import validation as val
+from exetera.core import utils
 
 
 def isin(field:Field, test_elements:Union[list, set, np.ndarray]):
@@ -158,10 +159,7 @@ class HDF5Field(Field, SubjectObserver):
         """
         Return if the dataframe's name matches the field h5group path; if not, means this field is a view.
         """
-        if self._field.name[1:1+len(self.dataframe.name)] != self.dataframe.name:
-            return True
-        else:
-            return False
+        return self._field.name[1:1+len(self.dataframe.name)] != self.dataframe.name
 
 class MemoryField(Field):
 
@@ -264,9 +262,12 @@ class ReadOnlyFieldArray:
         return self._dataset.dtype
 
     def __getitem__(self, item):
-        if self._field_instance.filter is not None:
-            mask = self._field_instance.filter[:]
-            return self._dataset[mask][item]  # note: mask before item
+        if self._field_instance.filter is not None and not isinstance(self._field_instance, IndexedStringField):
+            mask = self._field_instance.filter[item]
+            if utils.is_sorted(mask):
+                return self._dataset[mask]
+            else:
+                return self._dataset[np.sort(mask)][np.argsort(mask)]
         else:
             return self._dataset[item]
 
@@ -330,11 +331,13 @@ class WriteableFieldArray:
 
     def __getitem__(self, item):
         if self._field_instance.filter is not None and not isinstance(self._field_instance, IndexedStringField):
-            mask = self._field_instance.filter[:]
-            data = self._dataset[:][mask]  # as HDF5 does not support unordered mask
-            return data[item]
+            mask = self._field_instance.filter[item]
+            if utils.is_sorted(mask):
+                return self._dataset[mask]
+            else:
+                return self._dataset[np.sort(mask)][np.argsort(mask)]
         else:
-            return self._dataset[:][item]  # as HDF5 does not support unordered mask, not efficient
+            return self._dataset[item]
 
     def __setitem__(self, key, value):
         self._dataset[key] = value
@@ -549,13 +552,22 @@ class ReadOnlyIndexedFieldArray:
                                 index[ir + 1] - np.int64(startindex)].tobytes().decode()
                 return results
             else:
-                mask = self._field_instance.filter[:]
-                index_s = self._indices[mask]
-                index_e = self._indices[mask + 1]
-                results = [None] * len(mask)
-                for ir in range(len(results)):
-                    results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
-                return results[item]
+                mask = self._field_instance.filter[item]
+                if utils.is_sorted(mask):
+                    index_s = self._indices[mask]
+                    index_e = self._indices[mask + 1]
+                    results = [None] * len(mask)
+                    for ir in range(len(results)):
+                        results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
+                else:
+                    s_mask = np.sort(mask)
+                    orignal_order = np.argsort(mask)
+                    index_s = self._indices[s_mask][orignal_order]
+                    index_e = self._indices[s_mask + 1][orignal_order]
+                    results = [None] * len(s_mask)
+                    for ir in range(len(results)):
+                        results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
+                return results
 
         elif isinstance(item, int):
             if self._field_instance.filter is None:
@@ -570,12 +582,11 @@ class ReadOnlyIndexedFieldArray:
                 mask = self._field_instance.filter[:]
                 if item >= len(mask) - 1:
                     raise ValueError("index is out of range")
+                mask = mask[item]
                 index_s = self._indices[mask]
                 index_e = self._indices[mask + 1]
-                results = [None] * len(mask)
-                for ir in range(len(results)):
-                    results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
-                return results[item]
+                results = self._values[index_s: index_e].tobytes().decode()
+                return results
 
     def __setitem__(self, key, value):
         raise PermissionError("This field was created read-only; call <field>.writeable() "
@@ -674,13 +685,22 @@ class WriteableIndexedFieldArray:
                                 index[ir + 1] - np.int64(startindex)].tobytes().decode()
                 return results
             else:
-                mask = self._field_instance.filter[:]
-                index_s = self._indices[mask]
-                index_e = self._indices[mask + 1]
-                results = [None] * len(mask)
-                for ir in range(len(results)):
-                    results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
-                return results[item]
+                mask = self._field_instance.filter[item]
+                if utils.is_sorted(mask):
+                    index_s = self._indices[mask]
+                    index_e = self._indices[mask + 1]
+                    results = [None] * len(mask)
+                    for ir in range(len(results)):
+                        results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
+                else:
+                    s_mask = np.sort(mask)
+                    orignal_order = np.argsort(mask)
+                    index_s = self._indices[s_mask][orignal_order]
+                    index_e = self._indices[s_mask + 1][orignal_order]
+                    results = [None] * len(s_mask)
+                    for ir in range(len(results)):
+                        results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
+                return results
 
         elif isinstance(item, int):
             if self._field_instance.filter is None:
@@ -695,12 +715,11 @@ class WriteableIndexedFieldArray:
                 mask = self._field_instance.filter[:]
                 if item >= len(mask) - 1:
                     raise ValueError("index is out of range")
+                mask = mask[item]
                 index_s = self._indices[mask]
                 index_e = self._indices[mask + 1]
-                results = [None] * len(mask)
-                for ir in range(len(results)):
-                    results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
-                return results[item]
+                results = self._values[index_s: index_e].tobytes().decode()
+                return results
 
     def __setitem__(self, key, value):
         raise PermissionError("IndexedStringField instances cannot be edited via array syntax;"
@@ -2138,7 +2157,7 @@ class IndexedStringField(HDF5Field):
     def __init__(self, session, group, dataframe, write_enabled=False):
         super().__init__(session, group, dataframe, write_enabled=write_enabled)
         self._session = session
-        self._dataframe = None
+        self._dataframe = dataframe
         self._data_wrapper = None
         self._index_wrapper = None
         self._value_wrapper = None

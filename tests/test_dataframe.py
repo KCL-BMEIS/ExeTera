@@ -1329,10 +1329,19 @@ class TestDataFrameDescribe(unittest.TestCase):
                 df.describe(exclude=['num', 'num2', 'ts1'])
             self.assertTrue(isinstance(context.exception, ValueError))
 
-class TestDataFrameFilter(SessionTestCase):
+class TestDataFrameView(SessionTestCase):
+
+    def test_get_view(self):
+        """
+        Test dataframe.view, field.is_view, register
+        """
+        pass
 
     @parameterized.expand([("create_numeric", "f_i8", {"nformat": "int8"}, [i for i in range(20)] ),])
     def test_apply_filter(self, creator, name, kwargs, data):
+        """
+        Test dataframe.apply_field, field.data[:]
+        """
         data = np.asarray(data)
         f = self.setup_field(self.df, creator, name, (), kwargs, data)
         view_df = self.ds.create_dataframe('view_df')
@@ -1350,11 +1359,12 @@ class TestDataFrameFilter(SessionTestCase):
             self.assertTrue(field.is_view())  # field is a view
             self.assertListEqual(data[filter_to_apply].tolist(), field.data[:].tolist())  # filtered
 
-    def test_remove_filter(self):
-        pass
 
     @parameterized.expand([("create_numeric", "f_i8", {"nformat": "int8"}, [i for i in range(20)]), ])
     def test_concrete_field(self, creator, name, kwargs, data):
+        """
+        Test dataframe.apply_filter, field.detach, field.notify, field.update
+        """
         data = np.asarray(data)
         f = self.setup_field(self.df, creator, name, (), kwargs, data)
         view_df = self.ds.create_dataframe('view_df')

@@ -500,14 +500,26 @@ class AbstractSession(ABC):
 
 class SubjectObserver(ABC):
     def attach(self, observer):
+        """
+        Attach the observer (view) to the subject (field).
+        """
         raise NotImplementedError()
 
     def detach(self, observer):
+        """
+        Detach the observer (view) from the subject (field), this is to remove the association between observer with subject.
+        """
         raise NotImplementedError()
 
     def notify(self, msg=None):
+        """
+        Called by the Subject to notify the observer on something.
+        """
         raise NotImplementedError()
 
     def update(self, subject, msg=None):
+        """
+        Called inside the observer, to perform actions based on subject and message type.
+        """
         raise NotImplementedError()
 

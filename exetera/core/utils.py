@@ -214,3 +214,10 @@ def guess_encoding(filename):
     else:
         return "utf-8"
 
+def is_sorted(array):
+    """
+    Check if an array is ordered.
+    """
+    if len(array) < 2:
+        return True
+    return np.all(array[:-1] <= array[1:])

@@ -117,17 +117,7 @@ class HDF5DataFrame(DataFrame):
 
         """
         # add view
-        if isinstance(field, fld.NumericField):
-            view = fld.NumericField(field._session, field._field, self, write_enabled=True)
-        elif isinstance(field, fld.CategoricalField):
-            view = fld.CategoricalField(field._session, field._field, self, write_enabled=True)
-        elif isinstance(field, fld.TimestampField):
-            view = fld.TimestampField(field._session, field._field, self, write_enabled=True)
-        elif isinstance(field, fld.FixedStringField):
-            view = fld.FixedStringField(field._session, field._field, self, write_enabled=True)
-        elif isinstance(field, fld.IndexedStringField):
-            view = fld.IndexedStringField(field._session, field._field, self, write_enabled=True)
-
+        view = type(field)(field._session, field._field, self, write_enabled=True)
         field.attach(view)
         self._columns[view.name] = view
 
@@ -148,31 +138,9 @@ class HDF5DataFrame(DataFrame):
                 filter_field.data.clear()
                 filter_field.data.write(filter)
 
-            view._filter_wrapper = filter_field.data
+            view._filter_wrapper = fld.ReadOnlyFieldArray(filter_field, 'values')  # read-only
 
         return self._columns[view.name]
-
-    # def change_filter(self, field: fld.Field, filter: np.ndarray):
-    #     """
-    #
-    #     :param field:
-    #     :param filter:
-    #     :return:
-    #     """
-    #     pass
-    #
-    # def remove_filter(self, field: Union[str, fld.Field]):
-    #     """
-    #     Remove filter from this dataframe specified by the field or field name.
-    #     """
-    #     if not isinstance(field, str) and not isinstance(field, fld.Field):
-    #         raise TypeError("The target field should be type field or string (name of the field in this dataframe).")
-    #
-    #     name = field if isinstance(field, str) else field.name
-    #     if name not in self._columns:
-    #         raise ValueError("The target field is not in this dataframe.")
-    #     else:
-    #         del self._filters_grp[name]
 
     def drop(self,
              name: str):
@@ -337,14 +305,6 @@ class HDF5DataFrame(DataFrame):
                 if id(field) == id(v):
                     return True
             return False
-
-
-    def _get_filter_grp(self, field: Union[str, fld.Field]=None):
-        """
-        Get a filter array specified by the field or field name.
-        """
-        filter_name = '_filter'
-        return self._filters_grp[filter_name]
 
     def __getitem__(self, name):
         """
