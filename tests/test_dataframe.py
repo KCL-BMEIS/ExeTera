@@ -1330,6 +1330,7 @@ class TestDataFrameDescribe(unittest.TestCase):
                 df.describe(exclude=['num', 'num2', 'ts1'])
             self.assertTrue(isinstance(context.exception, ValueError))
 
+
 class TestDataFrameView(SessionTestCase):
 
     @parameterized.expand(DEFAULT_FIELD_DATA)
@@ -1410,8 +1411,3 @@ class TestDataFrameView(SessionTestCase):
         self.assertListEqual([], np.asarray(f.data[:]).tolist())
         self.assertListEqual(data.tolist(), np.asarray(view[name].data[:]).tolist())  # notify and update
         self.assertFalse(view[name] in f._view_refs)  # detached
-
-
-
-
-
