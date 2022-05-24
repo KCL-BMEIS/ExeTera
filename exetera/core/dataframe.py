@@ -123,7 +123,9 @@ class HDF5DataFrame(DataFrame):
 
         # add filter
         if filter is not None:
-            nformat = 'int32' if filter[-1] < 2 ** 31 - 1 else 'int64'
+            nformat = 'int32'
+            if len(filter) > 0 and np.max(filter) >= 2**31 - 1:
+                nformat = 'int64'
             filter_name = view.name
             if filter_name not in self._filters_grp.keys():
                 fld.numeric_field_constructor(self._dataset.session, self._filters_grp, filter_name, nformat)

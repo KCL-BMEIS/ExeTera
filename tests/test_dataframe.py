@@ -913,6 +913,7 @@ class TestDataFrameSort(unittest.TestCase):
             self.assertListEqual(list(val), df['val'].data[:].tolist())
             self.assertListEqual(list(val2), df['val2'].data[:])
 
+
             self.assertListEqual([b'a', b'b', b'c', b'd', b'e'], ddf['idx'].data[:].tolist())
             self.assertListEqual([10, 30, 50, 40, 20], ddf['val'].data[:].tolist())
             self.assertListEqual(['a', 'bbb', 'ccccc', 'dddd', 'ee'], ddf['val2'].data[:])
@@ -1331,56 +1332,85 @@ class TestDataFrameDescribe(unittest.TestCase):
 
 class TestDataFrameView(SessionTestCase):
 
-    def test_get_view(self):
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_get_view(self, creator, name, kwargs, data):
         """
-        Test dataframe.view, field.is_view, register
+        Test dataframe.view, field.is_view, apply_filter, and apply_index
         """
-        pass
-
-    @parameterized.expand([("create_numeric", "f_i8", {"nformat": "int8"}, [i for i in range(20)] ),])
-    def test_apply_filter(self, creator, name, kwargs, data):
-        """
-        Test dataframe.apply_field, field.data[:]
-        """
-        data = np.asarray(data)
         f = self.setup_field(self.df, creator, name, (), kwargs, data)
-        view_df = self.ds.create_dataframe('view_df')
-        filter_to_apply = np.asarray([i%2 == 0 for i in data])
-        self.df.apply_filter(filter_to_apply, ddf= view_df)
-        for field in view_df.values():
-            self.assertTrue(field.is_view())  # field is a view
-            self.assertListEqual(data[filter_to_apply].tolist(), field.data[:].tolist() )  # filtered
+        if "nformat" in kwargs:
+            data = np.asarray(data, dtype=kwargs["nformat"])
+        else:
+            data = np.asarray(data)
 
-        #
-        view_df2 = self.ds.create_dataframe('view_df2')
-        filter_to_apply &= np.asarray([i < 10 for i in data])
-        self.df.apply_filter(filter_to_apply, ddf=view_df2)
-        for field in view_df2.values():
-            self.assertTrue(field.is_view())  # field is a view
-            self.assertListEqual(data[filter_to_apply].tolist(), field.data[:].tolist())  # filtered
+        view = self.df.view()
+        self.assertTrue(view[name].is_view())
+        self.assertListEqual(data[:].tolist(), np.asarray(view[name].data[:]).tolist())
 
+        with self.subTest('All False:'):
+            df2 = self.ds.create_dataframe('df2')
+            d_filter = np.array([False])
+            self.df.apply_filter(d_filter, df2)
+            self.assertTrue(df2[name].is_view())
+            d_filter = np.nonzero(d_filter)[0]
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+            self.ds.drop('df2')
 
-    @parameterized.expand([("create_numeric", "f_i8", {"nformat": "int8"}, [i for i in range(20)]), ])
+        with self.subTest('All True:'):
+            df2 = self.ds.create_dataframe('df2')
+            d_filter = np.array([True]*len(data))
+            self.df.apply_filter(d_filter, df2)
+            self.assertTrue(df2[name].is_view())
+            d_filter = np.nonzero(d_filter)[0]
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+            self.ds.drop('df2')
+
+        with self.subTest('Ramdon T/F'):
+            df2 = self.ds.create_dataframe('df2')
+            d_filter = np.array([np.random.random()>=0.5 for i in range(len(data))])
+            self.df.apply_filter(d_filter, df2)
+            self.assertTrue(df2[name].is_view())
+            d_filter = np.nonzero(d_filter)[0]
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+            self.ds.drop('df2')
+
+        with self.subTest('All Index:'):
+            df2 = self.ds.create_dataframe('df2')
+            d_filter = np.array([i for i in range(len(data))])
+            self.df.apply_index(d_filter, df2)
+            self.assertTrue(df2[name].is_view())
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+            self.ds.drop('df2')
+
+        with self.subTest('Random Index:'):
+            df2 = self.ds.create_dataframe('df2')
+            d_filter = []
+            for i in range(len(data)):
+                if np.random.random() >= 0.5:
+                    d_filter.append(i)
+            d_filter = np.array(d_filter)
+            self.df.apply_index(d_filter, df2)
+            self.assertTrue(df2[name].is_view())
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+            self.ds.drop('df2')
+
+    @parameterized.expand(DEFAULT_FIELD_DATA)
     def test_concrete_field(self, creator, name, kwargs, data):
         """
-        Test dataframe.apply_filter, field.detach, field.notify, field.update
+        Test field.attach, field.detach, field.notify, field.update
         """
-        data = np.asarray(data)
         f = self.setup_field(self.df, creator, name, (), kwargs, data)
-        view_df = self.ds.create_dataframe('view_df')
-        filter_to_apply = np.asarray([i % 2 == 0 for i in data])
-        self.df.apply_filter(filter_to_apply, ddf=view_df)
-        for field in view_df.values():
-            self.assertTrue(field.is_view())  # field is a view
-            self.assertListEqual(data[filter_to_apply].tolist(), field.data[:].tolist())  # filtered
-
-        new_data = data + 1
+        if "nformat" in kwargs:
+            data = np.asarray(data, dtype=kwargs["nformat"])
+        else:
+            data = np.asarray(data)
+        view = self.df.view()
+        self.assertTrue(view[name] in f._view_refs)  # attached
         f.data.clear()
-        f.data.write(new_data)  # data changed, view should be concreate automatically
+        self.assertListEqual([], np.asarray(f.data[:]).tolist())
+        self.assertListEqual(data.tolist(), np.asarray(view[name].data[:]).tolist())  # notify and update
+        self.assertFalse(view[name] in f._view_refs)  # detached
 
-        for field in view_df.values():
-            self.assertFalse(field.is_view())
-            self.assertListEqual(data[filter_to_apply].tolist(), field.data[:].tolist())  # filtered
 
 
 

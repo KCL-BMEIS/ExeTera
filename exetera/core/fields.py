@@ -267,7 +267,7 @@ class ReadOnlyFieldArray:
             if utils.is_sorted(mask):
                 return self._dataset[mask]
             else:
-                return self._dataset[np.sort(mask)][np.argsort(mask)]
+                return self._dataset[np.sort(mask)][mask]
         else:
             return self._dataset[item]
 
@@ -335,7 +335,7 @@ class WriteableFieldArray:
             if utils.is_sorted(mask):
                 return self._dataset[mask]
             else:
-                return self._dataset[np.sort(mask)][np.argsort(mask)]
+                return self._dataset[np.sort(mask)][mask]
         else:
             return self._dataset[item]
 
@@ -561,9 +561,9 @@ class ReadOnlyIndexedFieldArray:
                         results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
                 else:
                     s_mask = np.sort(mask)
-                    orignal_order = np.argsort(mask)
-                    index_s = self._indices[s_mask][orignal_order]
-                    index_e = self._indices[s_mask + 1][orignal_order]
+                    #orignal_order = np.argsort(mask)
+                    index_s = self._indices[s_mask][mask]
+                    index_e = self._indices[s_mask + 1][mask]
                     results = [None] * len(s_mask)
                     for ir in range(len(results)):
                         results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
@@ -672,6 +672,8 @@ class WriteableIndexedFieldArray:
             if self._field_instance.filter is None:
                 start = item.start if item.start is not None else 0
                 stop = item.stop if item.stop is not None else len(self._indices) - 1
+                if stop <= 0:  # empty field
+                    return []
                 step = item.step
                 # TODO: validate slice
                 index = self._indices[start:stop + 1]
@@ -693,9 +695,9 @@ class WriteableIndexedFieldArray:
                         results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
                 else:
                     s_mask = np.sort(mask)
-                    orignal_order = np.argsort(mask)
-                    index_s = self._indices[s_mask][orignal_order]
-                    index_e = self._indices[s_mask + 1][orignal_order]
+                    #orignal_order = np.argsort(mask)
+                    index_s = self._indices[s_mask][mask]
+                    index_e = self._indices[s_mask + 1][mask]
                     results = [None] * len(s_mask)
                     for ir in range(len(results)):
                         results[ir] = self._values[index_s[ir]: index_e[ir]].tobytes().decode()
