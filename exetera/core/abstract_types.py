@@ -508,6 +508,13 @@ class SubjectObserver(ABC):
     def detach(self, observer):
         """
         Detach the observer (view) from the subject (field), this is to remove the association between observer with subject.
+        This method id called by the observer.
+        """
+        raise NotImplementedError()
+
+    def notify_deletion(self, observer=None):
+        """
+        Delete the observer from the subject, but called from the subject side.
         """
         raise NotImplementedError()
 
@@ -522,4 +529,6 @@ class SubjectObserver(ABC):
         Called inside the observer, to perform actions based on subject and message type.
         """
         raise NotImplementedError()
+
+
 

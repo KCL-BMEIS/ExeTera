@@ -56,7 +56,7 @@ class HDF5Field(Field, SubjectObserver):
         self._value_wrapper = None
         self._valid_reference = True
 
-        self._filter_wrapper = None
+        self._filter_index_wrapper = None
         self._view_refs = list()
 
 
@@ -120,10 +120,10 @@ class HDF5Field(Field, SubjectObserver):
 
     @property
     def filter(self):
-        if self._filter_wrapper is None:  # poential returns: raise error or return a full-index array
+        if self._filter_index_wrapper is None:  # poential returns: raise error or return a full-index array
             return None
         else:
-            return self._filter_wrapper
+            return self._filter_index_wrapper
 
     def __bool__(self):
         # this method is required to prevent __len__ being called on derived methods when fields are queried as
@@ -159,7 +159,7 @@ class HDF5Field(Field, SubjectObserver):
         """
         Return if the dataframe's name matches the field h5group path; if not, means this field is a view.
         """
-        return self._field.name[1:1+len(self.dataframe.name)] != self.dataframe.name
+        return 'source_field' in  self._field.attrs
 
 class MemoryField(Field):
 
@@ -247,7 +247,11 @@ class MemoryField(Field):
 class ReadOnlyFieldArray:
     def __init__(self, field, dataset_name):
         self._field_instance = field
-        self._field = field._field
+        if 'source_field' in field._field.attrs:  # is a view
+            data_h5group = field._field.file.get(field._field.attrs['source_field'])
+        else:
+            data_h5group = field._field
+        self._field = data_h5group  # HDF5 group instance
         self._name = dataset_name
         self._dataset = self._field[dataset_name]
 
@@ -310,7 +314,11 @@ class ReadOnlyFieldArray:
 class WriteableFieldArray:
     def __init__(self, field, dataset_name):
         self._field_instance = field
-        self._field = field._field  # HDF5 group instance
+        if 'source_field' in field._field.attrs:  # is a view
+            data_h5group = field._field.file.get(field._field.attrs['source_field'])
+        else:
+            data_h5group = field._field
+        self._field = data_h5group  # HDF5 group instance
         self._name = dataset_name
         self._dataset = self._field[dataset_name]
 
@@ -537,7 +545,7 @@ class ReadOnlyIndexedFieldArray:
         :return: Item value from dataset
         """
         if isinstance(item, slice):
-            if self._field_instance.filter is None:
+            if self._field_instance.filter is None:  # This field is not a view so no filtered_index to deal with
                 start = item.start if item.start is not None else 0
                 stop = item.stop if item.stop is not None else len(self._indices) - 1
                 step = item.step
@@ -2149,6 +2157,18 @@ def timestamp_field_constructor(session, group, name, timestamp=None, chunksize=
     DataWriter.write(field, 'values', [], 0, 'float64')
 
 
+def base_view_contructor(session, group, source):
+    """
+    Constructor are for setup the hdf5 group that going to be a container for a view (rather than a field).
+    """
+    if source.name in group:
+        msg = "Field '{}' already exists in group '{}'"
+        raise ValueError(msg.format(source.name, group))
+    field = source.create_like(group, source.name)  # copy other attributes
+    field._field.attrs['source_field'] = source._field.name
+    return field._field
+
+
 # HDF5 fields
 # ===========
 
@@ -2215,21 +2235,40 @@ class IndexedStringField(HDF5Field):
         else:
             self._view_refs.remove(view)
 
+    def notify_deletion(self, view=None):
+        if view is None:  # detach all
+            self._view_refs.clear()
+        else:
+            self._view_refs.remove(view)
+
     def notify(self, msg=None):
         for view in self._view_refs:
             view.update(self, msg)
 
     def update(self, subject, msg=None):
         if isinstance(subject, (WriteableFieldArray, WriteableIndexedFieldArray)):
+            """
+            This field is being notified by its own field array
+            It needs to notify other fields that it is about to change before the change goes ahead
+            """
             self.notify(msg)
-            self.detach()
+            self.notify_deletion()
 
         if isinstance(subject, HDF5Field):
+            """
+            This field is being notified by the field that owns the data that it has a view of
+            At present, the behavior is that it copies the data and then detaches from the view that notified it, as it
+            no longer has an observation relationship with that field
+            """
             if msg == 'write' or msg == 'clear':
                 if self.is_view():
-                    del self.dataframe[self.name]  # notice dataframe
-                    concrete_field = self.create_like(self.dataframe, self.name)  # create
-                    concrete_field.data.write(self.data[:])  # write data
+                    field_data = self.data[:]
+                    del self._field.attrs['source_field']  # del view attr
+                    self._index_wrapper = None
+                    self._value_wrapper = None
+                    self._data_wrapper = None  # re-init the field array
+                    self._filter_index_wrapper = None  # reset the filter
+                    self.data.write(field_data)
 
     def is_sorted(self):
         """
@@ -2513,21 +2552,38 @@ class FixedStringField(HDF5Field):
         else:
             self._view_refs.remove(view)
 
+    def notify_deletion(self, view=None):
+        if view is None:  # detach all
+            self._view_refs.clear()
+        else:
+            self._view_refs.remove(view)
+
     def notify(self, msg=None):
         for view in self._view_refs:
             view.update(self, msg)
 
     def update(self, subject, msg=None):
         if isinstance(subject, (WriteableFieldArray, WriteableIndexedFieldArray)):
+            """
+            This field is being notified by its own field array
+            It needs to notify other fields that it is about to change before the change goes ahead
+            """
             self.notify(msg)
-            self.detach()
+            self.notify_deletion()
 
         if isinstance(subject, HDF5Field):
+            """
+            This field is being notified by the field that owns the data that it has a view of
+            At present, the behavior is that it copies the data and then detaches from the view that notified it, as it
+            no longer has an observation relationship with that field
+            """
             if msg == 'write' or msg == 'clear':
                 if self.is_view():
-                    del self.dataframe[self.name]  # notice dataframe
-                    concrete_field = self.create_like(self.dataframe, self.name)  # create
-                    concrete_field.data.write(self.data[:])  # write data
+                    field_data = self.data[:]
+                    del self._field.attrs['source_field']  # del view attr
+                    self._value_wrapper = None  # re-init the field array
+                    self._filter_index_wrapper = None  # reset the filter
+                    self.data.write(field_data)
 
     def is_sorted(self):
         """
@@ -2745,21 +2801,39 @@ class NumericField(HDF5Field):
         else:
             self._view_refs.remove(view)
 
+    def notify_deletion(self, view=None):
+        if view is None:  # detach all
+            self._view_refs.clear()
+        else:
+            self._view_refs.remove(view)
+
     def notify(self, msg=None):
         for view in self._view_refs:
             view.update(self, msg)
 
     def update(self, subject, msg=None):
         if isinstance(subject, (WriteableFieldArray, WriteableIndexedFieldArray)):
+            """
+            This field is being notified by its own field array
+            It needs to notify other fields that it is about to change before the change goes ahead
+            """
             self.notify(msg)
-            self.detach()
+            self.notify_deletion()
 
         if isinstance(subject, HDF5Field):
+            """
+            This field is being notified by the field that owns the data that it has a view of
+            At present, the behavior is that it copies the data and then detaches from the view that notified it, as it
+            no longer has an observation relationship with that field
+            """
             if msg == 'write' or msg == 'clear':
                 if self.is_view():
-                    del self.dataframe[self.name]  # notice dataframe
-                    concrete_field = self.create_like(self.dataframe, self.name)  # create
-                    concrete_field.data.write(self.data[:])  # write data
+                    field_data = self.data[:]
+                    del self._field.attrs['source_field']  # del view attr
+                    self._value_wrapper = None  # re-init the field array
+                    self._filter_index_wrapper = None  # reset the filter
+                    self.data.write(field_data)
+
 
     def is_sorted(self):
         """
@@ -3110,21 +3184,38 @@ class CategoricalField(HDF5Field):
         else:
             self._view_refs.remove(view)
 
+    def notify_deletion(self, view=None):
+        if view is None:  # detach all
+            self._view_refs.clear()
+        else:
+            self._view_refs.remove(view)
+
     def notify(self, msg=None):
         for view in self._view_refs:
             view.update(self, msg)
 
     def update(self, subject, msg=None):
         if isinstance(subject, (WriteableFieldArray, WriteableIndexedFieldArray)):
+            """
+            This field is being notified by its own field array
+            It needs to notify other fields that it is about to change before the change goes ahead
+            """
             self.notify(msg)
-            self.detach()
+            self.notify_deletion()
 
         if isinstance(subject, HDF5Field):
+            """
+            This field is being notified by the field that owns the data that it has a view of
+            At present, the behavior is that it copies the data and then detaches from the view that notified it, as it
+            no longer has an observation relationship with that field
+            """
             if msg == 'write' or msg == 'clear':
                 if self.is_view():
-                    del self.dataframe[self.name]  # notice dataframe
-                    concrete_field = self.create_like(self.dataframe, self.name)  # create
-                    concrete_field.data.write(self.data[:])  # write data
+                    field_data = self.data[:]
+                    del self._field.attrs['source_field']  # del view attr
+                    self._value_wrapper = None  # re-init the field array
+                    self._filter_index_wrapper = None  # reset the filter
+                    self.data.write(field_data)
 
     def is_sorted(self):
         """
@@ -3456,21 +3547,38 @@ class TimestampField(HDF5Field):
         else:
             self._view_refs.remove(view)
 
+    def notify_deletion(self, view=None):
+        if view is None:  # detach all
+            self._view_refs.clear()
+        else:
+            self._view_refs.remove(view)
+
     def notify(self, msg=None):
         for view in self._view_refs:
             view.update(self, msg)
 
     def update(self, subject, msg=None):
         if isinstance(subject, (WriteableFieldArray, WriteableIndexedFieldArray)):
+            """
+            This field is being notified by its own field array
+            It needs to notify other fields that it is about to change before the change goes ahead
+            """
             self.notify(msg)
-            self.detach()
+            self.notify_deletion()
 
         if isinstance(subject, HDF5Field):
+            """
+            This field is being notified by the field that owns the data that it has a view of
+            At present, the behavior is that it copies the data and then detaches from the view that notified it, as it
+            no longer has an observation relationship with that field
+            """
             if msg == 'write' or msg == 'clear':
                 if self.is_view():
-                    del self.dataframe[self.name]  # notice dataframe
-                    concrete_field = self.create_like(self.dataframe, self.name)  # create
-                    concrete_field.data.write(self.data[:])  # write data
+                    field_data = self.data[:]
+                    del self._field.attrs['source_field']  # del view attr
+                    self._value_wrapper = None  # re-init the field array
+                    self._filter_index_wrapper = None  # reset the filter
+                    self.data.write(field_data)
 
     def is_sorted(self):
         """

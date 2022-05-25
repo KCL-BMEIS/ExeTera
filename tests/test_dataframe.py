@@ -1355,6 +1355,11 @@ class TestDataFrameView(SessionTestCase):
             self.assertTrue(df2[name].is_view())
             d_filter = np.nonzero(d_filter)[0]
             self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+
+            d_filter = np.array([True]*len(data))
+            self.df.apply_filter(d_filter, df2)
+            d_filter = np.nonzero(d_filter)[0]
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
             self.ds.drop('df2')
 
         with self.subTest('All True:'):
@@ -1362,6 +1367,11 @@ class TestDataFrameView(SessionTestCase):
             d_filter = np.array([True]*len(data))
             self.df.apply_filter(d_filter, df2)
             self.assertTrue(df2[name].is_view())
+            d_filter = np.nonzero(d_filter)[0]
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+
+            d_filter = np.array([np.random.random()>=0.5 for i in range(len(data))])
+            self.df.apply_filter(d_filter, df2)
             d_filter = np.nonzero(d_filter)[0]
             self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
             self.ds.drop('df2')
@@ -1390,6 +1400,11 @@ class TestDataFrameView(SessionTestCase):
                 if np.random.random() >= 0.5:
                     d_filter.append(i)
             d_filter = np.array(d_filter)
+            self.df.apply_index(d_filter, df2)
+            self.assertTrue(df2[name].is_view())
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+
+            d_filter = np.array([i for i in range(len(data))])
             self.df.apply_index(d_filter, df2)
             self.assertTrue(df2[name].is_view())
             self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())

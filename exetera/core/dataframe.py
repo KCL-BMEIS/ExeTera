@@ -117,7 +117,8 @@ class HDF5DataFrame(DataFrame):
 
         """
         # add view
-        view = type(field)(field._session, field._field, self, write_enabled=True)
+        h5group = fld.base_view_contructor(field._session, self, field)
+        view = type(field)(field._session, h5group, self, write_enabled=True)
         field.attach(view)
         self._columns[view.name] = view
 
@@ -140,7 +141,7 @@ class HDF5DataFrame(DataFrame):
                 filter_field.data.clear()
                 filter_field.data.write(filter)
 
-            view._filter_wrapper = fld.ReadOnlyFieldArray(filter_field, 'values')  # read-only
+            view._filter_index_wrapper = fld.ReadOnlyFieldArray(filter_field, 'values')  # read-only
 
         return self._columns[view.name]
 
@@ -524,17 +525,23 @@ class HDF5DataFrame(DataFrame):
         :returns: a dataframe contains all the fields filterd, self if ddf is not set
         """
         filter_to_apply_ = val.validate_filter(filter_to_apply)
-        if ddf is not None and ddf is not self:
-            if not isinstance(ddf, DataFrame):
-                raise TypeError("The destination object must be an instance of DataFrame.")
-            filter_to_apply_ = filter_to_apply_.nonzero()[0]
-            for name, field in self._columns.items():
-                ddf._add_view(field, filter_to_apply_)
-            return ddf
-        else:
+        ddf = self if ddf is None else ddf
+        if not isinstance(ddf, DataFrame):
+            raise TypeError("The destination object must be an instance of DataFrame.")
+        if ddf == self:
             for field in self._columns.values():
                 field.apply_filter(filter_to_apply_, in_place=True)
-            return self
+        elif ddf.dataset == self.dataset:  # another df in the same ds, create view
+            filter_to_apply_ = filter_to_apply_.nonzero()[0]
+            for name, field in self._columns.items():
+                if name in ddf:
+                    del ddf[name]
+                ddf._add_view(field, filter_to_apply_)
+        else:  # another df in different ds, do hard copy
+            for name, field in self._columns.items():
+                newfld = field.create_like(ddf, name)
+                field.apply_filter(filter_to_apply_, target=newfld)
+        return ddf
 
     def apply_index(self, index_to_apply, ddf=None):
         """
@@ -559,21 +566,23 @@ class HDF5DataFrame(DataFrame):
         :param ddf: optional- the destination data frame
         :returns: a dataframe contains all the fields re-indexed, self if ddf is not set
         """
-        if ddf is not None and ddf is not self:
-            if not isinstance(ddf, DataFrame):
-                raise TypeError("The destination object must be an instance of DataFrame.")
-            for name, field in self._columns.items():
-                # newfld = field.create_like(ddf, name)
-                # field.apply_index(index_to_apply, target=newfld)
-                ddf._add_view(field, index_to_apply)
-            return ddf
-        else:
+        ddf = self if ddf is None else ddf
+        if not isinstance(ddf, DataFrame):
+            raise TypeError("The destination object must be an instance of DataFrame.")
+        if ddf == self:  # in_place
             val.validate_all_field_length_in_df(self)
-
             for field in self._columns.values():
                 field.apply_index(index_to_apply, in_place=True)
-            return self
-
+        elif ddf.dataset == self.dataset:  # view
+            for name, field in self._columns.items():
+                if name in ddf:
+                    del ddf[name]
+                ddf._add_view(field, index_to_apply)
+        else:  # hard copy
+            for name, field in self._columns.items():
+                newfld = field.create_like(ddf, name)
+                field.apply_index(index_to_apply, target=newfld)
+        return ddf
 
     def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):
         """
