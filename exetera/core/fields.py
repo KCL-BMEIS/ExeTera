@@ -2160,6 +2160,10 @@ def timestamp_field_constructor(session, group, name, timestamp=None, chunksize=
 def base_view_contructor(session, group, source):
     """
     Constructor are for setup the hdf5 group that going to be a container for a view (rather than a field).
+    :param session: The ExeTera session.
+    :param group: The dataframe to locate this view.
+    :param source: The source field to copy the attributes.
+    :return: The h5group where this view is created.
     """
     if source.name in group:
         msg = "Field '{}' already exists in group '{}'"

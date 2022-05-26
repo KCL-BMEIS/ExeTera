@@ -17,6 +17,7 @@ from exetera.core.abstract_types import Dataset, DataFrame, DataFrameGroupBy
 from exetera.core import fields as fld
 from exetera.core import operations as ops
 from exetera.core import validation as val
+from exetera.core.utils import INT64_INDEX_LENGTH
 import h5py
 import csv as csvlib
 
@@ -125,7 +126,7 @@ class HDF5DataFrame(DataFrame):
         # add filter
         if filter is not None:
             nformat = 'int32'
-            if len(filter) > 0 and np.max(filter) >= 2**31 - 1:
+            if len(filter) > 0 and np.max(filter) >= INT64_INDEX_LENGTH:
                 nformat = 'int64'
             filter_name = view.name
             if filter_name not in self._filters_grp.keys():
@@ -144,6 +145,19 @@ class HDF5DataFrame(DataFrame):
             view._filter_index_wrapper = fld.ReadOnlyFieldArray(filter_field, 'values')  # read-only
 
         return self._columns[view.name]
+
+    def _bind_view(self, view: fld.Field, source_field: fld.Field):
+        """
+        Binding view is when the view (reference field) is already set, but has not attach to the original field yet, for
+        instance during the initializing of an existing dataset/dataframe.
+        :param view: The view field.
+        :param source_field: The original field.
+        """
+        source_field.attach(view)
+        if view.name in self._filters_grp.keys():
+            filter_field = fld.NumericField(self._dataset.session, self._filters_grp[view.name], self,
+                                            write_enabled=True)
+            view._filter_index_wrapper = fld.ReadOnlyFieldArray(filter_field, 'values')  # read-only
 
     def drop(self,
              name: str):
@@ -1037,7 +1051,13 @@ class HDF5DataFrame(DataFrame):
         return result
 
     def view(self):
-        dfv = self.dataset.create_dataframe(self.name + '_view')
+        """
+        Create a view of this dataframe.
+        """
+        view_name = '_' + self.name + '_view'
+        if view_name in self.dataset:
+            self.dataset.drop(view_name)
+        dfv = self.dataset.create_dataframe(view_name)
         for f in self.columns.values():
             dfv._add_view(f)
         return dfv

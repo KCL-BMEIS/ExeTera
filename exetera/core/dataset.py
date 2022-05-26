@@ -48,11 +48,20 @@ class HDF5Dataset(Dataset):
         self._file = h5py.File(dataset_path, mode)
         self._dataframes = dict()
 
+        #initilize the dataframe and fields
         for group in self._file.keys():
             if group not in ('trash',):
                 h5group = self._file[group]
                 dataframe = edf.HDF5DataFrame(self, group, h5group=h5group)
                 self._dataframes[group] = dataframe
+        # bind the views
+        for df in self._dataframes.values():
+            for field in df.columns.values():
+                if field.is_view():
+                    source_name = field._field.attrs['source_field']
+                    idx = source_name.rfind('/')
+                    source_field = self._dataframes[source_name[1:idx]][source_name[idx+1:]]
+                    df._bind_view(field, source_field)
 
     @property
     def session(self):

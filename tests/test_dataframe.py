@@ -1426,3 +1426,25 @@ class TestDataFrameView(SessionTestCase):
         self.assertListEqual([], np.asarray(f.data[:]).tolist())
         self.assertListEqual(data.tolist(), np.asarray(view[name].data[:]).tolist())  # notify and update
         self.assertFalse(view[name] in f._view_refs)  # detached
+
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_view_persistence(self, creator, name, kwargs, data):
+        """
+        The view should be persistent over sessions.
+        """
+        bio = BytesIO()
+        src = self.s.open_dataset(bio, 'w', 'src')
+        df = src.create_dataframe('df')
+        f = self.setup_field(df, creator, name, (), kwargs, data)
+        df2 = src.create_dataframe('df2')
+        d_filter = np.array([np.random.random()>=0.5 for i in range(len(data))])
+        df.apply_filter(d_filter, df2)
+        self.assertTrue(df2[name].is_view())
+        self.s.close()
+
+        src = self.s.open_dataset(bio, 'r+', 'src')
+        df = src['df']
+        df2 = src['df2']
+        self.assertTrue(df2[name].is_view())
+        self.assertTrue(df2[name] in df[name]._view_refs)
+
