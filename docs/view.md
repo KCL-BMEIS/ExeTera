@@ -1,5 +1,5 @@
 # View
-## what is a view
+## What is a view
 A view is a special field that has a ‘source_field’ in it’s hdf5 attributes. In this case, the view will initialize the dataset from the destination specified by the ‘source_field’ rather than in it’s own hdf5 storage.
 
 
@@ -38,3 +38,11 @@ Step4: At the moment, the view.update() will copy the original data to it’s ow
 
 ### An existing view
 As the view is stored in the hdf5, the view relationship can be presistenced over sessions. Upon loading a dataset (in dataset.__init__), the dataset will check if there is a view and call dataframe._bind_view() to attach the view to the field during initialization of dataset/dataframe/fields. This is why the view can only be created from a field that co-exist in the same dataset (hdf5 file).
+
+
+## Future works
+### Data fetching performance
+Different ways of getting data out from the HDF5 can vary the performance a lot. For example, it's generally better to get the data out of HDF5 by chunk rather than indexes. In the current implementation (fieldarray.__getitem__), we mask the index filter with item first, then fetch the data out from hdf5. As hdf5 doesn't support un-ordered data access, we sort the mask and convert them back when return the data. Further work can be done on how to arrange the order of index filter and item (specified by the user through __getitem__). For example, with large volume of data and small set of index filter, it might make sense to mask the filter first. However in the case of large filters, it will be faster to load the data into memory first. Where is the boundary worth investigating.
+
+### Dependency between views
+In the current implementation, the views all dependent on the source field. In the case of changing the data in the field, all the attached views will copy the data over and write it's own copy. This is not efficient with a number of views attached. One better way could be only one of the view to copy the data over and become the source field of the rest views. This needs a detailed design and implementation in fields.update().
