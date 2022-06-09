@@ -15,6 +15,7 @@ import operator
 
 import numpy as np
 import h5py
+import re
 
 from exetera.core.abstract_types import Field
 from exetera.core.data_writer import DataWriter
@@ -161,7 +162,7 @@ class HDF5Field(Field):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
 
-    def where(self, cond:Union[list, tuple, np.ndarray, Field], b, inplace=False):
+    def where(self, cond:Union[list, tuple, np.ndarray, Field, Callable], b, inplace=False):
         if isinstance(cond, (list, tuple, np.ndarray)):
             cond = cond
         elif isinstance(cond, Field):
@@ -173,22 +174,39 @@ class HDF5Field(Field):
         else:
             raise TypeError("'cond' parameter needs to be either callable lambda function, or array like, or NumericMemField")
 
-        # if isinstance(b, str):
-        #     b = b.encode()
-        if isinstance(b, Field):
-            b = b.data[:]
 
-        result_ndarray = np.where(cond, self.data[:], b)
         result_mem_field = None
-        if str(result_ndarray.dtype) in utils.PERMITTED_NUMERIC_TYPES:
-            result_mem_field = NumericMemField(self._session, str(result_ndarray.dtype))
-            result_mem_field.data.write(result_ndarray)
 
-        elif isinstance(self, (IndexedStringField, FixedStringField)) or isinstance(b, (IndexedStringField, FixedStringField)):
-            result_mem_field = IndexedStringMemField(self._session)
-            result_mem_field.data.write(result_ndarray)
+        if isinstance(self, IndexedStringField) or isinstance(b, IndexedStringField):
+            # TODO: return IndexedStringMemField
+
+            # if isinstance(b, str):
+            #     b = b.encode()
+
+            pass
         else:
-            raise NotImplementedError(f"instance method where doesn't support the current input type")
+            b_data = b.data[:] if isinstance(b, Field) else b
+
+
+            result_ndarray = np.where(cond, self.data[:], b_data)
+
+
+            if isinstance(self, FixedStringField) or isinstance(b, FixedStringField):
+                length = 0
+                result = re.findall(r"<U(\d+)|S(\d+)", str(result_ndarray.dtype))
+                if result:
+                    length = result[0][0] if result[0][0] else result[0][1]
+                else:
+                    raise ValueError("The return dtype of instance method `where` doesn't match '<U(\d+)' or 'S(\d+)' when one of the field is FixedStringField")
+
+                result_mem_field = FixedStringMemField(self._session, length)
+                result_mem_field.data.write(result_ndarray)
+
+            elif str(result_ndarray.dtype) in utils.PERMITTED_NUMERIC_TYPES:
+                result_mem_field = NumericMemField(self._session, str(result_ndarray.dtype))
+                result_mem_field.data.write(result_ndarray)
+            else:
+                raise NotImplementedError(f"instance method `where` doesn't support the current input type: {type(self)} and {type(b)}")
 
         # if inplace:
         #     self.data.clear()

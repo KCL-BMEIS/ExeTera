@@ -2185,6 +2185,12 @@ WHERE_NUMERIC_TESTS = [
 
 ]
 
+WHERE_FIXED_STRING_TESTS = [
+    (lambda f: f > 5, "create_numeric", {"nformat": "int8"}, shuffle_randstate(list(range(-10,10))), "create_fixed_string", {"length": 3}, [b"aaa", b"bbb", b"eee", b"ccc", b"   "]*4),
+    (lambda f: f > 2, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, RAND_STATE.randint(1, 4, 20).tolist(), "create_fixed_string", {"length": 3}, [b"aaa", b"bbb", b"eee", b"ccc", b"   "]*4),
+    (RAND_STATE.randint(0, 2, 20).tolist(),  "create_fixed_string", {"length": 3}, [b"aaa", b"bbb", b"eee", b"ccc", b"   "]*4, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, RAND_STATE.randint(1, 4, 20).tolist()),
+    (RAND_STATE.randint(0, 2, 20).tolist(),  "create_fixed_string", {"length": 3}, [b"aaa", b"bbb", b"eee", b"ccc", b"   "]*4, "create_numeric", {"nformat": "int8"}, shuffle_randstate(list(range(-10,10)))),
+]
 
 WHERE_INDEXED_STRING_TESTS = [
     (lambda f: f > 5, ['a', 'b', 'c'], [1,2,3]),
@@ -2234,7 +2240,7 @@ class TestFieldWhereFunctions(SessionTestCase):
 
 
     @parameterized.expand(WHERE_NUMERIC_TESTS)
-    def test_instance_field_where_return_numericmemfield(self, cond, a_creator, a_kwarg, a_field_data, b_creator, b_kwarg, b_data, expected_dtype):
+    def test_instance_field_where_return_numeric_mem_field(self, cond, a_creator, a_kwarg, a_field_data, b_creator, b_kwarg, b_data, expected_dtype):
         a_field = self.setup_field(self.df, a_creator, "af", (), a_kwarg, a_field_data)
 
         expected_result = where_oracle(cond, a_field_data, b_data)
@@ -2255,8 +2261,21 @@ class TestFieldWhereFunctions(SessionTestCase):
                 np.testing.assert_array_equal(result, expected_result)
 
 
+    @parameterized.expand(WHERE_FIXED_STRING_TESTS)
+    def test_instance_field_where_return_fixed_string_mem_field(self, cond, a_creator, a_kwarg, a_field_data, b_creator, b_kwarg, b_data):
+        a_field = self.setup_field(self.df, a_creator, "af", (), a_kwarg, a_field_data)
+        b_field = self.setup_field(self.df, b_creator, "bf", (), b_kwarg, b_data)
+
+        expected_result = where_oracle(cond, a_field_data, b_data)
+
+        with self.subTest(f"Test instance where method: a is {type(a_field)}, b is {type(b_field)}"):
+            result = a_field.where(cond, b_field)
+            self.assertIsInstance(result, fields.FixedStringMemField)
+            np.testing.assert_array_equal(result.data[:], expected_result)
+
+
     @parameterized.expand(WHERE_INDEXED_STRING_TESTS)
-    def test_instance_field_where_return_numericmemfield(self, cond, a, b):
+    def test_instance_field_where_return_indexed_string_mem_field(self, cond, a, b):
         pass
         
 
