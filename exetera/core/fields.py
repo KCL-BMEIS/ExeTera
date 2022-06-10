@@ -177,34 +177,46 @@ class HDF5Field(Field):
 
         result_mem_field = None
 
-        if isinstance(self, IndexedStringField) or isinstance(b, IndexedStringField):
+        if isinstance(self, IndexedStringField) and isinstance(b, IndexedStringField):
+
+            a_indices, a_values = self.indices[:], self.values[:]
+            b_indices, b_values = b.indices[:], b.values[:]
+            if len(cond) != len(a_indices) - 1 or len(cond) != len(b_indices) - 1:
+                raise ValueError(f"operands can't work with shapes ({len(cond)},) ({len(a_indices) - 1},)  ({len(b_indices) - 1},)")
+
+            r_indices = np.zeros(len(a_indices), dtype=np.int64)
+            r_values = np.zeros(max(len(a_values), len(b_values)), dtype=np.uint8)
+
+            ops.where_for_two_indexed_string_fields(np.array(cond), a_indices, a_values, b_indices, b_values, r_indices, r_values)
+
+            r_values = r_values[:r_indices[-1]]
+
+            result_mem_field = IndexedStringMemField(self._session)
+            result_mem_field.indices.write(r_indices)
+            result_mem_field.values.write(r_values)
+
+        elif isinstance(self, IndexedStringField) or isinstance(b, IndexedStringField):
             # TODO: return IndexedStringMemField
-
-            # if isinstance(b, str):
-            #     b = b.encode()
-
+            # operands could not be broadcast together with shapes (4,) (3,) (3,)
             pass
         else:
             b_data = b.data[:] if isinstance(b, Field) else b
-
-
-            result_ndarray = np.where(cond, self.data[:], b_data)
-
+            r_ndarray = np.where(cond, self.data[:], b_data)
 
             if isinstance(self, FixedStringField) or isinstance(b, FixedStringField):
                 length = 0
-                result = re.findall(r"<U(\d+)|S(\d+)", str(result_ndarray.dtype))
+                result = re.findall(r"<U(\d+)|S(\d+)", str(r_ndarray.dtype))
                 if result:
                     length = result[0][0] if result[0][0] else result[0][1]
                 else:
                     raise ValueError("The return dtype of instance method `where` doesn't match '<U(\d+)' or 'S(\d+)' when one of the field is FixedStringField")
 
                 result_mem_field = FixedStringMemField(self._session, length)
-                result_mem_field.data.write(result_ndarray)
+                result_mem_field.data.write(r_ndarray)
 
-            elif str(result_ndarray.dtype) in utils.PERMITTED_NUMERIC_TYPES:
-                result_mem_field = NumericMemField(self._session, str(result_ndarray.dtype))
-                result_mem_field.data.write(result_ndarray)
+            elif str(r_ndarray.dtype) in utils.PERMITTED_NUMERIC_TYPES:
+                result_mem_field = NumericMemField(self._session, str(r_ndarray.dtype))
+                result_mem_field.data.write(r_ndarray)
             else:
                 raise NotImplementedError(f"instance method `where` doesn't support the current input type: {type(self)} and {type(b)}")
 

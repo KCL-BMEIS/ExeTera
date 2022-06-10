@@ -2169,31 +2169,38 @@ class TestFieldIsIn(SessionTestCase):
                 np.testing.assert_array_equal(expected, result)
 
 
+WHERE_BOOLEAN_COND = RAND_STATE.randint(0, 2, 20).tolist()
+WHERE_NUMERIC_FIELD_DATA = shuffle_randstate(list(range(-10,10)))
+WHERE_FIXED_STRING_FIELD_DATA = [b"aaa", b"bbb", b"eee", b"ccc", b"   "]*4
+WHERE_CATEGORICAL_FIELD_DATA = RAND_STATE.randint(1, 4, 20).tolist()
+WHERE_INDEXED_STRING_FIELD_DATA = (["a", "bb", "eeeee", "ccc", "dddd","", " "]*3)[:-1:] # make data length to 20
+
 WHERE_NUMERIC_TESTS = [
-    (lambda f: f > 5, "create_numeric", {"nformat": "int8"}, shuffle_randstate(list(range(-10,10))), None, None, 0, 'int8'),
-    (lambda f: f > 5, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, RAND_STATE.randint(1, 4, 20).tolist(), None, None, -1.0, 'float64'),
-    (lambda f: f > 5, "create_numeric", {"nformat": "float32"}, shuffle_randstate(list(range(-10,10))), None, None, -1.0, 'float32'),
-    (lambda f: f > 5, "create_numeric", {"nformat": "int32"}, shuffle_randstate(list(range(-10,10))), None, None, shuffle_randstate(list(range(0,20))), 'int64'),
-    (lambda f: f > 5, "create_numeric", {"nformat": "int32"}, shuffle_randstate(list(range(-10,10))), None, None, np.array(shuffle_randstate(list(range(0,20))), dtype='int32'), 'int32'),
-    (lambda f: f > 5, "create_categorical", {"nformat": "int16", "key": {"a": 1, "b": 2, "c": 3}}, RAND_STATE.randint(1, 4, 20).tolist(),  None, None, np.array(shuffle_randstate(list(range(-20,0))), dtype='float32'), 'float32'),
-    (lambda f: f > 5, "create_numeric", {"nformat": "float32"}, shuffle_randstate(list(range(-10,10))), "create_categorical", {"nformat": "int8", "key": {"a": 1, "b": 2, "c": 3}}, RAND_STATE.randint(1, 4, 20).tolist(), 'float32'),
-    (lambda f: f > 5, "create_numeric", {"nformat": "float32"}, shuffle_randstate(list(range(-10,10))), "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, RAND_STATE.randint(1, 4, 20).tolist(), 'float64'),
-    (lambda f: f > 5, "create_categorical", {"nformat": "int16", "key": {"a": 1, "b": 2, "c": 3}}, RAND_STATE.randint(1, 4, 20).tolist(), "create_numeric", {"nformat": "float32"}, shuffle_randstate(list(range(-10,10))), 'float32'),
-    (lambda f: f > 5, "create_categorical", {"nformat": "int16", "key": {"a": 1, "b": 2, "c": 3}}, RAND_STATE.randint(1, 4, 20).tolist(), "create_numeric", {"nformat": "float32"}, shuffle_randstate(list(range(-10,10))), 'float32'),
-    (lambda f: f > 5, "create_numeric", {"nformat": "float32"}, shuffle_randstate(list(range(-10,10))),"create_numeric", {"nformat": "float64"}, shuffle_randstate(list(range(-10,10))), 'float64'),
-    (RAND_STATE.randint(0, 2, 20).tolist(), "create_categorical", {"nformat": "int16", "key": {"a": 1, "b": 2, "c": 3}}, RAND_STATE.randint(1, 4, 20).tolist(),"create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, RAND_STATE.randint(1, 4, 20).tolist(), 'int32'),
+    (lambda f: f > 5, "create_numeric", {"nformat": "int8"}, WHERE_NUMERIC_FIELD_DATA, None, None, 0, 'int8'),
+    (lambda f: f > 5, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA, None, None, -1.0, 'float64'),
+    (lambda f: f > 5, "create_numeric", {"nformat": "float32"}, WHERE_NUMERIC_FIELD_DATA, None, None, -1.0, 'float32'),
+    (lambda f: f > 5, "create_numeric", {"nformat": "int32"}, WHERE_NUMERIC_FIELD_DATA, None, None, shuffle_randstate(list(range(0,20))), 'int64'),
+    (lambda f: f > 5, "create_numeric", {"nformat": "int32"}, WHERE_NUMERIC_FIELD_DATA, None, None, np.array(shuffle_randstate(list(range(0,20))), dtype='int32'), 'int32'),
+    (lambda f: f > 5, "create_categorical", {"nformat": "int16", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA,  None, None, np.array(shuffle_randstate(list(range(-20,0))), dtype='float32'), 'float32'),
+    (lambda f: f > 5, "create_numeric", {"nformat": "float32"}, WHERE_NUMERIC_FIELD_DATA, "create_categorical", {"nformat": "int8", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA, 'float32'),
+    (lambda f: f > 5, "create_numeric", {"nformat": "float32"}, WHERE_NUMERIC_FIELD_DATA, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA, 'float64'),
+    (lambda f: f > 5, "create_categorical", {"nformat": "int16", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA, "create_numeric", {"nformat": "float32"}, WHERE_NUMERIC_FIELD_DATA, 'float32'),
+    (lambda f: f > 5, "create_categorical", {"nformat": "int16", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA, "create_numeric", {"nformat": "float32"}, WHERE_NUMERIC_FIELD_DATA, 'float32'),
+    (lambda f: f > 5, "create_numeric", {"nformat": "float32"}, WHERE_NUMERIC_FIELD_DATA,"create_numeric", {"nformat": "float64"}, WHERE_NUMERIC_FIELD_DATA, 'float64'),
+    (WHERE_BOOLEAN_COND, "create_categorical", {"nformat": "int16", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA,"create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA, 'int32'),
 
 ]
 
 WHERE_FIXED_STRING_TESTS = [
-    (lambda f: f > 5, "create_numeric", {"nformat": "int8"}, shuffle_randstate(list(range(-10,10))), "create_fixed_string", {"length": 3}, [b"aaa", b"bbb", b"eee", b"ccc", b"   "]*4),
-    (lambda f: f > 2, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, RAND_STATE.randint(1, 4, 20).tolist(), "create_fixed_string", {"length": 3}, [b"aaa", b"bbb", b"eee", b"ccc", b"   "]*4),
-    (RAND_STATE.randint(0, 2, 20).tolist(),  "create_fixed_string", {"length": 3}, [b"aaa", b"bbb", b"eee", b"ccc", b"   "]*4, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, RAND_STATE.randint(1, 4, 20).tolist()),
-    (RAND_STATE.randint(0, 2, 20).tolist(),  "create_fixed_string", {"length": 3}, [b"aaa", b"bbb", b"eee", b"ccc", b"   "]*4, "create_numeric", {"nformat": "int8"}, shuffle_randstate(list(range(-10,10)))),
+    (lambda f: f > 5, "create_numeric", {"nformat": "int8"}, WHERE_NUMERIC_FIELD_DATA, "create_fixed_string", {"length": 3}, WHERE_FIXED_STRING_FIELD_DATA),
+    (lambda f: f > 2, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA, "create_fixed_string", {"length": 3}, WHERE_FIXED_STRING_FIELD_DATA),
+    (WHERE_BOOLEAN_COND,  "create_fixed_string", {"length": 3}, WHERE_FIXED_STRING_FIELD_DATA, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA),
+    (WHERE_BOOLEAN_COND,  "create_fixed_string", {"length": 3}, WHERE_FIXED_STRING_FIELD_DATA, "create_numeric", {"nformat": "int8"}, WHERE_NUMERIC_FIELD_DATA),
+    (WHERE_BOOLEAN_COND,  "create_fixed_string", {"length": 3}, WHERE_FIXED_STRING_FIELD_DATA, "create_fixed_string", {"length": 1}, [b"a", b"b", b"e", b"c", b" "]*4 ),
 ]
 
 WHERE_INDEXED_STRING_TESTS = [
-    (lambda f: f > 5, ['a', 'b', 'c'], [1,2,3]),
+    (WHERE_BOOLEAN_COND, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA, "create_indexed_string", {},  np.array(shuffle_randstate(WHERE_INDEXED_STRING_FIELD_DATA))),
 ]
 
 def where_oracle(cond, a, b):
@@ -2262,11 +2269,11 @@ class TestFieldWhereFunctions(SessionTestCase):
 
 
     @parameterized.expand(WHERE_FIXED_STRING_TESTS)
-    def test_instance_field_where_return_fixed_string_mem_field(self, cond, a_creator, a_kwarg, a_field_data, b_creator, b_kwarg, b_data):
+    def test_instance_field_where_return_fixed_string_mem_field(self, cond, a_creator, a_kwarg, a_field_data, b_creator, b_kwarg, b_field_data):
         a_field = self.setup_field(self.df, a_creator, "af", (), a_kwarg, a_field_data)
-        b_field = self.setup_field(self.df, b_creator, "bf", (), b_kwarg, b_data)
+        b_field = self.setup_field(self.df, b_creator, "bf", (), b_kwarg, b_field_data)
 
-        expected_result = where_oracle(cond, a_field_data, b_data)
+        expected_result = where_oracle(cond, a_field_data, b_field_data)
 
         with self.subTest(f"Test instance where method: a is {type(a_field)}, b is {type(b_field)}"):
             result = a_field.where(cond, b_field)
@@ -2275,37 +2282,19 @@ class TestFieldWhereFunctions(SessionTestCase):
 
 
     @parameterized.expand(WHERE_INDEXED_STRING_TESTS)
-    def test_instance_field_where_return_indexed_string_mem_field(self, cond, a, b):
-        pass
-        
+    def test_instance_field_where_return_indexed_string_mem_field(self, cond, a_creator, a_kwarg, a_field_data, b_creator, b_kwarg, b_field_data):
+        a_field = self.setup_field(self.df, a_creator, "af", (), a_kwarg, a_field_data)
+        b_field = self.setup_field(self.df, b_creator, "bf", (), b_kwarg, b_field_data)
 
-    # def test_field_where_fixed_string(self):
-    #     def create_fixed_string(df, name):
-    #         f = df.create_fixed_string(name, 6)
-    #         f.data.write(np.asarray(['foo', '"foo"', '', 'bar', 'barn', 'bat'], dtype='S6'))
-    #         return f
+        expected_result = where_oracle(cond, a_field_data, b_field_data)
 
-    #     self._test_module_where(create_fixed_string, lambda f: np.char.str_len(f.data[:]) > 3,
-    #                             'boo', '_far',
-    #                             ['_far', 'boo', '_far', '_far', 'boo', '_far'])
-    #                             # [b'_far', b'boo', b'_far', b'_far', b'boo', b'_far'])
-
-    #     self._test_instance_where(create_fixed_string, lambda f: np.char.str_len(f.data[:]) > 3,
-    #                               'foobar',
-    #                               [b'foobar', b'"foo"', b'foobar', b'foobar', b'barn', b'foobar'])
+        with self.subTest(f"Test instance where method: a is {type(a_field)}, b is {type(b_field)}"):
+            result = a_field.where(cond, b_field)
+            self.assertIsInstance(result, fields.IndexedStringMemField)
+            np.testing.assert_array_equal(result.data[:], expected_result)
+          
 
 
-    # def test_field_where_indexed_string(self):
-    #     def create_indexed_string(df, name):
-    #         f = df.create_indexed_string(name)
-    #         f.data.write(['foo', '"foo"', '', 'bar', 'barn', 'bat'])
-    #         return f
-
-    #     self._test_module_where(create_indexed_string, lambda f: np.char.str_len(f.data[:]) > 3,
-    #                             'boo', '_far', ['_far', 'boo', '_far', '_far', 'boo', '_far'])
-
-    #     self._test_module_where(create_indexed_string, lambda f: (f.indices[1:] - f.indices[:-1]) > 3,
-    #                             'boo', '_far', ['_far', 'boo', '_far', '_far', 'boo', '_far'])
 
     #
     # def test_instance_where_numeric_inplace(self):
