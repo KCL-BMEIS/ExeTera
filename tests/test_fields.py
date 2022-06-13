@@ -2200,7 +2200,13 @@ WHERE_FIXED_STRING_TESTS = [
 ]
 
 WHERE_INDEXED_STRING_TESTS = [
-    (WHERE_BOOLEAN_COND, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA, "create_indexed_string", {},  np.array(shuffle_randstate(WHERE_INDEXED_STRING_FIELD_DATA))),
+    (WHERE_BOOLEAN_COND, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA, "create_indexed_string", {},  shuffle_randstate(WHERE_INDEXED_STRING_FIELD_DATA)),
+    (WHERE_BOOLEAN_COND, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA, "create_fixed_string", {"length": 3}, WHERE_FIXED_STRING_FIELD_DATA),
+    (WHERE_BOOLEAN_COND, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA, "create_numeric", {"nformat": "int8"}, WHERE_NUMERIC_FIELD_DATA),
+    (WHERE_BOOLEAN_COND, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA),
+    (WHERE_BOOLEAN_COND, "create_fixed_string", {"length": 3}, WHERE_FIXED_STRING_FIELD_DATA, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA),
+    (WHERE_BOOLEAN_COND, "create_numeric", {"nformat": "int8"}, WHERE_NUMERIC_FIELD_DATA, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA),
+    (WHERE_BOOLEAN_COND, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA),
 ]
 
 def where_oracle(cond, a, b):
@@ -2295,8 +2301,6 @@ class TestFieldWhereFunctions(SessionTestCase):
           
 
 
-
-    #
     # def test_instance_where_numeric_inplace(self):
     #     input_data = [1,2,3,5,9,8,6,4,7,0]
     #     data = np.asarray(input_data, dtype=np.int32)
