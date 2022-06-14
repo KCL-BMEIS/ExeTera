@@ -51,11 +51,97 @@ def where(cond: Union[list, tuple, np.ndarray, Field], a, b):
     elif callable(cond):
         raise NotImplementedError("module method `fields.where` doesn't support callable cond, please use instance mehthod `where` for callable cond.")
 
-    if isinstance(a, Field):
-        a = a.data[:]
-    if isinstance(b, Field):
-        b = b.data[:]
-    return np.where(cond, a, b)
+    return where_helper(cond, a, b)
+
+
+def where_helper(cond:Union[list, tuple, np.ndarray, Field], a, b) -> Field:
+    result_mem_field = None
+
+    if isinstance(a, (IndexedStringField, IndexedStringMemField)) and isinstance(b, (IndexedStringField, IndexedStringMemField)):
+        a_indices, a_values = a.indices[:], a.values[:]
+        b_indices, b_values = b.indices[:], b.values[:]
+        if len(cond) != len(a_indices) - 1 or len(cond) != len(b_indices) - 1:
+            raise ValueError(f"operands can't work with shapes ({len(cond)},) ({len(a_indices) - 1},)  ({len(b_indices) - 1},)")
+
+        r_indices = np.zeros(len(a_indices), dtype=np.int64)
+        r_values = np.zeros(max(len(a_values), len(b_values)), dtype=np.uint8)
+
+        ops.where_for_two_indexed_string_fields(np.array(cond), a_indices, a_values, b_indices, b_values, r_indices, r_values)
+
+        r_values = r_values[:r_indices[-1]]
+
+        result_mem_field = IndexedStringMemField(a._session)
+        result_mem_field.indices.write(r_indices)
+        result_mem_field.values.write(r_values)
+
+    elif isinstance(a, (IndexedStringField, IndexedStringMemField)) or isinstance(b, (IndexedStringField, IndexedStringMemField)):
+        indexed_str_field = a if isinstance(a, (IndexedStringField, IndexedStringMemField)) else b
+        other_field = b if isinstance(a, (IndexedStringField, IndexedStringMemField)) else a
+
+        # check length
+        indexed_str_field_row_count = len(indexed_str_field.indices[:]) - 1
+        other_field_row_count = len(other_field.data[:])
+        if len(cond) != indexed_str_field_row_count or len(cond) != other_field_row_count:
+            raise ValueError(f"operands can't work with shapes ({len(cond)},) ({indexed_str_field_row_count},)  ({other_field_row_count},)")
+
+        # convert other field data to string array
+        data_converted_to_str = np.where([True]*other_field_row_count, other_field.data[:], [""]*other_field_row_count)
+        maxLength = 0
+        re_match = re.findall(r"<U(\d+)|S(\d+)", str(data_converted_to_str.dtype))
+        if re_match:
+            maxLength = int(re_match[0][0]) if re_match[0][0] else int(re_match[0][1])
+        else:
+            raise ValueError("The return dtype of instance method `where` doesn't match '<U(\d+)' or 'S(\d+)' when one of the field is FixedStringField")
+
+        # convert other field string array to indices and values
+        other_indices = np.zeros(other_field_row_count + 1, dtype=np.int64)
+        other_values = np.zeros(np.int64(other_field_row_count*maxLength), dtype=np.uint8)
+        for i, s in enumerate(data_converted_to_str):
+            encoded_s = np.array(list(s), dtype='S1').view(np.uint8)
+            other_indices[i + 1] = other_indices[i] + len(encoded_s)
+            other_values[other_indices[i]:other_indices[i + 1]] = encoded_s
+
+        # assign self to a, b to b, according to a.where(cond, b)
+        if isinstance(a, (IndexedStringField, IndexedStringMemField)):
+            a_indices, a_values = indexed_str_field.indices[:], indexed_str_field.values[:]
+            b_indices, b_values = other_indices, other_values
+        else:
+            a_indices, a_values = other_indices, other_values
+            b_indices, b_values = indexed_str_field.indices[:], indexed_str_field.values[:]
+
+        # get indices and values for result
+        r_indices = np.zeros(len(a_indices), dtype=np.int64)
+        r_values = np.zeros(max(len(a_values), len(b_values)), dtype=np.uint8)
+        ops.where_for_two_indexed_string_fields(np.array(cond), a_indices, a_values, b_indices, b_values, r_indices, r_values)
+        r_values = r_values[:r_indices[-1]]
+
+        # return IndexStringMemField
+        result_mem_field = IndexedStringMemField(a._session)
+        result_mem_field.indices.write(r_indices)
+        result_mem_field.values.write(r_values)
+
+    else:
+        b_data = b.data[:] if isinstance(b, Field) else b
+        r_ndarray = np.where(cond, a.data[:], b_data)
+
+        if isinstance(a, (FixedStringField, FixedStringMemField)) or isinstance(b, (FixedStringField, FixedStringMemField)):
+            length = 0
+            result = re.findall(r"<U(\d+)|S(\d+)", str(r_ndarray.dtype))
+            if result:
+                length = int(result[0][0]) if result[0][0] else int(result[0][1])
+            else:
+                raise ValueError("The return dtype of instance method `where` doesn't match '<U(\d+)' or 'S(\d+)' when one of the field is FixedStringField")
+
+            result_mem_field = FixedStringMemField(a._session, length)
+            result_mem_field.data.write(r_ndarray)
+
+        elif str(r_ndarray.dtype) in utils.PERMITTED_NUMERIC_TYPES:
+            result_mem_field = NumericMemField(a._session, str(r_ndarray.dtype))
+            result_mem_field.data.write(r_ndarray)
+        else:
+            raise NotImplementedError(f"instance method `where` doesn't support the current input type: {type(a)} and {type(b)}")
+
+    return result_mem_field
 
 
 class HDF5Field(Field):
@@ -174,97 +260,7 @@ class HDF5Field(Field):
         else:
             raise TypeError("'cond' parameter needs to be either callable lambda function, or array like, or NumericMemField")
 
-        result_mem_field = None
-
-        if isinstance(self, IndexedStringField) and isinstance(b, IndexedStringField):
-            a_indices, a_values = self.indices[:], self.values[:]
-            b_indices, b_values = b.indices[:], b.values[:]
-            if len(cond) != len(a_indices) - 1 or len(cond) != len(b_indices) - 1:
-                raise ValueError(f"operands can't work with shapes ({len(cond)},) ({len(a_indices) - 1},)  ({len(b_indices) - 1},)")
-
-            r_indices = np.zeros(len(a_indices), dtype=np.int64)
-            r_values = np.zeros(max(len(a_values), len(b_values)), dtype=np.uint8)
-
-            ops.where_for_two_indexed_string_fields(np.array(cond), a_indices, a_values, b_indices, b_values, r_indices, r_values)
-
-            r_values = r_values[:r_indices[-1]]
-
-            result_mem_field = IndexedStringMemField(self._session)
-            result_mem_field.indices.write(r_indices)
-            result_mem_field.values.write(r_values)
-
-        elif isinstance(self, IndexedStringField) or isinstance(b, IndexedStringField):
-            indexed_str_field = self if isinstance(self, IndexedStringField) else b
-            other_field = b if isinstance(self, IndexedStringField) else self
-
-            # check length
-            indexed_str_field_row_count = len(indexed_str_field.indices[:]) - 1
-            other_field_row_count = len(other_field.data[:])
-            if len(cond) != indexed_str_field_row_count or len(cond) != other_field_row_count:
-                raise ValueError(f"operands can't work with shapes ({len(cond)},) ({indexed_str_field_row_count},)  ({other_field_row_count},)")
-
-            # convert other field data to string array
-            data_converted_to_str = np.where([True]*other_field_row_count, other_field.data[:], [""]*other_field_row_count)
-            maxLength = 0
-            re_match = re.findall(r"<U(\d+)|S(\d+)", str(data_converted_to_str.dtype))
-            if re_match:
-                maxLength = int(re_match[0][0]) if re_match[0][0] else int(re_match[0][1])
-            else:
-                raise ValueError("The return dtype of instance method `where` doesn't match '<U(\d+)' or 'S(\d+)' when one of the field is FixedStringField")
-
-            # convert other field string array to indices and values
-            other_indices = np.zeros(other_field_row_count + 1, dtype=np.int64)
-            other_values = np.zeros(np.int64(other_field_row_count*maxLength), dtype=np.uint8)
-            for i, s in enumerate(data_converted_to_str):
-                encoded_s = np.array(list(s), dtype='S1').view(np.uint8)
-                other_indices[i + 1] = other_indices[i] + len(encoded_s)
-                other_values[other_indices[i]:other_indices[i + 1]] = encoded_s
-
-            # assign self to a, b to b, according to a.where(cond, b)
-            if isinstance(self, IndexedStringField):
-                a_indices, a_values = indexed_str_field.indices[:], indexed_str_field.values[:]
-                b_indices, b_values = other_indices, other_values
-            else:
-                a_indices, a_values = other_indices, other_values
-                b_indices, b_values = indexed_str_field.indices[:], indexed_str_field.values[:]
-
-            # get indices and values for result
-            r_indices = np.zeros(len(a_indices), dtype=np.int64)
-            r_values = np.zeros(max(len(a_values), len(b_values)), dtype=np.uint8)
-            ops.where_for_two_indexed_string_fields(np.array(cond), a_indices, a_values, b_indices, b_values, r_indices, r_values)
-            r_values = r_values[:r_indices[-1]]
-
-            # return IndexStringMemField
-            result_mem_field = IndexedStringMemField(self._session)
-            result_mem_field.indices.write(r_indices)
-            result_mem_field.values.write(r_values)
-
-        else:
-            b_data = b.data[:] if isinstance(b, Field) else b
-            r_ndarray = np.where(cond, self.data[:], b_data)
-
-            if isinstance(self, FixedStringField) or isinstance(b, FixedStringField):
-                length = 0
-                result = re.findall(r"<U(\d+)|S(\d+)", str(r_ndarray.dtype))
-                if result:
-                    length = int(result[0][0]) if result[0][0] else int(result[0][1])
-                else:
-                    raise ValueError("The return dtype of instance method `where` doesn't match '<U(\d+)' or 'S(\d+)' when one of the field is FixedStringField")
-
-                result_mem_field = FixedStringMemField(self._session, length)
-                result_mem_field.data.write(r_ndarray)
-
-            elif str(r_ndarray.dtype) in utils.PERMITTED_NUMERIC_TYPES:
-                result_mem_field = NumericMemField(self._session, str(r_ndarray.dtype))
-                result_mem_field.data.write(r_ndarray)
-            else:
-                raise NotImplementedError(f"instance method `where` doesn't support the current input type: {type(self)} and {type(b)}")
-
-        # if inplace:
-        #     self.data.clear()
-        #     self.data.write(result)
-
-        return result_mem_field
+        return where_helper(cond, self, b)
 
 
 class MemoryField(Field):
@@ -344,6 +340,21 @@ class MemoryField(Field):
         Apply index on the field.
         """
         raise NotImplementedError("Please use apply_index() on specific fields, not the field base class.")
+
+
+    def where(self, cond:Union[list, tuple, np.ndarray, Field, Callable], b, inplace=False):
+        if isinstance(cond, (list, tuple, np.ndarray)):
+            cond = cond
+        elif isinstance(cond, Field):
+            if cond.indexed:
+                raise NotImplementedError("Where does not support indexed string fields at present")
+            cond = cond.data[:]
+        elif callable(cond):
+            cond = cond(self.data[:])
+        else:
+            raise TypeError("'cond' parameter needs to be either callable lambda function, or array like, or NumericMemField")
+
+        return where_helper(cond, self, b)
 
 
 class ReadOnlyFieldArray:

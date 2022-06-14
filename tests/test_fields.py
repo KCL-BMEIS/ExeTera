@@ -2286,6 +2286,21 @@ class TestFieldWhereFunctions(SessionTestCase):
             self.assertIsInstance(result, fields.FixedStringMemField)
             np.testing.assert_array_equal(result.data[:], expected_result)
 
+        # reload to test FixedStringMemField
+        a_mem_field, b_mem_field = a_field, b_field
+        if isinstance(a_field, fields.FixedStringField):
+            a_mem_field = fields.FixedStringMemField(self.s, a_kwarg["length"])
+            a_mem_field.data.write(np.array(a_field_data))
+
+        if isinstance(b_field, fields.FixedStringField):
+            b_mem_field = fields.FixedStringMemField(self.s, b_kwarg["length"])
+            b_mem_field.data.write(np.array(b_field_data))
+
+        with self.subTest(f"Test instance where method: a is {type(a_mem_field)}, b is {type(b_mem_field)}"):
+            result = a_mem_field.where(cond, b_mem_field)
+            self.assertIsInstance(result, fields.FixedStringMemField)
+            np.testing.assert_array_equal(result.data[:], expected_result)
+
 
     @parameterized.expand(WHERE_INDEXED_STRING_TESTS)
     def test_instance_field_where_return_indexed_string_mem_field(self, cond, a_creator, a_kwarg, a_field_data, b_creator, b_kwarg, b_field_data):
@@ -2299,23 +2314,20 @@ class TestFieldWhereFunctions(SessionTestCase):
             self.assertIsInstance(result, fields.IndexedStringMemField)
             np.testing.assert_array_equal(result.data[:], expected_result)
           
+        # reload to test FixedStringMemField
+        a_mem_field, b_mem_field = a_field, b_field
+        if isinstance(a_field, fields.IndexedStringMemField):
+            a_mem_field = fields.IndexedStringMemField(self.s)
+            a_mem_field.data.write(a_field_data)
 
+        if isinstance(b_field, fields.IndexedStringMemField):
+            b_mem_field = fields.IndexedStringMemField(self.s)
+            b_mem_field.data.write(b_field_data)
 
-    # def test_instance_where_numeric_inplace(self):
-    #     input_data = [1,2,3,5,9,8,6,4,7,0]
-    #     data = np.asarray(input_data, dtype=np.int32)
-    #     bio = BytesIO()
-    #     with session.Session() as s:
-    #         src = s.open_dataset(bio, 'w', 'src')
-    #         df = src.create_dataframe('df')
-    #         f = df.create_numeric('foo', 'int32')
-    #         f.data.write(data)
-    #
-    #         r = f.where(f > 5, 0)
-    #         self.assertEqual(list(f.data[:]), [1,2,3,5,9,8,6,4,7,0])
-    #         r = f.where(f > 5, 0, inplace=True)
-    #         self.assertEqual(list(f.data[:]), [0,0,0,0,9,8,6,0,7,0])
-    #
+        with self.subTest(f"Test instance where method: a is {type(a_mem_field)}, b is {type(b_mem_field)}"):
+            result = a_mem_field.where(cond, b_mem_field)
+            self.assertIsInstance(result, fields.IndexedStringMemField)
+            np.testing.assert_array_equal(result.data[:], expected_result)
 
 
 class TestFieldModuleFunctions(SessionTestCase):
