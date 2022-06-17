@@ -45,9 +45,10 @@ def where(cond: Union[list, tuple, np.ndarray, Field], a, b):
     if isinstance(cond, (list, tuple, np.ndarray)):
         cond = cond
     elif isinstance(cond, Field):
-        if cond.indexed:
-            raise NotImplementedError("Where does not support condition on indexed string fields at present")
-        cond = cond.data[:]
+        if isinstance(cond, (NumericField, CategoricalField)):
+            cond = cond.data[:]
+        else:
+            raise NotImplementedError("Where only support condition on numeric field and categorical field at present.")
     elif callable(cond):
         raise NotImplementedError("module method `fields.where` doesn't support callable cond, please use instance mehthod `where` for callable cond.")
 
@@ -61,9 +62,11 @@ def where_helper(cond:Union[list, tuple, np.ndarray, Field], a, b) -> Field:
         other_field_row_count = len(other_field.data[:])
         data_converted_to_str = np.where([True]*other_field_row_count, other_field.data[:], [""]*other_field_row_count)
         maxLength = 0
-        re_match = re.findall(r"<U(\d+)|S(\d+)", str(data_converted_to_str.dtype))
+        re_match = re.findall(r"<U(\d+)|>U(\d+)|S(\d+)", str(data_converted_to_str.dtype))
         if re_match:
-            maxLength = int(re_match[0][0]) if re_match[0][0] else int(re_match[0][1])
+            for l in re_match[0]:
+                if l:
+                    maxLength = int(l)
         else:
             raise ValueError("The return dtype of instance method `where` doesn't match '<U(\d+)' or 'S(\d+)' when one of the field is FixedStringField")
 
@@ -108,14 +111,16 @@ def where_helper(cond:Union[list, tuple, np.ndarray, Field], a, b) -> Field:
         r_ndarray = np.where(cond, a.data[:], b_data)
 
         if isinstance(a, (FixedStringField, FixedStringMemField)) or isinstance(b, (FixedStringField, FixedStringMemField)):
-            length = 0
-            result = re.findall(r"<U(\d+)|S(\d+)", str(r_ndarray.dtype))
-            if result:
-                length = int(result[0][0]) if result[0][0] else int(result[0][1])
+            maxLength = 0
+            re_match = re.findall(r"<U(\d+)|>U(\d+)|S(\d+)", str(r_ndarray.dtype))
+            if re_match:
+                for l in re_match[0]:
+                    if l:
+                        maxLength = int(l)
             else:
                 raise ValueError("The return dtype of instance method `where` doesn't match '<U(\d+)' or 'S(\d+)' when one of the field is FixedStringField")
 
-            result_mem_field = FixedStringMemField(a._session, length)
+            result_mem_field = FixedStringMemField(a._session, maxLength)
             result_mem_field.data.write(r_ndarray)
 
         elif str(r_ndarray.dtype) in utils.PERMITTED_NUMERIC_TYPES:
@@ -235,13 +240,14 @@ class HDF5Field(Field):
         if isinstance(cond, (list, tuple, np.ndarray)):
             cond = cond
         elif isinstance(cond, Field):
-            if cond.indexed:
-                raise NotImplementedError("Where does not support indexed string fields at present")
-            cond = cond.data[:]
+            if isinstance(cond, (NumericField, CategoricalField)):
+                cond = cond.data[:]
+            else:
+                raise NotImplementedError("Where only support condition on numeric field and categorical field at present.")
         elif callable(cond):
             cond = cond(self.data[:])
         else:
-            raise TypeError("'cond' parameter needs to be either callable lambda function, or array like, or NumericMemField")
+            raise TypeError("'cond' parameter needs to be either callable lambda function, or array like, or NumericMemField.")
 
         return where_helper(cond, self, b)
 
@@ -329,13 +335,14 @@ class MemoryField(Field):
         if isinstance(cond, (list, tuple, np.ndarray)):
             cond = cond
         elif isinstance(cond, Field):
-            if cond.indexed:
-                raise NotImplementedError("Where does not support indexed string fields at present")
-            cond = cond.data[:]
+            if isinstance(cond, (NumericField, CategoricalField)):
+                cond = cond.data[:]
+            else:
+                raise NotImplementedError("Where only support condition on numeric field and categorical field at present.")
         elif callable(cond):
             cond = cond(self.data[:])
         else:
-            raise TypeError("'cond' parameter needs to be either callable lambda function, or array like, or NumericMemField")
+            raise TypeError("'cond' parameter needs to be either callable lambda function, or array like, or NumericMemField.")
 
         return where_helper(cond, self, b)
 

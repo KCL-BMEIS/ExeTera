@@ -2217,6 +2217,9 @@ def where_oracle(cond, a, b):
             cond = cond(np.array(a))
         elif isinstance(a, np.ndarray):
             cond = cond(a)
+    elif isinstance(cond, (fields.NumericField, fields.CategoricalField)):
+        cond = cond.data[:]
+
     return np.where(cond, a, b)
 
 
@@ -2328,6 +2331,24 @@ class TestFieldWhereFunctions(SessionTestCase):
             result = a_mem_field.where(cond, b_mem_field)
             self.assertIsInstance(result, fields.IndexedStringMemField)
             np.testing.assert_array_equal(result.data[:], expected_result)
+
+    @parameterized.expand(WHERE_INDEXED_STRING_TESTS)
+    def test_instance_field_where_with_cond_is_field(self, _, a_creator, a_kwarg, a_field_data, b_creator, b_kwarg, b_field_data):
+        a_field = self.setup_field(self.df, a_creator, "af", (), a_kwarg, a_field_data)
+        b_field = self.setup_field(self.df, b_creator, "bf", (), b_kwarg, b_field_data)
+        cond = a_field
+
+        with self.subTest(f"Test instance where method: cond is a is {type(a_field)}, a is {type(a_field)}, b is {type(b_field)}"):
+            if isinstance(cond, (fields.NumericField, fields.CategoricalField)):
+                result = a_field.where(cond, b_field)
+                self.assertIsInstance(result, fields.IndexedStringMemField)
+
+                expected_result = where_oracle(cond, a_field_data, b_field_data)
+                np.testing.assert_array_equal(result.data[:], expected_result)
+            else:
+                with self.assertRaises(NotImplementedError) as context:
+                    result = a_field.where(cond, b_field)
+                self.assertEqual(str(context.exception), "Where only support condition on numeric field and categorical field at present.")
 
 
 class TestFieldModuleFunctions(SessionTestCase):
