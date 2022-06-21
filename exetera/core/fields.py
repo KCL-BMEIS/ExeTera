@@ -9,7 +9,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Optional, Union
+from typing import Callable, ItemsView, Optional, Union
 from datetime import datetime, timezone
 import operator
 
@@ -251,6 +251,17 @@ class HDF5Field(Field):
 
         return where_helper(cond, self, b)
 
+    def __getitem__(self, item:Union[list, tuple, np.ndarray]):
+        if isinstance(item, slice):
+            # TODO
+            pass
+        elif isinstance(item, int):
+            # TODO
+            pass
+        elif isinstance(item, (list, tuple, np.ndarray)):
+            filter_to_apply = np.array(item, dtype=np.int64)
+            # ? dstfld
+            self.apply_filter(filter_to_apply, dstfld=None)          
 
 class MemoryField(Field):
 
