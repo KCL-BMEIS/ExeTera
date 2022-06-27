@@ -250,18 +250,7 @@ class HDF5Field(Field):
             raise TypeError("'cond' parameter needs to be either callable lambda function, or array like, or NumericMemField.")
 
         return where_helper(cond, self, b)
-
-    def __getitem__(self, item:Union[list, tuple, np.ndarray]):
-        if isinstance(item, slice):
-            # TODO
-            pass
-        elif isinstance(item, int):
-            # TODO
-            pass
-        elif isinstance(item, (list, tuple, np.ndarray)):
-            filter_to_apply = np.array(item, dtype=np.int64)
-            # ? dstfld
-            self.apply_filter(filter_to_apply, dstfld=None)          
+         
 
 class MemoryField(Field):
 
