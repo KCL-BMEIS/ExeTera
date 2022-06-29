@@ -143,6 +143,25 @@ def map_between_categories(first_map, second_map):
     return result_map
 
 
+def check_input_lengths(names, fields):
+    assert(len(names) == len(fields))
+    assert(isinstance(names, tuple))
+    assert(isinstance(fields, tuple))
+
+    length = None
+    error = False
+    for f in fields:
+        if not length:
+            length = len(f)
+        elif length != len(f):
+            error = True
+
+    if error:
+        field_name_str = ','.join([f"'{n}'" for n in names])
+        length_str = ','.join([len(f) for f in fields])
+        raise ValueError(f"Collections {field_name_str} have inconsistent lengths: ({length_str})")
+
+
 def datetime_to_seconds(dt):
     return f'{dt[0:4]}-{dt[5:7]}-{dt[8:10]} {dt[11:13]}:{dt[14:16]}:{dt[17:19]}'
 
