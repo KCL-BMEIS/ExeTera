@@ -2330,6 +2330,22 @@ def where_oracle(cond, a, b):
 
 class TestFieldWhereFunctions(SessionTestCase):
 
+    def reloadToMemField(self, field, field_data, kwarg):
+        if isinstance(field, fields.NumericField):
+            mem_field = fields.NumericMemField(self.s, kwarg['nformat'])
+            mem_field.data.write(np.array(field_data, dtype=kwarg['nformat']))
+        elif isinstance(field, fields.CategoricalField):
+            mem_field = fields.CategoricalMemField(self.s, kwarg['nformat'], kwarg['key'])
+            mem_field.data.write(np.array(field_data, dtype=kwarg['nformat']))
+        elif isinstance(field, fields.FixedStringField):
+            mem_field = fields.FixedStringMemField(self.s, kwarg["length"])
+            mem_field.data.write(np.array(field_data))
+        elif isinstance(field, fields.IndexedStringField):
+            mem_field = fields.IndexedStringMemField(self.s)
+            mem_field.data.write(field_data)
+        return mem_field
+
+
     @parameterized.expand(WHERE_NUMERIC_TESTS)
     def test_module_fields_where(self, cond, a_creator, a_kwarg, a_field_data, b_creator, b_kwarg, b_data, expected_dtype):
         """
@@ -2363,116 +2379,101 @@ class TestFieldWhereFunctions(SessionTestCase):
     @parameterized.expand(WHERE_NUMERIC_TESTS)
     def test_instance_field_where_return_numeric_mem_field(self, cond, a_creator, a_kwarg, a_field_data, b_creator, b_kwarg, b_data, expected_dtype):
         a_field = self.setup_field(self.df, a_creator, "af", (), a_kwarg, a_field_data)
+        a_mem_field = self.reloadToMemField(a_field, a_field_data, a_kwarg)
 
         expected_result = where_oracle(cond, a_field_data, b_data)
 
         if b_kwarg is None:
-            with self.subTest(f"Test instance where method: a is {type(a_field)}, b is {type(b_data)}"):
-                result = a_field.where(cond, b_data)
-                self.assertEqual(result._nformat, expected_dtype)
-                np.testing.assert_array_equal(result, expected_result)
+            combinations = [(a_field, b_data),
+                            (a_mem_field, b_data)]
+
+            for a, b in combinations:
+                with self.subTest(f"Test instance where method: a is {type(a_field)}, b is {type(b_data)}"):
+                    result = a.where(cond, b)
+                    self.assertEqual(result._nformat, expected_dtype)
+                    np.testing.assert_array_equal(result, expected_result)
 
         else:
             b_field = self.setup_field(self.df, b_creator, "bf", (), b_kwarg, b_data)
+            b_mem_field = self.reloadToMemField(b_field, b_data, b_kwarg)
+            combinations = [(a_field, b_field),
+                            (a_field, b_mem_field),
+                            (a_mem_field, b_field),
+                            (a_mem_field, b_mem_field)]
 
-            with self.subTest(f"Test instance where method: a is {type(a_field)}, b is {type(b_field)}"):
-                result = a_field.where(cond, b_field)
-                self.assertIsInstance(result, fields.NumericMemField)
-                self.assertEqual(result._nformat, expected_dtype)
-                np.testing.assert_array_equal(result, expected_result)
-
-            # reload to test NumericMemField and CategoricalMemField
-            def reloadToMemField(field, field_data, kwarg):
-                if isinstance(field, fields.NumericField):
-                    mem_field = fields.NumericMemField(self.s, kwarg['nformat'])
-                    mem_field.data.write(np.array(field_data, dtype=kwarg['nformat']))
-                elif isinstance(field, fields.CategoricalField):
-                    mem_field = fields.CategoricalMemField(self.s, kwarg['nformat'], kwarg['key'])
-                    mem_field.data.write(np.array(field_data, dtype=kwarg['nformat']))
-                return mem_field
-
-            a_mem_field = reloadToMemField(a_field, a_field_data, a_kwarg)
-            b_mem_field = reloadToMemField(b_field, b_data, b_kwarg)
-
-            with self.subTest(f"Test instance where method: a is {type(a_mem_field)}, b is {type(b_mem_field)}"):
-                result = a_mem_field.where(cond, b_mem_field)
-                self.assertIsInstance(result, fields.NumericMemField)
-                self.assertEqual(result._nformat, expected_dtype)
-                np.testing.assert_array_equal(result, expected_result)
+            for a, b in combinations:
+                with self.subTest(f"Test instance where method: a is {type(a_field)}, b is {type(b_field)}"):
+                    result = a.where(cond, b)
+                    self.assertIsInstance(result, fields.NumericMemField)
+                    self.assertEqual(result._nformat, expected_dtype)
 
 
     @parameterized.expand(WHERE_FIXED_STRING_TESTS)
     def test_instance_field_where_return_fixed_string_mem_field(self, cond, a_creator, a_kwarg, a_field_data, b_creator, b_kwarg, b_field_data):
         a_field = self.setup_field(self.df, a_creator, "af", (), a_kwarg, a_field_data)
         b_field = self.setup_field(self.df, b_creator, "bf", (), b_kwarg, b_field_data)
+        a_mem_field = self.reloadToMemField(a_field, a_field_data, a_kwarg)
+        b_mem_field = self.reloadToMemField(b_field, b_field_data, b_kwarg)
 
         expected_result = where_oracle(cond, a_field_data, b_field_data)
 
-        with self.subTest(f"Test instance where method: a is {type(a_field)}, b is {type(b_field)}"):
-            result = a_field.where(cond, b_field)
-            self.assertIsInstance(result, fields.FixedStringMemField)
-            np.testing.assert_array_equal(result.data[:], expected_result)
+        combinations = [(a_field, b_field),
+                        (a_field, b_mem_field),
+                        (a_mem_field, b_field),
+                        (a_mem_field, b_mem_field)]
 
-        # reload to test FixedStringMemField
-        a_mem_field, b_mem_field = a_field, b_field
-        if isinstance(a_field, fields.FixedStringField):
-            a_mem_field = fields.FixedStringMemField(self.s, a_kwarg["length"])
-            a_mem_field.data.write(np.array(a_field_data))
-
-        if isinstance(b_field, fields.FixedStringField):
-            b_mem_field = fields.FixedStringMemField(self.s, b_kwarg["length"])
-            b_mem_field.data.write(np.array(b_field_data))
-
-        with self.subTest(f"Test instance where method: a is {type(a_mem_field)}, b is {type(b_mem_field)}"):
-            result = a_mem_field.where(cond, b_mem_field)
-            self.assertIsInstance(result, fields.FixedStringMemField)
-            np.testing.assert_array_equal(result.data[:], expected_result)
+        for a, b in combinations:
+            with self.subTest(f"Test instance where method: a is {type(a_field)}, b is {type(b_field)}"):
+                result = a.where(cond, b)
+                self.assertIsInstance(result, fields.FixedStringMemField)
+                np.testing.assert_array_equal(result.data[:], expected_result)
 
 
     @parameterized.expand(WHERE_INDEXED_STRING_TESTS)
     def test_instance_field_where_return_indexed_string_mem_field(self, cond, a_creator, a_kwarg, a_field_data, b_creator, b_kwarg, b_field_data):
         a_field = self.setup_field(self.df, a_creator, "af", (), a_kwarg, a_field_data)
         b_field = self.setup_field(self.df, b_creator, "bf", (), b_kwarg, b_field_data)
+        a_mem_field = self.reloadToMemField(a_field, a_field_data, a_kwarg)
+        b_mem_field = self.reloadToMemField(b_field, b_field_data, b_kwarg)
 
         expected_result = where_oracle(cond, a_field_data, b_field_data)
 
-        with self.subTest(f"Test instance where method: a is {type(a_field)}, b is {type(b_field)}"):
-            result = a_field.where(cond, b_field)
-            self.assertIsInstance(result, fields.IndexedStringMemField)
-            np.testing.assert_array_equal(result.data[:], expected_result)
-          
-        # reload to test IndexedStringMemField
-        a_mem_field, b_mem_field = a_field, b_field
-        if isinstance(a_field, fields.IndexedStringField):
-            a_mem_field = fields.IndexedStringMemField(self.s)
-            a_mem_field.data.write(a_field_data)
+        combinations = [(a_field, b_field),
+                        (a_field, b_mem_field),
+                        (a_mem_field, b_field),
+                        (a_mem_field, b_mem_field)]
+        for a, b in combinations:
+            with self.subTest(f"Test instance where method: a is {type(a_field)}, b is {type(b_field)}"):
+                result = a.where(cond, b)
+                self.assertIsInstance(result, fields.IndexedStringMemField)
+                np.testing.assert_array_equal(result.data[:], expected_result)
 
-        if isinstance(b_field, fields.IndexedStringField):
-            b_mem_field = fields.IndexedStringMemField(self.s)
-            b_mem_field.data.write(b_field_data)
-
-        with self.subTest(f"Test instance where method: a is {type(a_mem_field)}, b is {type(b_mem_field)}"):
-            result = a_mem_field.where(cond, b_mem_field)
-            self.assertIsInstance(result, fields.IndexedStringMemField)
-            np.testing.assert_array_equal(result.data[:], expected_result)
 
     @parameterized.expand(WHERE_INDEXED_STRING_TESTS)
     def test_instance_field_where_with_cond_is_field(self, _, a_creator, a_kwarg, a_field_data, b_creator, b_kwarg, b_field_data):
         a_field = self.setup_field(self.df, a_creator, "af", (), a_kwarg, a_field_data)
         b_field = self.setup_field(self.df, b_creator, "bf", (), b_kwarg, b_field_data)
+        a_mem_field = self.reloadToMemField(a_field, a_field_data, a_kwarg)
+        b_mem_field = self.reloadToMemField(b_field, b_field_data, b_kwarg)
         cond = a_field
 
-        with self.subTest(f"Test instance where method: cond is a is {type(a_field)}, a is {type(a_field)}, b is {type(b_field)}"):
-            if isinstance(cond, (fields.NumericField, fields.CategoricalField)):
-                result = a_field.where(cond, b_field)
-                self.assertIsInstance(result, fields.IndexedStringMemField)
+        combinations = [(a_field, b_field),
+                        (a_field, b_mem_field),
+                        (a_mem_field, b_field),
+                        (a_mem_field, b_mem_field)]
 
-                expected_result = where_oracle(cond, a_field_data, b_field_data)
-                np.testing.assert_array_equal(result.data[:], expected_result)
-            else:
-                with self.assertRaises(NotImplementedError) as context:
-                    result = a_field.where(cond, b_field)
-                self.assertEqual(str(context.exception), "Where only support condition on numeric field and categorical field at present.")
+        for a, b in combinations:
+            with self.subTest(f"Test instance where method: cond is a is {type(a_field)}, a is {type(a_field)}, b is {type(b_field)}"):
+                if isinstance(cond, (fields.NumericField, fields.CategoricalField, fields.NumericMemField, fields.CategoricalMemField)):
+                    result = a.where(cond, b)
+                    self.assertIsInstance(result, fields.IndexedStringMemField)
+
+                    expected_result = where_oracle(cond, a_field_data, b_field_data)
+                    np.testing.assert_array_equal(result.data[:], expected_result)
+                else:
+                    with self.assertRaises(NotImplementedError) as context:
+                        result = a.where(cond, b)
+                    self.assertEqual(str(context.exception), "Where only support condition on numeric field and categorical field at present.")
 
 
 class TestFieldModuleFunctions(SessionTestCase):
