@@ -377,6 +377,10 @@ class DateTimeImporter:
                     v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
                                           int(value[11:13]), int(value[14:16]), int(value[17:19]),
                                           int(value[20:26]), tzinfo=timezone.utc)
+                elif v_len == 27:  # b'2020-06-15 19:45:39.005 UTC'
+                    v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
+                                          int(value[11:13]), int(value[14:16]), int(value[17:19]),
+                                          int(value[20:23]) * 1000)
                 elif v_len == 25:
                     # ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S%z')
                     v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
