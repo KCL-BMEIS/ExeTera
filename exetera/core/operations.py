@@ -124,6 +124,28 @@ def _filter_non_orphaned_foreign_keys(primary_key, foreign_key, results):
     return results
 
 
+def filter_duplicate_fields(field):
+    """
+    DEPRECATED
+    """
+    field_ = val.array_from_field_or_lower('field', field)
+    filter_ = np.ones(len(field_), dtype=bool)
+    _filter_duplicate_fields(field_, filter_)
+    return filter_
+
+
+def _filter_duplicate_fields(field, filter):
+    seen_ids = dict()
+    for i in range(len(field)):
+        f = field[i]
+        if f in seen_ids:
+            filter[i] = False
+        else:
+            seen_ids[f] = 1
+            filter[i] = True
+    return filter
+
+
 # mapping functionality
 # =====================
 
