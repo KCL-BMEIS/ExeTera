@@ -127,7 +127,7 @@ class HDF5Field(Field):
         """
         raise NotImplementedError("Please use get_spans() on specific fields, not the field base class.")
 
-    def apply_filter(self, filter_to_apply, dstfld=None):
+    def apply_filter(self, filter_to_apply, target=None, in_place=False):
         """
         Apply filter on the field.
         """
@@ -142,6 +142,17 @@ class HDF5Field(Field):
     def _ensure_valid(self):
         if not self._valid_reference:
             raise ValueError("This field no longer refers to a valid underlying field object")
+
+    def __getitem__(self, item:Union[list, tuple, np.ndarray]):
+        if isinstance(item, slice):
+            # TODO
+            pass
+        elif isinstance(item, int):
+            # TODO
+            pass
+        elif isinstance(item, (list, tuple, np.ndarray)):
+            filter_to_apply = np.array(item, dtype=np.int64) if not isinstance(item, np.ndarray) else item
+            return self.apply_filter(filter_to_apply, target=None, in_place=False)
 
 
 class MemoryField(Field):
@@ -210,7 +221,7 @@ class MemoryField(Field):
         #   if f is not None:
         return True
 
-    def apply_filter(self, filter_to_apply, dstfld=None):
+    def apply_filter(self, filter_to_apply, target=None, in_place=False):
         """
         Apply filter on the field.
         """
