@@ -45,7 +45,7 @@ def where(cond: Union[list, tuple, np.ndarray, Field], a, b):
     if isinstance(cond, (list, tuple, np.ndarray)):
         cond = cond
     elif isinstance(cond, Field):
-        if isinstance(cond, (NumericField, CategoricalField)):
+        if isinstance(cond, (NumericField, NumericMemField, CategoricalField, CategoricalMemField)):
             cond = cond.data[:]
         else:
             raise NotImplementedError("Where only support condition on numeric field and categorical field at present.")
@@ -240,7 +240,7 @@ class HDF5Field(Field):
         if isinstance(cond, (list, tuple, np.ndarray)):
             cond = cond
         elif isinstance(cond, Field):
-            if isinstance(cond, (NumericField, CategoricalField)):
+            if isinstance(cond, (NumericField, NumericMemField, CategoricalField, CategoricalMemField)):
                 cond = cond.data[:]
             else:
                 raise NotImplementedError("Where only support condition on numeric field and categorical field at present.")
@@ -335,7 +335,7 @@ class MemoryField(Field):
         if isinstance(cond, (list, tuple, np.ndarray)):
             cond = cond
         elif isinstance(cond, Field):
-            if isinstance(cond, (NumericField, CategoricalField)):
+            if isinstance(cond, (NumericField, NumericMemField, CategoricalField, CategoricalMemField)):
                 cond = cond.data[:]
             else:
                 raise NotImplementedError("Where only support condition on numeric field and categorical field at present.")

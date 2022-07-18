@@ -2298,6 +2298,7 @@ WHERE_NUMERIC_TESTS = [
 
 WHERE_FIXED_STRING_TESTS = [
     (lambda f: f > 5, "create_numeric", {"nformat": "int8"}, WHERE_NUMERIC_FIELD_DATA, "create_fixed_string", {"length": 3}, WHERE_FIXED_STRING_FIELD_DATA),
+    (lambda f: f > 5, "create_numeric", {"nformat": "float32"}, WHERE_NUMERIC_FIELD_DATA, "create_fixed_string", {"length": 3}, WHERE_FIXED_STRING_FIELD_DATA),
     (lambda f: f > 2, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA, "create_fixed_string", {"length": 3}, WHERE_FIXED_STRING_FIELD_DATA),
     (WHERE_BOOLEAN_COND,  "create_fixed_string", {"length": 3}, WHERE_FIXED_STRING_FIELD_DATA, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA),
     (WHERE_BOOLEAN_COND,  "create_fixed_string", {"length": 3}, WHERE_FIXED_STRING_FIELD_DATA, "create_numeric", {"nformat": "int8"}, WHERE_NUMERIC_FIELD_DATA),
@@ -2314,7 +2315,7 @@ WHERE_INDEXED_STRING_TESTS = [
     (WHERE_BOOLEAN_COND, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, WHERE_CATEGORICAL_FIELD_DATA, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA),
 ]
 
-def where_oracle(cond, a, b):
+def where_oracle(cond, a, b, set_a_dtype = None, set_b_dtype=None):
     if callable(cond):
         if isinstance(a, fields.Field):
             cond = cond(a.data[:])
@@ -2322,8 +2323,13 @@ def where_oracle(cond, a, b):
             cond = cond(np.array(a))
         elif isinstance(a, np.ndarray):
             cond = cond(a)
-    elif isinstance(cond, (fields.NumericField, fields.CategoricalField)):
+    elif isinstance(cond, (fields.NumericField, fields.NumericMemField, fields.CategoricalField, fields.CategoricalMemField)):
         cond = cond.data[:]
+
+    if set_a_dtype and isinstance(a, list):
+        a = np.array(a, dtype=set_a_dtype)
+    if set_b_dtype and isinstance(b, list):
+        b = np.array(b, dtype=set_b_dtype)    
 
     return np.where(cond, a, b)
 
@@ -2415,12 +2421,15 @@ class TestFieldWhereFunctions(SessionTestCase):
         a_mem_field = self.reloadToMemField(a_field, a_field_data, a_kwarg)
         b_mem_field = self.reloadToMemField(b_field, b_field_data, b_kwarg)
 
-        expected_result = where_oracle(cond, a_field_data, b_field_data)
+        set_a_dtype= a_kwarg['nformat'] if 'nformat' in a_kwarg else None
+        set_b_dtype= b_kwarg['nformat'] if 'nformat' in b_kwarg else None
+        expected_result = where_oracle(cond, a_field_data, b_field_data, set_a_dtype, set_b_dtype)
 
         combinations = [(a_field, b_field),
                         (a_field, b_mem_field),
                         (a_mem_field, b_field),
-                        (a_mem_field, b_mem_field)]
+                        (a_mem_field, b_mem_field)
+                        ]
 
         for a, b in combinations:
             with self.subTest(f"Test instance where method: a is {type(a_field)}, b is {type(b_field)}"):
