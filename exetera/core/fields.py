@@ -151,8 +151,18 @@ class HDF5Field(Field):
             # TODO
             pass
         elif isinstance(item, (list, tuple, np.ndarray)):
-            filter_to_apply = np.array(item, dtype=np.int64) if not isinstance(item, np.ndarray) else item
-            return self.apply_filter(filter_to_apply, target=None, in_place=False)
+            allBooleanFlag = True
+            for x in item:
+                if not isinstance(x, bool):
+                    allBooleanFlag = False
+                    break
+
+            if allBooleanFlag:
+                filter_to_apply = np.array(item, dtype='bool') if not isinstance(item, np.ndarray) else item
+                return self.apply_filter(filter_to_apply, target=None, in_place=False)
+            else:
+                index_to_apply = np.array(item, dtype=np.int64) if not isinstance(item, np.ndarray) else item
+                return self.apply_index(index_to_apply, target=None, in_place=False)
 
 
 class MemoryField(Field):
