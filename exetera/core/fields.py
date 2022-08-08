@@ -48,9 +48,9 @@ def where(cond: Union[list, tuple, np.ndarray, Field], a, b):
         if isinstance(cond, (NumericField, NumericMemField, CategoricalField, CategoricalMemField)):
             cond = cond.data[:]
         else:
-            raise NotImplementedError("Where only support condition on numeric field and categorical field at present.")
+            raise NotImplementedError("where only supports python sequences, numpy ndarrays, and numeric field and categorical field types for the cond parameter at present.")
     elif callable(cond):
-        raise NotImplementedError("module method `fields.where` doesn't support callable cond, please use instance mehthod `where` for callable cond.")
+        raise NotImplementedError("module method fields.where doesn't support callable cond parameter, please use the instance method where if you need to use a callable cond parameter.")
 
     return where_helper(cond, a, b)
 
@@ -68,7 +68,7 @@ def where_helper(cond:Union[list, tuple, np.ndarray, Field], a, b) -> Field:
                 if l:
                     maxLength = int(l)
         else:
-            raise ValueError("The return dtype of instance method `where` doesn't match '<U(\d+)' or 'S(\d+)' when one of the field is FixedStringField")
+            raise ValueError("The return dtype of instance method where doesn't match '<U(\d+)' or 'S(\d+)' when one of the fields is a fixed string field")
 
         # convert other field string array to indices and values
         indices = np.zeros(other_field_row_count + 1, dtype=np.int64)
@@ -118,7 +118,7 @@ def where_helper(cond:Union[list, tuple, np.ndarray, Field], a, b) -> Field:
                     if l:
                         maxLength = int(l)
             else:
-                raise ValueError("The return dtype of instance method `where` doesn't match '<U(\d+)' or 'S(\d+)' when one of the field is FixedStringField")
+                raise ValueError("The return dtype of instance method where doesn't match '<U(\d+)' or 'S(\d+)' when one of the fields is a fixed string field")
 
             result_mem_field = FixedStringMemField(a._session, maxLength)
             result_mem_field.data.write(r_ndarray)
@@ -243,11 +243,11 @@ class HDF5Field(Field):
             if isinstance(cond, (NumericField, NumericMemField, CategoricalField, CategoricalMemField)):
                 cond = cond.data[:]
             else:
-                raise NotImplementedError("Where only support condition on numeric field and categorical field at present.")
+                raise NotImplementedError("where only supports python sequences, numpy ndarrays, and numeric field and categorical field types for the cond parameter at present.")
         elif callable(cond):
             cond = cond(self.data[:])
         else:
-            raise TypeError("'cond' parameter needs to be either callable lambda function, or array like, or NumericMemField.")
+            raise TypeError("where only supports callables, python sequences, numpy ndarrays, and numeric field and categorical field types for the cond parameter at present.")
 
         return where_helper(cond, self, b)
          
@@ -338,11 +338,11 @@ class MemoryField(Field):
             if isinstance(cond, (NumericField, NumericMemField, CategoricalField, CategoricalMemField)):
                 cond = cond.data[:]
             else:
-                raise NotImplementedError("Where only support condition on numeric field and categorical field at present.")
+                raise NotImplementedError("where only supports python sequences, numpy ndarrays, and numeric field and categorical field types for the cond parameter at present.")
         elif callable(cond):
             cond = cond(self.data[:])
         else:
-            raise TypeError("'cond' parameter needs to be either callable lambda function, or array like, or NumericMemField.")
+            raise TypeError("where only supports callables, python sequences, numpy ndarrays, and numeric field and categorical field types for the cond parameter at present.")
 
         return where_helper(cond, self, b)
 
