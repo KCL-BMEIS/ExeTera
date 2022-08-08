@@ -3111,3 +3111,13 @@ def compare_arrays(a, b):
         return 1
     return 0
 
+
+@exetera_njit
+def where_for_two_indexed_string_fields(cond, a_indices, a_values, b_indices, b_values, r_indices, r_values):
+    for i, c in enumerate(cond):
+        if c:
+            r_indices[i + 1] = r_indices[i] + a_indices[i + 1] - a_indices[i]
+            r_values[r_indices[i]:r_indices[i + 1]] = a_values[a_indices[i]:a_indices[i + 1]]
+        else:
+            r_indices[i + 1] = r_indices[i] + b_indices[i + 1] - b_indices[i]
+            r_values[r_indices[i]:r_indices[i + 1]] = b_values[b_indices[i]:b_indices[i + 1]]

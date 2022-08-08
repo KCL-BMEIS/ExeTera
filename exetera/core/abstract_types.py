@@ -85,6 +85,10 @@ class Field(ABC):
     def unique(self, return_index=False, return_inverse=False, return_counts=False):
         raise NotImplementedError()
 
+    @staticmethod
+    def where(cond, a, b):
+        raise NotImplementedError()
+
 
 class Dataset(ABC):
     """
