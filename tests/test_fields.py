@@ -2288,3 +2288,71 @@ class TestFieldModuleFunctions(SessionTestCase):
         else:
             with self.assertRaises(ValueError):
                 fields.argsort(f)
+
+
+ARRAY_DEREFERENCE_FILTER_TESTS = [
+    ([True, False, True], "create_indexed_string", {}, ['a', 'bb', 'ccc']),
+    ([True, False, True], "create_fixed_string", {"length": 3}, ['a', 'b', 'c']),
+    ([True, False, True], "create_numeric", {"nformat": "int8"}, [20,30,40]),
+    ([True, False, True], "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, [1,2,3])
+]
+
+ARRAY_DEREFERENCE_INDEX_TESTS = [
+    ([0, 2], "create_indexed_string", {}, ['a', 'bb', 'ccc']),
+    ([0, 2], "create_fixed_string", {"length": 3}, ['a', 'b', 'c']),
+    ([0, 2], "create_numeric", {"nformat": "int8"}, [20,30,40]),
+    ([0, 2], "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, [1,2,3])
+]
+
+ARRAY_SLICE_AND_INT_TESTS = [
+    (slice(0,2,1),  "create_indexed_string", {}, ['a', 'bb', 'ccc']),
+    (slice(0,3,1), "create_fixed_string", {"length": 3}, [b'a', b'b', b'c']),
+    (slice(0,2,2), "create_numeric", {"nformat": "int8"}, [20,30,40]),
+    (slice(0,3,2), "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, [1,2,3]),
+    (0,  "create_indexed_string", {}, ['a', 'bb', 'ccc']),
+    (1, "create_fixed_string", {"length": 3}, [b'a', b'b', b'c']),
+    (2, "create_numeric", {"nformat": "int8"}, [20,30,40]),
+    (0, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, [1,2,3])
+]
+class TestArrayDereferenceFunctions(SessionTestCase):
+
+    def assertIfMemFieldAndIfSameTypeAsField(self, memfield, field):
+        self.assertIsInstance(memfield, fields.MemoryField)
+        if not (isinstance(field, fields.IndexedStringField) and isinstance(memfield, fields.IndexedStringMemField)) \
+            and not (isinstance(field, fields.FixedStringField) and isinstance(memfield, fields.FixedStringMemField)) \
+            and not (isinstance(field, fields.NumericField) and isinstance(memfield, fields.NumericMemField)) \
+            and not (isinstance(field, fields.CategoricalField) and isinstance(memfield, fields.CategoricalMemField)):
+            raise AssertionError(f"{type(memfield)} is not the MemField for {type(field)}")
+
+
+    @parameterized.expand(ARRAY_DEREFERENCE_FILTER_TESTS)
+    def test_field_filter_dereference(self, filter, creator, kwargs, data):
+        f = self.setup_field(self.df, creator, 'f', (), kwargs, data)
+        result = f[filter]
+
+        filter_to_apply = filter if isinstance(filter, np.ndarray) else np.array(filter, dtype=np.int8)
+        expected_result = f.apply_filter(filter_to_apply, target=None, in_place=False)
+
+        self.assertIfMemFieldAndIfSameTypeAsField(result, f)
+        np.testing.assert_array_equal(result.data[:], expected_result.data[:])
+
+    @parameterized.expand(ARRAY_DEREFERENCE_INDEX_TESTS)
+    def test_field_index_dereference(self, index, creator, kwargs, data):
+        f = self.setup_field(self.df, creator, 'f', (), kwargs, data)
+        result = f[index]
+
+        index_to_apply = index if isinstance(index, np.ndarray) else np.array(index, dtype=np.int8)
+        expected_result = f.apply_index(index_to_apply, target=None, in_place=False)
+
+        self.assertIfMemFieldAndIfSameTypeAsField(result, f)
+        np.testing.assert_array_equal(result.data[:], expected_result.data[:])
+
+
+    @parameterized.expand(ARRAY_SLICE_AND_INT_TESTS)
+    def test_field_slice(self, slice, creator, kwargs, data):
+        f = self.setup_field(self.df, creator, 'f', (), kwargs, data)
+        result = f[slice]
+        expected_result = data[slice]
+
+        self.assertIfMemFieldAndIfSameTypeAsField(result, f)
+        np.testing.assert_array_equal(result.data[:], expected_result)

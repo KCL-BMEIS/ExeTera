@@ -998,8 +998,8 @@ class HDF5DataFrameGroupBy(DataFrameGroupBy):
         Write groupby keys to ddf only if write_key = True
         """
         if write_keys: 
-            by_fields = np.asarray([self._columns[k] for k in self._by]) 
-            for field in by_fields:
+            for k in self._by:
+                field = self._columns[k]
                 newfld = field.create_like(ddf, field.name)
                 
                 if self._sorted_index is not None:                    
