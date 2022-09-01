@@ -145,11 +145,17 @@ class HDF5Field(Field):
 
     def __getitem__(self, item:Union[list, tuple, np.ndarray]):
         if isinstance(item, slice):
-            # TODO
-            pass
+            data = self.data[item]
+            memfield = self.create_like()
+            memfield.data.write(data)
+            return memfield
+
         elif isinstance(item, int):
-            # TODO
-            pass
+            data = self.data[item]
+            memfield = self.create_like()
+            memfield.data.write(np.array([data]))
+            return memfield
+
         elif isinstance(item, (list, tuple, np.ndarray)):
             allBooleanFlag = True
             for x in item:

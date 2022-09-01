@@ -2292,9 +2292,6 @@ class TestFieldModuleFunctions(SessionTestCase):
 
 ARRAY_DEREFERENCE_FILTER_TESTS = [
     ([True, False, True], "create_indexed_string", {}, ['a', 'bb', 'ccc']),
-    # (WHERE_BOOLEAN_COND, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA),
-    # (WHERE_BOOLEAN_COND, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA),
-    # (WHERE_BOOLEAN_COND, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA),
     ([True, False, True], "create_fixed_string", {"length": 3}, ['a', 'b', 'c']),
     ([True, False, True], "create_numeric", {"nformat": "int8"}, [20,30,40]),
     ([True, False, True], "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, [1,2,3])
@@ -2302,14 +2299,21 @@ ARRAY_DEREFERENCE_FILTER_TESTS = [
 
 ARRAY_DEREFERENCE_INDEX_TESTS = [
     ([0, 2], "create_indexed_string", {}, ['a', 'bb', 'ccc']),
-    # (WHERE_BOOLEAN_COND, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA),
-    # (WHERE_BOOLEAN_COND, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA),
-    # (WHERE_BOOLEAN_COND, "create_indexed_string", {}, WHERE_INDEXED_STRING_FIELD_DATA),
     ([0, 2], "create_fixed_string", {"length": 3}, ['a', 'b', 'c']),
     ([0, 2], "create_numeric", {"nformat": "int8"}, [20,30,40]),
     ([0, 2], "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, [1,2,3])
 ]
 
+ARRAY_SLICE_AND_INT_TESTS = [
+    (slice(0,2,1),  "create_indexed_string", {}, ['a', 'bb', 'ccc']),
+    (slice(0,3,1), "create_fixed_string", {"length": 3}, [b'a', b'b', b'c']),
+    (slice(0,2,2), "create_numeric", {"nformat": "int8"}, [20,30,40]),
+    (slice(0,3,2), "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, [1,2,3]),
+    (0,  "create_indexed_string", {}, ['a', 'bb', 'ccc']),
+    (1, "create_fixed_string", {"length": 3}, [b'a', b'b', b'c']),
+    (2, "create_numeric", {"nformat": "int8"}, [20,30,40]),
+    (0, "create_categorical", {"nformat": "int32", "key": {"a": 1, "b": 2, "c": 3}}, [1,2,3])
+]
 class TestArrayDereferenceFunctions(SessionTestCase):
 
     def assertIfMemFieldAndIfSameTypeAsField(self, memfield, field):
@@ -2342,3 +2346,13 @@ class TestArrayDereferenceFunctions(SessionTestCase):
 
         self.assertIfMemFieldAndIfSameTypeAsField(result, f)
         np.testing.assert_array_equal(result.data[:], expected_result.data[:])
+
+
+    @parameterized.expand(ARRAY_SLICE_AND_INT_TESTS)
+    def test_field_slice(self, slice, creator, kwargs, data):
+        f = self.setup_field(self.df, creator, 'f', (), kwargs, data)
+        result = f[slice]
+        expected_result = data[slice]
+
+        self.assertIfMemFieldAndIfSameTypeAsField(result, f)
+        np.testing.assert_array_equal(result.data[:], expected_result)
