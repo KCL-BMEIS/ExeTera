@@ -91,6 +91,61 @@ def chunks(length, chunksize=1 << 20):
         cur = next_
 
 
+# old functionality still required by exeteracovid scripts
+
+def foreign_key_is_in_primary_key(primary_key, foreign_key):
+    """
+    DEPRECATED
+    """
+    val.ensure_valid_field_like('primary_key', primary_key)
+    val.ensure_valid_field_like('foreign_key', foreign_key)
+    if isinstance(primary_key, Field):
+        pk = primary_key.data[:]
+    else:
+        pk = primary_key
+    if isinstance(foreign_key, Field):
+        fk = foreign_key.data[:]
+    else:
+        fk = foreign_key
+
+    result = np.zeros(len(fk), dtype=bool)
+    return _filter_non_orphaned_foreign_keys(pk, fk, result)
+
+
+def _filter_non_orphaned_foreign_keys(primary_key, foreign_key, results):
+    pkids = dict()
+    trueval = bool(True)
+    falseval = bool(False)
+    for p in primary_key:
+        pkids[p] = trueval
+
+    for i, f in enumerate(foreign_key):
+        results[i] = pkids.get(f, falseval)
+    return results
+
+
+def filter_duplicate_fields(field):
+    """
+    DEPRECATED
+    """
+    field_ = val.array_from_field_or_lower('field', field)
+    filter_ = np.ones(len(field_), dtype=bool)
+    _filter_duplicate_fields(field_, filter_)
+    return filter_
+
+
+def _filter_duplicate_fields(field, filter):
+    seen_ids = dict()
+    for i in range(len(field)):
+        f = field[i]
+        if f in seen_ids:
+            filter[i] = False
+        else:
+            seen_ids[f] = 1
+            filter[i] = True
+    return filter
+
+
 # mapping functionality
 # =====================
 

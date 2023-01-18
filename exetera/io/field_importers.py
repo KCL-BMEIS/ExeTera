@@ -1,12 +1,17 @@
 from typing import Mapping
-from exetera.core.abstract_types import DataFrame
+
+from datetime import datetime, date, timezone
+
 import numpy as np
+
+import pytz
+
+from exetera.core.abstract_types import DataFrame
 from exetera.core import fields as fld
 from exetera.core import operations as ops
 from exetera.core.data_writer import DataWriter
 from exetera.core import utils
-from datetime import datetime, date, timezone
-import pytz
+
 
 INDEXED_STRING_FIELD_SIZE = 10 # guessing
 
@@ -359,6 +364,7 @@ class DateTimeImporter:
         self.flag_field = None
         if create_flag_field:
             self.flag_field = df.create_numeric(f"{name}_set", 'bool', timestamp, None)
+        self.name = name
 
     def write_part(self, values):
         datetime_ts = np.zeros(len(values), dtype=np.float64)
@@ -371,21 +377,7 @@ class DateTimeImporter:
                 datetime_ts[i] = 0
                 flags[i] = False
             else:
-                v_len = len(value)
-                if v_len == 32:
-                    # ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S.%f%z')
-                    v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
-                                          int(value[11:13]), int(value[14:16]), int(value[17:19]),
-                                          int(value[20:26]), tzinfo=timezone.utc)
-                elif v_len == 25:
-                    # ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S%z')
-                    v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
-                                          int(value[11:13]), int(value[14:16]), int(value[17:19]), tzinfo=timezone.utc)
-                elif v_len == 19:
-                    v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
-                                          int(value[11:13]), int(value[14:16]), int(value[17:19]), tzinfo=timezone.utc)
-                else:
-                    raise ValueError(f"Date field '{self.field}' has unexpected format '{value}'")
+                v_datetime = parse_timestamp_bytes(self.name, value)
                 datetime_ts[i] = v_datetime.timestamp()
                 dates[i] = value[:10]
         
@@ -483,3 +475,42 @@ class TimestampImporter:
     def write(self, values):
         self.write_part(values)
         self.complete()
+
+
+def parse_timestamp_bytes(field_name: str, value: bytes):
+    v_len = len(value)
+
+    if value[-3:] == b'UTC':
+        if v_len == 27:  # b'2020-06-15 19:45:39.056 UTC'
+            v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
+                                  int(value[11:13]), int(value[14:16]), int(value[17:19]),
+                                  int(value[20:23]) * 1000, tzinfo=timezone.utc)
+        elif v_len == 26:  # b'2020-06-15 19:45:39.05 UTC'
+            v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
+                                  int(value[11:13]), int(value[14:16]), int(value[17:19]),
+                                  int(value[20:22]) * 10000, tzinfo=timezone.utc)
+        elif v_len == 25:  # b'2020-06-15 19:45:39.1 UTC'
+            v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
+                                  int(value[11:13]), int(value[14:16]), int(value[17:19]),
+                                  int(value[20:22]) * 100000, tzinfo=timezone.utc)
+        else:  # b'2020-06-15 19:45:39 UTC'
+            v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
+                                  int(value[11:13]), int(value[14:16]), int(value[17:19]),
+                                  tzinfo=timezone.utc)
+    else:
+        if v_len == 32:
+            # ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S.%f%z')
+            v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
+                                  int(value[11:13]), int(value[14:16]), int(value[17:19]),
+                                  int(value[20:26]), tzinfo=timezone.utc)
+        elif v_len == 25:
+            # ts = datetime.strptime(value.decode(), '%Y-%m-%d %H:%M:%S%z')
+            v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
+                                  int(value[11:13]), int(value[14:16]), int(value[17:19]), tzinfo=timezone.utc)
+        elif v_len == 19:
+            v_datetime = datetime(int(value[0:4]), int(value[5:7]), int(value[8:10]),
+                                  int(value[11:13]), int(value[14:16]), int(value[17:19]), tzinfo=timezone.utc)
+        else:
+            raise ValueError(f"Date field '{field_name}' has unexpected format '{value}'")
+
+    return v_datetime

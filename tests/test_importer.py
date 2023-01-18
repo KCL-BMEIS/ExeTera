@@ -49,9 +49,18 @@ TEST_SCHEMA = json.dumps({
                     'value_type': 'float64',
                     'validation_mode': 'relaxed'
                 },
-                'updated_at':{
+                'updated_at': {
                     'field_type': 'datetime',
                     'create_day_field': True
+                },
+                'updated_at_26': {
+                    'field_type': 'datetime'
+                },
+                'updated_at_27': {
+                    'field_type': 'datetime'
+                },
+                'updated_at_32': {
+                    'field_type': 'datetime'
                 },
                 'birthday':{
                     'field_type':'date',
@@ -94,12 +103,12 @@ TEST_SCHEMA = json.dumps({
 
 
 TEST_CSV_CONTENTS = '\n'.join((
-    'name, id, age, birthday,  height, weight_change, BMI,  postcode, patient_id,   degree, updated_at',
-    'a,     1, 30, 1990-01-01, 170.9,    21.2,        20.5,      NW1,         E1, bachelor, 2020-05-12 07:00:00',
-    'bb,    2, 40, 1980-03-04, 180.2,        ,        25.4,     SW1P,       E123,   master, 2020-05-13 01:00:00',
-    'ccc,   3, 50, 1970-04-05,      ,   -17.5,        27.2,       E1,       E234,         , 2020-05-14 03:00:00',
-    'dddd,  4, 60, 1960-04-05,      ,   -17.5,        27.2,         ,           ,     prof, 2020-05-15 03:00:00',
-    'eeeee, 5, 70, 1950-04-05, 161.0,     2.5,        20.2,      NW3,    E456789,   doctor, 2020-05-16 03:00:00',
+    'name, id, age, birthday,  height, weight_change, BMI,  postcode, patient_id,   degree, updated_at, updated_at_26, updated_at_27, updated_at_32',
+    'a,     1, 30, 1990-01-01, 170.9,    21.2,        20.5,      NW1,         E1, bachelor, 2020-05-12 07:00:00, 2022-02-03 12:00:00.12 UTC, 2022-02-03 12:00:00.123 UTC, 2022-02-03 12:00:01.123456+00.00',
+    'bb,    2, 40, 1980-03-04, 180.2,        ,        25.4,     SW1P,       E123,   master, 2020-05-13 01:00:00, 2022-02-03 12:00:00.12 UTC, 2022-02-03 12:00:00.123 UTC, 2022-02-03 12:00:01.123456+00.00',
+    'ccc,   3, 50, 1970-04-05,      ,   -17.5,        27.2,       E1,       E234,         , 2020-05-14 03:00:00, 2022-02-03 12:00:00.12 UTC, 2022-02-03 12:00:00.123 UTC, 2022-02-03 12:00:01.123456+00.00',
+    'dddd,  4, 60, 1960-04-05,      ,   -17.5,        27.2,         ,           ,     prof, 2020-05-15 03:00:00, 2022-02-03 12:00:00.12 UTC, 2022-02-03 12:00:00.123 UTC, 2022-02-03 12:00:01.123456+00.00',
+    'eeeee, 5, 70, 1950-04-05, 161.0,     2.5,        20.2,      NW3,    E456789,   doctor, 2020-05-16 03:00:00, 2022-02-03 12:00:00.12 UTC, 2022-02-03 12:00:00.123 UTC, 2022-02-03 12:00:01.123456+00.00',
 ))
 
 class TestImporter(unittest.TestCase):

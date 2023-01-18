@@ -1,13 +1,14 @@
 from pickle import FALSE
 import unittest
 import operator
+import itertools
 
 import numpy as np
 import numpy.testing
 from io import BytesIO
 
 import h5py
-from datetime import datetime
+from datetime import datetime, timezone
 from parameterized import parameterized
 import math
 
@@ -15,9 +16,9 @@ from .utils import SessionTestCase, shuffle_randstate, allow_slow_tests, RAND_ST
 
 from exetera.core import session
 from exetera.core import fields
-from exetera.io import field_importers as fi
 from exetera.core import utils
-import itertools
+from exetera.io import field_importers as fi
+
 
 NUMERIC_ONLY = [d for d in DEFAULT_FIELD_DATA if d[0] == "create_numeric"]
 REALLY_LARGE_LIST = list(range(1_000_000))
@@ -2288,3 +2289,38 @@ class TestFieldModuleFunctions(SessionTestCase):
         else:
             with self.assertRaises(ValueError):
                 fields.argsort(f)
+
+
+class TestParseTimestampBytes(unittest.TestCase):
+
+    def _run_test(self, value, expected):
+        actual = fi.parse_timestamp_bytes("foo", value)
+        self.assertEqual(expected, actual)
+
+    def test_parse_timestamp_bytes_utc_27(self):
+        self._run_test(b'2020-06-15 12:13:14.789 UTC',
+                       datetime(2020, 6, 15, 12, 13, 14, 789000, tzinfo=timezone.utc))
+
+    def test_parse_timestamp_bytes_utc_26(self):
+        self._run_test(b'2020-06-15 12:13:14.78 UTC',
+                       datetime(2020, 6, 15, 12, 13, 14, 780000, tzinfo=timezone.utc))
+
+    def test_parse_timestamp_bytes_utc_25(self):
+        self._run_test(b'2020-06-15 12:13:14.7 UTC',
+                       datetime(2020, 6, 15, 12, 13, 14, 700000, tzinfo=timezone.utc))
+
+    def test_parse_timestamp_bytes_utc_23(self):
+        self._run_test(b'2020-06-15 12:13:14 UTC',
+                       datetime(2020, 6, 15, 12, 13, 14, tzinfo=timezone.utc))
+
+    def test_parse_timestamp_bytes_32(self):
+        self._run_test(b'2022-02-03 12:00:01.123456+00.00',
+                       datetime(2022, 2, 3, 12, 0, 1, 123456, tzinfo=timezone.utc))
+
+    def test_parse_timestamp_bytes_25(self):
+        self._run_test(b'2022-02-03 12:00:01+00.00',
+                       datetime(2022, 2, 3, 12, 0, 1, tzinfo=timezone.utc))
+
+    def test_parse_timestamp_bytes_19(self):
+        self._run_test(b'2022-02-03 12:00:01',
+                       datetime(2022, 2, 3, 12, 0, 1, tzinfo=timezone.utc))
