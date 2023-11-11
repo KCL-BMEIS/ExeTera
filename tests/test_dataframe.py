@@ -1,6 +1,7 @@
 import pandas as pd
 from exetera.core.operations import INVALID_INDEX
 import unittest
+from parameterized import parameterized
 from io import BytesIO
 import numpy as np
 import tempfile
@@ -8,7 +9,7 @@ import os
 
 from exetera.core import session
 from exetera.core import dataframe
-
+from .utils import SessionTestCase, DEFAULT_FIELD_DATA
 
 class TestDataFrameCreateFields(unittest.TestCase):
 
@@ -912,6 +913,7 @@ class TestDataFrameSort(unittest.TestCase):
             self.assertListEqual(list(val), df['val'].data[:].tolist())
             self.assertListEqual(list(val2), df['val2'].data[:])
 
+
             self.assertListEqual([b'a', b'b', b'c', b'd', b'e'], ddf['idx'].data[:].tolist())
             self.assertListEqual([10, 30, 50, 40, 20], ddf['val'].data[:].tolist())
             self.assertListEqual(['a', 'bbb', 'ccccc', 'dddd', 'ee'], ddf['val2'].data[:])
@@ -1327,3 +1329,122 @@ class TestDataFrameDescribe(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 df.describe(exclude=['num', 'num2', 'ts1'])
             self.assertTrue(isinstance(context.exception, ValueError))
+
+
+class TestDataFrameView(SessionTestCase):
+
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_get_view(self, creator, name, kwargs, data):
+        """
+        Test dataframe.view, field.is_view, apply_filter, and apply_index
+        """
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        if "nformat" in kwargs:
+            data = np.asarray(data, dtype=kwargs["nformat"])
+        else:
+            data = np.asarray(data)
+
+        view = self.df.view()
+        self.assertTrue(view[name].is_view())
+        self.assertListEqual(data[:].tolist(), np.asarray(view[name].data[:]).tolist())
+
+        with self.subTest('All False:'):
+            df2 = self.ds.create_dataframe('df2')
+            d_filter = np.array([False])
+            self.df.apply_filter(d_filter, df2)
+            self.assertTrue(df2[name].is_view())
+            d_filter = np.nonzero(d_filter)[0]
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+
+            d_filter = np.array([True]*len(data))
+            self.df.apply_filter(d_filter, df2)
+            d_filter = np.nonzero(d_filter)[0]
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+            self.ds.drop('df2')
+
+        with self.subTest('All True:'):
+            df2 = self.ds.create_dataframe('df2')
+            d_filter = np.array([True]*len(data))
+            self.df.apply_filter(d_filter, df2)
+            self.assertTrue(df2[name].is_view())
+            d_filter = np.nonzero(d_filter)[0]
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+
+            d_filter = np.array([np.random.random()>=0.5 for i in range(len(data))])
+            self.df.apply_filter(d_filter, df2)
+            d_filter = np.nonzero(d_filter)[0]
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+            self.ds.drop('df2')
+
+        with self.subTest('Ramdon T/F'):
+            df2 = self.ds.create_dataframe('df2')
+            d_filter = np.array([np.random.random()>=0.5 for i in range(len(data))])
+            self.df.apply_filter(d_filter, df2)
+            self.assertTrue(df2[name].is_view())
+            d_filter = np.nonzero(d_filter)[0]
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+            self.ds.drop('df2')
+
+        with self.subTest('All Index:'):
+            df2 = self.ds.create_dataframe('df2')
+            d_filter = np.array([i for i in range(len(data))])
+            self.df.apply_index(d_filter, df2)
+            self.assertTrue(df2[name].is_view())
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+            self.ds.drop('df2')
+
+        with self.subTest('Random Index:'):
+            df2 = self.ds.create_dataframe('df2')
+            d_filter = []
+            for i in range(len(data)):
+                if np.random.random() >= 0.5:
+                    d_filter.append(i)
+            d_filter = np.array(d_filter)
+            self.df.apply_index(d_filter, df2)
+            self.assertTrue(df2[name].is_view())
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+
+            d_filter = np.array([i for i in range(len(data))])
+            self.df.apply_index(d_filter, df2)
+            self.assertTrue(df2[name].is_view())
+            self.assertListEqual(data[d_filter].tolist(), np.asarray(df2[name].data[:]).tolist())
+            self.ds.drop('df2')
+
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_concrete_field(self, creator, name, kwargs, data):
+        """
+        Test field.attach, field.detach, field.notify, field.update
+        """
+        f = self.setup_field(self.df, creator, name, (), kwargs, data)
+        if "nformat" in kwargs:
+            data = np.asarray(data, dtype=kwargs["nformat"])
+        else:
+            data = np.asarray(data)
+        view = self.df.view()
+        self.assertTrue(view[name] in f._view_refs)  # attached
+        f.data.clear()
+        self.assertListEqual([], np.asarray(f.data[:]).tolist())
+        self.assertListEqual(data.tolist(), np.asarray(view[name].data[:]).tolist())  # notify and update
+        self.assertFalse(view[name] in f._view_refs)  # detached
+
+    @parameterized.expand(DEFAULT_FIELD_DATA)
+    def test_view_persistence(self, creator, name, kwargs, data):
+        """
+        The view should be persistent over sessions.
+        """
+        bio = BytesIO()
+        src = self.s.open_dataset(bio, 'w', 'src')
+        df = src.create_dataframe('df')
+        f = self.setup_field(df, creator, name, (), kwargs, data)
+        df2 = src.create_dataframe('df2')
+        d_filter = np.array([np.random.random()>=0.5 for i in range(len(data))])
+        df.apply_filter(d_filter, df2)
+        self.assertTrue(df2[name].is_view())
+        self.s.close()
+
+        src = self.s.open_dataset(bio, 'r+', 'src')
+        df = src['df']
+        df2 = src['df2']
+        self.assertTrue(df2[name].is_view())
+        self.assertTrue(df2[name] in df[name]._view_refs)
+

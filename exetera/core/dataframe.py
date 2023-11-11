@@ -17,6 +17,7 @@ from exetera.core.abstract_types import Dataset, DataFrame, DataFrameGroupBy
 from exetera.core import fields as fld
 from exetera.core import operations as ops
 from exetera.core import validation as val
+from exetera.core.utils import INT64_INDEX_LENGTH
 import h5py
 import csv as csvlib
 
@@ -58,10 +59,16 @@ class HDF5DataFrame(DataFrame):
         self.name = name
         self._columns = OrderedDict()
         self._dataset = dataset
-        self._h5group = h5group
+        self._h5group = h5group  # the HDF5 group to store all fields
 
         for subg in h5group.keys():
-            self._columns[subg] = dataset.session.get(h5group[subg])
+            if subg[0] != '_':  # stores metadata, for example filters
+                self._columns[subg] = dataset.session.get(h5group[subg])
+
+        if '_filters' not in h5group.keys():
+            self._filters_grp = self._h5group.create_group('_filters')
+        else:
+            self._filters_grp = h5group['_filters']
 
     @property
     def columns(self):
@@ -101,6 +108,57 @@ class HDF5DataFrame(DataFrame):
             nfield.data.write(field.data[:])
         self._columns[dname] = nfield
 
+    def _add_view(self, field: fld.Field, filter: np.ndarray = None):
+        """
+        Internal function called by apply_filter to add a field view into the dataframe.
+
+        :param field: The field to apply filter to.
+        :param filter: The filter to apply.
+        :return: The field view.
+
+        """
+        # add view
+        h5group = fld.base_view_contructor(field._session, self, field)
+        view = type(field)(field._session, h5group, self, write_enabled=True)
+        field.attach(view)
+        self._columns[view.name] = view
+
+        # add filter
+        if filter is not None:
+            nformat = 'int32'
+            if len(filter) > 0 and np.max(filter) >= INT64_INDEX_LENGTH:
+                nformat = 'int64'
+            filter_name = view.name
+            if filter_name not in self._filters_grp.keys():
+                fld.numeric_field_constructor(self._dataset.session, self._filters_grp, filter_name, nformat)
+                filter_field = fld.NumericField(self._dataset.session, self._filters_grp[filter_name], self,
+                                                write_enabled=True)
+                filter_field.data.write(filter)
+            else:
+                filter_field = fld.NumericField(self._dataset.session, self._filters_grp[filter_name], self,
+                                                write_enabled=True)
+                if nformat not in filter_field._fieldtype:
+                    filter_field = filter_field.astype(nformat)
+                filter_field.data.clear()
+                filter_field.data.write(filter)
+
+            view._filter_index_wrapper = fld.ReadOnlyFieldArray(filter_field, 'values')  # read-only
+
+        return self._columns[view.name]
+
+    def _bind_view(self, view: fld.Field, source_field: fld.Field):
+        """
+        Binding view is when the view (reference field) is already set, but has not attach to the original field yet, for
+        instance during the initializing of an existing dataset/dataframe.
+        :param view: The view field.
+        :param source_field: The original field.
+        """
+        source_field.attach(view)
+        if view.name in self._filters_grp.keys():
+            filter_field = fld.NumericField(self._dataset.session, self._filters_grp[view.name], self,
+                                            write_enabled=True)
+            view._filter_index_wrapper = fld.ReadOnlyFieldArray(filter_field, 'values')  # read-only
+
     def drop(self,
              name: str):
         """
@@ -108,8 +166,9 @@ class HDF5DataFrame(DataFrame):
 
         :param name: name of field to be dropped
         """
-        del self._columns[name]
-        del self._h5group[name]
+        del self._columns[name]  # should always be
+        if name in self._h5group.keys():  # in case of reference only
+            del self._h5group[name]
 
     def create_group(self,
                      name: str):
@@ -317,8 +376,10 @@ class HDF5DataFrame(DataFrame):
         if not self.__contains__(name=name):
             raise ValueError("There is no field named '{}' in this dataframe".format(name))
         else:
-            del self._h5group[name]
-            del self._columns[name]
+            del self._columns[name]  # should always be
+            if name in self._h5group.keys():  # in case of reference only
+                del self._h5group[name]
+
 
     def delete_field(self, field):
         """
@@ -478,18 +539,23 @@ class HDF5DataFrame(DataFrame):
         :returns: a dataframe contains all the fields filterd, self if ddf is not set
         """
         filter_to_apply_ = val.validate_filter(filter_to_apply)
-
-        if ddf is not None:
-            if not isinstance(ddf, DataFrame):
-                raise TypeError("The destination object must be an instance of DataFrame.")
+        ddf = self if ddf is None else ddf
+        if not isinstance(ddf, DataFrame):
+            raise TypeError("The destination object must be an instance of DataFrame.")
+        if ddf == self:
+            for field in self._columns.values():
+                field.apply_filter(filter_to_apply_, in_place=True)
+        elif ddf.dataset == self.dataset:  # another df in the same ds, create view
+            filter_to_apply_ = filter_to_apply_.nonzero()[0]
+            for name, field in self._columns.items():
+                if name in ddf:
+                    del ddf[name]
+                ddf._add_view(field, filter_to_apply_)
+        else:  # another df in different ds, do hard copy
             for name, field in self._columns.items():
                 newfld = field.create_like(ddf, name)
                 field.apply_filter(filter_to_apply_, target=newfld)
-            return ddf
-        else:
-            for field in self._columns.values():
-                field.apply_filter(filter_to_apply_, in_place=True)
-            return self
+        return ddf
 
     def apply_index(self, index_to_apply, ddf=None):
         """
@@ -514,20 +580,23 @@ class HDF5DataFrame(DataFrame):
         :param ddf: optional- the destination data frame
         :returns: a dataframe contains all the fields re-indexed, self if ddf is not set
         """
-        if ddf is not None:
-            if not isinstance(ddf, DataFrame):
-                raise TypeError("The destination object must be an instance of DataFrame.")
+        ddf = self if ddf is None else ddf
+        if not isinstance(ddf, DataFrame):
+            raise TypeError("The destination object must be an instance of DataFrame.")
+        if ddf == self:  # in_place
+            val.validate_all_field_length_in_df(self)
+            for field in self._columns.values():
+                field.apply_index(index_to_apply, in_place=True)
+        elif ddf.dataset == self.dataset:  # view
+            for name, field in self._columns.items():
+                if name in ddf:
+                    del ddf[name]
+                ddf._add_view(field, index_to_apply)
+        else:  # hard copy
             for name, field in self._columns.items():
                 newfld = field.create_like(ddf, name)
                 field.apply_index(index_to_apply, target=newfld)
-            return ddf
-        else:
-            val.validate_all_field_length_in_df(self) 
-
-            for field in self._columns.values():
-                field.apply_index(index_to_apply, in_place=True)
-            return self
-
+        return ddf
 
     def sort_values(self, by: Union[str, List[str]], ddf: DataFrame = None, axis=0, ascending=True, kind='stable'):
         """
@@ -981,6 +1050,17 @@ class HDF5DataFrame(DataFrame):
                 print('\n')
         return result
 
+    def view(self):
+        """
+        Create a view of this dataframe.
+        """
+        view_name = '_' + self.name + '_view'
+        if view_name in self.dataset:
+            self.dataset.drop(view_name)
+        dfv = self.dataset.create_dataframe(view_name)
+        for f in self.columns.values():
+            dfv._add_view(f)
+        return dfv
 
 
 class HDF5DataFrameGroupBy(DataFrameGroupBy):

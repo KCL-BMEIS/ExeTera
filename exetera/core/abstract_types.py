@@ -65,6 +65,11 @@ class Field(ABC):
     def data(self):
         raise NotImplementedError()
 
+    @property
+    @abstractmethod
+    def filter(self):
+        raise NotImplementedError()
+
     @abstractmethod
     def __bool__(self):
         raise NotImplementedError()
@@ -491,3 +496,39 @@ class AbstractSession(ABC):
                             left_field_sources=tuple(), right_field_sinks=None,
                             right_to_left_map=None, right_unique=False, left_unique=False):
         raise NotImplementedError()
+
+
+class SubjectObserver(ABC):
+    def attach(self, observer):
+        """
+        Attach the observer (view) to the subject (field).
+        """
+        raise NotImplementedError()
+
+    def detach(self, observer):
+        """
+        Detach the observer (view) from the subject (field), this is to remove the association between observer with subject.
+        This method id called by the observer.
+        """
+        raise NotImplementedError()
+
+    def notify_deletion(self, observer=None):
+        """
+        Delete the observer from the subject, but called from the subject side.
+        """
+        raise NotImplementedError()
+
+    def notify(self, msg=None):
+        """
+        Called by the Subject to notify the observer on something.
+        """
+        raise NotImplementedError()
+
+    def update(self, subject, msg=None):
+        """
+        Called inside the observer, to perform actions based on subject and message type.
+        """
+        raise NotImplementedError()
+
+
+

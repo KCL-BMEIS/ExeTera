@@ -36,6 +36,7 @@ Getting started
     dataset.md
     dataframe.md
     field.md
+    view.md
 
 .. toctree::
     :maxdepth: 1
